@@ -1,0 +1,321 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Compress::Zlib qw(compress crc32 uncompress);
+use File::Basename qw(dirname);
+
+sub usage {
+    return <<'USAGE';
+Usage: stego_cli --embed --in INPUT.png --out OUTPUT.png --size BYTES --depth BITS
+
+Embeds random payload data in the least-significant bits of an 8-bit,
+non-interlaced grayscale, RGB, grayscale-alpha, or RGBA PNG.
+USAGE
+}
+
+sub fail {
+    my ($message) = @_;
+    die "stego_cli: $message\n";
+}
+
+sub parse_arguments {
+    my %options;
+
+    while (@ARGV) {
+        my $argument = shift @ARGV;
+
+        if ($argument eq '--embed') {
+            $options{embed} = 1;
+        }
+        elsif ($argument eq '--help' || $argument eq '-h') {
+            print usage();
+            exit 0;
+        }
+        elsif ($argument eq '--in' || $argument eq '--out'
+            || $argument eq '--size' || $argument eq '--depth') {
+            @ARGV or fail("missing value for $argument");
+            $options{substr($argument, 2)} = shift @ARGV;
+        }
+        else {
+            fail("unknown argument: $argument\n" . usage());
+        }
+    }
+
+    $options{embed} or fail("--embed is required\n" . usage());
+    for my $required (qw(in out size depth)) {
+        defined $options{$required}
+            or fail("--$required is required\n" . usage());
+    }
+
+    $options{size} =~ /\A[1-9][0-9]*\z/
+        or fail('--size must be a positive integer');
+    $options{depth} =~ /\A[1-4]\z/
+        or fail('--depth must be an integer from 1 to 4');
+
+    return \%options;
+}
+
+sub read_binary_file {
+    my ($path) = @_;
+    open my $handle, '<:raw', $path or fail("cannot open input '$path': $!");
+    local $/;
+    my $contents = <$handle>;
+    close $handle or fail("cannot close input '$path': $!");
+    return $contents;
+}
+
+sub parse_png {
+    my ($png) = @_;
+    my $signature = "\x89PNG\x0d\x0a\x1a\x0a";
+    substr($png, 0, 8) eq $signature or fail('input is not a PNG file');
+
+    my @chunks;
+    my $offset = 8;
+    my $saw_iend = 0;
+
+    while ($offset + 12 <= length $png) {
+        my $length = unpack('N', substr($png, $offset, 4));
+        $offset += 4;
+        $offset + 8 + $length <= length $png
+            or fail('PNG contains a truncated chunk');
+
+        my $type = substr($png, $offset, 4);
+        $offset += 4;
+        my $data = substr($png, $offset, $length);
+        $offset += $length;
+        my $stored_crc = unpack('N', substr($png, $offset, 4));
+        $offset += 4;
+        my $calculated_crc = crc32($type . $data);
+        $stored_crc == $calculated_crc
+            or fail("PNG chunk $type has an invalid checksum");
+
+        push @chunks, { type => $type, data => $data };
+        if ($type eq 'IEND') {
+            $saw_iend = 1;
+            last;
+        }
+    }
+
+    $saw_iend or fail('PNG has no IEND chunk');
+    return \@chunks;
+}
+
+sub paeth_predictor {
+    my ($left, $up, $upper_left) = @_;
+    my $estimate = $left + $up - $upper_left;
+    my $left_distance = abs($estimate - $left);
+    my $up_distance = abs($estimate - $up);
+    my $upper_left_distance = abs($estimate - $upper_left);
+
+    return $left if $left_distance <= $up_distance
+        && $left_distance <= $upper_left_distance;
+    return $up if $up_distance <= $upper_left_distance;
+    return $upper_left;
+}
+
+sub unfilter_scanlines {
+    my ($filtered, $width, $height, $bytes_per_pixel) = @_;
+    my $stride = $width * $bytes_per_pixel;
+    my $expected_length = $height * ($stride + 1);
+    length($filtered) == $expected_length
+        or fail('decompressed PNG data has an unexpected size');
+
+    my @previous = (0) x $stride;
+    my $pixels = '';
+    my $offset = 0;
+
+    for (1 .. $height) {
+        my $filter = ord substr($filtered, $offset, 1);
+        $offset++;
+        $filter <= 4 or fail("unsupported PNG filter type: $filter");
+        my @encoded = unpack('C*', substr($filtered, $offset, $stride));
+        $offset += $stride;
+        my @row;
+
+        for my $index (0 .. $stride - 1) {
+            my $left = $index >= $bytes_per_pixel
+                ? $row[$index - $bytes_per_pixel]
+                : 0;
+            my $up = $previous[$index];
+            my $upper_left = $index >= $bytes_per_pixel
+                ? $previous[$index - $bytes_per_pixel]
+                : 0;
+            my $predictor = 0;
+
+            if ($filter == 1) {
+                $predictor = $left;
+            }
+            elsif ($filter == 2) {
+                $predictor = $up;
+            }
+            elsif ($filter == 3) {
+                $predictor = int(($left + $up) / 2);
+            }
+            elsif ($filter == 4) {
+                $predictor = paeth_predictor($left, $up, $upper_left);
+            }
+
+            $row[$index] = ($encoded[$index] + $predictor) & 0xff;
+        }
+
+        $pixels .= pack('C*', @row);
+        @previous = @row;
+    }
+
+    return $pixels;
+}
+
+sub random_bytes {
+    my ($length) = @_;
+    my $bytes = '';
+
+    if (open my $random, '<:raw', '/dev/urandom') {
+        while (length($bytes) < $length) {
+            my $read = read($random, $bytes, $length - length($bytes), length($bytes));
+            defined $read or fail("cannot read random payload data: $!");
+            $read > 0 or fail('random data source ended unexpectedly');
+        }
+        close $random;
+        return $bytes;
+    }
+
+    # Fallback for Perl environments without /dev/urandom. The payload only
+    # needs statistical variation for dataset generation; it is not a secret.
+    $bytes .= chr(int(rand(256))) for 1 .. $length;
+    return $bytes;
+}
+
+sub embed_payload {
+    my ($pixels, $payload, $depth, $channels, $has_alpha) = @_;
+    my $payload_bits = unpack('B*', $payload);
+    my $payload_length = length $payload_bits;
+    my $mask = (1 << $depth) - 1;
+    my $bit_offset = 0;
+
+    for my $index (0 .. length($pixels) - 1) {
+        next if $has_alpha && $index % $channels == $channels - 1;
+        last if $bit_offset >= $payload_length;
+
+        my $bits_to_write = $depth;
+        if ($bit_offset + $bits_to_write > $payload_length) {
+            $bits_to_write = $payload_length - $bit_offset;
+        }
+        my $bit_string = substr($payload_bits, $bit_offset, $bits_to_write);
+        $bit_string .= '0' x ($depth - $bits_to_write);
+        my $value = 0;
+        $value = ($value << 1) | ($_ eq '1') for split //, $bit_string;
+
+        my $original = vec($pixels, $index, 8);
+        vec($pixels, $index, 8) = ($original & (0xff ^ $mask)) | $value;
+        $bit_offset += $bits_to_write;
+    }
+
+    $bit_offset == $payload_length
+        or fail('image capacity is smaller than the requested payload');
+    return $pixels;
+}
+
+sub make_chunk {
+    my ($type, $data) = @_;
+    return pack('N', length $data)
+        . $type
+        . $data
+        . pack('N', crc32($type . $data));
+}
+
+sub build_png {
+    my ($chunks, $compressed_pixels) = @_;
+    my $png = "\x89PNG\x0d\x0a\x1a\x0a";
+    my $wrote_image_data = 0;
+
+    for my $chunk (@$chunks) {
+        if ($chunk->{type} eq 'IDAT') {
+            if (!$wrote_image_data) {
+                $png .= make_chunk('IDAT', $compressed_pixels);
+                $wrote_image_data = 1;
+            }
+            next;
+        }
+        $png .= make_chunk($chunk->{type}, $chunk->{data});
+    }
+
+    $wrote_image_data or fail('PNG has no IDAT chunk');
+    return $png;
+}
+
+sub write_binary_file {
+    my ($path, $contents) = @_;
+    my $directory = dirname($path);
+    -d $directory or fail("output directory does not exist: '$directory'");
+    my $temporary_path = "$path.tmp.$$";
+
+    open my $handle, '>:raw', $temporary_path
+        or fail("cannot create output '$temporary_path': $!");
+    print {$handle} $contents
+        or fail("cannot write output '$temporary_path': $!");
+    close $handle or fail("cannot close output '$temporary_path': $!");
+
+    unlink $path if -e $path;
+    rename $temporary_path, $path
+        or fail("cannot move output into place at '$path': $!");
+}
+
+sub main {
+    my $options = parse_arguments();
+    my $png = read_binary_file($options->{in});
+    my $chunks = parse_png($png);
+    my ($ihdr) = grep { $_->{type} eq 'IHDR' } @$chunks;
+    $ihdr or fail('PNG has no IHDR chunk');
+    length($ihdr->{data}) == 13 or fail('PNG has an invalid IHDR chunk');
+
+    my ($width, $height, $bit_depth, $color_type,
+        $compression_method, $filter_method, $interlace_method)
+        = unpack('NNCCCCC', $ihdr->{data});
+
+    $bit_depth == 8 or fail("unsupported PNG bit depth: $bit_depth (expected 8)");
+    $compression_method == 0 or fail('unsupported PNG compression method');
+    $filter_method == 0 or fail('unsupported PNG filter method');
+    $interlace_method == 0 or fail('interlaced PNG images are not supported');
+
+    my %channels_for = (0 => 1, 2 => 3, 4 => 2, 6 => 4);
+    exists $channels_for{$color_type}
+        or fail("unsupported PNG color type: $color_type");
+    my $channels = $channels_for{$color_type};
+    my $has_alpha = $color_type == 4 || $color_type == 6;
+    my $carrier_channels = $channels - ($has_alpha ? 1 : 0);
+    my $capacity_bits = $width * $height * $carrier_channels * $options->{depth};
+    my $requested_bits = $options->{size} * 8;
+    $requested_bits <= $capacity_bits
+        or fail("requested payload is too large: $options->{size} bytes requested, "
+            . int($capacity_bits / 8) . ' bytes available');
+
+    my $compressed_data = join '', map { $_->{data} }
+        grep { $_->{type} eq 'IDAT' } @$chunks;
+    length($compressed_data) > 0 or fail('PNG has no image data');
+    my $filtered = uncompress($compressed_data);
+    defined $filtered or fail('could not decompress PNG image data');
+
+    my $pixels = unfilter_scanlines($filtered, $width, $height, $channels);
+    my $payload = random_bytes($options->{size});
+    $pixels = embed_payload(
+        $pixels,
+        $payload,
+        $options->{depth},
+        $channels,
+        $has_alpha,
+    );
+
+    my $stride = $width * $channels;
+    my $unfiltered = '';
+    for my $row (0 .. $height - 1) {
+        $unfiltered .= "\0" . substr($pixels, $row * $stride, $stride);
+    }
+    my $recompressed = compress($unfiltered);
+    defined $recompressed or fail('could not compress output PNG image data');
+
+    my $output_png = build_png($chunks, $recompressed);
+    write_binary_file($options->{out}, $output_png);
+}
+
+main();
