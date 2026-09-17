@@ -1,0 +1,9 @@
+.vendor/
+.tcl/
+.venv/
+__pycache__/
+tests/__pycache__/
+.runtime.json
+.runtime-path.txt
+startup-error.log
+generated/
