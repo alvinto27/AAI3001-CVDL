@@ -1,10 +1,8 @@
 input_dir: example_sources
-output_dir: generated/example-run
+output_dir: generated/example-run-v3
 payload_rate: 0.4
 run_seed: 42
-source_dataset: Synthetic smoke-test fixtures
 payload_mode: fixed
 payload_min: 0.1
-payload_max: 0.5
+payload_max: 0.9
 recursive: true
-error_policy: skip

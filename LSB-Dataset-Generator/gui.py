@@ -4,7 +4,6 @@ from __future__ import annotations
 import bootstrap  # noqa: F401
 import os
 import queue
-import secrets
 import threading
 import tkinter as tk
 from dataclasses import asdict
@@ -12,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from lsb_batch import Config, generate, read_config, verify_run, write_config
+from lsb_batch import Config, generate, read_config, write_config
 from lsb_core import VERSION
 
 
@@ -34,9 +33,9 @@ class App(tk.Tk):
         self.vars = {
             "input_dir": tk.StringVar(), "output_dir": tk.StringVar(),
             "payload_rate": tk.StringVar(value="0.4"), "run_seed": tk.StringVar(value="42"),
-            "source_dataset": tk.StringVar(), "payload_mode": tk.StringVar(value="fixed"),
-            "payload_min": tk.StringVar(value="0.1"), "payload_max": tk.StringVar(value="0.5"),
-            "recursive": tk.BooleanVar(value=True), "error_policy": tk.StringVar(value="skip"),
+            "payload_mode": tk.StringVar(value="fixed"),
+            "payload_min": tk.StringVar(value="0.1"), "payload_max": tk.StringVar(value="0.9"),
+            "recursive": tk.BooleanVar(value=True),
         }
         self.status = tk.StringVar(value="Ready to generate")
         self.detail = tk.StringVar(value="Choose your source PNG folder and an output location.")
@@ -87,7 +86,7 @@ class App(tk.Tk):
         outer.columnconfigure(0, weight=1)
         outer.rowconfigure(4, weight=1, minsize=220)
         ttk.Label(outer, text="LSB Dataset Generator", style="Title.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(outer, text="Create reproducible clean / stego pairs with exact modification records.").grid(row=1, column=0, sticky="w", pady=(3, 18))
+        ttk.Label(outer, text="Create clean / stego PNG pairs with exact modification masks and selected embedding locations.").grid(row=1, column=0, sticky="w", pady=(3, 18))
 
         body = ttk.Frame(outer)
         body.grid(row=2, column=0, sticky="nsew")
@@ -104,10 +103,8 @@ class App(tk.Tk):
         self.entry(locations, "output_dir").grid(row=4, column=0, sticky="ew", pady=(5, 4))
         self.button(locations, "Choose…", self.pick_output).grid(row=4, column=1, padx=(8, 0))
         ttk.Label(locations, text="Choose a parent folder; a new run folder is suggested.", style="Muted.TLabel").grid(row=5, column=0, columnspan=2, sticky="w")
-        ttk.Label(locations, text="Dataset name  (optional)", style="Card.TLabel").grid(row=6, column=0, sticky="w", pady=(14, 4))
-        self.entry(locations, "source_dataset").grid(row=7, column=0, columnspan=2, sticky="ew")
         recursive = ttk.Checkbutton(locations, text="Include subfolders", variable=self.vars["recursive"])
-        recursive.grid(row=8, column=0, sticky="w", pady=(13, 0))
+        recursive.grid(row=6, column=0, sticky="w", pady=(14, 0))
         self.controls.append(recursive)
 
         settings = ttk.Frame(body, style="Card.TFrame", padding=18)
@@ -131,15 +128,7 @@ class App(tk.Tk):
         self.max_entry = self.entry(range_frame, "payload_max", width=8)
         self.max_entry.pack(side="left", padx=6)
         ttk.Label(settings, text="Run seed", style="Card.TLabel").grid(row=4, column=0, sticky="w")
-        self.entry(settings, "run_seed", width=15).grid(row=5, column=0, sticky="ew", pady=(4, 10), padx=(0, 8))
-        self.button(settings, "New seed", lambda: self.vars["run_seed"].set(str(secrets.randbits(64)))).grid(row=5, column=1, sticky="w")
-        ttk.Label(settings, text="When a file cannot be processed", style="Card.TLabel").grid(row=6, column=0, columnspan=2, sticky="w")
-        policies = ttk.Frame(settings, style="Card.TFrame")
-        policies.grid(row=7, column=0, columnspan=2, sticky="w", pady=(8, 0))
-        for value, label in (("skip", "Skip and continue"), ("stop", "Stop run")):
-            radio = ttk.Radiobutton(policies, text=label, value=value, variable=self.vars["error_policy"])
-            radio.pack(side="left", padx=(0, 12))
-            self.controls.append(radio)
+        self.entry(settings, "run_seed", width=15).grid(row=5, column=0, columnspan=2, sticky="ew", pady=(4, 10))
 
         actions = ttk.Frame(outer)
         actions.grid(row=3, column=0, sticky="ew", pady=14)
@@ -169,8 +158,6 @@ class App(tk.Tk):
         footer.grid(row=4, column=0, sticky="ew", pady=(10, 0))
         self.open_button = ttk.Button(footer, text="Open output folder", command=self.open_output, state="disabled")
         self.open_button.pack(side="left")
-        self.verify_button = self.button(footer, "Verify saved run…", self.pick_verify)
-        self.verify_button.pack(side="right")
         ttk.Label(outer, text=f"v{VERSION}  •  Static 8-bit RGB PNG only  •  All RGB channels eligible  •  Original dimensions preserved", foreground="#556477", font=("Segoe UI", 9)).grid(row=5, column=0, sticky="w", pady=(12, 0))
         self.update_mode()
 
@@ -269,15 +256,6 @@ class App(tk.Tk):
         self.last_output = Path(config.output_dir)
         self.begin(lambda: generate(config, self.events.put, self.cancel_event), "Generating dataset")
 
-    def pick_verify(self) -> None:
-        path = filedialog.askdirectory(title="Choose an existing run to verify", parent=self)
-        if path:
-            self.start_verification(Path(path))
-
-    def start_verification(self, path: Path) -> None:
-        self.last_output = path
-        self.begin(lambda: verify_run(path, self.events.put, self.cancel_event), "Verifying saved run")
-
     def cancel(self) -> None:
         self.cancel_event.set()
         self.status.set("Stopping after the current image…")
@@ -297,11 +275,8 @@ class App(tk.Tk):
                 self.last_result = result = event["result"]
                 self.set_busy(False)
                 status = result["status"]
-                self.status.set({"completed": "Dataset ready", "completed_with_rejections": "Dataset ready — review rejected files", "verified": "Saved run verified", "cancelled": "Cancelled — partial results retained", "failed": "Run failed — review the log"}.get(status, status))
-                if "verified" in result:
-                    self.detail.set(f"{result['verified']} samples verified. Original run: {result.get('original_run_status', 'verification interrupted')}.")
-                else:
-                    self.detail.set(f"{result['total_generated']} generated   •   {result['total_rejected']} rejected   •   {result['total_failed']} failed   •   {result['total_zero_change']} zero-change   •   {result['total_unprocessed']} unprocessed")
+                self.status.set({"completed": "Dataset ready", "cancelled": "Cancelled — partial results retained", "failed": "Run failed — review the log"}.get(status, status))
+                self.detail.set(f"{result['total_generated']} generated   •   {result['total_skipped']} skipped   •   of {result['total_discovered']} discovered")
                 self.append_log(self.status.get() + ". " + self.detail.get())
             elif event["kind"] == "error":
                 self.set_busy(False)

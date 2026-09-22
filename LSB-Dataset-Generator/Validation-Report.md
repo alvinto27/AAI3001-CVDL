@@ -1,5 +1,7 @@
 # LSB Dataset Generator validation
 
+> **Superseded on 2026-09-22.** This report describes the 2.0.0 implementation, which stored SHA-256 source identities, derived a seed per image and offered saved-run replay verification. Version 3.0.0 removed that identity, replay and verification machinery while keeping the embedding operation, the modification masks and the selected locations. The report is retained as history and does not describe the current generator. Current evidence is the automated test suite described in [README.md](README.md).
+
 **Result: Complete** for the requested desktop GUI and specification-based generator implementation. Validated on 2026-09-10 using Python 3.12.14, NumPy 2.3.5, Pillow 12.3.0, PyYAML 6.0.3 and Tcl/Tk 8.6.12 on Windows. This is synthetic functional validation, not validation of a full experimental dataset.
 
 ## Automated evidence
