@@ -86,7 +86,7 @@ class App(tk.Tk):
         outer.columnconfigure(0, weight=1)
         outer.rowconfigure(4, weight=1, minsize=220)
         ttk.Label(outer, text="LSB Dataset Generator", style="Title.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(outer, text="Create clean / stego PNG pairs with exact modification masks and selected embedding locations.").grid(row=1, column=0, sticky="w", pady=(3, 18))
+        ttk.Label(outer, text="Create clean / stego PNG pairs with exact modification masks and configurable LSB payload rates.").grid(row=1, column=0, sticky="w", pady=(3, 18))
 
         body = ttk.Frame(outer)
         body.grid(row=2, column=0, sticky="nsew")

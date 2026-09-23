@@ -18,10 +18,9 @@ from lsb_core import embed, load_rgb, payload_length
 
 Progress = Callable[[dict], None]
 LOGGER_NAME = "lsb.generator"
-ARTIFACT_DIRS = ("clean", "stego", "masks", "selected_locations")
+ARTIFACT_DIRS = ("clean", "stego", "masks")
 METADATA_FIELDS = [
-    "source_id", "source_file", "clean_file", "stego_file", "mask_file",
-    "selected_locations_file", "payload_rate",
+    "source_id", "source_file", "clean_file", "stego_file", "mask_file", "payload_rate",
 ]
 
 
@@ -166,11 +165,10 @@ def generate(config: Config, progress: Progress | None = None,
                         "clean_file": f"clean/{source_id}.png",
                         "stego_file": f"stego/{source_id}.png",
                         "mask_file": f"masks/{source_id}.npy",
-                        "selected_locations_file": f"selected_locations/{source_id}.npy",
                         "payload_rate": rate,
                     }
                     for field, array in (("clean_file", clean), ("stego_file", stego),
-                                         ("mask_file", mask), ("selected_locations_file", selected)):
+                                         ("mask_file", mask)):
                         path = target / row[field]
                         with path.open("xb") as output:
                             written.append(path)

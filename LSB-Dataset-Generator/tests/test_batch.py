@@ -14,7 +14,7 @@ import numpy as np
 from PIL import Image
 
 from lsb_batch import Config, METADATA_FIELDS, generate, read_config, write_config
-from lsb_core import VERSION, load_rgb, payload_length
+from lsb_core import VERSION, load_rgb
 
 GENERATOR = Path(__file__).resolve().parents[1] / "generate.py"
 
@@ -48,15 +48,14 @@ class BatchTests(unittest.TestCase):
         result = generate(self.config)
         self.assertEqual(result["status"], "completed")
         self.assertEqual((result["total_discovered"], result["total_generated"], result["total_skipped"]), (2, 2, 0))
-        for folder in ("clean", "stego", "masks", "selected_locations"):
+        for folder in ("clean", "stego", "masks"):
             self.assertTrue((self.out / folder).is_dir(), folder)
+        self.assertFalse((self.out / "selected_locations").exists())
         for artifact in ("metadata.csv", "run_config.yaml", "run_summary.json", "generation.log"):
             self.assertTrue((self.out / artifact).is_file(), artifact)
         self.assertEqual(sorted(path.name for path in (self.out / "clean").iterdir()), ["000001.png", "000002.png"])
         self.assertEqual(sorted(path.name for path in (self.out / "stego").iterdir()), ["000001.png", "000002.png"])
         self.assertEqual(sorted(path.name for path in (self.out / "masks").iterdir()), ["000001.npy", "000002.npy"])
-        self.assertEqual(sorted(path.name for path in (self.out / "selected_locations").iterdir()),
-                         ["000001.npy", "000002.npy"])
         summary = json.loads((self.out / "run_summary.json").read_text(encoding="utf-8"))
         self.assertEqual(summary, {"status": "completed", "run_seed": 42, "payload_mode": "fixed",
                                    "payload_min": 0.1, "payload_max": 0.9, "total_discovered": 2,
@@ -66,17 +65,18 @@ class BatchTests(unittest.TestCase):
         generate(self.config)
         with (self.out / "metadata.csv").open(newline="", encoding="utf-8") as file:
             self.assertEqual(next(csv.reader(file)), METADATA_FIELDS)
+        self.assertNotIn("selected_locations_file", METADATA_FIELDS)
         rows = self.rows()
         self.assertEqual([row["source_id"] for row in rows], ["000001", "000002"])
         self.assertEqual([row["source_file"] for row in rows], ["one.png", "two.PNG"])
         for row in rows:
             self.assertEqual(set(row), set(METADATA_FIELDS))
-            for field in ("clean_file", "stego_file", "mask_file", "selected_locations_file"):
+            for field in ("clean_file", "stego_file", "mask_file"):
                 self.assertTrue((self.out / row[field]).is_file(), row[field])
         self.assertEqual(read_config(self.out / "run_config.yaml"),
                          replace(self.config, input_dir=str(self.source), output_dir=str(self.out)))
 
-    def test_saved_artifacts_match_masks_locations_and_rates(self):
+    def test_saved_artifacts_match_masks_and_rates(self):
         generate(replace(self.config, payload_mode="range", payload_min=0.1, payload_max=0.8))
         rows = self.rows()
         self.assertEqual(len(rows), 2)
@@ -84,15 +84,12 @@ class BatchTests(unittest.TestCase):
             clean = load_rgb(self.out / row["clean_file"])
             stego = load_rgb(self.out / row["stego_file"])
             mask = np.load(self.out / row["mask_file"], allow_pickle=False)
-            selected = np.load(self.out / row["selected_locations_file"], allow_pickle=False)
             self.assertEqual(mask.dtype, np.bool_)
             self.assertEqual(mask.shape, clean.shape)
             self.assertTrue(np.array_equal(mask, clean != stego))
             self.assertFalse(np.any((clean ^ stego) & np.uint8(254)))
-            self.assertEqual(len(selected), payload_length(float(row["payload_rate"]), clean.size))
-            self.assertEqual(np.unique(selected).size, len(selected))
-            self.assertTrue(set(np.flatnonzero((clean != stego).reshape(-1)).tolist())
-                            .issubset(set(int(index) for index in selected)))
+            self.assertGreaterEqual(float(row["payload_rate"]), 0.1)
+            self.assertLessEqual(float(row["payload_rate"]), 0.8)
 
     def test_fixed_rate_applies_to_every_sample(self):
         generate(replace(self.config, payload_rate=0.35))
@@ -184,7 +181,7 @@ class BatchTests(unittest.TestCase):
         self.assertEqual((result["total_generated"], result["total_skipped"]), (0, 2))
         self.assertEqual(result["status"], "failed")
         self.assertEqual(self.rows(), [])
-        for folder in ("clean", "stego", "masks", "selected_locations"):
+        for folder in ("clean", "stego", "masks"):
             self.assertEqual(list((self.out / folder).iterdir()), [], folder)
         self.assertIn("disk full", (self.out / "generation.log").read_text(encoding="utf-8"))
 

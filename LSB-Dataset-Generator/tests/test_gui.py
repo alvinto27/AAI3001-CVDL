@@ -63,8 +63,9 @@ class GuiTests(unittest.TestCase):
         self.assertFalse(self.app.generate_button.instate(["disabled"]))
         self.assertFalse(self.app.open_button.instate(["disabled"]))
         self.assertEqual(float(self.app.progress["value"]), float(self.app.progress["maximum"]))
-        for folder in ("clean", "stego", "masks", "selected_locations"):
+        for folder in ("clean", "stego", "masks"):
             self.assertTrue((self.root / "out" / folder).is_dir(), folder)
+        self.assertFalse((self.root / "out" / "selected_locations").exists())
         self.assertTrue((self.root / "out" / "metadata.csv").is_file())
         self.assertEqual([row["source_id"] for row in self.rows()], ["000001"])
 

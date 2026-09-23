@@ -1,6 +1,6 @@
 # LSB Dataset Generator
 
-Standalone desktop GUI and command-line generator, version **3.0.0**. It produces clean/stego PNG pairs, exact Boolean modification masks, selected embedding locations and the payload rate used for each image. It performs no dataset splitting, training, resizing or inference.
+Standalone desktop GUI and command-line generator, version **3.0.0**. It produces clean/stego PNG pairs, exact Boolean modification masks and the payload rate used for each image. Selected embedding locations are used internally but are not saved. It performs no dataset splitting, training, resizing or inference.
 
 ## Open on this computer
 
@@ -53,7 +53,6 @@ output/
 ├── clean/000001.png
 ├── stego/000001.png
 ├── masks/000001.npy
-├── selected_locations/000001.npy
 ├── metadata.csv
 ├── run_config.yaml
 ├── run_summary.json
@@ -65,13 +64,12 @@ output/
 | `clean/<source_id>.png` | Source image saved again through the same PNG path as stego, original dimensions |
 | `stego/<source_id>.png` | Image after LSB replacement |
 | `masks/<source_id>.npy` | Boolean `H × W × 3` array, true only where that channel value actually changed |
-| `selected_locations/<source_id>.npy` | Unique flat RGB-channel indices selected for embedding |
 | `metadata.csv` | One row per generated pair |
 | `run_config.yaml` | Effective configuration of the run |
 | `run_summary.json` | Run status and counts |
 | `generation.log` | Run start, configuration, skipped inputs, failures and final counts |
 
-Read NumPy files with `np.load(path, allow_pickle=False)`. A flat index `i` maps to row `i // (width * 3)`, column `(i // 3) % width` and channel `i % 3`, in R/G/B order.
+Load mask files with `np.load(path, allow_pickle=False)`. During embedding, a selected flat index `i` maps to row `i // (width * 3)`, column `(i // 3) % width` and channel `i % 3`, in R/G/B order. Selected indices stay in memory and are not exported.
 
 Source IDs are sequential six-digit numbers assigned in processing order, so `000001` is the first successfully generated image of the run. The original discovery path is kept in `source_file` for every row.
 
@@ -85,18 +83,18 @@ Source IDs are sequential six-digit numbers assigned in processing order, so `00
 
 The same input set, processing order, run seed and configuration reproduce the same random sequence. Per-image reproducibility that is independent of file order is not provided.
 
-## Mask and selected-location meaning
+## Modification mask and internal selections
 
-The two arrays answer different questions and are intentionally different.
+The mask and the positions selected during embedding answer different questions.
 
 - The mask is the exact difference between the saved clean and stego images. It has one Boolean value per channel and is true only where the value changed. It is the ground truth for segmentation and localisation.
-- The selected locations are the positions offered to the embedder. A selected position whose stored bit already matched the payload bit does not change, so `mask.sum()` is usually smaller than `len(selected)` and every true mask position is contained in the selected locations.
+- The embedder selects unique channel positions in memory. A selected position whose stored bit already matched the payload bit does not change. These positions are not saved; the mask records only actual changes, so `mask.sum()` is usually smaller than the number of selected positions.
 
 ## Metadata schema
 
 ```csv
-source_id,source_file,clean_file,stego_file,mask_file,selected_locations_file,payload_rate
-000001,img1.png,clean/000001.png,stego/000001.png,masks/000001.npy,selected_locations/000001.npy,0.4
+source_id,source_file,clean_file,stego_file,mask_file,payload_rate
+000001,img1.png,clean/000001.png,stego/000001.png,masks/000001.npy,0.4
 ```
 
 | Column | Meaning |
@@ -106,7 +104,6 @@ source_id,source_file,clean_file,stego_file,mask_file,selected_locations_file,pa
 | `clean_file` | Run-relative path of the clean PNG |
 | `stego_file` | Run-relative path of the stego PNG |
 | `mask_file` | Run-relative path of the modification mask |
-| `selected_locations_file` | Run-relative path of the selected locations |
 | `payload_rate` | Rate actually used for this image |
 
 Values that are constant for the whole run are stored once in `run_config.yaml` or `run_summary.json` instead of in every row.
