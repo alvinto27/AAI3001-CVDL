@@ -2,22 +2,25 @@
 from __future__ import annotations
 
 import warnings
-from decimal import ROUND_HALF_UP, Decimal
+import string
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
-VERSION = "3.0.0"
+VERSION = "5.0.0"
+PAYLOAD_ENCODING = "ASCII"
+MESSAGE_BIT_ORDER = "most_significant_bit_first"
+TEXT_POLICY = "uniform_independent_A-Z_a-z"
+LETTER_BYTES = np.frombuffer(string.ascii_letters.encode("ascii"), dtype=np.uint8)
+PLACEMENT_POLICY = "sequential_random_start_no_wrap"
 MAX_PIXELS = 16_000_000
 
 
-def payload_length(rate: float, capacity: int) -> int:
-    """Number of LSB positions used by ``rate`` of ``capacity``, rounded half up."""
-    value = Decimal(str(rate))
-    if not value.is_finite() or not 0 < value <= 1:
-        raise ValueError("Payload rate must be greater than 0 and at most 1.")
-    return int((value * capacity).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+def validate_character_count(character_count: int) -> None:
+    """Require a positive whole-number count, excluding Boolean values."""
+    if type(character_count) is not int or character_count < 1:
+        raise ValueError("Character count must be a positive whole number.")
 
 
 def validate_array(array: np.ndarray) -> None:
@@ -69,18 +72,27 @@ def load_rgb(path: Path) -> np.ndarray:
     return array
 
 
-def embed(clean: np.ndarray, rate: float, rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Replace LSBs at ``rate`` of the flat RGB positions with random payload bits.
+def embed(clean: np.ndarray, character_count: int,
+          rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray, int, int]:
+    """Return stego, Boolean H × W selected-region mask, start channel and length.
 
-    Returns the stego image, the exact H × W × 3 mask of channels that changed and
-    the selected flat RGB-channel indices, which may include positions whose value
-    did not change.
+    Selection is one nonwrapping interval in row-major, interleaved RGB order.
+    The region mask includes selected pixels even when their values do not change.
     """
     validate_array(clean)
-    count = payload_length(rate, clean.size)
-    payload = rng.integers(0, 2, size=count, dtype=np.uint8)
-    selected = rng.choice(clean.size, size=count, replace=False).astype(np.int64)
+    validate_character_count(character_count)
+    count = 8 * character_count
+    if count > clean.size:
+        raise ValueError(f"Requested {character_count} characters exceeds capacity "
+                         f"of {clean.size // 8} characters ({clean.size} bits).")
+    start = int(rng.integers(0, clean.size - count + 1))
+    end = start + count
+    letter_indices = rng.integers(0, len(LETTER_BYTES), size=character_count)
+    message_bytes = LETTER_BYTES[letter_indices]
+    payload = np.unpackbits(message_bytes, bitorder="big")
     stego = clean.copy()
     flat = stego.reshape(-1)
-    flat[selected] = (flat[selected] & np.uint8(254)) | payload
-    return stego, clean != stego, selected
+    flat[start:end] = (flat[start:end] & np.uint8(254)) | payload
+    mask = np.zeros(clean.shape[:2], dtype=np.bool_)
+    mask.reshape(-1)[start // 3:(end - 1) // 3 + 1] = True
+    return stego, mask, start, count

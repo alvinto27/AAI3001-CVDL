@@ -1,8 +1,8 @@
 input_dir: example_sources
-output_dir: generated/example-run-v3
-payload_rate: 0.4
+output_dir: generated/example-run-v5
+character_count: 40
 run_seed: 42
 payload_mode: fixed
-payload_min: 0.1
-payload_max: 0.9
+min_character_count: 10
+max_character_count: 90
 recursive: true

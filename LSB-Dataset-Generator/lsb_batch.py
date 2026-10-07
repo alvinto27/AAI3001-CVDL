@@ -14,13 +14,16 @@ import numpy as np
 import yaml
 from PIL import Image
 
-from lsb_core import embed, load_rgb, payload_length
+from lsb_core import (MESSAGE_BIT_ORDER, PAYLOAD_ENCODING, PLACEMENT_POLICY,
+                      TEXT_POLICY, VERSION, embed, load_rgb, validate_character_count)
 
 Progress = Callable[[dict], None]
 LOGGER_NAME = "lsb.generator"
 ARTIFACT_DIRS = ("clean", "stego", "masks")
 METADATA_FIELDS = [
-    "source_id", "source_file", "clean_file", "stego_file", "mask_file", "payload_rate",
+    "source_id", "source_file", "clean_file", "stego_file", "mask_file",
+    "character_count", "encoded_byte_count", "payload_percentage",
+    "start_channel", "embedding_length",
 ]
 
 
@@ -29,12 +32,12 @@ class Config:
     input_dir: str
     output_dir: str
 
-    payload_rate: float = 0.4
+    character_count: int = 40
     run_seed: int = 42
 
     payload_mode: str = "fixed"
-    payload_min: float = 0.1
-    payload_max: float = 0.9
+    min_character_count: int = 10
+    max_character_count: int = 90
 
     recursive: bool = True
 
@@ -47,12 +50,10 @@ class Config:
             raise ValueError("Run seed must be a non-negative integer.")
         if self.payload_mode not in ("fixed", "range"):
             raise ValueError("Payload mode must be fixed or range.")
-        for value in (self.payload_rate, self.payload_min, self.payload_max):
-            if type(value) not in (float, int):
-                raise ValueError("Payload rates must be numbers.")
-            payload_length(value, 3)
-        if self.payload_min > self.payload_max:
-            raise ValueError("Minimum payload rate must not exceed maximum.")
+        for value in (self.character_count, self.min_character_count, self.max_character_count):
+            validate_character_count(value)
+        if self.min_character_count > self.max_character_count:
+            raise ValueError("Minimum character count must not exceed maximum.")
         if type(self.recursive) is not bool:
             raise ValueError("Include subfolders must be true or false.")
 
@@ -84,7 +85,7 @@ def generate(config: Config, progress: Progress | None = None,
     """Generate a dataset for every valid source image found under the input folder.
 
     Invalid or failed sources are logged, counted as skipped and never stop the
-    run. One run-level NumPy generator supplies the payload rates, payload bits
+    run. One run-level NumPy generator supplies the character counts, text bytes
     and embedding locations, so the same input set, order, seed and
     configuration reproduce the same random sequence.
     """
@@ -105,8 +106,14 @@ def generate(config: Config, progress: Progress | None = None,
         "status": "running",
         "run_seed": config.run_seed,
         "payload_mode": config.payload_mode,
-        "payload_min": config.payload_min,
-        "payload_max": config.payload_max,
+        "generator_version": VERSION,
+        "placement_policy": PLACEMENT_POLICY,
+        "payload_encoding": PAYLOAD_ENCODING,
+        "message_bit_order": MESSAGE_BIT_ORDER,
+        "text_policy": TEXT_POLICY,
+        "character_count": config.character_count,
+        "min_character_count": config.min_character_count,
+        "max_character_count": config.max_character_count,
         "total_discovered": len(candidates),
         "total_generated": 0,
         "total_skipped": 0,
@@ -152,20 +159,25 @@ def generate(config: Config, progress: Progress | None = None,
                     report(f"Skipped {file.relative_to(source)}: {exc}", current)
                     continue
                 source_id = f"{summary['total_generated'] + 1:06d}"
-                if config.payload_mode == "fixed":
-                    rate = float(config.payload_rate)
-                else:
-                    rate = float(rng.uniform(config.payload_min, config.payload_max))
                 written: list[Path] = []
                 try:
-                    stego, mask, selected = embed(clean, rate, rng)
+                    if config.payload_mode == "fixed":
+                        character_count = config.character_count
+                    else:
+                        character_count = int(rng.integers(config.min_character_count,
+                                                           config.max_character_count, endpoint=True))
+                    stego, mask, start, length = embed(clean, character_count, rng)
                     row = {
                         "source_id": source_id,
                         "source_file": file.relative_to(source).as_posix(),
                         "clean_file": f"clean/{source_id}.png",
                         "stego_file": f"stego/{source_id}.png",
                         "mask_file": f"masks/{source_id}.npy",
-                        "payload_rate": rate,
+                        "character_count": character_count,
+                        "encoded_byte_count": character_count,
+                        "payload_percentage": 100 * length / clean.size,
+                        "start_channel": start,
+                        "embedding_length": length,
                     }
                     for field, array in (("clean_file", clean), ("stego_file", stego),
                                          ("mask_file", mask)):
@@ -185,8 +197,8 @@ def generate(config: Config, progress: Progress | None = None,
                     report(f"Failed {file.relative_to(source)}: {exc}", current)
                     continue
                 summary["total_generated"] += 1
-                notify(current, f"{source_id}  {len(selected):,} locations selected, "
-                                f"{int(mask.sum()):,} channels changed, rate {rate:.4f}")
+                notify(current, f"{source_id}  {length:,} sequential channels from {start:,}, "
+                                f"{int(mask.sum()):,} region pixels, {character_count:,} characters")
         if summary["status"] == "running":
             summary["status"] = "completed" if summary["total_generated"] else "failed"
     except BaseException as exc:

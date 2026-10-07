@@ -16,7 +16,13 @@ def main() -> int:
     parser.add_argument("--config", type=Path, help="YAML configuration file")
     parser.add_argument("--input", dest="input_dir", help="source image folder")
     parser.add_argument("--output", dest="output_dir", help="new or empty run output folder")
-    parser.add_argument("--payload-rate", type=float, default=0.4, help="fixed payload rate, or the range default in YAML")
+    parser.add_argument("--character-count", type=int, default=40,
+                        help="positive whole-number count of mixed-case ASCII letters")
+    parser.add_argument("--payload-mode", choices=("fixed", "range"), default="fixed")
+    parser.add_argument("--min-character-count", type=int, default=10,
+                        help="inclusive minimum character count in range mode")
+    parser.add_argument("--max-character-count", type=int, default=90,
+                        help="inclusive maximum character count in range mode")
     parser.add_argument("--run-seed", type=int, default=42, help="one seed for the whole run")
     args = parser.parse_args()
     cancel = threading.Event()
@@ -29,7 +35,10 @@ def main() -> int:
         if not args.config and (not args.input_dir or not args.output_dir):
             parser.error("Provide --config or both --input and --output.")
         config = read_config(args.config) if args.config else Config(
-            args.input_dir, args.output_dir, args.payload_rate, args.run_seed)
+            input_dir=args.input_dir, output_dir=args.output_dir,
+            character_count=args.character_count, run_seed=args.run_seed,
+            payload_mode=args.payload_mode, min_character_count=args.min_character_count,
+            max_character_count=args.max_character_count)
         result = generate(config, progress, cancel)
         print(json.dumps(result, indent=2))
         return 0 if result["status"] == "completed" else 1

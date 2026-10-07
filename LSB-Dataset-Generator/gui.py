@@ -32,9 +32,9 @@ class App(tk.Tk):
         self.controls: list[tk.Widget] = []
         self.vars = {
             "input_dir": tk.StringVar(), "output_dir": tk.StringVar(),
-            "payload_rate": tk.StringVar(value="0.4"), "run_seed": tk.StringVar(value="42"),
+            "character_count": tk.StringVar(value="40"), "run_seed": tk.StringVar(value="42"),
             "payload_mode": tk.StringVar(value="fixed"),
-            "payload_min": tk.StringVar(value="0.1"), "payload_max": tk.StringVar(value="0.9"),
+            "min_character_count": tk.StringVar(value="10"), "max_character_count": tk.StringVar(value="90"),
             "recursive": tk.BooleanVar(value=True),
         }
         self.status = tk.StringVar(value="Ready to generate")
@@ -86,7 +86,7 @@ class App(tk.Tk):
         outer.columnconfigure(0, weight=1)
         outer.rowconfigure(4, weight=1, minsize=220)
         ttk.Label(outer, text="LSB Dataset Generator", style="Title.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(outer, text="Create clean / stego PNG pairs with exact modification masks and configurable LSB payload rates.").grid(row=1, column=0, sticky="w", pady=(3, 18))
+        ttk.Label(outer, text="Create sequential LSB PNG pairs with whole-region masks and mixed-case text payloads.").grid(row=1, column=0, sticky="w", pady=(3, 18))
 
         body = ttk.Frame(outer)
         body.grid(row=2, column=0, sticky="nsew")
@@ -112,23 +112,30 @@ class App(tk.Tk):
         settings.columnconfigure(0, weight=1)
         settings.columnconfigure(1, weight=1)
         ttk.Label(settings, text="2   Set embedding", style="Section.TLabel").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 12))
-        for col, (value, label) in enumerate((("fixed", "Fixed rate"), ("range", "Random range"))):
+        for col, (value, label) in enumerate((("fixed", "Fixed characters"), ("range", "Random range"))):
             radio = ttk.Radiobutton(settings, text=label, value=value, variable=self.vars["payload_mode"], command=self.update_mode)
             radio.grid(row=1, column=col, sticky="w")
             self.controls.append(radio)
-        self.rate_entry = self.entry(settings, "payload_rate", width=12)
-        self.rate_entry.grid(row=2, column=0, sticky="ew", pady=(8, 4), padx=(0, 8))
-        ttk.Label(settings, text="0.4 = 40% of RGB LSBs", style="Muted.TLabel").grid(row=2, column=1, sticky="w")
+        self.count_entry = self.entry(settings, "character_count", width=12)
+        self.count_entry.grid(row=2, column=0, sticky="ew", pady=(8, 4), padx=(0, 8))
+        ttk.Label(settings, text="Positive character count", style="Muted.TLabel").grid(row=2, column=1, sticky="w")
         range_frame = ttk.Frame(settings, style="Card.TFrame")
         range_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(2, 9))
-        ttk.Label(range_frame, text="Min", style="Muted.TLabel").pack(side="left")
-        self.min_entry = self.entry(range_frame, "payload_min", width=8)
+        ttk.Label(range_frame, text="Min chars", style="Muted.TLabel").pack(side="left")
+        self.min_entry = self.entry(range_frame, "min_character_count", width=8)
         self.min_entry.pack(side="left", padx=(6, 14))
-        ttk.Label(range_frame, text="Max", style="Muted.TLabel").pack(side="left")
-        self.max_entry = self.entry(range_frame, "payload_max", width=8)
+        ttk.Label(range_frame, text="Max chars", style="Muted.TLabel").pack(side="left")
+        self.max_entry = self.entry(range_frame, "max_character_count", width=8)
         self.max_entry.pack(side="left", padx=6)
         ttk.Label(settings, text="Run seed", style="Card.TLabel").grid(row=4, column=0, sticky="w")
         self.entry(settings, "run_seed", width=15).grid(row=5, column=0, columnspan=2, sticky="ew", pady=(4, 10))
+        ttk.Label(
+            settings,
+            text="Maximum per image is floor(width × height × 3 / 8) characters.\n"
+                 "A 128 × 128 image holds 6,144 characters.\n"
+                 "Images too small for the chosen count are skipped.",
+            style="Muted.TLabel", wraplength=330,
+        ).grid(row=6, column=0, columnspan=2, sticky="w")
 
         actions = ttk.Frame(outer)
         actions.grid(row=3, column=0, sticky="ew", pady=14)
@@ -158,19 +165,19 @@ class App(tk.Tk):
         footer.grid(row=4, column=0, sticky="ew", pady=(10, 0))
         self.open_button = ttk.Button(footer, text="Open output folder", command=self.open_output, state="disabled")
         self.open_button.pack(side="left")
-        ttk.Label(outer, text=f"v{VERSION}  •  Static 8-bit RGB PNG only  •  All RGB channels eligible  •  Original dimensions preserved", foreground="#556477", font=("Segoe UI", 9)).grid(row=5, column=0, sticky="w", pady=(12, 0))
+        ttk.Label(outer, text=f"v{VERSION}  •  Static 8-bit RGB PNG only  •  Random start, no wrapping  •  Original dimensions preserved", foreground="#556477", font=("Segoe UI", 9)).grid(row=5, column=0, sticky="w", pady=(12, 0))
         self.update_mode()
 
     def update_mode(self) -> None:
         fixed = self.vars["payload_mode"].get() == "fixed"
-        self.rate_entry.configure(state="normal" if fixed and not self.busy else "disabled")
+        self.count_entry.configure(state="normal" if fixed and not self.busy else "disabled")
         for widget in (self.min_entry, self.max_entry):
             widget.configure(state="normal" if not fixed and not self.busy else "disabled")
 
     def get_config(self) -> Config:
         values = {key: var.get() for key, var in self.vars.items()}
-        for key in ("payload_rate", "payload_min", "payload_max"):
-            values[key] = float(values[key])
+        for key in ("character_count", "min_character_count", "max_character_count"):
+            values[key] = int(values[key])
         values["run_seed"] = int(values["run_seed"])
         config = Config(**values)
         config.validate()
@@ -189,7 +196,7 @@ class App(tk.Tk):
     def pick_output(self) -> None:
         path = filedialog.askdirectory(title="Choose parent folder for a new run", parent=self)
         if path:
-            name = datetime.now().strftime("lsb-run-%Y%m%d-%H%M%S-%f")
+            name = datetime.now().strftime("lsb-text-v5-run-%Y%m%d-%H%M%S-%f")
             self.vars["output_dir"].set(str(Path(path) / name))
 
     def save_settings(self) -> None:
