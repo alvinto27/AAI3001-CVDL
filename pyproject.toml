@@ -10,6 +10,7 @@ dependencies = [
     "numpy>=2.3.5",
     "pillow>=12.3.0",
     "pyyaml>=6.0.3",
+    "lightning>=2.6.6",
 ]
 
 [tool.uv]
