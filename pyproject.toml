@@ -30,3 +30,8 @@ torchvision = [
 name = "pytorch-cu130"
 url = "https://download.pytorch.org/whl/cu130"
 explicit = true
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.4.0",
+]
