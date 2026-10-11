@@ -15,6 +15,7 @@ To add a package, run `uv add <package>`. Commit the changed `pyproject.toml` an
 `LSB-Dataset-Generator/README.md` documents the v6 image pipeline.
 Run `prepare.py` to create RGB PNG tiles, then `generate.py` to create clean/stego pairs.
 Use `generate.py --verify` to check deterministic replay.
+See [the RAISE 512 rebuild guide](docs/rebuild-raise512-run1.md) for the complete dataset command sequence.
 
 ## Train on the Spot VM
 
