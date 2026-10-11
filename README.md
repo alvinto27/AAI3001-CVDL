@@ -12,7 +12,9 @@ uv run python train.py                   # run a script in the environment
 
 To add a package, run `uv add <package>`. Commit the changed `pyproject.toml` and `uv.lock` together.
 
-`LSB-Dataset-Generator/` is a standalone tool. It keeps its own `requirements.txt` and also runs in this environment.
+`LSB-Dataset-Generator/README.md` documents the v6 image pipeline.
+Run `prepare.py` to create RGB PNG tiles, then `generate.py` to create clean/stego pairs.
+Use `generate.py --verify` to check deterministic replay.
 
 ## Train on the Spot VM
 
