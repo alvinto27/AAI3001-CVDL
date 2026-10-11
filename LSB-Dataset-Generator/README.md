@@ -35,8 +35,7 @@ The standalone tool needs these packages:
 | rawpy | RAW photo decoding |
 
 The main team project uses `uv` and `pyproject.toml`.
-The team `uv` environment now lists NumPy, Pillow, PyYAML, and rawpy in `pyproject.toml`.
-The lock update is pending. See the root README.
+The team `uv` environment lists NumPy, Pillow, PyYAML, and rawpy in `pyproject.toml`.
 
 Use any other Python environment with:
 

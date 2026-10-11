@@ -12,17 +12,6 @@ uv run python train.py                   # run a script in the environment
 
 To add a package, run `uv add <package>`. Commit the changed `pyproject.toml` and `uv.lock` together.
 
-## Pending: update uv.lock
-
-`pyproject.toml` now lists pandas, matplotlib, and rawpy. `uv.lock` is out of date.
-Pandas and matplotlib support notebooks. rawpy supports RAW input to `LSB-Dataset-Generator/prepare.py`.
-On a device with uv, such as the gcp-aai3001 VM, run `uv lock`.
-Check that torch and torchvision still use the `pytorch-cu130` index.
-Run `uv sync` and `uv run python -c "import pandas, matplotlib, rawpy, torch; print(torch.cuda.is_available())"`.
-Commit `pyproject.toml` if uv changed it and `uv.lock` together.
-Delete this section after the lock update.
-Until then, `uv sync` updates the lock by itself and `uv sync --locked` fails.
-
 `LSB-Dataset-Generator/README.md` documents the v6 image pipeline.
 Run `prepare.py` to create RGB PNG tiles, then `generate.py` to create clean/stego pairs.
 Use `generate.py --verify` to check deterministic replay.
