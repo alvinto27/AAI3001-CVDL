@@ -281,6 +281,34 @@ def print_summary(selected: Sequence[Photo], catalog: Sequence[Photo]) -> None:
     print(f"Total expected size: {expected_gb:.2f} GB")
 
 
+def print_selection_summary(selected: Sequence[Photo]) -> None:
+    """Print Device and Keywords shares from a selection only."""
+    selected_devices = Counter(photo.device for photo in selected)
+    print(f"Selection contains {len(selected):,} images")
+    print("Device counts (selection share):")
+    for device in sorted(selected_devices, key=lambda value: (value == "", value.lower())):
+        amount = selected_devices[device]
+        share = amount / len(selected) if selected else 0.0
+        print(f"  {display_name(device)}: {amount:,} ({share:.1%})")
+
+    keywords = Counter(photo.keywords for photo in selected)
+    print("Top Keywords in selection:")
+    for subject, amount in sorted(keywords.items(), key=lambda item: (-item[1], item[0]))[:20]:
+        print(f"  {display_name(subject)}: {amount:,}")
+    expected_gb = sum(photo.expected_bytes for photo in selected) / 1_000_000_000
+    print(f"Total expected size: {expected_gb:.2f} GB")
+
+
+def load_selection_only(path: Path) -> list[Photo]:
+    """Read and validate a committed selection without loading a catalog."""
+    seed, count, selected = read_selection(path)
+    if seed is None or count is None:
+        raise SelectionError(f"selection manifest must contain a seed/count header: {path}")
+    if len(selected) != count:
+        raise SelectionError(f"{path} contains {len(selected)} rows, expected {count}")
+    return selected
+
+
 def destination_for(photo: Photo, output: Path) -> Path:
     """Derive a safe output filename from the NEF URL."""
     name = Path(unquote(urlsplit(photo.nef_url).path)).name
@@ -420,6 +448,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--count", type=nonnegative_int, default=1000)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--csv", type=Path, default=Path("ImageSets/RAISE/RAISE_all.csv"))
+    parser.add_argument(
+        "--selection",
+        type=Path,
+        help="use this selection manifest without reading the full catalog",
+    )
     parser.add_argument("--out", type=Path, default=Path("ImageSets/RAISE/NEF"))
     parser.add_argument("--workers", type=positive_int, default=4)
     parser.add_argument("--retries", type=nonnegative_int, default=3)
@@ -436,13 +469,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("error: --timeout must be greater than zero", file=sys.stderr)
         return 2
     try:
-        catalog = load_catalog(args.csv)
-        if args.dry_run:
-            selected = stratified_selection(catalog, args.count, args.seed)
-            print_summary(selected, catalog)
-            return 0
-        manifest = selection_path(args.csv)
-        selected = prepare_selection(catalog, manifest, args.count, args.seed, args.force)
+        if args.selection is not None:
+            manifest = args.selection
+            selected = load_selection_only(manifest)
+            if args.dry_run:
+                print_selection_summary(selected)
+                return 0
+        else:
+            catalog = load_catalog(args.csv)
+            if args.dry_run:
+                selected = stratified_selection(catalog, args.count, args.seed)
+                print_summary(selected, catalog)
+                return 0
+            manifest = selection_path(args.csv)
+            selected = prepare_selection(catalog, manifest, args.count, args.seed, args.force)
         print(f"Selection manifest: {manifest} ({len(selected):,} files)")
         downloaded, skipped, failed = download_all(
             selected, args.out, args.workers, args.timeout, args.retries

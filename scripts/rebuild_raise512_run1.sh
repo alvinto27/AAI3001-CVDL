@@ -107,13 +107,9 @@ on_error() {
 trap on_error ERR
 
 step_start 1 download
-mkdir -p ImageSets/RAISE
-cp -f data/raise/selection.csv ImageSets/RAISE/selection.csv
 uv run python scripts/download_raise.py \
-    --csv ImageSets/RAISE/RAISE_all.csv \
-    --out ImageSets/RAISE/NEF \
-    --count 1000 \
-    --seed 0
+    --selection data/raise/selection.csv \
+    --out ImageSets/RAISE/NEF
 step_done
 
 step_start 2 prepare

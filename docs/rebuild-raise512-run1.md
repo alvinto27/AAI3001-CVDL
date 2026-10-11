@@ -11,7 +11,7 @@ Run every command from the repository root.
 | Python | Use Python 3.12 with `uv sync`, or install the generator requirements with pip. |
 | RAW decoder | Use `rawpy==0.27.1`. The lock file pins this version. A different rawpy or LibRaw version can produce different pixels. |
 | Disk | Keep about 80 GB free. |
-| RAISE catalog | Put `RAISE_all.csv` at `ImageSets/RAISE/RAISE_all.csv`. |
+| RAISE source | The committed selection contains the source URLs. No RAISE catalog file is needed. |
 
 The small committed RAISE files are:
 
@@ -66,16 +66,12 @@ The last line must start with `REBUILD DONE:` and show `clean=49796 stego=49796 
 
 ## Rebuild steps
 
-1. Create the source folder and install the committed selection manifest. The downloader has no separate selection-file option. It reads `selection.csv` beside the catalog. The copy below makes it use the committed selection.
+1. Download the 1,000 photos in the committed selection. The `--selection` option reads the selection file directly. It does not read a full RAISE catalog.
 
    ```sh
-   mkdir -p ImageSets/RAISE
-   cp data/raise/selection.csv ImageSets/RAISE/selection.csv
    uv run python scripts/download_raise.py \
-     --csv ImageSets/RAISE/RAISE_all.csv \
-     --out ImageSets/RAISE/NEF \
-     --count 1000 \
-     --seed 0
+     --selection data/raise/selection.csv \
+     --out ImageSets/RAISE/NEF
    ```
 
    The committed manifest has 1,000 rows and the header `seed=0 count=1000`.
