@@ -1,50 +1,57 @@
-# Checkpoints
+# Checkpoints and run outputs
 
-This folder stores local training outputs. The outputs are not tracked. Only
-this README is tracked.
+Small outputs from these three runs are tracked in git:
 
-## Run folders
-
-Notebook 04 creates one folder per run. The full run name is built from
-`CLIP_T` and `NORM`; `_quick` is added when `QUICK=True`.
-
-| Example | Meaning |
+| Run folder | Version |
 | --- | --- |
-| `baseline_kv_xunet_v3_clip3_group` | V3c: `CLIP_T=3`, `NORM="group"` |
-| `baseline_kv_xunet_v3_clip3_group_quick` | The same settings with the quick test mode |
+| `baseline_kv_xunet_v3_clip3_batch/` | V3a: clipping and BatchNorm |
+| `baseline_kv_xunet_v3_noclip_group/` | V3b: no clipping and GroupNorm |
+| `baseline_kv_xunet_v3_clip3_group/` | V3c: clipping and GroupNorm |
 
-A run folder can contain:
+Each folder contains test predictions, a per-setting CSV table, four heatmap
+PNGs, and `logs/csv/run/metrics.csv` with small `hparams.yaml` files. V3c also
+has `training_curves.png`. The older runs have a `NOTE.md` that gives the
+original metrics path and links to the report plots.
 
-- `epochNN-*.ckpt`, the checkpoint for each epoch.
-- `best-*.ckpt`, the checkpoint selected by validation P_E.
-- `last.ckpt`, the resume checkpoint.
-- `test_predictions.csv` and `test_predictions_per_setting.csv`.
-- Four per-setting heatmaps and `training_curves.png`.
-- `logs/csv/run/metrics.csv` and `logs/tb/run/` TensorBoard events.
+## Model files are on the VM
 
-Older `lightning_logs/version_N/` folders hold outputs from v1, v2, and v3a.
-The current local checkpoint tree is about 26 MB.
+Model files live at:
+
+```text
+/srv/aai3001/AAI3001-CVDL/checkpoints/<run>/
+```
+
+The VM holds the full v3a, v3b and v3c run folders, including the `.ckpt`
+files. Fetch a best checkpoint from the repository root with:
+
+```sh
+scp 'aai-team@gcp-aai3001:/srv/aai3001/AAI3001-CVDL/checkpoints/baseline_kv_xunet_v3_clip3_group/best-*.ckpt' \
+  checkpoints/baseline_kv_xunet_v3_clip3_group/
+```
+
+Use `last.ckpt` to resume training. Use `best-*.ckpt` for evaluation. Keep
+local model copies out of git.
+
+## Not tracked
+
+Git ignores `.ckpt` files, per-run `logs/tb/` TensorBoard events, old
+`lightning_logs/`, and `_quick` run folders. V1/v2 folders and the old local
+executed v3b notebook are also ignored. Do not stage other run folders.
 
 ## Watch TensorBoard
 
-Notebook 04 writes CSV and TensorBoard logs inside each run folder. From the
-ROCm container, use:
+From the ROCm container:
 
 ```sh
 podman exec aai3001 tensorboard \
   --logdir /work/checkpoints --bind_all --port 6006
 ```
 
-From the VM repository root, use:
+From the VM repository root:
 
 ```sh
 uv run tensorboard --logdir checkpoints --port 6006
 ```
 
-Open `http://localhost:6006`. Notebook 04 documents the optional SSH tunnel
-for the VM. Stop TensorBoard with `Ctrl+C` when finished.
-
-## Do not commit
-
-Never commit `.ckpt` files, prediction CSV files, heatmaps, training curves,
-TensorBoard events, or other run outputs. Keep only this README in git.
+Open `http://localhost:6006`. Notebook 04 gives the optional SSH tunnel for
+the VM. Stop TensorBoard with `Ctrl+C` when finished.
