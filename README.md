@@ -22,6 +22,7 @@ See [the RAISE 512 rebuild guide](docs/rebuild-raise512-run1.md) for the complet
 | File | Purpose |
 | --- | --- |
 | [`04_baseline_kv_xunet_v3.ipynb`](notebooks/04_baseline_kv_xunet_v3.ipynb) | Current training notebook. It has `CLIP_T` and `NORM` switches. V3c, with `CLIP_T=3` and `NORM="group"`, is the current baseline. |
+| [`04_v3c_clip3_group.ipynb`](notebooks/runs/04_v3c_clip3_group.ipynb) | executed v3c run with outputs |
 | [`02_eval_breakdown.ipynb`](notebooks/02_eval_breakdown.ipynb) | Per-setting evaluation of a `test_predictions.csv` file. |
 | [`01_baseline_kv_xunet.ipynb`](notebooks/01_baseline_kv_xunet.ipynb) and [`03_baseline_kv_xunet_v2.ipynb`](notebooks/03_baseline_kv_xunet_v2.ipynb) | V1 and v2 history. They stay because the reports link them. |
 | [`rocm_conv1_wgrad.py`](notebooks/rocm_conv1_wgrad.py) | ROCm-only conv1 speed fix used by notebook 04. |
