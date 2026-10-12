@@ -253,8 +253,9 @@ epoch. Full tables and the v3 plan are in the
 - Focus future data and larger models on k<=2 and bpp<=0.3.
 - In the next dataset version, merge `lowest, k=1` and `plane, k=1` into one
   k=1 setting, or report their results as one combined group.
-- Compare v2 with v1 on the same test split.
-- Check accuracy at threshold 0.5 and calibration in v2.
+- Done: Compared v2 with v1 on the same test split. V2 test accuracy was 0.5352, AUC was 0.915, and P_E was 0.1148.
+- Done: Checked v2 at threshold 0.5 and its calibration. Test accuracy was 0.5352, AUC was 0.915, and P_E was 0.1148.
+- Follow-up baseline: [V3b results](results-v3b.md).
 - Fix or replace the BatchNorm behaviour before trusting a larger model.
 - Use more seeds before drawing a final conclusion.
 
