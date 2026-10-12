@@ -24,9 +24,8 @@ made from that same noisy cover. Never add noise to only one side. Otherwise,
 the model can learn that noise means stego.
 
 ```text
-                         + noise -> noisy cover -> save as clean
- tile from NEF ---------+
-                         + embed -> save as stego
+tile from NEF -> + noise -> noisy cover -+-> save as clean
+                                         +-> embed -> save as stego
 ```
 
 Both saved images must use the same noisy pixel array before embedding.
