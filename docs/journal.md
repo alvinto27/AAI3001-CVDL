@@ -109,6 +109,31 @@ Numbers are kept when they are known. Pending work is marked.
   overconfident. The hypothesis is confirmed.
 - The effect was likely easy to find because inputs were raw 0-255 values and
   tile photo textures varied widely.
+- The PC v1 run stopped during epoch 9. It used the epoch-5 checkpoint,
+  `epoch04-val_loss0.3209.ckpt`, for test evaluation. That checkpoint was
+  selected by validation loss. The run had val accuracy 0.598 at epoch 3,
+  val loss 0.3209 at epoch 5, val loss 2.28 and val accuracy 0.611 at epoch 6,
+  val loss 29.6 and val accuracy 0.501 at epoch 8, and val loss 33.7 and val
+  accuracy 0.500 at epoch 9. Train accuracy stayed near 0.98.
+- The test set had 14,866 images (7,433 pairs). The result was P_E 0.0276 and
+  AUC 0.989. At the best global threshold 0.981, P_FA was 0.010 and P_MD was
+  0.045. Accuracy at threshold 0.5 was 0.839. Clean-image `prob_stego`
+  quantiles at 50%, 90%, and 99% were 0.277, 0.813, and 0.982. Scores ranked
+  well but were badly calibrated.
+- Per-setting P_E was 0.103 for lowest/k1 and 0.115 for plane/k1. It was about
+  0.03 for k2 and at most 0.02 for k>=3. Plane k6-k8 had P_E 0.000. For bpp
+  bins 0.05-0.15, 0.15-0.30, and 0.30-0.50, P_E was 0.055, 0.023, and 0.008.
+  The hardest heatmap cells were k1 at 0.05-0.15 bpp: lowest 0.174 (n=149)
+  and plane 0.199 (n=138). At 0.15-0.30 bpp they were 0.080 and 0.085.
+- Replace and match gave 0.028 and 0.027. Random bytes and letters gave 0.026
+  and 0.029. Contiguous, random, and stride gave 0.018, 0.026, and 0.037;
+  stride values varied from 0.00 to 0.07 with about 150 pairs each, so they
+  are noisy.
+- Local PC records are in `checkpoints/baseline_kv_xunet/`: the predictions,
+  per-setting CSV, and four heatmap PNG files. They are not committed.
+- About 80% of settings were near-solved by the 19.5 K-parameter model. Only
+  k1-k2 with small payloads clearly separate models. One run and one seed make
+  these numbers approximate.
 
 ### Decided
 
@@ -117,12 +142,13 @@ Numbers are kept when they are known. Pending work is marked.
   validation accuracy, use AdamW with weight decay 1e-4, set deterministic mode
   off, set `MIOPEN_FIND_MODE=1`, and detect the repository root automatically.
 - Run v2 on the VM while the PC finishes v1.
-- Delay larger models such as SRNet until the heatmap shows which settings are
-  hard. Possible later tests are 256-pixel crops, dropping trivial settings,
-  and fp16.
+- Focus future datasets and larger models on k<=2 and bpp<=0.3.
+- Compare v2 with v1 on the same test split. Include accuracy at threshold 0.5
+  because the v1 score ranking was good but its calibration was poor.
+- Delay larger models such as SRNet until the hard settings are confirmed.
+  Possible later tests are 256-pixel crops, dropping trivial settings, and fp16.
 
 ### Next
 
-- Pending: finish the PC v1 run and record its final test result.
-- Pending: run notebook 03 on the VM and compare it with v1.
-- Pending: use notebook 02 heatmaps to choose settings for larger models.
+- Pending: run notebook 03 on the VM and compare it with v1 on the same test split.
+- Pending: test PC speed with deterministic mode off and `MIOPEN_FIND_MODE=1`.
