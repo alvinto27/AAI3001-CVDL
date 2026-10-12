@@ -260,5 +260,117 @@ variance range was about 45-50 times; this is a variance ratio, not a measured
 
 ### Next
 
-- Run v3a and v3b on the VM, then compare the detection and batch-composition
-  checks. Test v3c only if needed.
+- V3a and v3b are now complete; see the continuation below. V3b used an
+  approved PC GPU window rather than the VM.
+
+## 2026-10-12 — V3 runs and ROCm convolution fix (continuation)
+
+### Did
+
+- Added notebook 04 in `ef2a2e3`, with `CLIP_T` and `NORM` switches. V3a
+  clips the KV residual to [-3, 3] and keeps BatchNorm. V3b uses no clipping
+  and GroupNorm with 8 groups. Other training and split settings stay the same.
+- Selected checkpoints by validation P_E. Saved one checkpoint every epoch
+  plus a separate best checkpoint. Both full runs verified `last.ckpt` had
+  `epoch=9`, the final epoch of 10. CUDA alone uses `cudnn.benchmark=True`.
+- Added the ROCm conv1 weight-gradient fix in `ee5813f`.
+  - With MIOpen 3.6.1, Winograd weight gradient is not applicable to this
+    512 x 512 convolution at batch size >=15. The fallback makes one rocBLAS
+    matrix multiplication per image. See `rocm-libraries#12222`.
+  - The replacement uses unfold plus batched matrix multiplication. At batch
+    32, measured training step time fell from 174-189 ms to 103.5 ms, or
+    309 images/s. Weight-gradient relative difference was 2.3e-6.
+  - The user chose ON by default on ROCm. Set `V3_ROCM_CONV1_FIX=False` to
+    disable it. It has no effect on CUDA. Restart the kernel after changing
+    this setting so the MIOpen environment setting takes effect.
+- Finished both ten-epoch runs. V3a ran on the VM L4; v3b ran in the PC ROCm
+  container during an approved GPU window. Kept logs and run folders, and
+  removed both temporary training scripts after completion.
+- Records: VM `logs/v3a_vm.log` and
+  `checkpoints/baseline_kv_xunet_v3_clip3_batch/`; PC `logs/v3b_pc.log` and
+  `checkpoints/baseline_kv_xunet_v3_noclip_group/`. These are not committed.
+
+### Found
+
+#### Validation trend and selected checkpoints
+
+Epoch numbers here start at 1; checkpoint filenames start at 0. Values below
+are the per-epoch validation P_E printed in the logs.
+
+| Epoch | V3a: clip 3 + BatchNorm | V3b: no clip + GroupNorm |
+| ---: | ---: | ---: |
+| 1 | 0.0239 | 0.0268 |
+| 2 | 0.0182 | 0.0165 |
+| 3 | 0.0146 | 0.0189 |
+| 4 | 0.0203 | 0.0174 |
+| 5 | 0.00963 | 0.0163 |
+| 6 | 0.00970 | 0.00957 |
+| 7 | 0.00870 | 0.0102 |
+| 8 | 0.00883 | 0.00997 |
+| 9 | 0.00830 | 0.00943 |
+| 10 | 0.00790 | 0.0102 |
+
+- V3a kept epoch 10: `best-epoch09-val_pe0.0079-val_auc0.9988.ckpt`.
+  Test accuracy at 0.5 was 0.9843, AUC 0.9982, and P_E 0.0120. The best
+  global threshold was 0.1646 (about 0.165), with P_FA 0.0112 and P_MD 0.0129.
+  K=1 P_E was 0.0277 for lowest and 0.0503 for plane.
+- V3b kept epoch 9: `best-epoch08-val_pe0.0094-val_auc0.9984.ckpt`.
+  Test accuracy at 0.5 was 0.9831, AUC 0.9971, and P_E 0.0157. The best
+  global threshold was 0.2833, with P_FA 0.0128 and P_MD 0.0187. K=1 P_E was
+  0.0437 for lowest and 0.0585 for plane.
+- V3a training was about 6.7 iterations/s and 6.5 minutes per epoch (total
+  training time 63.76 minutes). V3b was about 10.5 iterations/s, or 95 ms per
+  training step, and 4 minutes per epoch (total 39.27 minutes). The PC power
+  cap was about 255 W; this is a cap, not a measured mean power draw.
+
+#### Batch dependence
+
+The checks use the same seed-0 samples of 1,000 train pairs and 1,000
+validation pairs as the earlier diagnoses. Mode a scores all sample images
+in evaluation mode. Mode c uses 63 mixed 50/50 batches, with distinct covers
+within each batch. Mode e uses all-clean batches with the same cover sampler.
+The sampled aggregates need not match exactly: modes c and e can repeat
+covers across batches.
+
+| Model | Set | a: eval accuracy / loss | c: train-mode accuracy | e: all-clean accuracy / mean prob_stego |
+| --- | --- | --- | --- | --- |
+| V3a | Train | 0.9890 / 0.03486 | 0.9916 | 0.0169 / 0.9835 |
+| V3a | Val | 0.9880 / 0.04339 | 0.9896 | 0.0218 / 0.9754 |
+| V3b | Train | 0.9890 / 0.03476 | 0.9906 | 0.9955 / 0.0164 |
+| V3b | Val | 0.9885 / 0.04053 | 0.9911 | 0.9965 / 0.0154 |
+
+- Clipping alone closed the evaluation gap. V3a evaluation uses stored
+  statistics, is per-image, and works well. But its train-mode BatchNorm still
+  calls almost every tile in an all-clean batch stego.
+- GroupNorm removes batch dependence. V3b's train/eval maximum logit
+  difference on identical images was exactly 0 in all four checks. Its small
+  detection cost appears mostly at k=1.
+
+#### Test comparison
+
+All rows use the same test split. K=1 columns retain the historical label
+split: lowest and plane are the same k=1 embedding, not different methods.
+Batch independence refers to normalization in both train and evaluation mode.
+V2 k=1 values come from the VM's `logs/baseline_v2_vm.log`.
+
+| Model | Accuracy at 0.5 | AUC | P_E | K=1 P_E lowest / plane | Batch independent? |
+| --- | ---: | ---: | ---: | --- | --- |
+| V1 epoch 5 | 0.839 | 0.989 | 0.0276 | 0.103 / 0.115 | No: train-mode BatchNorm |
+| V2 epoch 1 | 0.5352 | 0.915 | 0.1148 | 0.3017 / 0.3101 | No: train-mode BatchNorm |
+| V3a epoch 10 | 0.9843 | 0.9982 | 0.0120 | 0.0277 / 0.0503 | No in train mode; yes in eval mode |
+| V3b epoch 9 | 0.9831 | 0.9971 | 0.0157 | 0.0437 / 0.0585 | Yes: GroupNorm |
+
+V3a and v3b ran on different GPUs: L4 versus ROCm with the conv1 fix. One
+seed does not separate hardware or run variation from the model changes.
+Small differences (roughly +/-0.002 P_E) may be run-to-run noise; this is a
+caution, not a measured confidence interval.
+
+### Decided
+
+- V3b is the current baseline candidate because it is batch-independent.
+- V3c will test clip 3 plus GroupNorm: one change from v3b.
+
+### Next
+
+- Pending: run v3c and compare it with v3b on detection and batch checks.
+- Pending: write `docs/results-v3.md`.
