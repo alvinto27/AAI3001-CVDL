@@ -20,6 +20,8 @@ README is tracked.
 The complete local dataset is about 38 GB. Clean and stego images stay in
 their own folders. A source photo must stay in one split.
 
+Cite [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](../ImageSets/README.md#citations-and-terms). RAISE is for non-commercial research and educational purposes.
+
 ## Rebuild
 
 Run the [RAISE 512 rebuild guide](../docs/rebuild-raise512-run1.md) from the

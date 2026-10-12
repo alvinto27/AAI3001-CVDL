@@ -26,7 +26,7 @@ candidate, not a claim about all images or all embedding tools.
 ### Data and split
 
 The dataset is `Datasets/raise512-run1`: 49,796 clean/stego pairs of 512 x 512
-RGB tiles from 1,000 RAISE RAW photos. Each stego tile has one random LSB
+RGB tiles from 1,000 RAISE RAW photos. The source citation is [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](../ImageSets/README.md#citations-and-terms) Each stego tile has one random LSB
 setting: lowest or plane bit mode, k=1..8, replace or match, contiguous,
 random, or stride placement, letters or random bytes, and 0.05-0.50 bpp.
 

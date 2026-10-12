@@ -28,6 +28,14 @@ See [the RAISE 512 rebuild guide](docs/rebuild-raise512-run1.md) for the complet
 
 Current results: [V3 comparison report](docs/results-v3.md).
 
+## Data and citations
+
+The `raise512-run1` source is RAISE. Cite it as [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](ImageSets/README.md#citations-and-terms) RAISE is for **non-commercial research and educational purposes**.
+
+DIV2K is downloaded locally but is not used by the code yet. Cite it as [E. Agustsson and R. Timofte, “NTIRE 2017 Challenge on Single Image Super-Resolution: Dataset and Study,” IEEE Conference on Computer Vision and Pattern Recognition (CVPR) Workshops, July 2017.](ImageSets/README.md#citations-and-terms) The official page says DIV2K is for **academic research purposes only** and that copyright belongs to the original owners.
+
+See the [ImageSets README](ImageSets/README.md) for source details, terms, and download links.
+
 ## Train on the Spot VM
 
 The `gcp-aai3001` VM is a Spot VM. Google can stop it at any time, with a 120-second notice.
