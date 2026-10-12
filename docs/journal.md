@@ -157,8 +157,8 @@ Numbers are kept when they are known. Pending work is marked.
   validation accuracy, use AdamW with weight decay 1e-4, set deterministic mode
   off, and detect the repository root automatically.
 - Use the B PC speed setting: deterministic mode off, default MIOpen find mode,
-  and no cuDNN benchmark. `MIOPEN_FIND_MODE=1` gave no gain and its removal
-  from notebook 03 is **Pending**.
+  and no cuDNN benchmark. `MIOPEN_FIND_MODE=1` gave no gain and was removed
+  from notebook 03.
 - Run v2 on the VM while the PC finishes v1.
 - Treat `lowest, k=1` and `plane, k=1` as one setting in future datasets, or
   report them as one combined group.
@@ -171,4 +171,3 @@ Numbers are kept when they are known. Pending work is marked.
 ### Next
 
 - Pending: run notebook 03 on the VM and compare it with v1 on the same test split.
-- Pending: remove `MIOPEN_FIND_MODE=1` from notebook 03 after review.
