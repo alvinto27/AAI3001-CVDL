@@ -4,3 +4,4 @@ checkpoints/
 ImageSets/*
 !ImageSets/README.md
 Datasets/
+logs/
