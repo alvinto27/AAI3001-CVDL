@@ -373,4 +373,5 @@ caution, not a measured confidence interval.
 ### Next
 
 - Pending: run v3c and compare it with v3b on detection and batch checks.
-- Pending: write `docs/results-v3.md`.
+- Done: wrote the [v3b results report](results-v3b.md), with training curves,
+  test plots, setting breakdowns, and batch-independence checks.
