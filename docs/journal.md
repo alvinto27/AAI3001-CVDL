@@ -493,3 +493,4 @@ high at that point. This was not tested.
   `prob_stego` near 1.0.
 - Pending: finish the TensorBoard chart layout and train/validation colour
   runs in notebook 04.
+- Pending: review the [noisy-cover dataset plan](plan-noisy-covers.md).
