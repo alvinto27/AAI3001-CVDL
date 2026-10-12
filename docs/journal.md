@@ -86,6 +86,12 @@ Numbers are kept when they are known. Pending work is marked.
 - The PC RX 9070 XT reached about 5.2 iterations/second, or about 7 minutes
   per epoch, with batch size 16 pairs. The VM L4 reached about 6.4 iterations
   per second.
+- A plain v2 PC speed loop used 32 images per step and 300 timed steps. It
+  measured 5.68 steps/s (182 images/s) with deterministic mode, 5.76 steps/s
+  (184 images/s) without it, and about 5.59 steps/s (179 images/s) with
+  `MIOPEN_FIND_MODE=1`. Warm `cudnn.benchmark=True` reached 5.77 steps/s
+  (185 images/s), but a fresh process paid about 145 seconds for one-time
+  search. The GPU was 100% busy and CPU load was low, so the GPU was the limit.
 - The likely speed cause is library tuning: NVIDIA cuDNN is better tuned than
   AMD MIOpen for these small convolutions on gfx1201. Deterministic mode also
   limits MIOpen choices. An earlier PC estimate of 13 minutes per epoch came
@@ -107,6 +113,8 @@ Numbers are kept when they are known. Pending work is marked.
   memorisation. The model learned to compare each image with its twin through
   BatchNorm batch statistics. When scored alone, it was at chance and very
   overconfident. The hypothesis is confirmed.
+- The speed result does not support deterministic mode as the cause of the PC
+  versus L4 gap. A separate ROCm performance investigation will continue.
 - The effect was likely easy to find because inputs were raw 0-255 values and
   tile photo textures varied widely.
 - The PC v1 run stopped during epoch 9. It used the epoch-5 checkpoint,
@@ -120,11 +128,18 @@ Numbers are kept when they are known. Pending work is marked.
   0.045. Accuracy at threshold 0.5 was 0.839. Clean-image `prob_stego`
   quantiles at 50%, 90%, and 99% were 0.277, 0.813, and 0.982. Scores ranked
   well but were badly calibrated.
-- Per-setting P_E was 0.103 for lowest/k1 and 0.115 for plane/k1. It was about
-  0.03 for k2 and at most 0.02 for k>=3. Plane k6-k8 had P_E 0.000. For bpp
-  bins 0.05-0.15, 0.15-0.30, and 0.30-0.50, P_E was 0.055, 0.023, and 0.008.
-  The hardest heatmap cells were k1 at 0.05-0.15 bpp: lowest 0.174 (n=149)
-  and plane 0.199 (n=138). At 0.15-0.30 bpp they were 0.080 and 0.085.
+- The generator code makes `lowest, k=1` and `plane, k=1` the same embedding:
+  both change bit 0, and both match by choosing `v +/- 1`. Edge values 0 and
+  255 use the same valid-direction rule in both paths. They differ at k=2:
+  `lowest` changes bits 0 and 1, while `plane` changes only bit 1. The combined
+  k=1 result was P_E 0.111 for 956 pairs; by bpp it was 0.188 (287 pairs),
+  0.086 (338), and 0.045 (331). The old label-specific values were 0.103 and
+  0.115, within sampling noise.
+- Per-setting P_E was about 0.03 for k2 and at most 0.02 for k>=3. Plane k6-k8
+  had P_E 0.000. For bpp bins 0.05-0.15, 0.15-0.30, and 0.30-0.50, P_E was
+  0.055, 0.023, and 0.008. The hardest heatmap cells were k1 at 0.05-0.15
+  bpp: lowest 0.174 (n=149) and plane 0.199 (n=138). At 0.15-0.30 bpp they
+  were 0.080 and 0.085; these labels describe the same k=1 embedding.
 - Replace and match gave 0.028 and 0.027. Random bytes and letters gave 0.026
   and 0.029. Contiguous, random, and stride gave 0.018, 0.026, and 0.037;
   stride values varied from 0.00 to 0.07 with about 150 pairs each, so they
@@ -140,8 +155,13 @@ Numbers are kept when they are known. Pending work is marked.
 - Build baseline v2 in notebook 03. The work is in progress.
 - For v2, put twins in different batches, select the best checkpoint by
   validation accuracy, use AdamW with weight decay 1e-4, set deterministic mode
-  off, set `MIOPEN_FIND_MODE=1`, and detect the repository root automatically.
+  off, and detect the repository root automatically.
+- Use the B PC speed setting: deterministic mode off, default MIOpen find mode,
+  and no cuDNN benchmark. `MIOPEN_FIND_MODE=1` gave no gain and its removal
+  from notebook 03 is **Pending**.
 - Run v2 on the VM while the PC finishes v1.
+- Treat `lowest, k=1` and `plane, k=1` as one setting in future datasets, or
+  report them as one combined group.
 - Focus future datasets and larger models on k<=2 and bpp<=0.3.
 - Compare v2 with v1 on the same test split. Include accuracy at threshold 0.5
   because the v1 score ranking was good but its calibration was poor.
@@ -151,4 +171,4 @@ Numbers are kept when they are known. Pending work is marked.
 ### Next
 
 - Pending: run notebook 03 on the VM and compare it with v1 on the same test split.
-- Pending: test PC speed with deterministic mode off and `MIOPEN_FIND_MODE=1`.
+- Pending: remove `MIOPEN_FIND_MODE=1` from notebook 03 after review.

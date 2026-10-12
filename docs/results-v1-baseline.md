@@ -109,9 +109,11 @@ The clean-image `prob_stego` score quantiles were 0.277 at the median, 0.813
 at the 90th percentile, and 0.982 at the 99th percentile. Thus the model
 ranked the test images well, but many clean images received high scores.
 
-At the global threshold, detection rates were 0.768 for lowest/k1 and 0.735
-for plane/k1. The overall bit-mode rates were about 0.95 to 0.96. These rates
-use one threshold. The per-setting P_E values below select a threshold for each
+At the global threshold, the original k=1 labels gave detection rates of 0.768
+for `lowest` and 0.735 for `plane`. The generator code shows that these labels
+make the same k=1 embedding, so the two rates should not be read as different
+methods. The overall bit-mode rates were about 0.95 to 0.96. These rates use
+one threshold. The per-setting P_E values below select a threshold for each
 setting, so they answer a different question.
 
 ## 5. Where it fails: k and payload size
@@ -128,6 +130,33 @@ The aggregate P_E by bit mode and k was:
 | 6 | 0.005 | 0.000 |
 | 7 | 0.010 | 0.000 |
 | 8 | 0.007 | 0.000 |
+
+The k=1 row retains the historical label split; it is one embedding, as
+explained below.
+
+### k=1 is one setting with two labels
+
+I checked `LSB-Dataset-Generator/lsb_engine.py`. For `k=1`, `lowest` and
+`plane` both replace bit 0. Their `match` paths also choose the same nearest
+value, `v - 1` or `v + 1`, with a random direction at a tie. This remains the
+same at edge values 0 and 255: the out-of-range choice is rejected in both
+paths, so only the valid direction is used. They differ starting at `k=2`:
+`lowest` changes bits 0 and 1 (up to +/-3), while `plane` changes only bit 1
+(+/-2) and keeps bit 0.
+
+The combined k=1 result is:
+
+| k=1 group | pairs | P_E |
+| --- | ---: | ---: |
+| All k=1 | 956 | 0.111 |
+| 0.05-0.15 bpp | 287 | 0.188 |
+| 0.15-0.30 bpp | 338 | 0.086 |
+| 0.30-0.50 bpp | 331 | 0.045 |
+
+The old `lowest` and `plane` values (0.103 and 0.115) have a gap within
+sampling noise, roughly +/-0.01-0.015 for about 470 pairs each. The heatmaps
+below retain their original labels, but their k=1 rows are the same embedding;
+use the combined table above for the k=1 result.
 
 P_E by bpp bin was 0.055 for 0.05-0.15, 0.023 for 0.15-0.30, and 0.008
 for 0.30-0.50. The hardest heatmap cells were k=1 at low payload:
@@ -209,6 +238,8 @@ between training-batch and running BatchNorm statistics, made worse by raw
 ## 9. What this means for next steps
 
 - Focus future data and larger models on k<=2 and bpp<=0.3.
+- In the next dataset version, merge `lowest, k=1` and `plane, k=1` into one
+  k=1 setting, or report their results as one combined group.
 - Compare v2 with v1 on the same test split.
 - Check accuracy at threshold 0.5 and calibration in v2.
 - Fix or replace the BatchNorm behaviour before trusting a larger model.
