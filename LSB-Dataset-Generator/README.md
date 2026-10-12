@@ -1,137 +1,417 @@
-# LSB Dataset Generator
+# LSB Dataset Generator v6
 
-Standalone desktop GUI and command-line generator, version **5.0.0**. It produces clean/stego PNG pairs using random-start sequential 1-bit RGB embedding and one Boolean pixel-level selected-region mask per pair. It performs no dataset splitting, training, resizing or inference.
+## What the tool does
 
-## Open on this computer
+The tool creates clean and stego image pairs for CNN steganalysis.
+A **least significant bit (LSB)** is a low-value bit in an image byte.
+The tool changes selected LSBs to store a payload.
 
-Double-click **Launch GUI.vbs** in this folder. No browser or server is needed. The launcher finds Python by itself, checking a `.venv` folder here, the path in `.runtime-path.txt` if that file exists, the Windows Python launcher, an installed Python, and finally `pythonw.exe` on `PATH`. If it finds nothing it lists the locations it searched. **No particular Python version is required.** Any Python 3.11 or newer with Tcl/Tk works, and an existing installation can be used as it is. You can also start `gui.py` yourself with any Python that has the dependencies.
-
-1. Browse to your input folder. Only static **8-bit RGB PNG** is accepted.
-2. Choose an output parent folder. The GUI suggests a new run subfolder and you can edit its path. The output folder must be new or empty and separate from the input tree.
-3. Select **Fixed characters** or **Random range**.
-   - Fixed mode uses the same positive whole-number character count for every image. `40` embeds 40 mixed-case ASCII letters, occupying 320 channel bits.
-   - Range mode independently draws a uniform integer count per valid source, including both bounds. Defaults are `10` and `90`. Equal bounds behave as a fixed count.
-   - Counts must be positive integers and minimum must not exceed maximum. A count too large for an image skips that image without truncation or resampling.
-4. Set the run seed. One seed controls the whole run.
-5. Click **Generate dataset**. The log reports skipped inputs and write failures. **Cancel** finishes the current image before stopping, and completed samples remain available.
-6. Use **Open output folder** for the generated files.
-
-At larger Windows display scales, use the right-hand page scrollbar to reach the full results area. The log has its own scrollbar.
-
-**Save config** and **Load config** use YAML. Relative paths in a loaded YAML file resolve beside that file. A saved effective run configuration points to the original input and output paths, so choose a new output before rerunning it.
-
-## Set up on another Windows computer
-
-Install any **Python 3.11 or newer** with Tcl/Tk support. Version 3.12 and 3.13 are both known to work. If the launcher already finds an installed Python that has NumPy, Pillow and PyYAML, no further setup is needed.
-
-To keep the dependencies separate and pinned, create a local environment in this folder instead:
-
-```powershell
-py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe gui.py
+```text
+source photos ──prepare.py──> 8-bit RGB PNG tiles
+                                  │
+                                  └──generate.py──> clean + stego + mask files
+                                                         │
+                                                         └──--verify
 ```
 
-The launcher prefers `.venv\Scripts\pythonw.exe` when that folder exists, and otherwise uses whatever Python it finds. `requirements.txt` pins the versions for that optional environment only. The ignored `.runtime-path.txt`, `.vendor/` and `.tcl/` items are local conveniences for particular computers, not part of the portable source package. No administrator installation is required by the application itself. If startup fails, the launcher displays an error and writes `startup-error.log`.
+Use the tools in this order:
 
-## Command line
+1. Use `prepare.py` to decode photos and create fixed-size PNG tiles.
+2. Use `generate.py` to create clean and stego images.
+3. Use `generate.py --verify` to replay and check every stego image.
 
-The CLI uses exactly the same core as the GUI and can run without a display:
+A tile is a square crop from one source photo.
+The tool does not resize a tile.
 
-```powershell
+## Setup
+
+The standalone tool needs these packages:
+
+| Package | Use |
+| --- | --- |
+| NumPy | Arrays and random number generation |
+| Pillow | PNG and photo decoding |
+| PyYAML | YAML run files |
+| rawpy | RAW photo decoding |
+
+The main team project uses `uv` and `pyproject.toml`.
+The team `uv` environment lists NumPy, Pillow, PyYAML, and rawpy in `pyproject.toml`.
+
+Use any other Python environment with:
+
+```sh
+python -m pip install -r requirements.txt
+```
+
+Run the tool with plain Python:
+
+```sh
+python prepare.py --help
+```
+
+## Prepare source photos
+
+Run this command:
+
+```sh
+python prepare.py --input SOURCE_DIR --output TILE_DIR [OPTIONS]
+```
+
+| Option | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `--input` | folder | required | Source folder searched recursively |
+| `--output` | folder | required | Tile folder |
+| `--tile` | positive integer | `512` | Tile width and height in pixels |
+| `--max-tiles-per-image` | positive integer | all tiles | Maximum random tile count per source |
+| `--seed` | non-negative integer | `0` | Tile selection seed |
+| `--workers` | positive integer | CPU count | Process worker count |
+| `--png-compress-level` | integer `0` to `9` | `1` | PNG compression level |
+
+The tool accepts these extensions:
+
+- RAW: `.nef`, `.nrw`, `.cr2`, `.cr3`, `.arw`, `.dng`, `.orf`, `.raf`, `.rw2`, `.pef`, `.srw`, and other listed rawpy extensions.
+- PNG, JPEG, TIFF, BMP, and WebP.
+
+RAW files use these fixed rawpy settings:
+
+| Setting | Value |
+| --- | --- |
+| White balance | Camera white balance |
+| Auto brightness | Disabled |
+| Output colour | sRGB |
+| Output depth | 8 bits per sample |
+| Demosaic | AHD |
+| Orientation | rawpy default handling |
+
+The settings and rawpy version are recorded in `run_config.yaml`.
+Pillow applies EXIF orientation to non-RAW files.
+The tool converts accepted non-RAW files to 8-bit RGB.
+
+The tool refuses these inputs:
+
+- Grayscale images.
+- Palette images with transparency.
+- RGBA images with any alpha value below 255.
+- 16-bit images.
+- Animated images.
+- Corrupt files and unsupported extensions.
+
+The tool does not invent colour for grayscale input.
+The tool does not resize an image.
+The tool crops a top-left, non-overlapping grid.
+It drops partial right and bottom edges.
+
+If `--max-tiles-per-image` is set, the tool selects tiles with:
+
+```text
+SeedSequence([seed, image_index])
+```
+
+The selection does not depend on worker count.
+
+### Prepare output
+
+```text
+TILE_DIR/
+├── source_r0_c0.png
+├── source_r0_c1.png
+├── manifest.csv
+├── run_config.yaml
+├── done.jsonl
+└── run.log
+```
+
+`r` is the zero-based tile row.
+`c` is the zero-based tile column.
+Each tile is written to a temporary file in the output folder.
+The tool renames the temporary file only after the PNG is complete.
+
+`manifest.csv` has one row per tile:
+
+| Column | Meaning |
+| --- | --- |
+| `tile_file` | Tile file name |
+| `source_file` | Source path relative to the input folder |
+| `source_format` | `raw`, `png`, `jpeg`, `tiff`, `bmp`, or `webp` |
+| `camera_make` | Camera make from RAW IFD0 or EXIF |
+| `camera_model` | Camera model from RAW IFD0 or EXIF |
+| `source_width` | Width after orientation |
+| `source_height` | Height after orientation |
+| `tile_row` | Zero-based grid row |
+| `tile_col` | Zero-based grid column |
+| `pixel_x` | Tile left position |
+| `pixel_y` | Tile top position |
+
+The source path identifies the photo.
+Use it to split train and test data by photo.
+Do not split by tile.
+
+The tool resumes when the output contains an identical `run_config.yaml`.
+It skips a source when its recorded tiles are present.
+It retries an unexpected error after removing that source's partial tiles.
+It records bad input and no-complete-tile results as completed skips.
+Ctrl+C keeps completed ledger entries and leaves no temporary tile files.
+
+## Generate clean and stego images
+
+Run this command:
+
+```sh
+python generate.py --config run.yaml [--workers N]
+```
+
+Use `--verify OUTPUT_DIR` instead of `--config` to verify an existing run:
+
+```sh
+python generate.py --verify OUTPUT_DIR [--workers N]
+```
+
+Verification uses all available CPU cores by default. Use `--workers N` to set the process count. It prints progress about every five percent. The report and failure details do not depend on the worker count.
+
+### Configuration keys
+
+The configuration uses YAML.
+Unknown keys are rejected.
+A scalar is fixed for every stego image.
+A list is a set of choices.
+The tool draws one list choice uniformly for each stego image.
+
+| Key | Type and allowed values | Default |
+| --- | --- | --- |
+| `seed` | non-negative integer | required |
+| `input` | folder | required |
+| `output` | folder | required |
+| `png_compress_level` | one integer from `0` to `9` | `1` |
+| `variants_per_cover` | positive integer | `1` |
+| `write_masks` | Boolean | `true` |
+| `bit_mode` | `lowest`, `plane`, or a list of these | `lowest` |
+| `k` | integer `1` to `8`, or a list of these | `1` |
+| `method` | `replace`, `match`, or a list of these | `replace` |
+| `placement` | `contiguous`, `stride`, `random`, or a list | `contiguous` |
+| `stride` | positive integer or `[min, max]` inclusive range | `1` |
+| `payload` | `random_bytes`, `letters`, or a list | `random_bytes` |
+| `start` | `random` or a non-negative integer | `random` |
+| `size` | exactly one size form | required |
+
+`stride` is used only when the drawn placement is `stride`.
+A stride range draws one integer uniformly from both endpoints.
+
+`size` accepts these forms:
+
+```yaml
+size:
+  bpp: [0.02, 0.08]
+```
+
+```yaml
+size:
+  payload_bytes: [10, 40]
+```
+
+A range draws uniformly from both endpoints.
+A single `bpp` or `payload_bytes` value is also valid.
+A scalar `size: 40` means `payload_bytes: 40`.
+A scalar `size: 0.04` means `bpp: 0.04`.
+
+**Bits per pixel (bpp)** is the requested payload byte count multiplied by eight and divided by image pixel count.
+The engine converts bpp to a byte count by rounding and enforcing a one-byte minimum.
+
+The runner draws settings with:
+
+```text
+SeedSequence([seed, cover_index, variant, 0])
+```
+
+The runner passes a separate embed stream to `lsb_engine.embed`:
+
+```text
+SeedSequence([seed, cover_index, variant, 1])
+```
+
+The embed seed is stored in the stego PNG JSON.
+Worker count and processing order do not change the output.
+
+If a drawn size exceeds capacity, the runner caps the upper range at the largest size that fits.
+If the minimum size does not fit, the runner skips that variant and logs the reason.
+
+### Complete example `run.yaml`
+
+```yaml
+seed: 123
+input: example_sources
+output: /tmp/aai3001-v6-example-run
+png_compress_level: 1
+variants_per_cover: 2
+write_masks: true
+bit_mode: [lowest, plane]
+k: [1, 2, 3]
+method: [replace, match]
+placement: [contiguous, stride, random]
+stride: [1, 3]
+payload: [random_bytes, letters]
+start: random
+size:
+  bpp: [0.02, 0.08]
+```
+
+Run the example from this folder with:
+
+```sh
 python generate.py --config example_config.yaml
-python generate.py --input C:\data\sources --output C:\data\new-run --character-count 40 --run-seed 42
-python generate.py --input C:\data\sources --output C:\data\range-run --payload-mode range --min-character-count 10 --max-character-count 90
-python generate.py --version
+python generate.py --verify /tmp/aai3001-v6-example-run
 ```
 
-The example configuration expects `example_sources/`, which contains three clearly synthetic test images. It is a smoke test, not an experimental dataset. Edit the configuration or use the GUI for real sources. Choose a new output path for every run. Existing output is never overwritten. Range mode is available through CLI flags, YAML and the GUI. `--config` supplies the full configuration and the direct flags are used when no configuration file is given. Ctrl+C requests cancellation after the current image. Exit code 0 means completed, and 1 means cancelled or failed.
+## Embedding rules
 
-## Output structure
+The **carrier** is the input `H × W × 3` uint8 RGB array.
+A **carrier unit** is one channel byte.
+Units use row-major order with R, G, B inside every pixel.
+The flat order is `R0, G0, B0, R1, G1, B1, ...`.
+
+A payload uses MSB-first bit order.
+The first payload bit is the most significant bit of the first payload byte.
+
+| Mode | Stored payload bits per selected unit |
+| --- | --- |
+| `lowest`, `k` | The `k` lowest bits of the byte |
+| `plane`, `k` | Bit plane `k`, which is bit `k - 1` with bit 1 as the LSB plane |
+
+**Replacement** directly replaces the target bits.
+
+**Matching** keeps a value when its target bits already match.
+For lowest-bit matching, the result is the nearest valid value with the target `k`-bit field.
+For plane matching, a mismatch uses `v - 2^(k-1)` or `v + 2^(k-1)`.
+The direction is random when both values are valid.
+The direction is forced at byte boundaries.
+For lowest-bit `k=8`, every target byte has one valid value, so matching equals replacement.
+
+The final selected unit receives random padding bits when the payload does not fill its field.
+Padding bits are not part of the extracted payload.
+
+| Placement | Selected units |
+| --- | --- |
+| `contiguous` | `start + i` |
+| `stride` | `start + i * stride` |
+| `random` | A sorted subset without replacement |
+
+For contiguous and stride placement, the legal non-wrapping start is:
+
+```text
+0 <= start <= total_units - 1 - (units_used - 1) * stride
+```
+
+The engine draws a legal start when `start: random`.
+Random placement does not use `start`.
+
+The `random_bytes` payload uses uniformly generated byte values.
+The `letters` payload uses uniformly generated ASCII `A-Z` and `a-z` bytes.
+
+The mask is an `H × W` one-bit PNG.
+It is true for every pixel with at least one selected channel.
+It is true even when matching or replacement leaves the selected value unchanged.
+The mask is based on selection, not on changed pixels.
+
+## Output layout and metadata
 
 ```text
 output/
 ├── clean/000001.png
-├── stego/000001.png
-├── masks/000001.npy
+├── stego/000001_1.png
+├── masks/000001_1.png
 ├── metadata.csv
 ├── run_config.yaml
-├── run_summary.json
-└── generation.log
+├── done.jsonl
+└── run.log
 ```
 
-| Output | Contents |
+`masks/` is empty when `write_masks: false`.
+Clean and stego PNGs both contain a `stego` PNG text chunk with JSON.
+
+Clean JSON contains:
+
+| Field | Meaning |
 | --- | --- |
-| `clean/<source_id>.png` | Source image saved again through the same PNG path as stego, original dimensions |
-| `stego/<source_id>.png` | Image after LSB replacement |
-| `masks/<source_id>.npy` | Boolean `H × W` array, true where at least one channel belongs to the selected interval |
-| `metadata.csv` | One row per generated pair |
-| `run_config.yaml` | Effective configuration of the run |
-| `run_summary.json` | Run status and counts |
-| `generation.log` | Run start, configuration, skipped inputs, failures and final counts |
+| `label` | `clean` |
+| `cover_id` | Six-digit cover identifier |
+| `source_file` | Relative source path |
+| `size` | `[height, width, channels]` |
 
-Load mask files with `np.load(path, allow_pickle=False)`. A flat channel index `i` maps to row `i // (width * 3)`, column `(i // 3) % width` and channel `i % 3`, in R/G/B order. Selection follows R, G, B within each pixel, left-to-right, then the next row. Selected-index files are not exported.
+Stego JSON contains the clean fields plus:
 
-Source IDs are sequential six-digit numbers assigned in processing order, so `000001` is the first successfully generated image of the run. The original discovery path is kept in `source_file` for every row.
+- `cover_index`, `variant`, and `generator_version`.
+- `seed` and `embed_seed` with the entropy needed for replay.
+- Every public `EmbedResult` field: `bit_mode`, `k`, `method`, `placement`, `start`, `stride`, `payload_kind`, `payload_bytes`, `embedded_bits`, `units_used`, `units_changed`, and `bpp_actual`.
+- `start_random`, which tells replay whether the start was drawn.
+- `size_kind` and `size_value`, which record the requested size form.
 
-## Payload semantics
+`metadata.csv` has one row for every clean and stego PNG.
+Its columns are flat scalar columns:
 
-- Generate a separate message for each image. Every character is independently sampled uniformly from all 52 uppercase and lowercase English letters.
-- Encode each letter as one ASCII byte and read its eight bits from left to right, most significant message bit first. No header, terminator, padding, compression or encryption is added.
-- Capacity is `C = H * W * 3` bits. A count `N` needs `L = 8 * N` bits. Maximum characters are `floor(C / 8)`. For example, a 128 × 128 image holds 6,144 characters.
-- If the chosen count exceeds capacity, skip and log that image without sample files or a metadata row. Do not truncate, clamp, resample or wrap.
-- Choose `S` uniformly from `0` through `C - L`, inclusive, then embed exactly `[S, S + L)`. Partial boundary pixels are allowed.
-- One run-level `numpy.random.default_rng(run_seed)` supplies range counts, starts and letter choices in processing order. Fixed mode uses `character_count`. Range mode uses inclusive `min_character_count` and `max_character_count`.
-- The embedding operation is `(old & 254) | bit`. Preserve all upper seven image bits and every channel outside the interval. Matching LSBs need not flip.
-- Messages are not retained in metadata, logs or separate files. The stego PNG necessarily contains the embedded text bits. There is no payload-recovery interface.
-- Mixed-case letters have structured bit patterns. Results do not automatically generalise to arbitrary or encrypted payloads, and no improvement in detector performance is promised.
-- Uniform valid starts do not give uniform channel coverage. Equal counts occupy different capacity percentages in differently sized images.
-
-Identical inputs, processing order, configuration, generator version and seed reproduce images, masks and per-sample choices. File-order-independent reproduction and reproduction of old-version outputs are not provided.
-
-## Region masks and compatibility
-
-The mask marks every pixel touched by the selected interval, including partial boundary pixels and selected pixels whose LSBs already matched the payload. It is derived from selection, not image differences or a rectangular bounding box. It can remain true even when the entire stego image equals the clean image. `mask.sum()` counts region pixels, not selected channels or actual changes.
-
-Historical version 3 outputs use scattered embedding and `H × W × 3` actual-change masks. Versions 4 and 5 export only `H × W` selected-region masks. Existing datasets are not converted, deleted or overwritten. Mask consumers require separately authorised compatibility work before using these outputs. Masks and generation metadata must not become detector inputs.
-
-Configuration uses `character_count`, `min_character_count` and `max_character_count`. Zero, negative, fractional, Boolean and floating-point YAML counts such as `40.0` are rejected. Old percentage and fractional-rate fields fail ordinary unknown-field validation. Old percentage and fractional-rate CLI flags are not accepted.
-
-`06_Scripts/build_manifest.py` accepts current `payload_percentage` metadata and divides it by 100 to preserve fractional `payload_rate` in its outputs. Historical `payload_rate` metadata remains supported. Reuse the permanent `source_split.csv` and supply the new run through `--generated-root`. Mask-loader and training compatibility work remains separate. Existing datasets retain their historical payload and mask meaning.
-
-## Metadata schema
-
-```csv
-source_id,source_file,clean_file,stego_file,mask_file,character_count,encoded_byte_count,payload_percentage,start_channel,embedding_length
-000001,img1.png,clean/000001.png,stego/000001.png,masks/000001.npy,8,8,0.13020833333333334,12,64
+```text
+label,cover_id,cover_index,variant,source_file,height,width,channels,generator_version,seed,embed_seed_seed,embed_seed_cover_index,embed_seed_variant,embed_seed_stream,bit_mode,k,method,placement,start,start_random,stride,payload_kind,payload_bytes,embedded_bits,units_used,units_changed,bpp_actual,size_kind,size_value,file,mask_file
 ```
 
-| Column | Meaning |
-| --- | --- |
-| `source_id` | Sequential run identifier, also the artifact file name |
-| `source_file` | Path of the original file relative to the input folder |
-| `clean_file` | Run-relative path of the clean PNG |
-| `stego_file` | Run-relative path of the stego PNG |
-| `mask_file` | Run-relative path of the selected-region mask |
-| `character_count` | Selected number of letters |
-| `encoded_byte_count` | ASCII bytes, equal to character count |
-| `payload_percentage` | Calculated measurement only, `100 * embedding_length / C` |
-| `start_channel` | Zero-based start in flat RGB-channel order |
-| `embedding_length` | Selected channel count, exclusive end is start plus length |
+The embed seed fields are separate columns.
+The CSV does not store JSON inside a cell.
 
-`run_config.yaml` records the effective seed and character-count configuration. `run_summary.json` records `generator_version: 5.0.0`, `payload_encoding: ASCII`, `message_bit_order: most_significant_bit_first`, `text_policy: uniform_independent_A-Z_a-z` and `placement_policy: sequential_random_start_no_wrap`, alongside the seed, count configuration and run counts. GUI suggested run names include `text-v5`.
+The runner writes one source result at a time to `done.jsonl`.
+Only successful covers, bad input, and size skips enter the ledger.
+Unexpected errors remove partial files and are retried on the next run.
+The runner rebuilds `metadata.csv` from the ledger.
 
-## Input and failure behaviour
+## Read one generated image
 
-- Original size is preserved. There is no resizing, cropping or format conversion.
-- RGBA, grayscale, palette, 16-bit, animated, transparency-bearing, corrupt and non-PNG files are rejected rather than converted.
-- The pixel safety limit is **16 million pixels per image**. Processing is serial and memory use grows with image size and character count.
-- An invalid or failed source is logged with its reason, counted as skipped and does not stop the run. If writing one sample fails part way through, its artifacts are deleted and it gets no metadata row.
-- An existing non-empty output folder is never overwritten, and the input and output folders must not overlap.
-- `run_summary.json` reports `completed`, `cancelled` or `failed`, together with the discovered, generated and skipped counts. A run that generates no sample is reported as `failed`.
+Use `replay()` with the clean array and the stego JSON.
+The function does not need `run_config.yaml`.
 
-## Verification
+```python
+import json
+from pathlib import Path
 
-The existing `tests/` suite describes the historical fractional-rate and actual-change-mask contract and has not been migrated. It is not version 5 validation. No new automated test infrastructure was added. Focused synthetic smoke checks and their limitations are recorded in the project's `04_Outputs/AAI3001-Text-LSB-Generator-Validation.md`. `Validation-Report.md` records the earlier 2.0.0 implementation and is kept as history.
+import numpy as np
+from PIL import Image
 
-Implementation, tests and documentation were produced with AI assistance. Team review is required before academic submission or experimental use.
+from lsb_batch import replay
+
+root = Path("/tmp/aai3001-v6-example-run")
+with Image.open(root / "clean/000001.png") as image:
+    clean = np.asarray(image).copy()
+with Image.open(root / "stego/000001_1.png") as image:
+    metadata = json.loads(image.text["stego"])
+
+replayed, mask, result = replay(clean, metadata)
+print(replayed.shape, mask.shape, result.payload_bytes)
+```
+
+## Verify a run
+
+`--verify` reads every stego PNG JSON. It uses all available CPU cores by default; use `--workers N` to choose the process count. It prints progress about every five percent.
+It reads the matching clean PNG.
+It rebuilds the payload and selected units from `embed_seed`.
+It checks every `EmbedResult` field.
+It checks the replayed stego pixels byte for byte.
+It extracts the payload from the replay and stored stego images.
+It reports passed and failed counts.
+A non-zero failure count returns exit code 2.
+
+## Caveats for CNN use
+
+- Split train and test data by source photo.
+- Split by camera when camera metadata is available.
+- Never split only by tile.
+- Never split only by variant.
+- The `letters` payload has a structured bit pattern.
+- JPEG-origin covers keep JPEG compression traces after PNG preparation.
+- Metadata and masks are not model inputs.
+- Keep clean and stego files from one source photo in the same split.
+
+## Tests
+
+Run the full v6 suite:
+
+```sh
+python -m unittest tests.test_prepare tests.test_engine tests.test_batch -v
+```
+
+The suite uses synthetic photos.
+It does not require a downloaded RAW file.

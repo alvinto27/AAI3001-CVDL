@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+checkpoints/**/*.ckpt
+checkpoints/**/logs/tb/
+checkpoints/lightning_logs/
+checkpoints/*_quick/
+checkpoints/baseline_kv_xunet/
+checkpoints/baseline_kv_xunet_pc/
+checkpoints/baseline_kv_xunet_v2/
+checkpoints/baseline_kv_xunet_v2_from_vm/
+checkpoints/baseline_kv_xunet_v3_noclip_group/v3b_pc_9070xt.ipynb
+ImageSets/*
+!ImageSets/README.md
+Datasets/*
+!Datasets/README.md
+logs/*
+!logs/README.md
