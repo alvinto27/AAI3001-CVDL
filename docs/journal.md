@@ -396,6 +396,10 @@ caution, not a measured confidence interval.
 - V3c ran on the PC AMD RX 9070 XT with clip 3, GroupNorm, and the ROCm conv1
   fix enabled. It ran at about 10.7 iterations/s (about 93 ms/step) and took
   39.7 minutes for 10 epochs.
+- Cleared local `logs/` on 2026-10-12 after recording results; numbers from
+  `logs/v3b_pc.log` and `logs/v3c_pc.log` remain in this journal,
+  `docs/results-v3b.md`, and `docs/results-v3.md`, run outputs stay in
+  `checkpoints/`, and notebook 04 now defaults to v3c.
 
 ### Found
 
