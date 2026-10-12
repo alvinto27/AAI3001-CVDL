@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+checkpoints/*
+!checkpoints/README.md
+ImageSets/*
+!ImageSets/README.md
+Datasets/*
+!Datasets/README.md
+logs/*
+!logs/README.md

@@ -1,238 +1,285 @@
-"""Batch generation, output contract and command-line tests."""
+"""Tests for deterministic v6 bulk generation."""
+from __future__ import annotations
+
 import csv
 import json
-import subprocess
-import sys
 import tempfile
-import threading
 import unittest
-from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
 from PIL import Image
+from PIL.PngImagePlugin import PngInfo
 
-from lsb_batch import Config, METADATA_FIELDS, generate, read_config, write_config
-from lsb_core import VERSION, load_rgb
-
-GENERATOR = Path(__file__).resolve().parents[1] / "generate.py"
-
-
-def cli_summary(stdout: str) -> dict:
-    return json.loads(stdout[stdout.index("{"):])
+from lsb_batch import Config, generate, read_config, replay, verify_output
 
 
 class BatchTests(unittest.TestCase):
-    def setUp(self):
+    """Exercise configuration, generation, resume, and verification."""
+
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.source = self.root / "input"
         self.source.mkdir()
-        Image.new("RGB", (11, 7), (10, 20, 31)).save(self.source / "one.png")
-        Image.new("RGB", (5, 8), (42, 57, 91)).save(self.source / "two.PNG")
-        self.config = Config(str(self.source), str(self.root / "out"))
+        (self.source / "nested").mkdir()
+        Image.new("RGB", (32, 32), (10, 20, 30)).save(self.source / "cover.png")
+        Image.new("RGB", (32, 32), (40, 50, 60)).save(self.source / "nested" / "other.png")
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.temp.cleanup()
 
-    @property
-    def out(self) -> Path:
-        return self.root / "out"
+    def config(self, output: Path, **changes: object) -> Config:
+        """Build a small deterministic test configuration."""
+        values: dict[str, object] = {
+            "seed": 7,
+            "input": str(self.source),
+            "output": str(output),
+            "variants_per_cover": 2,
+            "bit_mode": ["lowest", "plane"],
+            "k": [1, 2],
+            "method": ["replace", "match"],
+            "placement": ["contiguous", "stride", "random"],
+            "stride": [1, 3],
+            "payload": ["random_bytes", "letters"],
+            "size": {"payload_bytes": [1, 20]},
+        }
+        values.update(changes)
+        return Config(**values)
 
-    def rows(self, path=None):
-        with ((path or self.out) / "metadata.csv").open(newline="", encoding="utf-8") as file:
-            return list(csv.DictReader(file))
+    def files(self, output: Path) -> dict[str, bytes]:
+        """Read deterministic output files for comparison."""
+        names = ("clean", "stego", "masks", "metadata.csv", "done.jsonl")
+        result: dict[str, bytes] = {}
+        for name in names:
+            path = output / name
+            if path.is_dir():
+                for file in sorted(path.rglob("*")):
+                    if file.is_file():
+                        result[str(file.relative_to(output))] = file.read_bytes()
+            elif path.is_file():
+                result[name] = path.read_bytes()
+        return result
 
-    def test_successful_run_writes_the_documented_structure(self):
-        result = generate(self.config)
-        self.assertEqual(result["status"], "completed")
-        self.assertEqual((result["total_discovered"], result["total_generated"], result["total_skipped"]), (2, 2, 0))
-        for folder in ("clean", "stego", "masks"):
-            self.assertTrue((self.out / folder).is_dir(), folder)
-        self.assertFalse((self.out / "selected_locations").exists())
-        for artifact in ("metadata.csv", "run_config.yaml", "run_summary.json", "generation.log"):
-            self.assertTrue((self.out / artifact).is_file(), artifact)
-        self.assertEqual(sorted(path.name for path in (self.out / "clean").iterdir()), ["000001.png", "000002.png"])
-        self.assertEqual(sorted(path.name for path in (self.out / "stego").iterdir()), ["000001.png", "000002.png"])
-        self.assertEqual(sorted(path.name for path in (self.out / "masks").iterdir()), ["000001.npy", "000002.npy"])
-        summary = json.loads((self.out / "run_summary.json").read_text(encoding="utf-8"))
-        self.assertEqual(summary, {"status": "completed", "run_seed": 42, "payload_mode": "fixed",
-                                   "payload_min": 0.1, "payload_max": 0.9, "total_discovered": 2,
-                                   "total_generated": 2, "total_skipped": 0})
-
-    def test_metadata_schema_sequential_ids_and_real_artifact_paths(self):
-        generate(self.config)
-        with (self.out / "metadata.csv").open(newline="", encoding="utf-8") as file:
-            self.assertEqual(next(csv.reader(file)), METADATA_FIELDS)
-        self.assertNotIn("selected_locations_file", METADATA_FIELDS)
-        rows = self.rows()
-        self.assertEqual([row["source_id"] for row in rows], ["000001", "000002"])
-        self.assertEqual([row["source_file"] for row in rows], ["one.png", "two.PNG"])
-        for row in rows:
-            self.assertEqual(set(row), set(METADATA_FIELDS))
-            for field in ("clean_file", "stego_file", "mask_file"):
-                self.assertTrue((self.out / row[field]).is_file(), row[field])
-        self.assertEqual(read_config(self.out / "run_config.yaml"),
-                         replace(self.config, input_dir=str(self.source), output_dir=str(self.out)))
-
-    def test_saved_artifacts_match_masks_and_rates(self):
-        generate(replace(self.config, payload_mode="range", payload_min=0.1, payload_max=0.8))
-        rows = self.rows()
-        self.assertEqual(len(rows), 2)
-        for row in rows:
-            clean = load_rgb(self.out / row["clean_file"])
-            stego = load_rgb(self.out / row["stego_file"])
-            mask = np.load(self.out / row["mask_file"], allow_pickle=False)
-            self.assertEqual(mask.dtype, np.bool_)
-            self.assertEqual(mask.shape, clean.shape)
-            self.assertTrue(np.array_equal(mask, clean != stego))
-            self.assertFalse(np.any((clean ^ stego) & np.uint8(254)))
-            self.assertGreaterEqual(float(row["payload_rate"]), 0.1)
-            self.assertLessEqual(float(row["payload_rate"]), 0.8)
-
-    def test_fixed_rate_applies_to_every_sample(self):
-        generate(replace(self.config, payload_rate=0.35))
-        self.assertEqual({row["payload_rate"] for row in self.rows()}, {"0.35"})
-
-    def test_configurable_range_rates_stay_inside_their_band(self):
-        for low, high in ((0.1, 0.8), (0.2, 0.6), (0.05, 0.4), (0.4, 0.9)):
-            out = self.root / f"range-{low}-{high}"
-            result = generate(replace(self.config, output_dir=str(out), payload_mode="range",
-                                      payload_min=low, payload_max=high))
-            self.assertEqual(result["status"], "completed")
-            rates = [float(row["payload_rate"]) for row in self.rows(out)]
-            self.assertEqual(len(rates), 2)
-            for rate in rates:
-                self.assertGreaterEqual(rate, low)
-                self.assertLessEqual(rate, high)
-
-    def test_equal_range_bounds_behave_like_one_fixed_rate(self):
-        generate(replace(self.config, payload_mode="range", payload_min=0.25, payload_max=0.25))
-        self.assertEqual({row["payload_rate"] for row in self.rows()}, {"0.25"})
-
-    def test_same_seed_and_order_reproduce_the_random_sequence(self):
-        runs = {}
-        for name, seed in (("run-a", 42), ("run-b", 42), ("run-c", 43)):
-            generate(replace(self.config, output_dir=str(self.root / name), payload_mode="range",
-                             payload_min=0.2, payload_max=0.7, run_seed=seed))
-            runs[name] = self.rows(self.root / name)
-        self.assertEqual([row["payload_rate"] for row in runs["run-a"]],
-                         [row["payload_rate"] for row in runs["run-b"]])
-        for first, second in zip(runs["run-a"], runs["run-b"]):
-            self.assertEqual((self.root / "run-a" / first["stego_file"]).read_bytes(),
-                             (self.root / "run-b" / second["stego_file"]).read_bytes())
-        self.assertNotEqual([row["payload_rate"] for row in runs["run-a"]],
-                            [row["payload_rate"] for row in runs["run-c"]])
-
-    def test_subfolder_discovery_follows_the_recursive_setting(self):
-        nested = self.source / "nested"
-        nested.mkdir()
-        Image.new("RGB", (6, 6), (3, 4, 5)).save(nested / "three.png")
-        result = generate(replace(self.config, output_dir=str(self.root / "deep")))
-        self.assertEqual(result["total_discovered"], 3)
-        self.assertEqual([row["source_file"] for row in self.rows(self.root / "deep")],
-                         ["nested/three.png", "one.png", "two.PNG"])
-        result = generate(replace(self.config, output_dir=str(self.root / "flat"), recursive=False))
-        self.assertEqual((result["total_discovered"], result["total_generated"]), (2, 2))
-
-    def test_invalid_images_are_skipped_and_the_run_continues(self):
-        (self.source / "bad.png").write_bytes(b"corrupt")
-        (self.source / "photo.jpg").write_bytes(b"jpeg")
-        Image.new("RGBA", (4, 4)).save(self.source / "alpha.png")
-        result = generate(self.config)
-        self.assertEqual(result["status"], "completed")
-        self.assertEqual((result["total_discovered"], result["total_generated"], result["total_skipped"]), (5, 2, 3))
-        self.assertEqual([row["source_id"] for row in self.rows()], ["000001", "000002"])
-
-    def test_existing_output_is_never_overwritten(self):
-        generate(self.config)
-        original = (self.out / "metadata.csv").read_bytes()
-        with self.assertRaises(ValueError):
-            generate(self.config)
-        self.assertEqual(original, (self.out / "metadata.csv").read_bytes())
-        for output in (self.source, self.source / "nested", self.root):
-            with self.assertRaises(ValueError):
-                generate(replace(self.config, output_dir=str(output)))
-
-    def test_cancellation_stops_cleanly(self):
-        stopped = threading.Event()
-        stopped.set()
-        result = generate(replace(self.config, output_dir=str(self.root / "before")), cancel=stopped)
-        self.assertEqual(result["status"], "cancelled")
-        self.assertEqual(result["total_generated"], 0)
-
-        stopping = threading.Event()
-
-        def progress(event: dict) -> None:
-            if event["kind"] == "progress" and event["current"] >= 1:
-                stopping.set()
-
-        result = generate(replace(self.config, output_dir=str(self.root / "during")), progress, stopping)
-        self.assertEqual(result["status"], "cancelled")
-        self.assertEqual((result["total_generated"], result["total_skipped"]), (1, 0))
-        self.assertEqual(len(self.rows(self.root / "during")), 1)
-        self.assertTrue((self.root / "during" / "clean" / "000001.png").is_file())
-        self.assertFalse((self.root / "during" / "clean" / "000002.png").exists())
-
-    def test_partially_written_samples_are_cleaned_up(self):
-        with patch("lsb_batch.np.save", side_effect=OSError("disk full")):
-            result = generate(self.config)
-        self.assertEqual((result["total_generated"], result["total_skipped"]), (0, 2))
-        self.assertEqual(result["status"], "failed")
-        self.assertEqual(self.rows(), [])
-        for folder in ("clean", "stego", "masks"):
-            self.assertEqual(list((self.out / folder).iterdir()), [], folder)
-        self.assertIn("disk full", (self.out / "generation.log").read_text(encoding="utf-8"))
-
-    def test_empty_input_folder_generates_nothing(self):
-        empty = self.root / "empty"
-        empty.mkdir()
-        result = generate(replace(self.config, input_dir=str(empty), output_dir=str(self.root / "emptyout")))
-        self.assertEqual(result["status"], "failed")
-        self.assertEqual((result["total_discovered"], result["total_generated"]), (0, 0))
-
-    def test_log_records_skips_and_summary_without_every_success(self):
-        (self.source / "bad.png").write_bytes(b"corrupt")
-        generate(self.config)
-        log = (self.out / "generation.log").read_text(encoding="utf-8")
-        self.assertIn("Run started", log)
-        self.assertIn("Configuration:", log)
-        self.assertIn("Skipped bad.png", log)
-        self.assertIn("Run completed: 2 generated, 1 skipped of 3 discovered files", log)
-        self.assertNotIn("000001", log)
-
-    def test_config_round_trip_validation_and_cli(self):
-        path = self.root / "config.yaml"
-        write_config(path, self.config)
-        self.assertEqual(read_config(path), self.config)
-        for invalid in ("input_dir: input\noutput_dir: out\npayload_min: 0.8\npayload_max: 0.2\n",
-                        "input_dir: input\noutput_dir: out\npayload_rate: 0\n",
-                        "input_dir: input\noutput_dir: out\nsource_dataset: old\n",
-                        "input_dir: input\noutput_dir: out\nrun_seed: -1\n"):
-            path.write_text(invalid, encoding="utf-8")
-            with self.assertRaises(ValueError):
+    def test_config_validation_rejects_unknown_and_invalid_values(self) -> None:
+        """Reject unknown keys and malformed strict settings."""
+        cases = (
+            {"unknown": 1},
+            {"size": {"bpp": [0.1, 0.2], "payload_bytes": [1, 2]}},
+            {"size": {"bpp": [0, 0.2]}},
+            {"k": 9},
+            {"placement": "contiguous", "stride": 2},
+            {"size": {"payload_bytes": [4, 1]}},
+            {"png_compress_level": [1, 9]},
+        )
+        for index, changes in enumerate(cases):
+            path = self.root / f"invalid-{index}.yaml"
+            data = self.config(self.root / f"out-{index}").as_dict()
+            data.update(changes)
+            path.write_text(json.dumps(data), encoding="utf-8")
+            with self.subTest(index=index), self.assertRaises(ValueError):
                 read_config(path)
-        (self.root / "invalid.yaml").write_text("input_dir: input\noutput_dir: out\nrun_seed: -1\n", encoding="utf-8")
-        result = subprocess.run([sys.executable, str(GENERATOR), "--config", str(self.root / "invalid.yaml")],
-                                capture_output=True, text=True)
-        self.assertEqual(result.returncode, 1)
 
-        write_config(path, self.config)
-        result = subprocess.run([sys.executable, str(GENERATOR), "--config", str(path)], capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(cli_summary(result.stdout)["total_generated"], 2)
-        result = subprocess.run([sys.executable, str(GENERATOR), "--input", str(self.source),
-                                 "--output", str(self.root / "cli"), "--payload-rate", "0.3", "--run-seed", "9"],
-                                capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual({row["payload_rate"] for row in self.rows(self.root / "cli")}, {"0.3"})
-        self.assertEqual(subprocess.run([sys.executable, str(GENERATOR), "--input", str(self.source),
-                                         "--output", str(self.root / "cli")], capture_output=True).returncode, 1)
-        self.assertEqual(subprocess.run([sys.executable, str(GENERATOR), "--verify", str(self.out)],
-                                        capture_output=True).returncode, 2)
-        version = subprocess.run([sys.executable, str(GENERATOR), "--version"], capture_output=True, text=True)
-        self.assertEqual(version.stdout.strip(), VERSION)
+    def test_same_output_with_one_and_two_workers(self) -> None:
+        """Per-image seeds make worker count irrelevant."""
+        first = self.root / "one"
+        second = self.root / "two"
+        generate(self.config(first), workers=1)
+        generate(self.config(second), workers=2)
+        self.assertEqual(self.files(first), self.files(second))
+
+    def test_resume_after_partial_run_matches_full_run(self) -> None:
+        """A ledger-backed resume produces the same deterministic artifacts."""
+        full = self.root / "full"
+        partial = self.root / "partial"
+        full_config = self.config(full)
+        partial_config = self.config(partial)
+        generate(full_config, workers=1)
+        generate(partial_config, workers=1)
+        done = partial / "done.jsonl"
+        lines = done.read_text(encoding="utf-8").splitlines()
+        done.write_text("\n".join(lines[:-1]) + "\n", encoding="utf-8")
+        generate(partial_config, workers=2)
+        self.assertEqual(self.files(full), self.files(partial))
+
+    def test_resume_refuses_changed_config(self) -> None:
+        """Resume refuses a run with a different configuration."""
+        output = self.root / "run"
+        config = self.config(output)
+        generate(config, workers=1)
+        with self.assertRaises(ValueError):
+            generate(self.config(output, seed=8), workers=1)
+
+    def test_non_png_and_rgba_inputs_are_skipped(self) -> None:
+        """Unsupported extensions and alpha PNGs are logged and skipped."""
+        (self.source / "notes.txt").write_text("not an image", encoding="utf-8")
+        Image.new("RGBA", (8, 8), (1, 2, 3, 4)).save(self.source / "alpha.png")
+        output = self.root / "run"
+        result = generate(self.config(output, variants_per_cover=1), workers=1)
+        self.assertEqual(result["completed"], 4)
+        self.assertFalse(list((output / "stego").glob("*.png")) == [])
+        log = (output / "run.log").read_text(encoding="utf-8")
+        self.assertIn("unsupported extension", log)
+        self.assertIn("only 8-bit RGB PNG is supported", log)
+
+    def test_json_text_and_verify_pass_then_fail_after_payload_flip(self) -> None:
+        """PNG metadata parses and verification catches a changed payload bit."""
+        output = self.root / "run"
+        config = self.config(
+            output,
+            variants_per_cover=1,
+            bit_mode="lowest",
+            k=1,
+            method="replace",
+            placement="contiguous",
+            start=0,
+            payload="random_bytes",
+            stride=1,
+            size={"payload_bytes": 4},
+        )
+        generate(config, workers=1)
+        clean_path = output / "clean" / "000001.png"
+        stego_path = output / "stego" / "000001_1.png"
+        with Image.open(clean_path) as clean:
+            clean_meta = json.loads(clean.text["stego"])
+        with Image.open(stego_path) as stego:
+            stego_meta = json.loads(stego.text["stego"])
+        self.assertEqual(clean_meta["label"], "clean")
+        self.assertEqual(set(clean_meta), {"label", "cover_id", "source_file", "size"})
+        self.assertEqual(stego_meta["label"], "stego")
+        self.assertEqual(stego_meta["generator_version"], "6.0.0")
+        self.assertIn("embed_seed", stego_meta)
+        with (output / "metadata.csv").open(newline="", encoding="utf-8") as stream:
+            rows = list(csv.DictReader(stream))
+        self.assertNotIn("size", rows[0])
+        self.assertNotIn("embed_seed", rows[0])
+        self.assertTrue(all("[" not in value and "{" not in value for row in rows for value in row.values()))
+        (output / "run_config.yaml").unlink()
+        serial_report = verify_output(output, workers=1)
+        parallel_report = verify_output(output, workers=2)
+        self.assertEqual(serial_report, {"passed": 2, "failed": 0, "total": 2})
+        self.assertEqual(serial_report, parallel_report)
+
+        with Image.open(stego_path) as original:
+            array = np.asarray(original).copy()
+            raw_text = original.text["stego"]
+        array.reshape(-1)[0] ^= np.uint8(1)
+        info = PngInfo()
+        info.add_text("stego", raw_text)
+        Image.fromarray(array).save(stego_path, format="PNG", pnginfo=info)
+        serial_report = verify_output(output, workers=1)
+        serial_failure = [
+            line for line in (output / "run.log").read_text(encoding="utf-8").splitlines()
+            if line.startswith("FAIL ")
+        ][-1]
+        parallel_report = verify_output(output, workers=2)
+        parallel_failure = [
+            line for line in (output / "run.log").read_text(encoding="utf-8").splitlines()
+            if line.startswith("FAIL ")
+        ][-1]
+        self.assertEqual(serial_report, {"passed": 1, "failed": 1, "total": 2})
+        self.assertEqual(serial_report, parallel_report)
+        self.assertEqual(serial_failure, parallel_failure)
+
+        with Image.open(clean_path) as clean:
+            clean_array = np.asarray(clean).copy()
+        replayed, _, _ = replay(clean_array, stego_meta)
+        info = PngInfo()
+        info.add_text("stego", raw_text)
+        array = replayed.copy()
+        array.reshape(-1)[100] ^= np.uint8(1)
+        Image.fromarray(array).save(stego_path, format="PNG", pnginfo=info)
+        report = verify_output(output, workers=2)
+        self.assertEqual(report, {"passed": 1, "failed": 1, "total": 2})
+
+    def test_verify_workers_match_with_broken_pair(self) -> None:
+        """Serial and parallel verification keep reports and failure details."""
+        output = self.root / "verify-workers"
+        config = self.config(
+            output,
+            variants_per_cover=1,
+            bit_mode="lowest",
+            k=1,
+            method="replace",
+            placement="contiguous",
+            start=0,
+            payload="random_bytes",
+            stride=1,
+            size={"payload_bytes": 4},
+        )
+        generate(config, workers=1)
+        stego_path = output / "stego" / "000001_1.png"
+        with Image.open(stego_path) as original:
+            array = np.asarray(original).copy()
+            raw_text = original.text["stego"]
+        array.reshape(-1)[0] ^= np.uint8(1)
+        info = PngInfo()
+        info.add_text("stego", raw_text)
+        Image.fromarray(array).save(stego_path, format="PNG", pnginfo=info)
+
+        serial_report = verify_output(output, workers=1)
+        serial_failure = [
+            line for line in (output / "run.log").read_text(encoding="utf-8").splitlines()
+            if line.startswith("FAIL ")
+        ][-1]
+        parallel_report = verify_output(output, workers=2)
+        parallel_failure = [
+            line for line in (output / "run.log").read_text(encoding="utf-8").splitlines()
+            if line.startswith("FAIL ")
+        ][-1]
+        self.assertEqual(serial_report, {"passed": 1, "failed": 1, "total": 2})
+        self.assertEqual(serial_report, parallel_report)
+        self.assertEqual(serial_failure, parallel_failure)
+
+    def test_unexpected_write_failure_is_retried_on_resume(self) -> None:
+        """Unexpected worker failures are not written to the done ledger."""
+        output = self.root / "retry"
+        config = self.config(output, variants_per_cover=1, stride=1)
+        with patch("lsb_batch._save_png_atomic", side_effect=OSError("disk full")):
+            result = generate(config, workers=1)
+        self.assertEqual(result["status"], "failed")
+        done = output / "done.jsonl"
+        self.assertFalse(done.exists())
+        result = generate(config, workers=1)
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(len(done.read_text(encoding="utf-8").splitlines()), 2)
+
+    def test_size_range_caps_to_capacity_and_skips_when_minimum_is_too_large(self) -> None:
+        """Size ranges cap at capacity and skip variants whose minimum cannot fit."""
+        small = self.root / "small"
+        Image.new("RGB", (4, 4), (1, 2, 3)).save(self.source / "tiny.png")
+        config = self.config(
+            small,
+            variants_per_cover=1,
+            bit_mode="plane",
+            k=1,
+            placement="contiguous",
+            stride=1,
+            size={"payload_bytes": [1, 100]},
+        )
+        generate(config, workers=1)
+        with (small / "metadata.csv").open(newline="", encoding="utf-8") as stream:
+            rows = list(csv.DictReader(stream))
+        stego_rows = [row for row in rows if row["label"] == "stego" and row["source_file"] == "tiny.png"]
+        self.assertEqual(len(stego_rows), 1)
+        self.assertLessEqual(int(stego_rows[0]["payload_bytes"]), 6)
+
+        skipped = self.root / "skipped"
+        generate(
+            self.config(
+                skipped,
+                variants_per_cover=1,
+                input=str(self.source),
+                bit_mode="plane",
+                k=1,
+                stride=1,
+                size={"payload_bytes": [7, 100]},
+            ),
+            workers=1,
+        )
+        self.assertNotIn("000003_1.png", {path.name for path in (skipped / "stego").iterdir()})
+        self.assertIn("minimum payload_bytes does not fit", (skipped / "run.log").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
