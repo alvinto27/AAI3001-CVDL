@@ -22,6 +22,7 @@ See [the RAISE 512 rebuild guide](docs/rebuild-raise512-run1.md) for the complet
 | File | Purpose |
 | --- | --- |
 | [`04_baseline_kv_xunet_v3.ipynb`](notebooks/04_baseline_kv_xunet_v3.ipynb) | Current training notebook. It has `CLIP_T` and `NORM` switches. V3c, with `CLIP_T=3` and `NORM="group"`, is the current baseline. |
+| [`04_v3c_clip3_group.ipynb`](notebooks/runs/04_v3c_clip3_group.ipynb) | executed v3c run with outputs |
 | [`02_eval_breakdown.ipynb`](notebooks/02_eval_breakdown.ipynb) | Per-setting evaluation of a `test_predictions.csv` file. |
 
 Full working history (journal, v1/v2 notebooks, v1 report, ROCm fix, ideas): [branch yx](https://github.com/alvinto27/AAI3001-CVDL/tree/yx).
