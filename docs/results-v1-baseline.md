@@ -14,8 +14,9 @@ claim about all images or all embedding methods.
   default 0.5 threshold. Accuracy there was 0.839.
 - Most settings were easy for this small 19.5 K-parameter CNN. The hard region
   was k=1-2 with bpp at or below 0.3.
-- The run exposed a BatchNorm problem. The model could use the clean/stego twin
-  in the same batch. V2 must test unpaired batches and fix this issue.
+- The run exposed a BatchNorm problem. The twin-in-batch shortcut was found
+  first, but v2 shows twin pairing is not the whole cause. A train/eval BatchNorm
+  statistics mismatch is the current suspect (**Pending**).
 
 ## 2. Setup
 
@@ -43,7 +44,7 @@ photo never crosses a split. The test set is 7,433 pairs.
 The model starts with a fixed **KV filter**. This is a high-pass filter that
 keeps image changes and suppresses smooth content. It runs separately on each
 colour channel. The result is called a residual. An Xu-Net-style CNN then
-classifies the residual and the image features. The model has 19.5 K
+classifies the residual. The model has 19.5 K
 parameters.
 
 The input is raw 0-255 float32 data. Training used Adam with learning rate
@@ -68,8 +69,11 @@ The test score was therefore not used to choose the checkpoint.
 - `k` controls which bits are used. In `lowest` mode, `k` low bits are used. In
   `plane` mode, one bit plane is used: `k=1` is the LSB and larger `k` values
   select higher planes. Larger changes are easier to see.
-- `replace` writes the target bits. `match` chooses a nearby valid pixel value
-  that matches the target, so it usually changes the cover less.
+- `replace` overwrites the target bits directly. `match` reaches the target
+  bits by adding or subtracting (in plane mode, `v +/- 2^(k-1)`), choosing the
+  direction at random. It changes about as many values by a similar amount, but
+  it avoids the known statistical pattern of `replace`: values only swap inside
+  fixed pairs such as `2i` and `2i+1`, which classic LSB detectors use.
 - **Placement** controls where payload bits go. `contiguous` uses nearby carrier
   values, `stride` skips by a fixed step, and `random` chooses positions.
 - **Payload kind** is either uniform random bytes or letters. It changes the
@@ -175,11 +179,11 @@ The training log showed this pattern:
 
 | Point | Validation result | Train accuracy |
 | --- | --- | ---: |
-| Epoch 3 | val_acc 0.598 | about 0.98 |
-| Epoch 5 | val_loss 0.3209, the best checkpoint | about 0.98 |
-| Epoch 6 | val_loss 2.28, val_acc 0.611 | about 0.98 |
-| Epoch 8 | val_loss 29.6, val_acc 0.501 | about 0.98 |
-| Epoch 9 | val_loss 33.7, val_acc 0.500 | about 0.98 |
+| Epoch 3 | val_acc 0.598 | not recorded |
+| Epoch 5 | val_loss 0.3209, the best checkpoint | not recorded |
+| Epoch 6 | val_loss 2.28, val_acc 0.611 | 0.980 |
+| Epoch 8 | val_loss 29.6, val_acc 0.501 | 0.982 |
+| Epoch 9 | val_loss 33.7, val_acc 0.500 | 0.982 |
 
 BatchNorm uses statistics from a training batch, but running statistics in eval
 mode. A VM check used 1,000 train pairs and 1,000 validation pairs:
@@ -220,14 +224,14 @@ between training-batch and running BatchNorm statistics, made worse by raw
   only as a diagnosis.
 - Each stride value has only about 150 pairs. Stride comparisons are therefore
   uncertain.
-- Local prediction records are in
-  `../checkpoints/baseline_kv_xunet/test_predictions.csv` and
-  `../checkpoints/baseline_kv_xunet/test_predictions_per_setting.csv`. The
-  checkpoint folder is ignored and is not part of the report commit.
+- Local-only PC records (ignored by git; these paths do not work on GitHub)
+  are `../checkpoints/baseline_kv_xunet/test_predictions.csv`,
+  `../checkpoints/baseline_kv_xunet/test_predictions_per_setting.csv`, and
+  `../checkpoints/baseline_kv_xunet/baseline_pc_9070xt.ipynb`. The checkpoint
+  folder is not part of the report commit.
 
 Related files:
 
 - [Project journal](journal.md)
 - [Baseline notebook](../notebooks/01_baseline_kv_xunet.ipynb)
 - [Dataset rebuild guide](rebuild-raise512-run1.md)
-- [V1 PC notebook record](../checkpoints/baseline_kv_xunet/baseline_pc_9070xt.ipynb)
