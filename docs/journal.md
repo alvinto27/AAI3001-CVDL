@@ -485,7 +485,7 @@ high at that point. This was not tested.
 
 ### Next
 
-- Pending: write the V3 comparison report at `docs/results-v3.md`.
+- Done: wrote the [V3 comparison report](results-v3.md).
 - Pending: repeat the runs with other seeds to measure noise.
 - Pending: test learning-rate warm-up for the epoch-3 spike.
 - Pending: focus on plane k=1 at low bpp.
