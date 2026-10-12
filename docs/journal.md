@@ -93,10 +93,22 @@ Numbers are kept when they are known. Pending work is marked.
 - At PC epoch 6 of 10, the baseline showed train accuracy 0.980 and train loss
   0.060, but validation accuracy 0.611 and validation loss 2.28. At epoch 3,
   validation accuracy was 0.598 and validation loss was above 3.
-- The current hypothesis is that same-batch twins let BatchNorm use a shortcut
-  to compare each image with its twin. That shortcut is absent in evaluation
-  mode. The twins show the same picture, so content memorisation alone does
-  not explain the gap.
+- The VM v1 checkpoint `checkpoints/baseline_kv_xunet/last.ckpt` was at epoch 1,
+  global step 2,181. Its file name records `val_loss=13.05`.
+- A seed-0 sample of 1,000 train pairs and 1,000 validation pairs gave these
+  results. Each pair made 32 images in a batch of 16 pairs.
+
+  | set | eval mode (running BatchNorm statistics) | train-mode BatchNorm with twins together |
+  | --- | ---: | ---: |
+  | train | accuracy 0.5125, loss 13.08 | accuracy 0.969, loss 0.104 |
+  | val | accuracy 0.506, loss 12.92 | accuracy 0.963, loss 0.113 |
+
+- Train and validation behaved the same. This rules out simple content
+  memorisation. The model learned to compare each image with its twin through
+  BatchNorm batch statistics. When scored alone, it was at chance and very
+  overconfident. The hypothesis is confirmed.
+- The effect was likely easy to find because inputs were raw 0-255 values and
+  tile photo textures varied widely.
 
 ### Decided
 
@@ -112,7 +124,5 @@ Numbers are kept when they are known. Pending work is marked.
 ### Next
 
 - Pending: finish the PC v1 run and record its final test result.
-- Pending: run the v2 diagnosis that compares evaluation-mode accuracy with
-  batch-statistics accuracy on train and validation data.
 - Pending: run notebook 03 on the VM and compare it with v1.
 - Pending: use notebook 02 heatmaps to choose settings for larger models.
