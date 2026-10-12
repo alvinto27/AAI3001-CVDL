@@ -14,9 +14,9 @@ claim about all images or all embedding methods.
   default 0.5 threshold. Accuracy there was 0.839.
 - Most settings were easy for this small 19.5 K-parameter CNN. The hard region
   was k=1-2 with bpp at or below 0.3.
-- The run exposed a BatchNorm problem. The twin-in-batch shortcut was found
-  first, but v2 shows twin pairing is not the whole cause. A train/eval BatchNorm
-  statistics mismatch is the current suspect (**Pending**).
+- The run exposed batch-relative judging through BatchNorm statistics, not a
+  twin-pairing shortcut. V2 confirmed the problem (test P_E 0.115); running
+  statistic recalibration was not a reliable fix. See section 8.
 
 ## 2. Setup
 
@@ -223,17 +223,30 @@ mode. A VM check used 1,000 train pairs and 1,000 validation pairs:
 | Validation accuracy | 0.506 | 0.963 |
 | Loss | about 13 | 0.104 train, 0.113 validation |
 
-Train and validation behaved the same in this check. That argues against simple
-content memorisation. The model learned a shortcut: BatchNorm statistics let it
-compare a twin with its partner. When scored alone, it was at chance and very
-overconfident.
+The first check suggested a twin shortcut, but did not separate twin pairing
+from batch statistics. Two follow-up diagnoses correct that explanation.
+On the same seed-0 samples, train-mode BatchNorm scored almost the same with
+random unpaired batches and twins together: validation accuracy was
+0.961 versus 0.959 for v2 epoch 1, and 0.978 versus 0.978 for v1 epoch 5.
+Twins were not the cause.
 
-V2 is now at epoch 2 with twins in different batches, AdamW weight decay
-1e-4, and checkpoint selection by validation accuracy. It has train accuracy
-0.956, validation accuracy 0.533, and validation loss 4.31. This shows that
-twin pairing is not the whole cause. The current suspect is the mismatch
-between training-batch and running BatchNorm statistics, made worse by raw
-0-255 input and varied tile textures. Diagnosis 2 is **Pending**.
+With stored running statistics, validation accuracy was 0.541 for v2 and
+0.859 for v1. Recalibration with 100 unpaired train batches improved v2 to
+0.750 but reduced v1 to 0.544. It is not a reliable fix; v1's good epoch 5
+was partly luck in its stored statistics.
+
+Batch composition was decisive. All-clean batches gave accuracy 0.003-0.012
+and mean stego probability 0.97-0.99, while mixed 50/50 batches gave accuracy
+0.96-0.98. Both models judge images relative to their batch. The current
+explanation is BatchNorm applied to raw 0-255 KV residuals with widely varying
+texture and high-k stego: first-layer batch variance varied about 45-50 times.
+
+V2 finished 10 L4 epochs with unpaired training images, but did not close the
+gap. Its best-validation-accuracy epoch-1 checkpoint gave test accuracy 0.5352,
+AUC 0.915, and P_E 0.1148 (about 0.115). Accuracy-based selection uses the
+broken 0.5 threshold; future runs select by validation P_E and save every
+epoch. Full tables and the v3 plan are in the
+[2026-10-12 journal entry](journal.md).
 
 ## 9. What this means for next steps
 

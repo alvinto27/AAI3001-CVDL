@@ -76,6 +76,11 @@ Numbers are kept when they are known. Pending work is marked.
   rates, and k-by-bpp heatmaps (`307420f`, `3f31122`).
 - Ran the baseline on the PC and VM. The baseline uses BatchNorm. BatchNorm
   normalizes activations with statistics from the current batch.
+- Finished v2 on the VM L4: 10 epochs with independently shuffled images,
+  AdamW weight decay 1e-4, and checkpoint selection by validation accuracy.
+- Completed the running-statistics and batch-composition diagnoses on the VM.
+- Completed the L4 convolution benchmark for the ROCm investigation. Details
+  stay in `rocm-perf/`, local only.
 
 ### Found
 
@@ -109,10 +114,10 @@ Numbers are kept when they are known. Pending work is marked.
   | train | accuracy 0.5125, loss 13.08 | accuracy 0.969, loss 0.104 |
   | val | accuracy 0.506, loss 12.92 | accuracy 0.963, loss 0.113 |
 
-- Train and validation behaved the same. This rules out simple content
-  memorisation. The model learned to compare each image with its twin through
-  BatchNorm batch statistics. When scored alone, it was at chance and very
-  overconfident. The hypothesis is confirmed.
+- Train and validation behaved the same. The first diagnosis suggested a
+  twin-in-batch shortcut, but it did not separate twin pairing from the use of
+  batch statistics. Diagnosis 2 below corrects that conclusion: twins were
+  not the cause.
 - The speed result does not support deterministic mode as the cause of the PC
   versus L4 gap. A separate ROCm performance investigation will continue.
 - The effect was likely easy to find because inputs were raw 0-255 values and
@@ -150,24 +155,110 @@ Numbers are kept when they are known. Pending work is marked.
   k1-k2 with small payloads clearly separate models. One run and one seed make
   these numbers approximate.
 
+- V2 did not close the train/validation gap. Train accuracy was 0.956-0.980.
+  Validation accuracy/loss were 0.533/4.31 at epoch 2, 0.513/10.4 at epoch 4,
+  0.522/13.8 at epoch 7, and 0.510/24.6 at epoch 9. The kept checkpoint was
+  epoch 1, with best validation accuracy 0.5448. Epoch numbers here start at
+  1; the checkpoint field `epoch=0` means epoch 1.
+- V2 test accuracy at 0.5 was 0.5352, AUC 0.915, and P_E 0.1148. V1 epoch 5
+  gave 0.839, 0.989, and 0.0276 on the same test split. Separating twins did
+  not fix the problem.
+- Selecting by validation accuracy failed: it uses the broken 0.5 threshold.
+  Select by validation P_E or AUC instead.
+- In this Lightning version, `save_last=True` wrote `last.ckpt` only when a
+  top-k checkpoint was saved. On both PC v1 and VM v2, last was best, not the
+  latest epoch. A resume after preemption would restart from the best epoch.
+  Save a checkpoint every epoch next time.
+
+#### Diagnosis 2 — Running statistics versus batch statistics
+
+Both models used seed-0 samples of 1,000 train pairs and 1,000 validation
+pairs. Each entry is **accuracy / cross-entropy loss**. Modes are:
+
+- **a:** evaluation mode with stored running statistics.
+- **b:** evaluation mode after resetting BatchNorm statistics and recalibrating
+  with 100 random unpaired train batches of 32 images, cumulative averaging.
+- **c:** train-mode BatchNorm on a model copy, 63 random unpaired batches of
+  32 images (2,016 images; covers can repeat across batches, never within one).
+- **d:** train-mode BatchNorm on a copy, with twins together (2,000 images).
+
+No gradients or original checkpoint statistics were changed.
+
+| Checkpoint | Set | a | b | c | d |
+| --- | --- | --- | --- | --- | --- |
+| V2 epoch 1 | Train | 0.5465 / 4.0007 | 0.7515 / 0.5356 | 0.9524 / 0.1252 | 0.9565 / 0.1217 |
+| V2 epoch 1 | Val | 0.5410 / 3.9859 | 0.7495 / 0.5609 | 0.9608 / 0.1165 | 0.9585 / 0.1266 |
+| V1 PC epoch 5 | Train | 0.8365 / 0.3318 | 0.5400 / 7.0538 | 0.9722 / 0.0754 | 0.9750 / 0.0708 |
+| V1 PC epoch 5 | Val | 0.8585 / 0.3009 | 0.5435 / 6.9305 | 0.9782 / 0.0726 | 0.9775 / 0.0697 |
+
+V2 last and best files have identical model tensors, both from epoch 1, so
+there is only one v2 model here. Modes c and d are approximately equal: twins
+were not the real cause. Recalibration helps v2 (validation 0.54 to 0.75) but
+harms v1 (0.86 to 0.54). It is not a reliable fix. V1's good epoch 5 was
+partly luck in its stored statistics.
+
+The first BatchNorm layer (`bn1`) had these statistics. Mean magnitude means
+mean absolute value across channels; variance means mean across channels.
+The change ratio is mean absolute change divided by the stored magnitude.
+Batch variance spread uses the first 50 unpaired calibration batches.
+
+| Model | Mean magnitude stored / recalibrated | Mean change ratio | Variance stored / recalibrated | Variance change ratio | Batch variance min / median / max |
+| --- | --- | --- | --- | --- | --- |
+| V2 epoch 1 | 3.3043 / 2.9098 | 0.1194 | 147.533 / 103.051 | 0.3015 | 9.0 / 75.7 / 412 |
+| V1 PC epoch 5 | 4.7433 / 4.3120 | 0.0909 | 281.616 / 237.977 | 0.1550 | 21.2 / 170 / 1027 |
+
+#### Diagnosis 3 — Batch composition
+
+The same seed-0 pair samples were used. Each mode used 63 batches of 32
+images, with the same randomly selected covers across modes. Covers can
+repeat across batches; each batch has distinct covers. Model copies used
+train-mode BatchNorm without gradients:
+
+- **e:** all clean; accuracy is the fraction predicted clean.
+- **f:** all stego; accuracy is the fraction predicted stego.
+- **g:** exactly 16 clean and 16 stego, without twins.
+
+Each entry is **accuracy / mean prob_stego / cross-entropy loss**.
+
+| Checkpoint | Set | e: all clean | f: all stego | g: mixed 50/50 |
+| --- | --- | --- | --- | --- |
+| V2 epoch 1 | Train | 0.0124 / 0.9729 / 9.6020 | 0.7887 / 0.7801 / 0.6030 | 0.9568 / 0.4881 / 0.1216 |
+| V2 epoch 1 | Val | 0.0060 / 0.9790 / 9.6525 | 0.7728 / 0.7706 / 0.6923 | 0.9613 / 0.4899 / 0.1265 |
+| V1 PC epoch 5 | Train | 0.0094 / 0.9875 / 28.7793 | 0.8323 / 0.8337 / 0.6749 | 0.9792 / 0.4946 / 0.0626 |
+| V1 PC epoch 5 | Val | 0.0035 / 0.9946 / 29.4181 | 0.8170 / 0.8175 / 0.8469 | 0.9782 / 0.4987 / 0.0679 |
+
+Both models call almost every clean tile stego in all-clean batches, yet score
+0.96-0.98 on mixed batches. They judge images relative to their batch.
+The current root-cause view is BatchNorm with raw 0-255 KV residuals whose
+scale varies widely with texture and high-k stego. The measured batch
+variance range was about 45-50 times; this is a variance ratio, not a measured
+45-50-fold change in standard deviation.
+
 ### Decided
 
-- Build baseline v2 in notebook 03. The work is in progress.
-- For v2, put twins in different batches, select the best checkpoint by
-  validation accuracy, use AdamW with weight decay 1e-4, set deterministic mode
-  off, and detect the repository root automatically.
+- V2 in notebook 03 is complete; its unpaired batches did not close the gap.
+- V2 used unpaired batches, validation-accuracy checkpoint selection, AdamW
+  with weight decay 1e-4, deterministic mode off, and automatic root detection.
+  Validation-accuracy selection is superseded by validation P_E for v3.
 - Use the B PC speed setting: deterministic mode off, default MIOpen find mode,
   and no cuDNN benchmark. `MIOPEN_FIND_MODE=1` gave no gain and was removed
   from notebook 03.
-- Run v2 on the VM while the PC finishes v1.
+- All stego training now runs on the VM. The PC GPU belongs to the ROCm
+  investigation.
 - Treat `lowest, k=1` and `plane, k=1` as one setting in future datasets, or
   report them as one combined group.
 - Focus future datasets and larger models on k<=2 and bpp<=0.3.
-- Compare v2 with v1 on the same test split. Include accuracy at threshold 0.5
-  because the v1 score ranking was good but its calibration was poor.
+- V3 tests one change at a time on the VM: v3a clips the KV residual to
+  `[-T, T]`, with T=3, and keeps BatchNorm; v3b replaces BatchNorm with
+  GroupNorm, with no clipping; v3c combines both only if needed. GroupNorm
+  computes statistics within each image rather than across the batch.
+- Every v3 run selects by validation P_E and saves a checkpoint every epoch.
+  Report test P_E, AUC, and accuracy at 0.5, the a-versus-c gap, the all-clean
+  batch check, and k-by-bpp heatmaps.
 - Delay larger models such as SRNet until the hard settings are confirmed.
   Possible later tests are 256-pixel crops, dropping trivial settings, and fp16.
 
 ### Next
 
-- Pending: run notebook 03 on the VM and compare it with v1 on the same test split.
+- Run v3a and v3b on the VM, then compare the detection and batch-composition
+  checks. Test v3c only if needed.
