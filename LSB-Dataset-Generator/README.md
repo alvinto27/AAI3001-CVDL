@@ -163,8 +163,10 @@ python generate.py --config run.yaml [--workers N]
 Use `--verify OUTPUT_DIR` instead of `--config` to verify an existing run:
 
 ```sh
-python generate.py --verify OUTPUT_DIR
+python generate.py --verify OUTPUT_DIR [--workers N]
 ```
+
+Verification uses all available CPU cores by default. Use `--workers N` to set the process count. It prints progress about every five percent. The report and failure details do not depend on the worker count.
 
 ### Configuration keys
 
@@ -383,7 +385,7 @@ print(replayed.shape, mask.shape, result.payload_bytes)
 
 ## Verify a run
 
-`--verify` reads every stego PNG JSON.
+`--verify` reads every stego PNG JSON. It uses all available CPU cores by default; use `--workers N` to choose the process count. It prints progress about every five percent.
 It reads the matching clean PNG.
 It rebuilds the payload and selected units from `embed_seed`.
 It checks every `EmbedResult` field.

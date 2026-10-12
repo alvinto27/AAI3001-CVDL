@@ -21,13 +21,13 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--verify cannot be combined with --config")
     if args.verify is None and args.config is None:
         parser.error("--config is required unless --verify is used")
+    if args.workers is not None and args.workers < 1:
+        parser.error("--workers must be at least 1")
     try:
         if args.verify is not None:
-            report = verify_output(args.verify)
+            report = verify_output(args.verify, workers=args.workers)
             print(json.dumps(report, sort_keys=True))
             return 0 if report["failed"] == 0 else 2
-        if args.workers is not None and args.workers < 1:
-            parser.error("--workers must be at least 1")
         config = read_config(args.config)
         report = generate(config, workers=args.workers)
         print(json.dumps(report, sort_keys=True))

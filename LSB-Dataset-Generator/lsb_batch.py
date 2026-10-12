@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv
 import json
 import math
+import multiprocessing
 import os
 import time
 import uuid
@@ -105,6 +106,7 @@ CSV_FIELDS = (
 )
 
 Progress = Callable[[dict[str, Any]], None]
+VERIFY_CHUNK_SIZE = 128
 
 
 @dataclass(frozen=True)
@@ -967,36 +969,94 @@ def regenerate_payload(
     return extract(generated, result), result
 
 
-def verify_output(output: Path) -> dict[str, int]:
+def _verify_one(path: Path, output: Path) -> str | None:
+    """Verify one stego PNG and return its failure line, if any."""
+    try:
+        metadata = _metadata_from_png(path)
+        image = load_rgb_png(path)
+        clean_path = output / "clean" / f"{metadata['cover_id']}.png"
+        clean = load_rgb_png(clean_path)
+        replayed, _, result = replay(clean, metadata)
+        if not np.array_equal(replayed, image):
+            raise ValueError("stored stego pixels differ from replay")
+        for field, value in _result_fields(result).items():
+            if metadata.get(field) != value:
+                raise ValueError(f"metadata field {field} does not match")
+        expected_payload = extract(replayed, result)
+        actual_payload = extract(image, result)
+        if actual_payload != expected_payload:
+            raise ValueError("extracted payload differs from regenerated payload")
+        if len(expected_payload) != int(metadata["payload_bytes"]):
+            raise ValueError("payload length does not match metadata")
+    except Exception as exc:
+        return f"FAIL {path.name}: {exc}"
+    return None
+
+
+def _verify_chunk(paths: list[tuple[str, str]]) -> tuple[int, list[str]]:
+    """Verify a small path chunk in one worker process."""
+    passed = 0
+    failures: list[str] = []
+    for path_string, output_string in paths:
+        failure = _verify_one(Path(path_string), Path(output_string))
+        if failure is None:
+            passed += 1
+        else:
+            failures.append(failure)
+    return passed, failures
+
+
+def verify_output(output: Path, workers: int | None = None) -> dict[str, int]:
     """Verify every stego PNG by replaying pixels and payload."""
     output = Path(output)
     stego_paths = sorted((output / "stego").glob("*.png"), key=lambda path: path.name)
+    total = len(stego_paths)
+    worker_count = workers if workers is not None else (os.cpu_count() or 1)
+    if worker_count < 1:
+        raise ValueError("workers must be at least 1")
+
     passed = 0
-    failed = 0
     log_lines: list[str] = []
-    for path in stego_paths:
+    if total:
+        paths = [(str(path), str(output)) for path in stego_paths]
+        chunks = [paths[start : start + VERIFY_CHUNK_SIZE] for start in range(0, total, VERIFY_CHUNK_SIZE)]
+        executor = ProcessPoolExecutor(
+            max_workers=min(worker_count, len(chunks)),
+            mp_context=multiprocessing.get_context("spawn"),
+        )
+        future_map: dict[Future[tuple[int, list[str]]], list[tuple[str, str]]] = {
+            executor.submit(_verify_chunk, chunk): chunk for chunk in chunks
+        }
+        processed = 0
+        progress_step = max(1, math.ceil(total / 20))
+        next_progress = progress_step
         try:
-            metadata = _metadata_from_png(path)
-            image = load_rgb_png(path)
-            clean_path = output / "clean" / f"{metadata['cover_id']}.png"
-            clean = load_rgb_png(clean_path)
-            replayed, _, result = replay(clean, metadata)
-            if not np.array_equal(replayed, image):
-                raise ValueError("stored stego pixels differ from replay")
-            for field, value in _result_fields(result).items():
-                if metadata.get(field) != value:
-                    raise ValueError(f"metadata field {field} does not match")
-            expected_payload = extract(replayed, result)
-            actual_payload = extract(image, result)
-            if actual_payload != expected_payload:
-                raise ValueError("extracted payload differs from regenerated payload")
-            if len(expected_payload) != int(metadata["payload_bytes"]):
-                raise ValueError("payload length does not match metadata")
-            passed += 1
-        except Exception as exc:
-            failed += 1
-            log_lines.append(f"FAIL {path.name}: {exc}")
-    report = {"passed": passed, "failed": failed, "total": len(stego_paths)}
+            for future in as_completed(future_map):
+                chunk = future_map[future]
+                try:
+                    chunk_passed, chunk_failures = future.result()
+                except Exception as exc:
+                    chunk_passed = 0
+                    chunk_failures = [
+                        f"FAIL {Path(path_string).name}: verification worker failed: {exc}"
+                        for path_string, _ in chunk
+                    ]
+                passed += chunk_passed
+                log_lines.extend(chunk_failures)
+                processed += len(chunk)
+                if processed >= next_progress:
+                    print(f"verified {processed}/{total}", flush=True)
+                    while next_progress <= processed:
+                        next_progress += progress_step
+        except KeyboardInterrupt:
+            executor.shutdown(wait=True, cancel_futures=True)
+            raise
+        else:
+            executor.shutdown(wait=True)
+
+    log_lines.sort()
+    failed = len(log_lines)
+    report = {"passed": passed, "failed": failed, "total": total}
     with (output / "run.log").open("a", encoding="utf-8") as stream:
         stream.write(
             f"Verify: {passed} passed, {failed} failed\n"

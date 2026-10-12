@@ -94,7 +94,7 @@ The last line must start with `REBUILD DONE:` and show `clean=49796 stego=49796 
      --config configs/raise512-run1.yaml
    ```
 
-4. Verify the generated images by deterministic replay.
+4. Verify the generated images by deterministic replay. Verification uses all available CPU cores by default. You can add `--workers N` to set the process count.
 
    ```sh
    uv run python LSB-Dataset-Generator/generate.py \

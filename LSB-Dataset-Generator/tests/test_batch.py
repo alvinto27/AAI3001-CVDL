@@ -156,7 +156,10 @@ class BatchTests(unittest.TestCase):
         self.assertNotIn("embed_seed", rows[0])
         self.assertTrue(all("[" not in value and "{" not in value for row in rows for value in row.values()))
         (output / "run_config.yaml").unlink()
-        self.assertEqual(verify_output(output), {"passed": 2, "failed": 0, "total": 2})
+        serial_report = verify_output(output, workers=1)
+        parallel_report = verify_output(output, workers=2)
+        self.assertEqual(serial_report, {"passed": 2, "failed": 0, "total": 2})
+        self.assertEqual(serial_report, parallel_report)
 
         with Image.open(stego_path) as original:
             array = np.asarray(original).copy()
@@ -165,8 +168,19 @@ class BatchTests(unittest.TestCase):
         info = PngInfo()
         info.add_text("stego", raw_text)
         Image.fromarray(array).save(stego_path, format="PNG", pnginfo=info)
-        report = verify_output(output)
-        self.assertEqual(report, {"passed": 1, "failed": 1, "total": 2})
+        serial_report = verify_output(output, workers=1)
+        serial_failure = [
+            line for line in (output / "run.log").read_text(encoding="utf-8").splitlines()
+            if line.startswith("FAIL ")
+        ][-1]
+        parallel_report = verify_output(output, workers=2)
+        parallel_failure = [
+            line for line in (output / "run.log").read_text(encoding="utf-8").splitlines()
+            if line.startswith("FAIL ")
+        ][-1]
+        self.assertEqual(serial_report, {"passed": 1, "failed": 1, "total": 2})
+        self.assertEqual(serial_report, parallel_report)
+        self.assertEqual(serial_failure, parallel_failure)
 
         with Image.open(clean_path) as clean:
             clean_array = np.asarray(clean).copy()
@@ -176,8 +190,47 @@ class BatchTests(unittest.TestCase):
         array = replayed.copy()
         array.reshape(-1)[100] ^= np.uint8(1)
         Image.fromarray(array).save(stego_path, format="PNG", pnginfo=info)
-        report = verify_output(output)
+        report = verify_output(output, workers=2)
         self.assertEqual(report, {"passed": 1, "failed": 1, "total": 2})
+
+    def test_verify_workers_match_with_broken_pair(self) -> None:
+        """Serial and parallel verification keep reports and failure details."""
+        output = self.root / "verify-workers"
+        config = self.config(
+            output,
+            variants_per_cover=1,
+            bit_mode="lowest",
+            k=1,
+            method="replace",
+            placement="contiguous",
+            start=0,
+            payload="random_bytes",
+            stride=1,
+            size={"payload_bytes": 4},
+        )
+        generate(config, workers=1)
+        stego_path = output / "stego" / "000001_1.png"
+        with Image.open(stego_path) as original:
+            array = np.asarray(original).copy()
+            raw_text = original.text["stego"]
+        array.reshape(-1)[0] ^= np.uint8(1)
+        info = PngInfo()
+        info.add_text("stego", raw_text)
+        Image.fromarray(array).save(stego_path, format="PNG", pnginfo=info)
+
+        serial_report = verify_output(output, workers=1)
+        serial_failure = [
+            line for line in (output / "run.log").read_text(encoding="utf-8").splitlines()
+            if line.startswith("FAIL ")
+        ][-1]
+        parallel_report = verify_output(output, workers=2)
+        parallel_failure = [
+            line for line in (output / "run.log").read_text(encoding="utf-8").splitlines()
+            if line.startswith("FAIL ")
+        ][-1]
+        self.assertEqual(serial_report, {"passed": 1, "failed": 1, "total": 2})
+        self.assertEqual(serial_report, parallel_report)
+        self.assertEqual(serial_failure, parallel_failure)
 
     def test_unexpected_write_failure_is_retried_on_resume(self) -> None:
         """Unexpected worker failures are not written to the done ledger."""
