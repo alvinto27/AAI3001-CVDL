@@ -1,0 +1,6 @@
+clip_t: 3.0
+lr: 0.001
+max_epochs: 10
+norm: batch
+paired_batches: false
+weight_decay: 0.0001
