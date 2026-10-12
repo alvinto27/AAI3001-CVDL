@@ -375,3 +375,121 @@ caution, not a measured confidence interval.
 - Pending: run v3c and compare it with v3b on detection and batch checks.
 - Done: wrote the [v3b results report](results-v3b.md), with training curves,
   test plots, setting breakdowns, and batch-independence checks.
+
+## 2026-10-12 — V3c run and notebook monitoring (continuation)
+
+### Did
+
+- Updated notebook 04 in commit `4a890d5`.
+  - Added TensorBoard 2.21.0 to `pyproject.toml` and `uv.lock`. The lock was
+    made on the VM in a temporary folder. Only TensorBoard and its helper
+    packages were added. After the push, teammates and the VM must run
+    `uv sync`.
+  - Added CSV and TensorBoard loggers to each run folder.
+  - Kept existing CSV rows when resuming. Lightning deletes `metrics.csv` on
+    logger re-initialisation unless the notebook preserves it.
+  - Logged `val_fa` and `val_md` at each epoch.
+  - Redrew `training_curves.png` after each epoch.
+  - Added the all-stego check (f).
+  - The resume check accepts epoch 9 or epoch 10 and checks that
+    `global_step` is unchanged.
+- V3c ran on the PC AMD RX 9070 XT with clip 3, GroupNorm, and the ROCm conv1
+  fix enabled. It ran at about 10.7 iterations/s (about 93 ms/step) and took
+  39.7 minutes for 10 epochs.
+
+### Found
+
+#### V3c validation trend
+
+The values below come from
+`checkpoints/baseline_kv_xunet_v3_clip3_group/logs/csv/run/metrics.csv`.
+Epoch numbers start at 1. Checkpoint filenames start at 0.
+
+| Epoch | Validation loss | Validation P_E |
+| ---: | ---: | ---: |
+| 1 | 0.0818977430 | 0.0219456702 |
+| 2 | 0.0696384236 | 0.0165261608 |
+| 3 | 0.1285918653 | 0.0175297745 |
+| 4 | 0.0673173890 | 0.0176635887 |
+| 5 | 0.0529728606 | 0.0142513048 |
+| 6 | 0.0452369750 | 0.0103037599 |
+| 7 | 0.0399012156 | 0.0101030376 |
+| 8 | 0.0411364138 | 0.0097015928 |
+| 9 | 0.0397889987 | 0.0098354071 |
+| 10 | 0.0385187827 | 0.0095677776 |
+
+- The selected V3c checkpoint was
+  `best-epoch09-val_pe0.0096-val_auc0.9985.ckpt`, human epoch 10. Test
+  accuracy at 0.5 was 0.9858, AUC was 0.9982, and P_E was 0.0139. The best
+  global threshold was 0.458815, with P_FA 0.008476 and P_MD 0.019239.
+- V3c per-k P_E was:
+
+  | k | Lowest | Plane |
+  | ---: | ---: | ---: |
+  | 1 | 0.031983 | 0.062628 |
+  | 2 | 0.007642 | 0.007883 |
+  | 3 | 0.003198 | 0.005123 |
+  | 4 | 0.003394 | 0.000000 |
+  | 5 | 0.002070 | 0.001012 |
+  | 6 | 0.001147 | 0.000000 |
+  | 7 | 0.004505 | 0.000000 |
+  | 8 | 0.004751 | 0.000000 |
+
+#### V3c normalization checks
+
+The checks used the same labels as the earlier entries: a is evaluation
+mode, c is mixed train-mode normalization, e is an all-clean batch, and f is
+an all-stego batch. The values for c, e, and f are accuracy / mean
+`prob_stego`; a is accuracy / loss.
+
+| Set | a | c | e | f |
+| --- | --- | --- | --- | --- |
+| Train | 0.987000 / 0.035752 | 0.990079 / 0.502371 | 0.995040 / 0.019812 | 0.984127 / 0.982507 |
+| Validation | 0.990500 / 0.041141 | 0.992560 / 0.502398 | 0.998016 / 0.018719 | 0.987599 / 0.985346 |
+
+GroupNorm's maximum train/evaluation logit difference on identical images was
+0 in every check.
+
+#### V3 comparison
+
+All rows use the same held-out test split and one seed. The all-clean values
+are clean accuracy in train-mode all-clean batches, shown as train / validation.
+
+| Model | Accuracy at 0.5 | AUC | P_E | Best threshold | K=1 P_E lowest / plane | All-clean accuracy train / val |
+| --- | ---: | ---: | ---: | ---: | --- | --- |
+| V3a clip 3 + BatchNorm | 0.9843 | 0.9982 | 0.0120 | 0.1646 | 0.0277 / 0.0503 | 0.0169 / 0.0218 |
+| V3b no clip + GroupNorm | 0.9831 | 0.9971 | 0.0157 | 0.2833 | 0.0437 / 0.0585 | 0.9955 / 0.9965 |
+| V3c clip 3 + GroupNorm | 0.9858 | 0.9982 | 0.0139 | 0.458815 | 0.0320 / 0.0626 | 0.995040 / 0.998016 |
+
+Clipping with GroupNorm improved overall P_E from 0.0157 to 0.0139 and
+lowest k=1 P_E from about 0.044 to about 0.032. It moved the best threshold
+near 0.5. Plane k=1 P_E became about 0.063 instead of about 0.059. Each
+version has one run and one seed. Differences of about 0.002 P_E can be
+chance.
+
+#### Validation-loss spike
+
+V3b and V3c both had a validation-loss spike at human epoch 3. The V3b CSV
+reported val_loss 0.1210675091, and the V3c CSV reported 0.1285918653. The
+V3a VM CSV at `/srv/aai3001/AAI3001-CVDL/checkpoints/lightning_logs/version_5/metrics.csv`
+also had one spike, but at human epoch 4: val_loss rose from 0.0642 to 0.1146
+and val_P_E rose from 0.0146 to 0.0203. All three runs recovered before or at
+the learning-rate drop. A possible cause is that learning rate 1e-3 is too
+high at that point. This was not tested.
+
+### Decided
+
+- V3c is the current baseline. It is batch-independent, has the best accuracy
+  at 0.5, has the best-calibrated threshold, and has P_E within the observed
+  run-to-run noise of V3a.
+
+### Next
+
+- Pending: write the V3 comparison report at `docs/results-v3.md`.
+- Pending: repeat the runs with other seeds to measure noise.
+- Pending: test learning-rate warm-up for the epoch-3 spike.
+- Pending: focus on plane k=1 at low bpp.
+- Pending: inspect confidently wrong images, including clean images with
+  `prob_stego` near 1.0.
+- Pending: finish the TensorBoard chart layout and train/validation colour
+  runs in notebook 04.
