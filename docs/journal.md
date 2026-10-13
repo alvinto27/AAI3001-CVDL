@@ -722,6 +722,17 @@ high at that point. This was not tested.
     with both sources and the run1 mix, independent of training settings.
     `legacy_v6` remains for a v3c comparison re-run.
   - Loader defaults are `prefetch_factor=4` and `in_order=True`.
+- The Worker committed the run1 records in commit `8c4e549`.
+  - `data/raise/run1_labels.csv.gz` is 3,307,725 bytes, and
+    `data/raise/run1_metadata.csv.gz` is 3,180,260 bytes. Both use `gzip -n`
+    for deterministic output.
+  - The originals are `labels.csv` (19,806,781 bytes, SHA-256
+    `3195008b...b511b`) and `metadata.csv` (15,485,145 bytes, SHA-256
+    `fdc6d413...f0be3`). PC and VM copies are identical.
+  - Decompressed hashes equal the originals. A second compression produces
+    the same gzip bytes. The record is also in
+    `docs/frozen-source-records.md` and the root README.
+  - `masks/` and `records/` are not kept in git. Masks can be regenerated.
 
 ### Found
 
@@ -1519,7 +1530,8 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   [docs/cache-verification.md](cache-verification.md).
 - Done: step 7, the mode 1 loader (`970750a`). See
   [docs/torch-loader-verification.md](torch-loader-verification.md).
-- Pending: commit the compressed run1 labels and metadata to `data/raise/`.
+- Done: committed the compressed run1 labels and metadata to `data/raise/`
+  (`8c4e549`).
 - Pending, after step 8: team agreement, then delete
   `Datasets/raise512-run1` on the VM.
 - Done: the VM machine type decision after step 7: keep `g2-standard-8`.
