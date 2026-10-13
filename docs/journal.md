@@ -693,6 +693,20 @@ high at that point. This was not tested.
     checks with `iter_tiles`.
   - Check script: `scripts/check_mode1.py`. Tests:
     `tests/test_lsb_mode1.py`.
+- The Worker did plan step 6. Commit `7e89fec`. The full record is
+  [docs/cache-verification.md](cache-verification.md).
+  - Cache code: `LSB-Dataset-Generator/lsb_cache.py`,
+    `scripts/build_cache.py`, `scripts/check_cache.py`, and
+    `tests/test_lsb_cache.py`.
+  - The VM cache is `/srv/aai3001/otf-cache/v1/`. It has 1,900 uint8
+    `(H, W, 3)` `.npy` files (one full clean photo each), 1,900 JSON records,
+    and one format header. Writes are atomic and resumable, with per-entry
+    locks. Group `aai3001` can write the folder.
+  - The strict loader checks the header, identity, decoder fingerprint, shape,
+    and master and array SHA-256. The fingerprint includes RAW settings,
+    rawpy 0.27.1, LibRaw 0.22.1, NumPy 2.5.3, Pillow 12.3.0, and the
+    disabled noise hook. It never silently decodes a bad entry. Hash checks
+    can be disabled only after a session check.
 
 ### Found
 
@@ -1204,6 +1218,40 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
     calls and 0 mismatches.
 - 68 unit tests pass.
 
+#### Full-photo cache verification (step 6)
+
+- Clean decode speed on the VM with no other work running. Values are
+  photos/s at 1 / 4 / 8 processes, with 8 photos per camera:
+
+  | Camera | 1 process | 4 processes | 8 processes |
+  | --- | ---: | ---: | ---: |
+  | D7000 | 0.44 | 1.58 | 1.79 |
+  | D90 | 0.56 | 2.05 | 2.31 |
+  | D40 | 1.15 | 3.86 | 4.14 |
+
+  One process took 2.26 s per D7000 photo, compared with 0.83 s on the PC.
+  Eight processes give only about 13% more than four (4 cores x 2 threads).
+- Full build: 1,900 photos, 8 processes, 554.7 s. Size is 52.76 GB
+  (49.15 GiB). Free disk after the build was about 50.1 GiB.
+- All 1,900 array hashes and master hashes match their records (364.8 s).
+- All 49,796 clean and stego pairs from the cache, without NEF decoding,
+  match the stored PNGs (382.6 s).
+- Cache read plus cut plus embed for all 49,796 pairs, without reference PNG
+  reads, took 154.8 s with 8 processes: about 322 pairs/s (about 643
+  images/s). Summed time was 917 s for cache reads and 316 s for cut plus
+  embed. Cache reads are the larger part.
+- One-CPU random reads of all 1,900 photos: normal `np.load` gave 14.45 and
+  14.42 photos/s in two passes. mmap plus copy gave 12.75 and 10.97. Disk
+  reads were about 204-206 MB/s. RAM is 31 GiB, less than the 52.8 GB cache.
+  About 33-49% of reads likely came from the page cache. This is an
+  estimate because there was no `drop_caches` permission.
+- One random 512 tile per random photo through mmap gave 79.9 tiles/s and
+  read 3.11 times the tile bytes from disk.
+- VM monitoring showed about 200 MiB/s disk reads. A 200 GiB balanced
+  persistent disk gives about 196 MiB/s by Google's formula
+  (`140 + 0.28 x 200`). A same-size standard persistent disk gives about
+  24 MiB/s (`0.12 MiB/s per GiB`) and is not suitable.
+
 ### Decided
 
 - The user confirmed the reason for the v3c baseline. The goal of v3c is not
@@ -1400,10 +1448,12 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   [docs/embed-core-verification.md](embed-core-verification.md).
 - Done: step 5, mode 1 in the shared pipeline (`fc87b9c`). See
   [docs/mode1-verification.md](mode1-verification.md).
-- Pending, in progress: step 6, the full-photo `.npy` cache on the VM at
-  `/srv/aai3001/otf-cache/v1/`, with cache checks and read-speed measurements.
-- Pending: step 7 includes the source setting (decode or cache) and the
-  byte-identity check between them.
+- Done: step 6, the full-photo `.npy` cache (`7e89fec`). See
+  [docs/cache-verification.md](cache-verification.md).
+- Pending, in progress: step 7, the mode 1 loader with source setting
+  (decode/cache), overlap grid, shuffle buffer, run settings, and speed at or
+  above the L4 demand of about 215 images/s.
+- Pending: the VM machine type decision after step 7.
 - VM machine decision (user, 2026-10-13): keep `g2-standard-8` for now:
   one L4, 8 vCPUs (4 cores x 2 threads), and 32 GB RAM. Decide whether to
   change it after step 7 measures whether the VM CPU and disk can feed the L4
