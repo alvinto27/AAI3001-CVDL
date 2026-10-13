@@ -547,6 +547,18 @@ high at that point. This was not tested.
   - PC: AMD Ryzen 7 7700, `nproc` 16.
   - Input: 4,096 real train pairs. DataLoader batch of 32 images, with the
     notebook flips and 90-degree rotations. Warm file cache. 3 trials.
+- Ran a CPU-only benchmark of embed -> tile on the fly (plan B). The loader
+  embeds into the whole cropped photo, then cuts the tiles.
+  - The Worker deleted its temporary files. No repository code changed.
+  - PC: AMD Ryzen 7 7700, `nproc` 16. Latency was measured on one CPU with
+    threads=1.
+  - Input: 36 train photos (32 D7000, 3 D90, 1 D40).
+  - Settings came from the original `lsb_batch._draw_settings`, applied to
+    the whole cropped photo, so bpp applies to the photo. Seeds were
+    `SeedSequence([1, photo index, 1, 0])` for the settings and
+    `[..., 1]` for the embedding.
+  - The embed step was a copy of the engine without the mask and
+    `EmbedResult` tail. Only that tail was removed.
 
 ### Found
 
@@ -604,6 +616,76 @@ faster):
   not get this saving. The cache was warm, and no GPU training ran at the
   same time.
 
+#### Embed -> tile benchmark on whole photos
+
+Tile grid audit over all 1,000 photos and 49,796 tiles:
+
+- Each photo has a complete, non-overlapping grid of 512 x 512 tiles from the
+  top-left corner. Edge pixels outside the grid are not in any tile.
+- Stitching the stored clean tiles rebuilds each cropped photo.
+
+  | Camera | Grid, rows x cols (landscape / portrait) | Photos (landscape + portrait) | Tiles |
+  | --- | --- | ---: | ---: |
+  | D7000 | 6 x 9 / 9 x 6 | 570 + 144 | 38,556 |
+  | D90 | 5 x 8 / 8 x 5 | 194 + 84 | 11,120 |
+  | D40 | 3 x 5 / 5 x 3 | 6 + 2 | 120 |
+
+- One NEF decode (D90, 4310 x 2868, project settings) took 683.8 ms. This is
+  one measurement.
+
+Per-photo latency, median / p90 in ms, n=36 photos. The three load sources
+are: stitch the stored clean tile PNGs, read one `.npy` array file per photo,
+or read one full-photo PNG (compression level 1).
+
+| Step | Stitch | `.npy` | Full PNG |
+| --- | ---: | ---: | ---: |
+| Load | 292.73 / 304.37 | 2.66 / 2.78 | 327.58 / 344.52 |
+| Embed | about 50-54 / 196-200 | about 50-54 / 196-200 | about 50-54 / 196-200 |
+| Cut tiles and labels | about 147 / 155 | about 147 / 155 | about 147 / 155 |
+| Total | 489.51 / 644.11 | 205.05 / 348.89 | 523.04 / 673.87 |
+| Total per output tile (median) | 4.619 | 1.899 | 4.940 |
+
+- File size per photo (median): `.npy` 40.50 MiB, full PNG 19.86 MiB (p90
+  22.89 MiB). A full `.npy` cache would be about 36.5 GiB.
+- Slowest embed (D7000, match), median per photo: random placement and
+  0.5 bpp with one bit per carrier value took about 586 ms (lowest k=1) and
+  578 ms (plane k=8). Lowest k=8 took about 76 ms. Contiguous and stride
+  placement at 0.5 bpp took about 118-126 ms, and about 14 ms at 0.05 bpp.
+- Placement on whole photos: contiguous placement makes horizontal bands;
+  about 6-18 of 54 tiles get payload. Stride placement is also localized.
+  Random placement reaches all 54 tiles.
+- DataLoader output, tiles/s. One item is one photo with its clean and
+  stego tiles. Prefetch factor 1.
+
+  | Workers | Stitch | `.npy` |
+  | ---: | ---: | ---: |
+  | 4 | 437.95 | 609.46 |
+  | 8 | 738.65 | 999.91 |
+  | 16 | 977.10 | 1265.04 |
+
+- Peak resident memory (RSS) was about 1.1 GiB per worker. This value
+  includes shared pages.
+- All rows are above the PC target of 340 tiles/s (images/s), also at 4 workers. The
+  VM estimate is about 489 tiles/s (stitch) and about 633 tiles/s (`.npy`).
+  These values are scaled from the PC, not measured on the VM.
+- Label statistics, 36 photos with mixed settings:
+  - 1,286 of 1,863 tiles from stego photos (69.03%) have label 1. The
+    other 577 tiles correctly have label 0: no pixel value changed.
+  - Random placement: 100% label 1. Stride: 42-83%. Contiguous: 14-24%.
+  - Over all clean and stego outputs, about 34.5% of tiles have label 1.
+  - The smallest changed-pixel count in a label-1 tile was 413. No label-1
+    tile had 10 or fewer changes. This is a sample result, not a guarantee.
+- Correctness:
+  - 1,863 of 1,863 stitched and recut clean tiles were byte-identical to the
+    stored tiles.
+  - Two whole-photo embeds with the same seed were byte-identical for 36 of
+    36 photos.
+  - The stored stego tiles were embedded per tile. They are not expected to
+    match whole-photo embedding.
+- Capacity: with one bit per carrier value and stride 16, the maximum is
+  about 0.1875 bpp. The original `_draw_settings` limits the bpp draw to the
+  capacity.
+
 ### Decided
 
 - The user confirmed the reason for the v3c baseline. The goal of v3c is not
@@ -624,10 +706,21 @@ faster):
     them.
   - Use on-the-fly generation if it does not slow down training.
   - Add no noise for now. The noisy-cover plan stays parked.
+- The user decided the training platform and the data upload:
+  - Kaggle notebooks will run the training.
+  - Upload only one master image set to Kaggle, one time. Do not upload the
+    NEFs or the other image sets.
+- Proposed, Pending user approval: the master set is 8-bit RGB full-photo
+  PNG files, one file per photo, cropped to the tile grid. It goes in a
+  private Kaggle dataset. The RAISE terms allow only non-commercial research
+  and education.
 
 ### Next
 
 - Pending: the open items from the 2026-10-12 V3c entry are unchanged.
-- Pending: the Worker is measuring embed -> tile on the fly on whole photos:
-  speed, memory, and per-tile label statistics.
+- Done: the Worker measured embed -> tile on the fly on whole photos. See
+  "Embed -> tile benchmark on whole photos" above.
+- Pending: user approval of the master format and crop.
+- Pending: a short real speed test on Kaggle (4 CPU cores).
+- Pending: loss or sampling balance for the about 34.5% label-1 tiles.
 - Pending: write a generator design plan for both modes.
