@@ -506,7 +506,7 @@ high at that point. This was not tested.
   runs in notebook 04.
 - Pending: review the [noisy-cover dataset plan](plan-noisy-covers.md).
 
-## 2026-10-13 — Record of late 10-12 commits and doc corrections
+## 2026-10-13 — Late 10-12 commits, doc corrections, and on-the-fly generation
 
 ### Did
 
@@ -539,6 +539,14 @@ high at that point. This was not tested.
   - Used 4 decimal places in the V3c row of the V3 comparison table.
 - Counted confident false alarms from each run's `test_predictions.csv`
   (clean rows, `label` 0) to give a source for the noisy-cover plan.
+- Ran a CPU-only benchmark of tile -> embed on the fly. "On the fly" means
+  the data loader makes each stego tile during training, instead of reading
+  a stored stego PNG.
+  - The Worker used a temporary script and deleted it. No repository code
+    changed.
+  - PC: AMD Ryzen 7 7700, `nproc` 16.
+  - Input: 4,096 real train pairs. DataLoader batch of 32 images, with the
+    notebook flips and 90-degree rotations. Warm file cache. 3 trials.
 
 ### Found
 
@@ -556,6 +564,44 @@ high at that point. This was not tested.
 - One run and one seed per model, so these counts are not a measured
   difference between models.
 
+#### On-the-fly generation benchmark
+
+Latency per output image (median / p90; p90 means 90% of images were
+faster):
+
+| Path | Median (ms) | p90 (ms) |
+| --- | ---: | ---: |
+| Stored pair (read clean and stego PNGs) | 5.835 | 6.204 |
+| On-the-fly pair (read clean PNG, embed) | 3.279 | 4.337 |
+| Embed only, per stego tile | 0.668 | 2.658 |
+| Full generator API, per stego tile | 0.736 | 2.770 |
+
+- PNG decode is the main cost. Embedding is not.
+- DataLoader throughput, images/s, median of 3 trials:
+
+  | Workers | Stored | On the fly |
+  | ---: | ---: | ---: |
+  | 4 | 405.9 | 559.7 |
+  | 8 | 733.7 | 854.8 |
+  | 16 | 962.2 | 1022.4 |
+
+- Training needs about 340 images/s on the PC (10.7 it/s x 32) and about
+  215 images/s on the VM (6.7 it/s x 32).
+- The VM estimate is about 511 images/s on 8 vCPUs. This value is scaled
+  from the PC. It is an estimate, not a VM measurement.
+- The slowest setting is random placement, 0.5 bpp (bits per pixel), match,
+  and k=1 or plane mode: about 5.8 ms median. Plane k=8 is similar. Random
+  placement, 0.5 bpp, and replace take about 4.3 ms.
+- Correctness: 32 of 32 sampled tiles were byte-identical to the stored stego
+  PNGs. The test used the original cover index, `SeedSequence([seed, index,
+  variant, 0])` for the settings, and `[..., 1]` for the embedding.
+- The embed engine uses vectorized NumPy. It always builds the mask and the
+  `EmbedResult` object. Training does not need them.
+- Caveats: the on-the-fly test reused one decode for the clean and stego
+  twins in one batch. The notebook shuffles images independently, so it does
+  not get this saving. The cache was warm, and no GPU training ran at the
+  same time.
+
 ### Decided
 
 - The user confirmed the reason for the v3c baseline. The goal of v3c is not
@@ -563,7 +609,23 @@ high at that point. This was not tested.
   (GroupNorm) and adds clipping with no clear loss in detection. Its P_E is
   0.0019 higher than v3a (0.0139 versus 0.0120). This difference is small,
   and run-to-run noise is not measured.
+- The user decided these points for the generator and the project:
+  - The project will become multiple instance learning (MIL). In MIL, the
+    model gets a group of items (a bag) with one label for the group. Here,
+    one bag is one whole photo, and its tiles are the items. The final goal
+    is a stego decision for each photo. This is future work.
+  - The generator must support two modes: tile -> embed (current, plan A)
+    and embed -> tile (plan B). Plan B is now reopened.
+  - The bpp value applies to the whole photo, not to each tile.
+  - A tile is stego only if at least one pixel value changed. Selected
+    pixels that did not change do not count, because the model cannot see
+    them.
+  - Use on-the-fly generation if it does not slow down training.
+  - Add no noise for now. The noisy-cover plan stays parked.
 
 ### Next
 
 - Pending: the open items from the 2026-10-12 V3c entry are unchanged.
+- Pending: the Worker is measuring embed -> tile on the fly on whole photos:
+  speed, memory, and per-tile label statistics.
+- Pending: write a generator design plan for both modes.

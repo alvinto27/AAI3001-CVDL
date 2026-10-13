@@ -1,6 +1,6 @@
 # Plan: noisy cover tiles
 
-Status: idea, not started
+Status: parked by the user on 2026-10-13 (no noise for now)
 
 ## 1. Idea
 
