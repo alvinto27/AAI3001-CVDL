@@ -1214,6 +1214,17 @@ Confirmation by ROCm-Works (2026-10-13):
 - Pending, in progress: the notebook 04 change (remove the
   `MIOPEN_GEMM_ENFORCE_BACKEND=5` default).
 - Pending, in progress: step 3, the shared settings and seed helpers.
+- VM machine decision (user, 2026-10-13): keep `g2-standard-8` for now:
+  one L4, 8 vCPUs (4 cores x 2 threads), and 32 GB RAM. Decide whether to
+  change it after step 7 measures whether the VM CPU and disk can feed the L4
+  at about 215 images/s.
+  - If a change is needed, the candidate is `g2-standard-16`: one L4,
+    16 vCPUs, and 64 GB RAM.
+  - `g2-standard-24` is not suitable. It has 2 L4 GPUs, while notebook 04
+    trains on 1 GPU. `ddp_notebook` is deferred.
+  - The full-photo `.npy` cache is about 50 GB (RAISE about 45 GB and DIV2K
+    about 5 GB), larger than 32 GB of RAM. Cache reads therefore come from
+    disk.
 - Done: ROCm-Works float64 layer check. The cause is found: wrong 1x1
   weight gradients with the variable. The v3b and v3c test metrics are
   correct; their training most likely had about 1 wrong step per epoch
@@ -1223,3 +1234,5 @@ Confirmation by ROCm-Works (2026-10-13):
   the variable. See "ROCm caution, cause found".
 - Pending: v2 conv1 fix proposal (exact file, diff, float64 checks), then a
   user decision.
+- Pending: VM machine type decision, after the step 7 loader speed
+  measurement.
