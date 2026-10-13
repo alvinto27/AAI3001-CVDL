@@ -14,8 +14,9 @@ image data is local only. Only this README is tracked.
 | `DIV2K_valid_HR/` | 100 PNGs, IDs 0801-0900 | about 429 MB |
 
 The RAISE source area is about 17 GB. The current ImageSets folder is about
-21 GB. DIV2K is not used by the code yet. It is planned for a cross-source
-test.
+21 GB. RAISE and DIV2K now have [frozen source records](../docs/frozen-source-records.md).
+DIV2K training integration is Pending; its PNG headers are used by the record
+builder. Both sources are planned for combined training and evaluation.
 
 ## Create or download
 
@@ -69,5 +70,6 @@ to the original owners. It also gives a removal contact for copyright owners.
 
 ## Do not commit
 
-Never commit NEF files, DIV2K PNG files, tile files, catalogues, manifests,
-or other downloaded or generated data. Keep only this README in git.
+Never commit NEF files, DIV2K PNG files, tile files, or downloaded catalogues.
+Keep only this README in git under `ImageSets/`. The reviewed small CSV records
+in `data/raise/` and `data/div2k/` are tracked; source images stay local.

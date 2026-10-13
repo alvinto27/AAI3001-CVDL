@@ -6,6 +6,7 @@
 - [V3 comparison results](results-v3.md)
 - [Noisy-cover dataset plan](plan-noisy-covers.md)
 - [On-the-fly generator design plan](plan-otf-generator.md)
+- [Frozen RAISE and DIV2K source records](frozen-source-records.md)
 - [Rebuild the RAISE 512 dataset](rebuild-raise512-run1.md)
 
 ## Local data folders
