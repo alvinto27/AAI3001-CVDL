@@ -650,6 +650,18 @@ high at that point. This was not tested.
   - README fixes: the root README and `ImageSets/README.md` no longer say
     that DIV2K is unused. `ImageSets/README.md` now allows the reviewed
     `data/raise` and `data/div2k` CSV files in git.
+- The Worker did plan step 2, the source step. Commit `a7feb63`. The full
+  record is [docs/source-verification.md](source-verification.md).
+  - `LSB-Dataset-Generator/lsb_raw.py`: shared RAW settings and decode path.
+    `lsb_prepare.py` uses it. The preparation settings did not change.
+  - `LSB-Dataset-Generator/lsb_source.py`: full-photo source API for `nef`
+    and `png8` sources. It checks sizes against the manifest, has an
+    `OMP_NUM_THREADS=1` guard for loader workers, and has a pre-demosaic
+    RAW-noise hook that is disabled.
+  - Grids from the manifests: `topleft_crop` (legacy, 512) and
+    `overlap_last` (512 and 256).
+  - Check script: `scripts/check_sources.py`. Tests:
+    `tests/test_lsb_source.py`.
 
 ### Found
 
@@ -949,6 +961,32 @@ relative error against float64:
   42,744. These match the plan values.
 - Nine unit tests pass on the VM.
 
+#### Source verification (step 2)
+
+- All 1,000 NEFs decoded on the VM. All 49,796 stored clean tiles are
+  byte-identical to the legacy crop (0 mismatches).
+- All 900 DIV2K decodes equal the PNG pixels and the manifest sizes.
+- Overlap tile counts at 512 / 256: RAISE 65,184 / 243,120; DIV2K 10,960 /
+  42,744.
+- Six camera and orientation samples have full pixel coverage and no
+  padding at both tile sizes.
+- 9 source tests pass, and 18 of 18 pass together with the manifest tests.
+- Versions: rawpy 0.27.1, LibRaw 0.22.1, NumPy 2.5.3, Pillow 12.3.0.
+- Wall time was 611.7 s with 8 processes. This includes reading each stored
+  clean PNG.
+- NEF decode per photo on the VM, median / p90 in s:
+
+  | Camera | Median | p90 |
+  | --- | ---: | ---: |
+  | D7000 | 3.775 | 3.981 |
+  | D90 | 2.884 | 3.091 |
+  | D40 | 1.403 | 1.470 |
+
+- This is about 4.5-5 times slower than the earlier one-core PC measurement
+  (D7000 0.83 s). The VM CPU is an Intel Xeon at 2.20 GHz with 4 cores x 2
+  threads (8 vCPUs). The check also read PNG files at the same time. Thus
+  this is not a clean speed measurement.
+
 ### Decided
 
 - The user confirmed the reason for the v3c baseline. The goal of v3c is not
@@ -1097,6 +1135,9 @@ relative error against float64:
   change after step 2.
 - Re-runs of v3b and v3c (user, 2026-10-13): on hold for now. V3c stays the
   baseline, but it is marked as not a clean baseline.
+- Session cache on the VM (2026-10-13): the `.npy` session cache is
+  necessary. Direct NEF decode during training is too slow for 8 vCPUs
+  that training also uses. Measure a clean decode speed in the cache step.
 
 ### Next
 
@@ -1118,9 +1159,11 @@ relative error against float64:
 - Done: moved the VM checkout to `yx`.
 - Done: plan step 1. Froze the RAISE and DIV2K photo and tile records, and
   the DIV2K split CSV (`63e4f59`).
-- Pending: step 2, the source step. Convert NEF and PNG to 8-bit, and cut
-  the overlap and legacy grids. The output must be byte-identical to the
-  stored clean tiles.
+- Done: step 2, the source step (`a7feb63`). See
+  [docs/source-verification.md](source-verification.md).
+- Pending, in progress: the notebook 04 change (remove the
+  `MIOPEN_GEMM_ENFORCE_BACKEND=5` default).
+- Pending: step 3, the shared settings and seed helpers.
 - Done: ROCm-Works float64 layer check. The cause is found: wrong 1x1
   weight gradients with the variable. The v3b and v3c test metrics are
   correct; their training most likely had about 1 wrong step per epoch
