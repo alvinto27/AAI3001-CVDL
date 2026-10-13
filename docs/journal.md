@@ -619,6 +619,22 @@ high at that point. This was not tested.
 - The ROCm-Works team (a separate orchestrator) is standing down. Agreed
   rules: announce PC GPU jobs in the shared orchestrator room. ROCm-Works
   writes only in `rocm-perf/` and makes no commits.
+- The Worker settled the plan policies and added DIV2K as a second image
+  source in commit `e96ad9f`.
+  - DIV2K header audit (read-only): all 900 PNG files are 8-bit RGB. The
+    shortest side is 648 pixels.
+  - Overlapped-grid tiles, one grid:
+
+    | Set | Tiles at 512 | Tiles at 256 |
+    | --- | ---: | ---: |
+    | DIV2K official train | 9,732 | 37,936 |
+    | DIV2K official valid | 1,228 | 4,808 |
+    | DIV2K total | 10,960 | 42,744 |
+    | RAISE + DIV2K | 76,144 | 285,864 |
+
+  - DIV2K is about 14% of all tiles.
+- Moved the VM checkout from `main` to `yx` (fast-forward to `18ef1fa`).
+  The teammate's untracked `modelling/` folder was not touched.
 
 ### Found
 
@@ -905,10 +921,43 @@ of 2 trials), against the PC target of 340 tiles/s:
      result. Do not use a new random-selection algorithm without a new
      approval.
   7. Evaluation uses the full legacy settings mix for now. Harder training
-     comes only from the training settings.
+     comes only from the training settings. (Superseded later on
+     2026-10-13: `overlap_full_mix` is the only required evaluation
+     profile. See the DIV2K and evaluation decisions below.)
   8. Fixed-size MIL batches: decide later.
 - All execution for this team runs on the team VM. The VM checkout will
-  move to branch `yx` after the user pushes it.
+  move to branch `yx` after the user pushes it. (Done: see Did.)
+- DIV2K decisions (user, 2026-10-13):
+  - Use DIV2K HR for extra training and testing. Mix it into one pool with
+    RAISE, in natural proportions, with one shared shuffle.
+  - Validation and test are combined sets. Report the metrics combined and
+    for each source. The per-source values check for false alarms from a
+    possible JPEG history in DIV2K.
+  - Source weights are an optional training setting.
+  - DIV2K split:
+    - Test: images 0801-0900 (100 images, the official validation folder).
+    - Train and validation: images 0001-0800, split 680 / 120. The split is
+      drawn one time with fixed seed 0 and frozen in a committed CSV file.
+    - The CSV file, not the seed, is the source of truth. The split never
+      changes between runs.
+- Per-run seed decision (user, 2026-10-13): a `run_seed` setting can change
+  the model initialisation, the shuffle order, the augmentation, and the
+  training embedding settings for each run. The split and the validation
+  and test embedding stay fixed. Cross-validation is possible later for
+  final comparisons, but not for screening.
+- Evaluation decision (user, 2026-10-13):
+  - `overlap_full_mix` is the only required fixed evaluation profile.
+  - There is no standing legacy evaluation. Legacy mode 1 replay stays as
+    the generator exactness test.
+  - If a v3c comparison is necessary, re-run the v3c configuration through
+    the new generator.
+- Run rules (user, 2026-10-13):
+  - The user runs the full training runs interactively in the notebook
+    (VS Code remote on the VM) to watch performance.
+  - Agents may run the notebook only for QUICK or smoke tests, with
+    separate run names. Agents must clean up after these tests.
+- The plan stays as written (user choice). The orchestrator runs the work
+  from a short step checklist, one step at a time.
 
 ### Next
 
@@ -926,6 +975,7 @@ of 2 trials), against the PC target of 340 tiles/s:
 - Done: the Worker updated the plan for overlapped tiles (`18ef1fa`).
 - Done: the user answered the open decisions in the plan. See the generator
   decisions above.
-- Pending: the Worker records these decisions in the plan.
-- Pending: move the VM checkout to `yx`, then do plan step 1 (freeze the
-  photo and tile records).
+- Done: the Worker recorded these decisions in the plan (`e96ad9f`).
+- Done: moved the VM checkout to `yx`.
+- Pending: plan step 1. Freeze the RAISE and DIV2K photo and tile records,
+  and the DIV2K split CSV.
