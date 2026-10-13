@@ -23,6 +23,12 @@ Use the tools in this order:
 A tile is a square crop from one source photo.
 The tool does not resize a tile.
 
+The shared full-photo source API is in `lsb_source.py`. It reads frozen RAISE
+and DIV2K records and cuts manifest-backed overlap or legacy tile views.
+It does not yet embed or load training batches. See the
+[source API and verification record](../docs/source-verification.md).
+The existing `prepare.py` workflow below is unchanged.
+
 ## Setup
 
 The standalone tool needs these packages:
