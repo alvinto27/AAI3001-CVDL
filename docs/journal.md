@@ -1171,11 +1171,18 @@ Confirmation by ROCm-Works (2026-10-13):
   - The VM checkout changes only by fast-forward after a push.
 - ROCm caution: the status changes from "open" to "cause found". See
   "ROCm caution, cause found" under Found.
-- Approved by the user (2026-10-13); Pending implementation: remove the
-  `MIOPEN_GEMM_ENFORCE_BACKEND=5` default from notebook 04, and keep the
-  conv1 unfold fix. Restart each PC kernel that has the variable set. A
-  find-db cleanup is not necessary for correctness. The Worker applies this
-  change after step 2.
+- Done: removed the `MIOPEN_GEMM_ENFORCE_BACKEND=5` default from notebook
+  04 in commit `5252943`.
+  - The setup cell now says not to force MIOpen GEMM backend 5 because
+    hipBLASLt `GemmWrw1x1_stride1` gives wrong conv3/conv4/conv5 1x1 weight
+    gradients. It says that the forward pass and conv1 unfold fix are
+    correct, and to restart the kernel if the override is already set.
+  - The markdown cell no longer says that the switch requests backend 5.
+    The conv1 unfold fix and `V3_ROCM_CONV1_FIX` switch are unchanged.
+  - Only 2 cell sources changed. Outputs and metadata are unchanged. The
+    executed record `notebooks/runs/04_v3c_clip3_group.ipynb` is unchanged.
+  - The user's approval is complete. A find-db cleanup is not necessary for
+    correctness.
 - Re-runs of v3b and v3c (user, 2026-10-13): on hold for now. V3c stays the
   baseline, but it is marked as not a clean baseline.
 - Session cache on the VM (2026-10-13): the `.npy` session cache is
@@ -1206,7 +1213,7 @@ Confirmation by ROCm-Works (2026-10-13):
   [docs/source-verification.md](source-verification.md).
 - Pending, in progress: the notebook 04 change (remove the
   `MIOPEN_GEMM_ENFORCE_BACKEND=5` default).
-- Pending: step 3, the shared settings and seed helpers.
+- Pending, in progress: step 3, the shared settings and seed helpers.
 - Done: ROCm-Works float64 layer check. The cause is found: wrong 1x1
   weight gradients with the variable. The v3b and v3c test metrics are
   correct; their training most likely had about 1 wrong step per epoch
