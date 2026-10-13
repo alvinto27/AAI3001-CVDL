@@ -1040,6 +1040,11 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   on the VM because it is active only on ROCm.
 - User decision (2026-10-13): approved. The Worker implemented the proposal
   after step 3 and ran its self-check on the PC GPU.
+- ROCm-Works tried a Triton kernel for the conv1 and conv2 weight gradients
+  on the PC GPU in container `aai3001-perf`. It was correct, but gave no clear
+  gain over committed fix `60f5c17`. An early version was about 4 ms per step
+  faster. There is no repository proposal. The committed fix stays, and the
+  PC GPU window is closed.
 - Worker commit `60f5c17` replaced `notebooks/rocm_conv1_wgrad.py` with the
   proposal file, unchanged. Its SHA-256 is
   `afe4a475322d0660a1877c08d1d6398d6ffa22eb55133c7339982c23b11f2301`, the
@@ -1354,9 +1359,17 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
     correctness.
 - Re-runs of v3b and v3c (user, 2026-10-13): on hold for now. V3c stays the
   baseline, but it is marked as not a clean baseline.
-- Session cache on the VM (2026-10-13): the `.npy` session cache is
-  necessary. Direct NEF decode during training is too slow for 8 vCPUs
-  that training also uses. Measure a clean decode speed in the cache step.
+- Session cache decision (user, 2026-10-13): the full-photo `.npy` cache
+  is optional. The step 7 loader gets a source setting. By default, it
+  decodes directly from the master NEF or PNG files, with no disk cache.
+  The cache is used only when a cache path is set.
+  - On the VM, the notebook points to `/srv/aai3001/otf-cache/v1/`, so VM
+    users do not pay extra disk for the shared cache.
+  - Teammates with strong CPUs do not need to use about 53 GB of disk.
+  - Both sources must produce byte-identical samples. Step 7 checks this.
+  - The cache holds the full clean 8-bit RGB photo after RAW conversion. It
+    is not cut into tiles and is not embedded. Cutting and embedding happen
+    during training.
 
 ### Next
 
@@ -1389,6 +1402,8 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   [docs/mode1-verification.md](mode1-verification.md).
 - Pending, in progress: step 6, the full-photo `.npy` cache on the VM at
   `/srv/aai3001/otf-cache/v1/`, with cache checks and read-speed measurements.
+- Pending: step 7 includes the source setting (decode or cache) and the
+  byte-identity check between them.
 - VM machine decision (user, 2026-10-13): keep `g2-standard-8` for now:
   one L4, 8 vCPUs (4 cores x 2 threads), and 32 GB RAM. Decide whether to
   change it after step 7 measures whether the VM CPU and disk can feed the L4
