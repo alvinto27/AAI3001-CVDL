@@ -926,6 +926,49 @@ relative error against float64:
     logs did not record the MIOpen solver choices.
   - The effect is probably small, but v3b and v3c are not clean baselines.
 
+Confirmation by ROCm-Works (2026-10-13):
+
+- Find-db replay. ROCm-Works used a read-only copy of the `aai3001` user
+  database, with `MIOPEN_GEMM_ENFORCE_BACKEND=5` set as in v3b and v3c.
+  Weight-gradient solver and relative error:
+
+  | Batch | Layer | Selected solver | Relative error, variable = 5 | Relative error, variable unset | Result |
+  | ---: | --- | --- | --- | --- | --- |
+  | 32 | conv3, conv4, conv5 | Winograd | about 1e-6 to 1e-5 | - | Correct |
+  | 20 | conv3 | `GemmWrw1x1_stride1` | 0.93 | 2.9e-6 | Wrong with the variable |
+  | 20 | conv4 | `GemmWrw1x1_stride1` | 0.33 | 9.0e-7 | Wrong with the variable |
+  | 20 | conv5 | Winograd | - | - | Correct |
+
+  Batch 20 is the last partial batch of each epoch
+  (69,780 = 2,180 x 32 + 20).
+- Most likely, the last step of each epoch had wrong conv3 and conv4 weight
+  gradients: 10 of 21,810 training steps in each of v3b and v3c.
+  - The forward pass, all data gradients, and all other weight gradients
+    were correct on every step.
+  - Validation and test use only the forward pass. Thus their metrics are
+    correct measurements.
+  - Limit: the replay shows which solver the records select. The training
+    logs did not record the MIOpen choices.
+  - The database entries for batch 20 did not change after v3b and v3c ran.
+    A backup from the previous morning has the same entries.
+- Cause in the MIOpen 3.6.1 source (`rocm-libraries` commit `39d8d603`):
+  - `gemm_v2.cpp` maps backend 5 to hipBLASLt.
+  - With rocBLAS, `CallGemmStridedBatchedSequential` loops over the images
+    and adds each result into the same weight gradient.
+  - With hipBLASLt, it makes one batched call with output stride 0. Thus the
+    results of the images are not added correctly. The code has a "todo"
+    comment at this point.
+  - The result is wrong for batch >= 2: measured relative error 0.83-1.06 at
+    batch 2, 8, 20, and 32. It is correct for batch 1 (2.5e-6).
+- Step time without the variable, on the PC at batch 32, median:
+
+  | Data | No fix | Current conv1 fix | v2 conv1 fix |
+  | --- | ---: | ---: | ---: |
+  | Synthetic, 3 fresh runs | 188 ms | 102.8 ms | 87.8 ms |
+  | Real, 200 steps | - | 99.3 ms (322 images/s) | 85.4 ms (375 images/s) |
+
+  With the current fix, the removal of the variable costs almost no speed.
+
 #### Frozen photo and tile records (step 1)
 
 | File | Data rows |
@@ -1168,5 +1211,8 @@ relative error against float64:
   weight gradients with the variable. The v3b and v3c test metrics are
   correct; their training most likely had about 1 wrong step per epoch
   (not provable from the logs).
-- Pending: ROCm-Works confirms the affected step count, measures the step
-  time without the variable, and proposes a faster conv1 fix (v2).
+- Done: ROCm-Works confirmed the affected step count (most likely 10 of
+  21,810 steps in each of v3b and v3c) and measured the step time without
+  the variable. See "ROCm caution, cause found".
+- Pending: v2 conv1 fix proposal (exact file, diff, float64 checks), then a
+  user decision.
