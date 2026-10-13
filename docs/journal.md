@@ -921,9 +921,8 @@ of 2 trials), against the PC target of 340 tiles/s:
      result. Do not use a new random-selection algorithm without a new
      approval.
   7. Evaluation uses the full legacy settings mix for now. Harder training
-     comes only from the training settings. (Superseded later on
-     2026-10-13: `overlap_full_mix` is the only required evaluation
-     profile. See the DIV2K and evaluation decisions below.)
+     comes only from the training settings. (Refined later on 2026-10-13:
+     the full mix is evaluated on the overlap grid as `overlap_full_mix`.)
   8. Fixed-size MIL batches: decide later.
 - All execution for this team runs on the team VM. The VM checkout will
   move to branch `yx` after the user pushes it. (Done: see Did.)
@@ -958,6 +957,11 @@ of 2 trials), against the PC target of 340 tiles/s:
     separate run names. Agents must clean up after these tests.
 - The plan stays as written (user choice). The orchestrator runs the work
   from a short step checklist, one step at a time.
+- Code workflow (user, 2026-10-13):
+  - The Worker commits locally on the PC.
+  - The Orchestrator checks the commits, approves them, and pushes them.
+  - Execution runs on the VM from a scratch copy.
+  - The VM checkout changes only by fast-forward after a push.
 
 ### Next
 
