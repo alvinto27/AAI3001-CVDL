@@ -572,6 +572,22 @@ high at that point. This was not tested.
   - The user reviewed the paid Colab tiers. The user already has 400 GB of
     Google storage (Google AI Plus, student plan). Storage is not a limit,
     and no paid plan is necessary now.
+- The Worker wrote the on-the-fly generator design plan:
+  [docs/plan-otf-generator.md](plan-otf-generator.md), commit `4d1036b`. It is
+  a design only. It has no code. It covers:
+  - shared modules for the pre-built dataset writer and the training loader;
+  - exact replay in mode 1 (tile -> embed);
+  - deterministic mode 2 (embed -> tile), with labels from actual pixel
+    changes;
+  - a RAW-noise hook, disabled;
+  - speed work, with exactness checks;
+  - seeds and variants;
+  - settings that each short run can change: k, bit_mode, method,
+    placement, stride, bpp, payload, tile size (512 or 256), and the
+    fraction of train photos;
+  - a session cache, tests, and 17 work steps.
+  - No new package is necessary. rawpy, NumPy, Pillow, PyYAML, PyTorch, and
+    Lightning are already in `pyproject.toml`.
 
 ### Found
 
@@ -781,7 +797,9 @@ of 2 trials), against the PC target of 340 tiles/s:
   - Use on-the-fly generation if it does not slow down training.
   - Add no noise for now. The noisy-cover plan stays parked.
 - The user decided the training platform and the data upload:
-  - Kaggle notebooks will run the training.
+  - Kaggle notebooks will run the training. (Superseded: later on
+    2026-10-13 the user said Kaggle is not a priority now. See the
+    run-plan decision below.)
   - Upload only one master image set to Kaggle, one time. Do not upload the
     NEFs or the other image sets. (Superseded: the user withdrew "do not
     upload the NEFs" later on 2026-10-13. The NEFs are now the master set.
@@ -810,6 +828,30 @@ of 2 trials), against the PC target of 340 tiles/s:
     current tiles exactly (42 of 42 photos byte-identical).
   - On machines with few CPUs, make a one-time 8-bit cache in each session.
     On machines with enough CPUs, decode the NEFs directly.
+- Run-plan decision (user, 2026-10-13):
+  - Kaggle execution is not a priority now. The two-GPU notebook setup
+    (`ddp_notebook`) is deferred. This supersedes the earlier "Kaggle
+    notebooks will run the training" line. The NEF master decision stays.
+  - Short test runs are the main need. Each full run takes about 40-60
+    minutes, and many configurations must be tested. The generator must
+    accept settings for each run without a dataset rebuild. A screening
+    protocol is a later step.
+  - The user reviewed free Colab and the paid Google AI Pro plan. The user
+    already has 400 GB of storage, so no paid plan is necessary now.
+- Tile-grid decision (user, 2026-10-13):
+  - The current pipeline crops each photo from the top-left corner to whole
+    512 x 512 tiles. It drops the edge strips. With the 512 grid, this drops
+    about 13% of the D7000 pixels, 15% of the D90 pixels, and 36% of the D40
+    pixels.
+  - New runs will use overlapped tiles. Each axis of length L gets
+    n = ceil(L / T) tiles of size T. The last tile ends at the photo edge and
+    overlaps its neighbour.
+  - Do not use padding. Padded pixels are not real photo data.
+  - Legacy mode 1 replay keeps the top-left crop, so that it reproduces
+    `raise512-run1` exactly.
+  - In mode 2, the generator embeds into the whole photo. Thus bpp applies
+    to all photo pixels, and runs with 256 and 512 tiles see the same stego
+    photo.
 
 ### Next
 
@@ -818,7 +860,10 @@ of 2 trials), against the PC target of 340 tiles/s:
   "Embed -> tile benchmark on whole photos" above.
 - Done: user decision on the master source. The NEFs are the master set.
   See the master decision above.
-- Pending: a short real speed test on Kaggle (4 CPU cores).
+- Pending, deferred: a short real speed test on Kaggle (4 CPU cores).
+  Kaggle is not a priority now.
 - Pending: loss or sampling balance for the about 34.5% label-1 tiles.
-- Pending: the Worker writes the on-the-fly generator design plan for both
-  modes (`docs/plan-otf-generator.md`).
+- Done: the Worker wrote the on-the-fly generator design plan for both
+  modes: [docs/plan-otf-generator.md](plan-otf-generator.md) (`4d1036b`).
+- Pending: the Worker updates the plan for overlapped tiles.
+- Pending: the user answers the open decisions in the plan.
