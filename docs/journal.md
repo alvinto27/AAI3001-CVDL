@@ -589,9 +589,11 @@ faster):
   215 images/s on the VM (6.7 it/s x 32).
 - The VM estimate is about 511 images/s on 8 vCPUs. This value is scaled
   from the PC. It is an estimate, not a VM measurement.
-- The slowest setting is random placement, 0.5 bpp (bits per pixel), match,
-  and k=1 or plane mode: about 5.8 ms median. Plane k=8 is similar. Random
-  placement, 0.5 bpp, and replace take about 4.3 ms.
+- The slowest settings store one bit per carrier value. Random placement,
+  0.5 bpp (bits per pixel), and match, with one bit per carrier value (k=1,
+  or plane mode; plane k=8 was measured): about 5.8 ms median. At k=1,
+  lowest and plane are the same embedding. Random placement, 0.5 bpp, and
+  replace take about 4.3 ms.
 - Correctness: 32 of 32 sampled tiles were byte-identical to the stored stego
   PNGs. The test used the original cover index, `SeedSequence([seed, index,
   variant, 0])` for the settings, and `[..., 1]` for the embedding.
