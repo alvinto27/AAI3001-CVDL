@@ -2,7 +2,7 @@
 
 Date: 2026-10-12
 
-> **Caution (2026-10-13):** the v3b and v3c PC results are not final until an open ROCm check is done; see the [journal item](journal.md#rocm-caution-open).
+> **Caution (2026-10-13):** the v3b and v3c test metrics are correct, but their training most likely had about 1 wrong conv3/conv4 weight-gradient step per epoch on ROCm; see the [journal item](journal.md#rocm-caution-cause-found).
 
 This report compares three fixes for the first steganalysis baseline. V3c is
 the current baseline. The [V3b report](results-v3b.md) is a detailed

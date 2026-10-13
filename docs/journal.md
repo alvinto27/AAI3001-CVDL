@@ -838,7 +838,12 @@ of 2 trials), against the PC target of 340 tiles/s:
   encode (OpenCV default) takes about 6.9 min. The encode time of the 8-bit
   cache was not measured.
 
-#### ROCm caution, open
+#### ROCm caution, cause found
+
+Status: cause found on 2026-10-13. The first report is kept below as history.
+The result of the float64 check follows it.
+
+First report:
 
 - The ROCm-Works team reported this on 2026-10-13. In a fixed-seed loss
   check, the setup with `MIOPEN_GEMM_ENFORCE_BACKEND=5` gave a different
@@ -854,19 +859,60 @@ of 2 trials), against the PC target of 340 tiles/s:
   for its matrix multiplications: hipBLASLt instead of rocBLAS.
 - The conv1 weight-gradient fix (unfold plus batched matrix multiplication)
   runs in PyTorch, not in MIOpen. Thus the fix itself cannot change the
-  forward pass. It is still open whether backend 5 changes any result.
+  forward pass. It was open at this point whether backend 5 changes any
+  result.
 - ROCm-Works also added an end-to-end inference check. It uses the same
   weights and inputs in three setups: the variable unset, the variable set
   to 5, and float64 on the CPU. It reports the maximum difference in
   `prob_stego`.
-- The cause is not known. It can be normal run-to-run variation, or a wrong
-  gradient in a layer.
-- The ROCm-Works worker is checking each convolution layer against a
-  float64 reference, with and without the variable.
-- Until that check is done, do not treat PC results from notebook 04 with
-  the ROCm switch on as final. This applies to the v3b and v3c PC runs.
-  V3a ran on the VM L4 with CUDA, so it is not affected.
+- At this point the cause was not known. It could be normal run-to-run
+  variation, or a wrong gradient in a layer.
+- The ROCm-Works worker checked each convolution layer against a float64
+  reference, with and without the variable.
+- Until that check was done, PC results from notebook 04 with the ROCm
+  switch on were not final. This applies to the v3b and v3c PC runs. V3a
+  ran on the VM L4 with CUDA, so it is not affected.
 - New runs of this team run on the VM only.
+
+Result of the ROCm-Works float64 check (N=8). Values are the maximum
+relative error against float64:
+
+| Quantity | Layers | Variable unset | Variable = 5 | Result |
+| --- | --- | --- | --- | --- |
+| Forward output | KV filter, conv1-conv5 | <= 8.4e-7 | <= 8.4e-7 | Correct |
+| Data gradient and bias gradient | All layers | <= 8e-7 | <= 8e-7 | Correct |
+| Weight gradient | conv1 / conv2 | 1.6e-5 / 9.4e-6 | 1.6e-5 / 9.4e-6 | Correct |
+| Weight gradient | conv3 / conv4 / conv5 (1x1) | 4e-6 / 2e-6 / 1e-6 | 0.81 / 0.74 / 0.94 | Wrong with the variable |
+| Weight gradient, conv1 unfold fix (both versions) | conv1 | 1.1e-6 / 5.3e-7 | 1.1e-6 / 5.3e-7 | Correct |
+
+- Cause: with the variable unset, MIOpen selects Winograd for the 1x1
+  weight gradients. With the variable set to 5, MIOpen's GEMM-based 1x1
+  weight-gradient solver `GemmWrw1x1_stride1` becomes the fastest choice.
+  On hipBLASLt, this solver returns wrong values.
+- The conv1 unfold fix does not use MIOpen for the weight gradient, so it
+  is correct in both settings.
+- The loss check agrees. With the variable, the loss at step 50 was
+  0.15-0.52 and changed between runs. Without it, the loss was about 0.11 in
+  every setting.
+- Forward pass and inference are not affected. With the same weights and 64
+  images in evaluation mode, the maximum absolute logit difference against
+  float64 was 1.2e-8 (variable unset) and 1.8e-8 (variable = 5). The
+  `prob_stego` difference between the two settings was at most 3.0e-8.
+- Thus the v3b and v3c test metrics are correct measurements of the trained
+  models. Only the training can be affected.
+- Likely extent (ROCm-Works analysis; confirmation is Pending):
+  - The MIOpen find-db (the record of tuned solver choices) in the container
+    already had records for conv3-conv5. At batch 32, the recorded fastest
+    solver is Winograd, which is correct.
+  - The last partial batch of each epoch has 20 images
+    (69,780 = 2,180 x 32 + 20). For 20 images, the recorded fastest solver
+    for conv3 and conv4 is `GemmWrw1x1_stride1`.
+  - Thus most likely about 1 step per epoch, about 10 of about 21,800
+    steps, had wrong conv3 and conv4 weight gradients.
+  - Limit: the find-db replay shows which solver the stored records select.
+    It cannot prove which solver ran in v3b and v3c, because the training
+    logs did not record the MIOpen solver choices.
+  - The effect is probably small, but v3b and v3c are not clean baselines.
 
 #### Frozen photo and tile records (step 1)
 
@@ -1042,6 +1088,13 @@ of 2 trials), against the PC target of 340 tiles/s:
   - The Orchestrator checks the commits, approves them, and pushes them.
   - Execution runs on the VM from a scratch copy.
   - The VM checkout changes only by fast-forward after a push.
+- ROCm caution: the status changes from "open" to "cause found". See
+  "ROCm caution, cause found" under Found.
+- Proposed, Pending user approval: remove the `MIOPEN_GEMM_ENFORCE_BACKEND=5`
+  default from notebook 04, and keep the conv1 unfold fix. Restart each PC
+  kernel that has the variable set. A find-db cleanup is not necessary for
+  correctness.
+- Pending user decision: re-run v3b and v3c, or not.
 
 ### Next
 
@@ -1066,5 +1119,9 @@ of 2 trials), against the PC target of 340 tiles/s:
 - Pending: step 2, the source step. Convert NEF and PNG to 8-bit, and cut
   the overlap and legacy grids. The output must be byte-identical to the
   stored clean tiles.
-- Pending: ROCm-Works float64 layer check; then confirm or qualify the v3b
-  and v3c PC results.
+- Done: ROCm-Works float64 layer check. The cause is found: wrong 1x1
+  weight gradients with the variable. The v3b and v3c test metrics are
+  correct; their training most likely had about 1 wrong step per epoch
+  (not provable from the logs).
+- Pending: ROCm-Works confirms the affected step count, measures the step
+  time without the variable, and proposes a faster conv1 fix (v2).
