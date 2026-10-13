@@ -733,6 +733,22 @@ high at that point. This was not tested.
     the same gzip bytes. The record is also in
     `docs/frozen-source-records.md` and the root README.
   - `masks/` and `records/` are not kept in git. Masks can be regenerated.
+- The Worker did plan step 8. Commit `f3dca17`. The full record is
+  [docs/notebook-otf-verification.md](notebook-otf-verification.md).
+  - Notebook 04 now uses `V3_DATA=otf` by default, with `png` retaining the
+    `raise512-run1` path. OTF settings include `V3_SOURCE`,
+    `V3_CACHE_ROOT`, `V3_WORKERS`, `V3_PREFETCH`, `V3_TILE_SIZE`,
+    `V3_RUN_SEED`, `V3_EVAL_PROFILE`, `V3_TRAIN_PHOTO_FRACTION`, and
+    `V3_SOURCES`. The defaults are decode, 6 workers, prefetch 4, tile 512,
+    run seed 0, and `overlap_full_mix`; `legacy_v6` is available.
+  - The default OTF run name ends in `_otf`, so it cannot resume a PNG
+    checkpoint. Settings are saved in `data_run_settings.json`.
+  - New module: `LSB-Dataset-Generator/lsb_notebook.py`. Notebook 02 cells 2
+    and 6 read self-contained OTF metadata. The PNG path is unchanged. Saved
+    outputs and the executed record notebooks are unchanged.
+  - Workers yield small groups, and the main process joins groups from all
+    workers into each batch. The loader yields uint8; the notebook converts
+    it to float32 on the device. A callback calls `set_epoch` at each epoch.
 
 ### Found
 
@@ -1317,6 +1333,35 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   exit codes were 0. The earlier `terminate called without an active
   exception` was benchmark shutdown behavior, not a loader fault.
 
+#### Notebook OTF verification (step 8)
+
+- Distinct photos per batch, 200 cache batches with 6 workers, mean / minimum:
+
+  | Tile size | Before | After |
+  | ---: | ---: | ---: |
+  | 512 | 13.77 / 6 | 26.66 / 20 |
+  | 256 | 5.89 / 2 | 18.90 / 12 |
+
+  Workers per batch rose from 1 to 6. Across 6,360 shared keys per size,
+  there were 0 byte changes.
+- The uint8 path equals the old float32 path in a unit test and a real device
+  batch.
+- Loader-only cache speed at 512, 6 workers, 120 s: 596.7 images/s,
+  452% CPU, 8.2 GB PSS RAM, and 154.6 MB/s disk.
+- L4 check with v3c, 32-true precision, batch 32, and 300 steps: 278.7
+  images/s with the loader versus 284.7 images/s for a fixed device batch.
+  The gap is 2.1%. GPU use was 100%, RAM 9.4 GB, and CPU 292%. The L4 is
+  the limit. The 17.2 ms loader wait mostly overlaps queued GPU work. A
+  512 epoch takes about 6.4 min.
+- QUICK smoke runs completed all 15 cells in order on the VM: OTF 100.3 s
+  for 2 epochs and PNG 24.3 s. The OTF test used 32 images and had P_E 0.1875;
+  QUICK scores have no meaning on tiny data. The checks showed uint8 equality,
+  changed epoch-1 training stego, unchanged validation/test, and GroupNorm
+  train/eval difference 0. All 16 test pairs stayed in the bpp bins.
+- Notebook 02's existing v3c PNG predictions gave a byte-identical
+  per-setting table before and after (SHA-256 `26fe36f6...a467`).
+- 82 tests pass.
+
 #### VM disk and retained records
 
 - VM disk on 2026-10-13: 193 GB total, 144 GB used (75%), and 49 GB free.
@@ -1532,8 +1577,15 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   [docs/torch-loader-verification.md](torch-loader-verification.md).
 - Done: committed the compressed run1 labels and metadata to `data/raise/`
   (`8c4e549`).
+- Done: step 8, notebook 04 connected to the OTF loader (`f3dca17`). See
+  [docs/notebook-otf-verification.md](notebook-otf-verification.md).
+- Pending: the user's first full OTF notebook 04 run on the VM
+  (`V3_CACHE_ROOT=/srv/aai3001/otf-cache/v1`, `QUICK=False`).
 - Pending, after step 8: team agreement, then delete
-  `Datasets/raise512-run1` on the VM.
+  `Datasets/raise512-run1` on the VM. The `V3_DATA=png` path needs that
+  folder; the OTF `legacy_v6` profile replaces it.
+- Pending: tell teammates that the VM checkout is on branch `yx`.
+- Later: Mode 2.
 - Done: the VM machine type decision after step 7: keep `g2-standard-8`.
 - VM machine decision (user, 2026-10-13): keep `g2-standard-8`:
   one L4, 8 vCPUs (4 cores x 2 threads), and 32 GB RAM. After step 7, the
