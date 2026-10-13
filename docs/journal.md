@@ -707,6 +707,21 @@ high at that point. This was not tested.
     rawpy 0.27.1, LibRaw 0.22.1, NumPy 2.5.3, Pillow 12.3.0, and the
     disabled noise hook. It never silently decodes a bad entry. Hash checks
     can be disabled only after a session check.
+- The Worker did plan step 7. Commit `970750a`. The full record is
+  [docs/torch-loader-verification.md](torch-loader-verification.md).
+  - `LSB-Dataset-Generator/lsb_torch.py` provides `RunSettings`, `Corpus`,
+    `TrainingImages` with `set_epoch`, `FixedPairs` for validation/test, and
+    `training_loader`. It has tests in `tests/test_lsb_torch.py` and a check
+    script at `scripts/check_torch_loader.py`.
+  - The default source is `decode`; `cache` uses a cache root. Each worker
+    loads one whole photo, makes all clean and stego tiles with keyed OTF
+    seeds, and shuffles them in a bounded uint8 buffer. The default buffer
+    is 1,024 images per worker.
+  - Images are float32 CHW values in the 0-255 range, with keyed flips and
+    90-degree rotations. Validation and test use fixed `overlap_full_mix`
+    with both sources and the run1 mix, independent of training settings.
+    `legacy_v6` remains for a v3c comparison re-run.
+  - Loader defaults are `prefetch_factor=4` and `in_order=True`.
 
 ### Found
 
@@ -1252,6 +1267,45 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   (`140 + 0.28 x 200`). A same-size standard persistent disk gives about
   24 MiB/s (`0.12 MiB/s per GiB`) and is not suitable.
 
+#### Torch loader verification (step 7)
+
+- Decode and cache produced 0 mismatches for all tiles of 8 photos (6 RAISE
+  camera/orientation groups and 2 DIV2K), with train and validation keys at
+  both 512 and 256. The result was unchanged with 0 or 4 workers.
+- The legacy profile checked 2,000 pairs across all 49,796 and had 0
+  mismatches against the stored PNGs. 79 tests pass.
+- Images per epoch (clean and stego), train / validation / test:
+
+  | Tile size | Train | Validation | Test |
+  | ---: | ---: | ---: | ---: |
+  | 512 | 107,900 | 22,476 | 21,912 |
+  | 256 | 405,144 | 84,408 | 82,176 |
+
+  The default has 1,381 train photos: 701 RAISE and 680 DIV2K. The RAISE
+  parts add up to 65,184 and 243,120 tiles at 512 and 256.
+- Loader-only speed, batch 32, after buffer fill, in images/s:
+
+  | Source and tile size | 4 workers | 6 workers | 8 workers |
+  | --- | ---: | ---: | ---: |
+  | Cache, 512, prefetch 1 | 303 | 358 | 418 |
+  | Cache, 256, prefetch 1 | 1,068 | 1,403 | 1,326 |
+
+  Decode at 512 with 8 workers gave 129 images/s at prefetch 1, 194 at
+  ordered prefetch 4, 183 at ordered prefetch 8, and 202 at unordered
+  prefetch 4. Decode at 256 with 8 workers and prefetch 1 gave 309.
+  Unordered loading keeps sample bytes but not batch order, so it is not the
+  default.
+- Joint L4 check with the v3c model, batch 32, 512 cache, and prefetch 4:
+  unordered 8 workers gave 268 images/s; ordered 8 workers gave 267; ordered
+  4 workers gave 267. GPU use was 100%, 99.8%, and 100%; loader wait was
+  0.4%, 0.6%, and 0.2%; RAM was 17.1, 17.3, and 9.4 GB. The GPU is now the
+  limit. A 512 epoch takes about 6.7 min.
+- Correction: notebook 04 uses 32-true precision with no autocast. The
+  earlier AMP note was wrong.
+- The benchmark now uses a bounded photo list and ends naturally. All worker
+  exit codes were 0. The earlier `terminate called without an active
+  exception` was benchmark shutdown behavior, not a loader fault.
+
 #### VM disk and retained records
 
 - VM disk on 2026-10-13: 193 GB total, 144 GB used (75%), and 49 GB free.
@@ -1463,17 +1517,15 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   [docs/mode1-verification.md](mode1-verification.md).
 - Done: step 6, the full-photo `.npy` cache (`7e89fec`). See
   [docs/cache-verification.md](cache-verification.md).
-- Pending, in progress: step 7, the mode 1 loader with source setting
-  (decode/cache), overlap grid, shuffle buffer, run settings, and speed at or
-  above the L4 demand of about 215 images/s.
+- Done: step 7, the mode 1 loader (`970750a`). See
+  [docs/torch-loader-verification.md](torch-loader-verification.md).
 - Pending: commit the compressed run1 labels and metadata to `data/raise/`.
 - Pending, after step 8: team agreement, then delete
   `Datasets/raise512-run1` on the VM.
-- Pending: the VM machine type decision after step 7.
-- VM machine decision (user, 2026-10-13): keep `g2-standard-8` for now:
-  one L4, 8 vCPUs (4 cores x 2 threads), and 32 GB RAM. Decide whether to
-  change it after step 7 measures whether the VM CPU and disk can feed the L4
-  at about 215 images/s.
+- Done: the VM machine type decision after step 7: keep `g2-standard-8`.
+- VM machine decision (user, 2026-10-13): keep `g2-standard-8`:
+  one L4, 8 vCPUs (4 cores x 2 threads), and 32 GB RAM. After step 7, the
+  loader keeps the L4 fully busy, so there is no upgrade.
   - If a change is needed, the candidate is `g2-standard-16`: one L4,
     16 vCPUs, and 64 GB RAM.
   - `g2-standard-24` is not suitable. It has 2 L4 GPUs, while notebook 04
@@ -1496,5 +1548,4 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   21,810 steps in each of v3b and v3c) and measured the step time without
   the variable. See "ROCm caution, cause found".
 - Done: v2 conv1 fix implementation and PC self-check (`60f5c17`).
-- Pending: VM machine type decision, after the step 7 loader speed
-  measurement.
+- Done: VM machine type decision after step 7: keep `g2-standard-8`.
