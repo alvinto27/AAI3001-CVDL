@@ -288,7 +288,10 @@ variance range was about 45-50 times; this is a variance ratio, not a measured
   removed both temporary training scripts after completion.
 - Records: VM `logs/v3a_vm.log` and
   `checkpoints/baseline_kv_xunet_v3_clip3_batch/`; PC `logs/v3b_pc.log` and
-  `checkpoints/baseline_kv_xunet_v3_noclip_group/`. These are not committed.
+  `checkpoints/baseline_kv_xunet_v3_noclip_group/`. At that time these were
+  not committed. Since `3787b14`, git tracks the small outputs (test CSVs,
+  heatmaps, `metrics.csv`), but not the `.ckpt` files. The v3a log is now at
+  `logs/v3a_legacy_from_vm/v3a_vm.log`.
 
 ### Found
 
@@ -362,17 +365,19 @@ V2 k=1 values come from the VM's `logs/baseline_v2_vm.log`.
 
 V3a and v3b ran on different GPUs: L4 versus ROCm with the conv1 fix. One
 seed does not separate hardware or run variation from the model changes.
-Small differences (roughly +/-0.002 P_E) may be run-to-run noise; this is a
-caution, not a measured confidence interval.
+Small differences (roughly +/-0.002 P_E) may not be real. Run-to-run noise
+is not measured; this is a caution, not a confidence interval.
 
 ### Decided
 
 - V3b is the current baseline candidate because it is batch-independent.
+  (Later superseded: v3c became the baseline in the next entry.)
 - V3c will test clip 3 plus GroupNorm: one change from v3b.
 
 ### Next
 
-- Pending: run v3c and compare it with v3b on detection and batch checks.
+- Done: ran v3c and compared it with v3b on detection and batch checks. See
+  the next entry.
 - Done: wrote the [v3b results report](results-v3b.md), with training curves,
   test plots, setting breakdowns, and batch-independence checks.
 
@@ -396,7 +401,8 @@ caution, not a measured confidence interval.
 - V3c ran on the PC AMD RX 9070 XT with clip 3, GroupNorm, and the ROCm conv1
   fix enabled. It ran at about 10.7 iterations/s (about 93 ms/step) and took
   39.7 minutes for 10 epochs.
-- Cleared local `logs/` on 2026-10-12 after recording results; numbers from
+- Deleted the v3b and v3c logs on 2026-10-12 after recording results. (Later,
+  `logs/` again held local task logs and `logs/v3a_legacy_from_vm/`.) Numbers from
   `logs/v3b_pc.log` and `logs/v3c_pc.log` remain in this journal,
   `docs/results-v3b.md`, and `docs/results-v3.md`, run outputs stay in
   `checkpoints/`, and notebook 04 now defaults to v3c.
@@ -463,13 +469,13 @@ are clean accuracy in train-mode all-clean batches, shown as train / validation.
 | --- | ---: | ---: | ---: | ---: | --- | --- |
 | V3a clip 3 + BatchNorm | 0.9843 | 0.9982 | 0.0120 | 0.1646 | 0.0277 / 0.0503 | 0.0169 / 0.0218 |
 | V3b no clip + GroupNorm | 0.9831 | 0.9971 | 0.0157 | 0.2833 | 0.0437 / 0.0585 | 0.9955 / 0.9965 |
-| V3c clip 3 + GroupNorm | 0.9858 | 0.9982 | 0.0139 | 0.458815 | 0.0320 / 0.0626 | 0.995040 / 0.998016 |
+| V3c clip 3 + GroupNorm | 0.9858 | 0.9982 | 0.0139 | 0.4588 | 0.0320 / 0.0626 | 0.9950 / 0.9980 |
 
 Clipping with GroupNorm improved overall P_E from 0.0157 to 0.0139 and
 lowest k=1 P_E from about 0.044 to about 0.032. It moved the best threshold
 near 0.5. Plane k=1 P_E became about 0.063 instead of about 0.059. Each
-version has one run and one seed. Differences of about 0.002 P_E can be
-chance.
+version has one run and one seed. Run-to-run noise is not measured, so
+differences of about 0.002 P_E may not be real.
 
 #### Validation-loss spike
 
@@ -484,8 +490,9 @@ high at that point. This was not tested.
 ### Decided
 
 - V3c is the current baseline. It is batch-independent, has the best accuracy
-  at 0.5, has the best-calibrated threshold, and has P_E within the observed
-  run-to-run noise of V3a.
+  at 0.5, and has the best-calibrated threshold. Its P_E is 0.0019 higher
+  than V3a; run-to-run noise is not measured. See the 2026-10-13 entry for the
+  user's reason.
 
 ### Next
 
@@ -498,3 +505,65 @@ high at that point. This was not tested.
 - Pending: finish the TensorBoard chart layout and train/validation colour
   runs in notebook 04.
 - Pending: review the [noisy-cover dataset plan](plan-noisy-covers.md).
+
+## 2026-10-13 — Record of late 10-12 commits and doc corrections
+
+### Did
+
+- Recorded six commits from 2026-10-12 that had no journal entry:
+  - `267f167`: added README files for the ignored data folders
+    (`ImageSets/`, `Datasets/`, `checkpoints/`, `logs/`) and listed them in
+    `docs/README.md`.
+  - `84b20b8`: added the RAISE citation where the data is used: the root
+    README, `Datasets/README.md`, the rebuild guide, and the v1, v3b, and v3
+    reports.
+  - `7c0984e`: notebook 04 now runs without `notebooks/rocm_conv1_wgrad.py`.
+    If the module is missing, it prints a message and uses the standard conv1.
+  - `cc2f87a`: notebook 04 now runs the best-checkpoint callback before the
+    every-epoch callback, so `last.ckpt` stores the correct best path. If that
+    path is missing, the notebook selects the `best-*.ckpt` file with the
+    lowest `val_pe`.
+  - `e5df2eb`: added the executed v3c notebook
+    `notebooks/runs/04_v3c_clip3_group.ipynb` and listed it in the README.
+  - `3787b14`: git now tracks the small v3a, v3b, and v3c run outputs (test
+    CSVs, heatmaps, `metrics.csv`, `hparams.yaml`). The `.ckpt` model files
+    stay ignored and live on the VM under
+    `/srv/aai3001/AAI3001-CVDL/checkpoints/`.
+- Corrected stale doc statements in `43f7163` and in this journal:
+  - Replaced "local only" and "not committed" notes for run outputs.
+  - Corrected the "logs/ cleared" notes.
+  - Marked the v3b report as superseded by v3c and closed its done items.
+  - Corrected the v3b all-stego claim in `results-v3.md`: that check was run
+    only for v3c.
+  - Replaced "observed run-to-run noise" with "not measured".
+  - Used 4 decimal places in the V3c row of the V3 comparison table.
+- Counted confident false alarms from each run's `test_predictions.csv`
+  (clean rows, `label` 0) to give a source for the noisy-cover plan.
+
+### Found
+
+- Clean test tiles with high `prob_stego`, out of 7,433 clean tiles:
+
+  | Model | >= 0.5 | >= 0.9 | >= 0.99 | >= 0.999 |
+  | --- | ---: | ---: | ---: | ---: |
+  | V3a | 63 | 57 | 33 | 18 |
+  | V3b | 78 | 58 | 54 | 47 |
+  | V3c | 57 | 12 | 5 | 2 |
+
+- The old "about 55" v3b figure in the noisy-cover plan matches 54 at the
+  0.99 threshold. The >= 0.5 counts match the false alarms at 0.5 in
+  `results-v3.md`.
+- One run and one seed per model, so these counts are not a measured
+  difference between models.
+
+### Decided
+
+- The user confirmed the reason for the v3c baseline. The goal of v3c is not
+  to beat v3a. V3c is the baseline because it is batch-independent
+  (GroupNorm) and adds clipping with no clear loss in detection. Its P_E is
+  0.0019 higher than v3a (0.0139 versus 0.0120). This difference is small,
+  and run-to-run noise is not measured.
+
+### Next
+
+- Pending: the open items from the 2026-10-12 V3c entry are unchanged.
