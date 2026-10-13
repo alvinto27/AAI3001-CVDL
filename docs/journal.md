@@ -673,6 +673,16 @@ high at that point. This was not tested.
     seed key.
   - Check script: `scripts/check_settings.py`. Tests:
     `tests/test_lsb_settings.py`.
+- The Worker did plan step 4. Commit `c2bdb53`. The full record is
+  [docs/embed-core-verification.md](embed-core-verification.md).
+  - `lsb_engine.py` now has one internal embed core. `embed()` keeps its
+    signature and returns `(stego, mask, EmbedResult)` unchanged.
+  - New `embed_fast()` returns `(stego, metadata dict, changed unit indices
+    or None)`. It has no mask. It computes changed indices only when asked,
+    and keeps the `units_changed` count. It always copies the clean carrier;
+    there is no in-place option.
+  - Check script: `scripts/check_embed_fast.py`. Tests:
+    `tests/test_embed_fast.py`.
 
 ### Found
 
@@ -1127,6 +1137,33 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - 60 tests pass on the VM: 26 new source/manifest/settings tests and 34
   existing batch/engine/prepare tests.
 
+#### Embed core verification (step 4)
+
+- 20,000 random cases covered all 96 bit-mode / k / method / placement
+  combinations (at least 208 cases each), shapes 256 x 256, 512 x 512,
+  odd shapes, and one full 3280 x 4948 photo. Pixels, masks, metadata, RNG
+  state after the call, and changed indices matched between an old-engine
+  copy, the new `embed()`, and `embed_fast()`.
+- 503 stored legacy stego rows from all 12 mode/method/placement groups had
+  0 mismatches.
+- 63 unit tests pass.
+- One-core median time per call, in ms:
+
+  | Input and placement | `embed` | `embed_fast` | `embed_fast` with changed indices |
+  | --- | ---: | ---: | ---: |
+  | 512 tile, contiguous | 5.45 | 4.93 | 5.83 |
+  | 512 tile, random | 8.68 | 8.13 | 9.08 |
+  | 256 tile, contiguous | 1.54 | 1.41 | 1.67 |
+  | Full D7000 photo, contiguous | 424 | 377 | 433 |
+  | Full D7000 photo, random | 880 | 833 | 890 |
+
+  Without changed indices, `embed_fast` is about 6-11% faster. With indices,
+  it is slower than `embed()`. At 512, it gives about 203 contiguous tiles/s
+  per core and 123 random tiles/s per core.
+- A boolean mark array was rejected as a sort replacement. It gave the same
+  output but was slower in all 6 tested cases. For example, full photo,
+  dense: sort 92.5 ms versus mark 183.6 ms. The sort is unchanged.
+
 ### Decided
 
 - The user confirmed the reason for the v3c baseline. The goal of v3c is not
@@ -1311,7 +1348,10 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Done: step 3, the shared settings and seed helpers (`967cfd4`). See
   [docs/settings-and-seeds.md](settings-and-seeds.md).
 - Done: v2 conv1 fix implementation (`60f5c17`).
-- Pending, in progress: step 4, one embed core plus a mask-free fast path.
+- Done: step 4, one embed core plus a mask-free fast path (`c2bdb53`). See
+  [docs/embed-core-verification.md](embed-core-verification.md).
+- Pending, in progress: step 5, mode 1 in the shared pipeline, byte-identical
+  to `raise512-run1` for all 49,796 pairs.
 - VM machine decision (user, 2026-10-13): keep `g2-standard-8` for now:
   one L4, 8 vCPUs (4 cores x 2 threads), and 32 GB RAM. Decide whether to
   change it after step 7 measures whether the VM CPU and disk can feed the L4
