@@ -1252,6 +1252,19 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   (`140 + 0.28 x 200`). A same-size standard persistent disk gives about
   24 MiB/s (`0.12 MiB/s per GiB`) and is not suitable.
 
+#### VM disk and retained records
+
+- VM disk on 2026-10-13: 193 GB total, 144 GB used (75%), and 49 GB free.
+  Largest items were the `.npy` cache (50 GB), `Datasets/raise512-run1`
+  (38 GB), RAISE NEFs (17 GB), DIV2K (3.7 GB), the system (about 13 GB),
+  `.venv` (5.6 GB), and the uv download cache (5.6 GB).
+- Run1 records not in git: `labels.csv` (19 MB; 3.3 MB compressed),
+  `metadata.csv` (15 MB; 3.2 MB compressed), and `records/` plus
+  `dataset_info.json` (81 MB; 5.1 MB compressed).
+- Already in git: `data/raise/split_seed0.csv`, `selection.csv`, and
+  `legacy_tile_manifest.csv`. The `masks/` folder is 507 MB, can be
+  regenerated, and need not be kept.
+
 ### Decided
 
 - The user confirmed the reason for the v3c baseline. The goal of v3c is not
@@ -1453,6 +1466,9 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Pending, in progress: step 7, the mode 1 loader with source setting
   (decode/cache), overlap grid, shuffle buffer, run settings, and speed at or
   above the L4 demand of about 215 images/s.
+- Pending: commit the compressed run1 labels and metadata to `data/raise/`.
+- Pending, after step 8: team agreement, then delete
+  `Datasets/raise512-run1` on the VM.
 - Pending: the VM machine type decision after step 7.
 - VM machine decision (user, 2026-10-13): keep `g2-standard-8` for now:
   one L4, 8 vCPUs (4 cores x 2 threads), and 32 GB RAM. Decide whether to
@@ -1465,6 +1481,13 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   - The full-photo `.npy` cache is about 50 GB (RAISE about 45 GB and DIV2K
     about 5 GB), larger than 32 GB of RAM. Cache reads therefore come from
     disk.
+- VM disk decision (user, 2026-10-13): wait. Take no disk action now. Do
+  not write or build more cache. Steps 7 and 8 only read the cache, and mode
+  2 uses the same cache.
+  - After step 8, ask the team to delete `Datasets/raise512-run1` on the VM.
+    This frees 38 GB, as allowed by plan decision 4.
+  - Before that deletion, commit `labels.csv.gz` and `metadata.csv.gz` to
+    `data/raise/` (option A). This is Pending.
 - Done: ROCm-Works float64 layer check. The cause is found: wrong 1x1
   weight gradients with the variable. The v3b and v3c test metrics are
   correct; their training most likely had about 1 wrong step per epoch
