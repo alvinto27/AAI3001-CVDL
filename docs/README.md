@@ -11,6 +11,7 @@
 - [Shared settings draws and seed keys](settings-and-seeds.md)
 - [Shared embed core and mask-free verification](embed-core-verification.md)
 - [Mode 1 sample API and legacy replay](mode1-verification.md)
+- [Mode 2 full-photo embedding and actual-change labels](mode2-verification.md)
 - [Full-photo session cache and read checks](cache-verification.md)
 - [Mode 1 PyTorch loader and contract checks](torch-loader-verification.md)
 - [Notebook OTF integration and QUICK checks](notebook-otf-verification.md)
