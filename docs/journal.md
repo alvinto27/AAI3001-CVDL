@@ -835,6 +835,15 @@ of 2 trials), against the PC target of 340 tiles/s:
   | 200 | 0.0038 | 0.0027 |
 
 - The ROCm switch in notebook 04 sets this variable by default.
+- `MIOPEN_GEMM_ENFORCE_BACKEND=5` only selects the library that MIOpen uses
+  for its matrix multiplications: hipBLASLt instead of rocBLAS.
+- The conv1 weight-gradient fix (unfold plus batched matrix multiplication)
+  runs in PyTorch, not in MIOpen. Thus the fix itself cannot change the
+  forward pass. It is still open whether backend 5 changes any result.
+- ROCm-Works also added an end-to-end inference check. It uses the same
+  weights and inputs in three setups: the variable unset, the variable set
+  to 5, and float64 on the CPU. It reports the maximum difference in
+  `prob_stego`.
 - The cause is not known. It can be normal run-to-run variation, or a wrong
   gradient in a layer.
 - The ROCm-Works worker is checking each convolution layer against a
