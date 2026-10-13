@@ -115,6 +115,6 @@ Do not push. Remove the scratch copies and test outputs after review.
 | DIV2K split | `7d43a8275c8bbeb9b85161ee97a18f65dddda68682be2d14f3a4bf65018bd3e3` |
 
 Done: full source decode and grid cutting in
-[plan step 2 verification](source-verification.md). Pending: shared sampling
-and embedding work.
+[plan step 2 verification](source-verification.md) and
+[step 3 settings/seed helpers](settings-and-seeds.md). Pending: embedding work.
 Source terms and citations remain in the [ImageSets guide](../ImageSets/README.md#citations-and-terms).

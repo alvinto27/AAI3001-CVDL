@@ -121,5 +121,5 @@ portrait). Environment: rawpy 0.27.1, LibRaw 0.22.1, NumPy 2.5.3, Pillow
 were written. Scratch logs, code copies, and test outputs are removed after
 verification; this record retains the measured result.
 
-Pending: shared sampling and embedding steps. Cache construction is not part
-of this check.
+Done: [shared settings and seed helpers](settings-and-seeds.md).
+Pending: embedding-core work. Cache construction is not part of this check.

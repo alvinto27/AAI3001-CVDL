@@ -29,6 +29,11 @@ It does not yet embed or load training batches. See the
 [source API and verification record](../docs/source-verification.md).
 The existing `prepare.py` workflow below is unchanged.
 
+`lsb_settings.py` now owns shared settings draws and generation seed keys.
+The existing batch route keeps its legacy draws and four-integer seeds.
+See the [settings and seed record](../docs/settings-and-seeds.md) for the
+separate versioned OTF route and its lower-to-fit size policy.
+
 ## Setup
 
 The standalone tool needs these packages:

@@ -8,6 +8,7 @@
 - [On-the-fly generator design plan](plan-otf-generator.md)
 - [Frozen RAISE and DIV2K source records](frozen-source-records.md)
 - [Full-photo source API and verification](source-verification.md)
+- [Shared settings draws and seed keys](settings-and-seeds.md)
 - [Rebuild the RAISE 512 dataset](rebuild-raise512-run1.md)
 
 ## Local data folders
