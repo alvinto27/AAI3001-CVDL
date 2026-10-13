@@ -749,6 +749,21 @@ high at that point. This was not tested.
   - Workers yield small groups, and the main process joins groups from all
     workers into each batch. The loader yields uint8; the notebook converts
     it to float32 on the device. A callback calls `set_epoch` at each epoch.
+- The user ran the first full OTF v3c run on the VM L4. The executed record
+  is `notebooks/runs/04_v3c_otf_2026-10-13.ipynb` (commit `973f010`, SHA-256
+  `3f167964...4bc9`, equal to the VM file). Settings were `V3_DATA=otf`,
+  `QUICK=False`, cache `/srv/aai3001/otf-cache/v1`, 6 workers, prefetch 4
+  groups, tile 512, run seed 0, `overlap_full_mix`, 10 epochs, batch 32,
+  and v3c (clip 3, GroupNorm). Run name:
+  `baseline_kv_xunet_v3_clip3_group_otf`.
+- The user ran a PC slow-run diagnosis and stopped the run. The Worker made
+  no code change. The GPU-only result was normal. The diagnosis found small
+  groups of 4 with prefetch 4, a main-process join and pin cost, and 16 main
+  torch threads as causes. Eight idle persistent validation workers also held
+  memory.
+- The Worker applied fixes 1-3 in commit `9c3bf0b`: one main torch thread;
+  four non-persistent evaluation workers; and prefetch counted in images,
+  with 128 images per worker. `V3_PREFETCH` remains a group-count override.
 
 ### Found
 
@@ -1362,6 +1377,52 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   per-setting table before and after (SHA-256 `26fe36f6...a467`).
 - 82 tests pass.
 
+#### First full OTF run and PC diagnosis
+
+- The VM run trained from 09:07 to 10:21, about 74 min. Validation P_E
+  for epochs 0-9 was 0.0357, 0.0356, 0.0247, 0.0219, 0.0187, 0.0158,
+  0.0177, 0.0146, 0.0147, and 0.0148. The best epoch was 7.
+- Test used 21,912 images: accuracy 0.9818, AUC 0.9975, P_E 0.0170.
+  Per-source P_E was RAISE 0.011153 (9,728 pairs) and DIV2K 0.057410
+  (1,228 pairs). Per-camera P_E was D7000 0.011482 (7,490), D90 0.009937
+  (2,214), D40 0.000000 (24), and not_applicable / DIV2K 0.057410 (1,228).
+- Weak settings were lowest k=1 at 0.060117, plane k=1 at 0.052000,
+  bpp 0.05-0.15 at 0.029448 (2,428 pairs), random placement at 0.021721,
+  and stride at 0.020380. Contiguous placement was 0.007815. Bpp bins had
+  0, 2,428, 4,141, 4,387, and 0 pairs for <=0.05, 0.05-0.15, 0.15-0.30,
+  0.30-0.50, and >0.50.
+- These results are not directly comparable with old v3c P_E 0.0139: the
+  test set, grid, source mix, and stego generation changed. `legacy_v6`
+  gives the like-for-like test. A legacy test of this checkpoint is Pending.
+- The PC slow run reached 8.85 it/s, with 24.7/33 GB RAM, 6.3 GB swap,
+  and 16 workers, so the user stopped it. GPU-only was 85.6 ms/step. The
+  uint8 conversion was not the cause (85.66 versus 85.65 ms).
+- The old prefetch gave 289.2 images/s. The new 128-image prefetch gave
+  384.5 images/s. The main-process join and pin cost about 5.7 ms; 16 main
+  torch threads made the join 40 ms instead of 2.8 ms. Decode bursts had a
+  p95 of 555 ms. Eight idle validation workers held 4.24 GB PSS.
+- Throughput after fixes, on 8,640 images:
+
+  | Case | Images/s |
+  | --- | ---: |
+  | PC GPU-only, fixed real batch | 366.0 |
+  | PC decode, old prefetch | 289.2 |
+  | PC decode, 128 images | 384.5 |
+  | L4 GPU-only, fixed real batch | 284.6 |
+  | L4 cache, old | 277.3 |
+  | L4 cache, new | 276.2 |
+
+- PC RAM was 4.68 GB for the main process plus 11.15 GB for 8 train
+  workers. L4 RAM was 2.75 GB for the main process plus 7.47 GB for 6
+  workers. Full PC validation took 103.6 s with 8 persistent workers and
+  136.0 s with 4 non-persistent workers; metrics were identical.
+- Data keys, labels, and bytes were identical in 200 batches at both tile
+  sizes. QUICK ran all 15 cells, and early stopping left no workers. 85
+  tests pass.
+- In decode mode, validation workers decode the same NEF several times when
+  one photo's batches go to different workers: 51 decodes with 2 workers and
+  101 with 4 workers for 1,600 pairs. Decoding used 96% of worker time.
+
 #### VM disk and retained records
 
 - VM disk on 2026-10-13: 193 GB total, 144 GB used (75%), and 49 GB free.
@@ -1541,6 +1602,14 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   - The cache holds the full clean 8-bit RGB photo after RAW conversion. It
     is not cut into tiles and is not embedded. Cutting and embedding happen
     during training.
+- Loader decisions (user, 2026-10-13): use main torch threads 1, four
+  non-persistent evaluation workers, and prefetch counted in images at 128
+  per worker. `V3_PREFETCH` remains a group-count override. These fixes are
+  in `9c3bf0b`.
+- The user agreed to queue fix 4 (background join and pinned copy) and fix 5
+  (one photo per evaluation worker, decode once, same order) after Mode 2.
+- Reporting rule (user): workers report only at task end, when blocked, or
+  when a decision is needed.
 
 ### Next
 
@@ -1579,13 +1648,14 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   (`8c4e549`).
 - Done: step 8, notebook 04 connected to the OTF loader (`f3dca17`). See
   [docs/notebook-otf-verification.md](notebook-otf-verification.md).
-- Pending: the user's first full OTF notebook 04 run on the VM
-  (`V3_CACHE_ROOT=/srv/aai3001/otf-cache/v1`, `QUICK=False`).
+- Done: the user's first full OTF v3c run on the VM. Its checkpoint is
+  `baseline_kv_xunet_v3_clip3_group_otf`; a `legacy_v6` test is Pending if
+  a like-for-like comparison is needed.
 - Pending, after step 8: team agreement, then delete
   `Datasets/raise512-run1` on the VM. The `V3_DATA=png` path needs that
   folder; the OTF `legacy_v6` profile replaces it.
 - Pending: tell teammates that the VM checkout is on branch `yx`.
-- Later: Mode 2.
+- Later: Mode 2. Fixes 4 and 5 are queued after Mode 2.
 - Done: the VM machine type decision after step 7: keep `g2-standard-8`.
 - VM machine decision (user, 2026-10-13): keep `g2-standard-8`:
   one L4, 8 vCPUs (4 cores x 2 threads), and 32 GB RAM. After step 7, the
