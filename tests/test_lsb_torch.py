@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"LSB-Dataset-Generator"))
-from lsb_torch import Corpus,RunSettings,TrainingImages,FixedPairs,training_loader
+from lsb_torch import Corpus,RunSettings,TrainingImages,FixedPairs,training_loader,prefetch_for_images
 from lsb_cache import build_entry
 from test_lsb_source import record
 
@@ -147,6 +147,63 @@ class TorchTests(unittest.TestCase):
         bins=complete_bpp_bins([.00001,.0499878,.05,.15,.30,.50,.60])
         self.assertFalse(bins.isna().any())
         self.assertEqual(list(bins.value_counts()),[3,1,1,1,1])
+
+    def test_prefetch_image_budget_and_explicit_override(self):
+        self.assertEqual(prefetch_for_images(4),32)
+        self.assertEqual(prefetch_for_images(32),4)
+        self.assertEqual(prefetch_for_images(3),43)
+        for images,lead in ((0,128),(4,0),(4,-1)):
+            with self.assertRaises(ValueError):
+                prefetch_for_images(images,lead)
+        ds=TrainingImages(self.corpus(RunSettings(tile_size=256,buffer_size=8)))
+        default=training_loader(ds,num_workers=2,pin_memory=False)
+        self.assertEqual(default.loader.prefetch_factor,32)
+        explicit=training_loader(ds,num_workers=2,pin_memory=False,prefetch_factor=4)
+        self.assertEqual(explicit.loader.prefetch_factor,4)
+        whole=training_loader(ds,num_workers=2,pin_memory=False,group_images=0)
+        self.assertEqual(whole.prefetch_factor,4)
+        paired=TrainingImages(self.corpus(RunSettings(tile_size=256,buffer_size=8,paired_batches=True)))
+        tiny=training_loader(paired,batch_size=1,num_workers=2,pin_memory=False)
+        self.assertEqual(tiny.loader.prefetch_factor,64)  # One pair = two images.
+        with self.assertRaises(ValueError):
+            training_loader(ds,num_workers=0,prefetch_factor=0)
+
+    def test_notebook_separate_evaluation_workers_and_record(self):
+        from lsb_notebook import NotebookData
+        adapter=NotebookData.__new__(NotebookData)
+        adapter.corpus=self.corpus(RunSettings(tile_size=256,buffer_size=8))
+        adapter.train=TrainingImages(adapter.corpus)
+        adapter.fixed_train=FixedPairs(adapter.corpus,'train')
+        adapter.val=FixedPairs(adapter.corpus,'val')
+        adapter.test=FixedPairs(adapter.corpus,'test')
+        adapter.record={}
+        train,*evaluation=adapter.loaders(32,4,False)
+        self.assertEqual(train.loader.num_workers,4)
+        self.assertEqual(train.loader.prefetch_factor,32)
+        self.assertTrue(train.loader.persistent_workers)
+        for loader in evaluation:
+            self.assertEqual(loader.num_workers,4)
+            self.assertEqual(loader.prefetch_factor,4)
+            self.assertFalse(loader.persistent_workers)
+        self.assertEqual(adapter.record['eval_workers'],4)
+        self.assertEqual(adapter.record['prefetch_images'],128)
+        self.assertEqual(adapter.record['train_prefetch_images'],128)
+        self.assertIsNone(adapter.record['prefetch_override'])
+        train,*evaluation=adapter.loaders(8,0,False,4,eval_workers=0,prefetch_images=64)
+        self.assertEqual(adapter.record['prefetch_factor'],4)
+        self.assertEqual(adapter.record['prefetch_override'],4)
+        self.assertEqual(adapter.record['eval_prefetch_factor'],8)
+        self.assertTrue(all(loader.num_workers==0 for loader in evaluation))
+        with self.assertRaises(ValueError):
+            adapter.loaders(32,4,False,eval_workers=-1)
+
+    def test_ordered_prefetch_equality(self):
+        ds=TrainingImages(self.corpus(RunSettings(tile_size=256,buffer_size=8)))
+        a=training_loader(ds,batch_size=8,num_workers=2,pin_memory=False,prefetch_factor=4)
+        b=training_loader(ds,batch_size=8,num_workers=2,pin_memory=False)
+        for left,right in zip(a,b):
+            self.assertTrue(all(x.equal(y) for x,y in zip(left,right)))
+        a.shutdown();b.shutdown()
 
     def test_source_weight_epoch_length_and_paired_contract(self):
         s=RunSettings(tile_size=256,buffer_size=8,paired_batches=True,source_weights={"div2k":2.0})

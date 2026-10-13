@@ -14,8 +14,11 @@ cannot silently resume the PNG baseline. `V3_RUN_NAME` overrides the name.
 | --- | --- |
 | `V3_SOURCE` | decode unless `V3_CACHE_ROOT` is supplied; explicit override wins. |
 | `V3_CACHE_ROOT` | Empty; required for cache source. |
-| `V3_WORKERS` | 6. |
-| `V3_PREFETCH` | 4; ordered delivery always used by the notebook. |
+| `V3_MAIN_THREADS` | 1; explicit main-process torch CPU thread count, also in reused kernels. |
+| `V3_WORKERS` | 6 training workers. |
+| `V3_EVAL_WORKERS` | 4 for val, test and train-eval; nonpersistent, released after each pass. |
+| `V3_PREFETCH_IMAGES` | 128 images ahead per worker; rounded up to whole tasks. |
+| `V3_PREFETCH` | Unset; optional old group-count override for training. Explicit 4 means 16 images ahead with groups4, not the new default. Ordered delivery remains enabled. |
 | `V3_TILE_SIZE` | 512; 256 supported. |
 | `V3_RUN_SEED` | 0; training sample/selection seed. |
 | `V3_EVAL_PROFILE` | overlap_full_mix; legacy_v6 is an option. |
@@ -25,7 +28,13 @@ cannot silently resume the PNG baseline. `V3_RUN_NAME` overrides the name.
 | `V3_RUN_NAME` | Distinct run name; agent uses dated smoke names. |
 
 Recommended VM controls: `V3_SOURCE=cache`,
-`V3_CACHE_ROOT=/srv/aai3001/otf-cache/v1`, `V3_WORKERS=6`, `V3_PREFETCH=4`.
+`V3_CACHE_ROOT=/srv/aai3001/otf-cache/v1`, `V3_WORKERS=6`,
+`V3_EVAL_WORKERS=4`, `V3_MAIN_THREADS=1`, `V3_PREFETCH_IMAGES=128`.
+Leave `V3_PREFETCH` unset to derive 32 four-image training groups. Evaluation
+uses the same image budget: four 32-image pair batches per worker at full batch32.
+Its workers stop after each pass, so their photo arrays do not occupy RAM during
+training. The record includes both worker counts, thread count, requested image
+budget, effective training lead, derived factors and any explicit override.
 The notebook prints the full settings/selected-photo record and saves
 `data_run_settings.json` beside checkpoints. QUICK fixed eval subsets have
 16 pairs each, chosen with fixed seeds by source/camera. Their pair IDs and the
@@ -67,13 +76,16 @@ as a reference. Notebook training, validation and prediction convert on the
 device to float32, with original 0..255 values and no normalization/resize.
 
 The uint8 shuffle buffer is unchanged: 768 MiB/worker at 512, 192 MiB at 256.
-Prefetch queues now contain small uint8 groups rather than whole float32
-batches. Joining holds at most one final batch plus groups; pinning can hold
+Prefetch queues contain small uint8 groups rather than whole float32
+batches. The current default is 128 images per worker (32 groups of four), not
+four groups. At 512 this is 96 MiB of queued image payload per worker, versus
+12 MiB with the historical four-group lead; the shuffle buffer is unchanged. Joining holds at most one final batch plus groups; pinning can hold
 one extra uint8 batch copy, far below the old batch/queue storage. CPU without
 an accelerator does not attempt to pin unpinned groups. CUDA and ROCm use the
 same data path; the existing ROCm-only conv1 model fix remains separate.
 
-Cache source, six workers, prefetch4, ordered, batch32, 200 batches per case:
+Historical step 8 check: cache source, six workers, four groups prefetched
+(16 images per worker), ordered, batch32, 200 batches per case:
 
 | Tile | Path | Mean distinct photos | Minimum photos | Mean / min workers |
 | --- | --- | ---: | ---: | ---: |
@@ -180,7 +192,7 @@ no code cell ran. A second setup attempt used base InteractiveShell and stopped
 before cell2 at its unimplemented GUI hook; using the terminal subclass fixed
 it. Failed attempts have no claimed notebook results.
 
-Final verification: 82 tests passed (48 shared pipeline/loader/adapter tests,
+Step 8 verification: 82 tests passed (48 shared pipeline/loader/adapter tests,
 34 engine/batch/prepare tests). Final suite emitted no termination warning.
 The group-mixing unit test now drains its short iterator before shutdown.
 PC/VM SHA-256 values match for every tested code/notebook file. Documentation
@@ -190,3 +202,142 @@ recording results; approved cache and original run folders were retained.
 See [loader step 7](torch-loader-verification.md) for prior cache/session parity,
 legacy profile and full split counts. Lightning arbitrary-iterable support was
 checked with Context7 `/lightning-ai/pytorch-lightning/2.6.6`.
+
+## Performance default checks (2026-10-13)
+
+The main torch CPU thread default is now 1. Evaluation uses four nonpersistent
+workers. OTF training derives its task lead from 128 images per worker:
+32 tasks of four images. The explicit `V3_PREFETCH` group override still works.
+These controls do not change samples, augmentation keys, split order or model
+code. Both fresh before/after QUICK processes already had one main thread;
+the explicit setting also prevents a reused kernel from keeping a larger count.
+The real notebook control was checked with a simulated reused16-thread process:
+it reset to1 by default, then respected an explicit3-thread override.
+
+### Parity and full validation
+
+The final suites passed 85 tests: 51 shared tests and 34 generator tests.
+At both 512 and 256, 200 training batches (6,400 images) have identical keys,
+labels and pixels in the same order at factors 4 and 32, with eight workers.
+Evaluation at eight and four workers likewise matches for 200 batches
+(3,200 pairs) at each size. All measured training worker exit codes were zero.
+This does not claim training order is unchanged when training worker count
+changes; photo sharding already depends on that count.
+
+Full decode validation has 11,238 pairs. Eight persistent workers in a fresh
+process took 103.56011892899551 s (217.03335446544187 images/s). Four
+nonpersistent workers took 135.99441288999515 s (165.27149551489785 images/s).
+Peak summed evaluation-worker PSS was 2,989,032,448 bytes. All six metrics are
+identical: loss 0.7803089618682861, accuracy 0.5, P_E 0.47997865080833435,
+AUC 0.513175904750824, false alarm 0.0, missed detection 1.0.
+An interim two-worker pass took 137.55978315700486 s; it is not the default.
+
+A frozen-weight Lightning fit ran two sanity validation batches, one zero-rate
+optimizer step, then the full four-worker validation pass. Weights stayed
+identical and all six metrics matched the values above.
+
+### Real asynchronous Lightning windows
+
+Every case uses the exact notebook v3c/clip3/GroupNorm model, float32
+`32-true`, no autocast, batch32 and 300 optimizer steps. The first 30 warm up;
+the measured 270 contain exactly 8,640 images. Synchronization occurs only at
+window boundaries, not each step. Rates are total images divided by elapsed
+completion time. GPU-completion interval p95 uses events; host callback p95
+uses CPU timestamps. All cases start from the same model state SHA-256
+`91bab9c3a59896faa7ba386c715d41892925ac19072cf21538ed24c70501e590`.
+GPU-only freezes the first real mixed batch on the device. Its first batch
+matches the old/new cases in keys and pixel hash within each platform.
+
+| Platform/case | Steady seconds | Images/s | GPU-completion p95 ms | Host callback p95 ms |
+| --- | ---: | ---: | ---: | ---: |
+| PC, fixed real GPU batch | 23.60652385999856 | 366.0005196546768 | 89.82775573730468 | 163.42893945002288 |
+| PC, decode8, old factor4 | 29.872453932999633 | 289.22967022992134 | 337.70809173583956 | 779.387333050181 |
+| PC, decode8, derived factor32 | 22.471585875995515 | 384.4855475567204 | 82.8984806060791 | 151.87416515036603 |
+| L4, fixed real GPU batch | 30.363586276005663 | 284.55136759743107 | 113.26376914978027 | 113.07677315271576 |
+| L4, cache6, old factor4 | 31.15216202800366 | 277.3483263291078 | 117.03321914672851 | 116.93229040065489 |
+| L4, cache6, derived factor32 | 31.283151044000988 | 276.1870115912396 | 118.00458030700683 | 117.45694034871121 |
+
+The new L4 rate is 2.9394889495048764% below its GPU-only reference. The new
+PC rate is 5.050546900721431% above its fixed-batch reference (signed gap
+-5.050546900721431%). This negative gap is an observation, not proof of
+negative loader cost: repeated fixed input and changing training input are not
+identical workloads. A matched random fixed-batch PC control gave
+344.7630100971867 images/s. The reason for the PC reference difference remains
+open; a future strict comparison should replay the same device-resident batch
+sequence. Do not compare these rates directly to the earlier per-step
+synchronized 209/312/369 measurements.
+
+New PC peak PSS: main 4,678,875,136 bytes; eight train workers 11,145,823,232;
+four-worker preview 2,058,414,080. New L4 peak PSS: main 2,754,504,704 bytes;
+six train workers 7,474,259,968; four-worker preview 1,590,490,112. Both have
+zero evaluation-worker PSS during training. Full PC evaluation peak is recorded
+separately above. All train worker exits were zero. VM checks required zero L4
+utilization, no compute process and no notebook kernel before each test. They
+used mirrored scratch code, the retained cache, and a read-only live checkout.
+
+### Why four-worker decode validation remains slow
+
+A controlled first-1,600-pair check used 100 full32-image batches:
+
+| Workers | Pass seconds | Full-photo loads | Summed photo-load seconds | Summed item-generation seconds |
+| --- | ---: | ---: | ---: | ---: |
+| 2, nonpersistent | 24.43056574500224 | 51 | 38.28914535402146 | 41.00799804187409 |
+| 4, nonpersistent | 25.835603224004444 | 101 | 78.55817700300395 | 81.50152954602527 |
+| 8, persistent, fresh | 24.734317536000162 | 122 | 101.94830253097462 | 105.23241107203648 |
+
+Four workers repeat almost twice as many whole-photo loads as two: ordered map
+batches distribute tiles from the same photo to different workers. Photo loading
+and decoding account for about96.4% of four-worker item-generation time. Equal
+2/4 pass time therefore does not show that decoding is unlimited.
+
+At four workers, process-ready delays span1.0161152510045213–4.017964180005947 s.
+First-photo loads take0.6674019240017515–0.6784606350047397 s; first fetch takes
+0.7260237510054139 s. Remaining fetch waits sum18.00667567698838 s, with
+795.1887818999239 ms p95. GPU forward totals2.4190234146118166 s (median
+24.02033233642578 ms). Device transfer totals0.09216743254661561 s; host
+transfer calls0.010391062052804045 s. Validation-step host spans total
+2.6321538840056746 s, mainly including GPU completion. Epoch AUC/P_E work takes
+0.002354937998461537 s. Main-process CPU totals3.52 s. Evaluation prefetch
+remains four full batches/128 images; it was not reduced by this change.
+
+A two-epoch, one-step-per-epoch, zero-rate Lightning fit verified true retained
+worker reuse: the same eight PIDs took24.04181039600371 s on the first prefix
+pass and16.056130497003323 s on the next. Startup retention saved about8 s.
+Both passes loaded122 photos; the last-photo arrays did not remove restarted
+prefix decoding. Separate `Trainer.validate` calls tear workers down and are
+not a valid warm-worker comparison. The full103.56 s before-pass above was
+fresh, so earlier warm workers did not cause that particular advantage.
+
+Proposal only, not implemented: assign all tiles from each evaluation photo to
+one worker, decode once, then restore canonical output order; or use the approved
+cache where available. More workers or deeper queues do not remove duplicated
+photo loading. The four-worker nonpersistent design is unchanged.
+
+### Early stop, interruption and QUICK
+
+Instrumentation wrapped PyTorch's own shutdown method without changing it.
+The direct two-batch iterator drop took1.4509231980046025 s including garbage
+collection; shutdown itself took1.3554129410040332 s. Lightning's two-batch sanity
+cleanup took0.5337219729990466 s. A real `KeyboardInterrupt` after two validation
+batches completed cleanup in0.8126337830035482 s (worker shutdown
+0.8092460670013679 s). Lightning's caught process exit1 is the expected interrupt
+path, not a worker exit: all four worker exits were0. No workers remained alive,
+no hang occurred, and no shutdown/termination diagnostic appeared.
+
+Both instrumented QUICK runs executed all15 code cells through terminal IPython:
+OTF261.99676013000135 s; PNG12.426183101997594 s. OTF preview drop after one
+batch took0.42437690000224393 s; its two-batch sanity cleanup took
+0.8975795030055451 s. Other full evaluation cleanup took0.4154–0.8785 s.
+PNG sanity cleanup took0.04676537499472033 s. Every observed worker exit was0;
+no workers remained. Existing Lightning worker/persistence suggestions and a
+pytree deprecation still print; they were not suppressed and are not shutdown
+faults. The expected graceful-interruption notice also prints.
+
+Fresh before/after OTF QUICK totals were262.75344457499887/263.0877361340026 s.
+CPU tie metrics took0.0033397070001228712/0.003548035994754173 s; P_E/AUC tables
+0.04228401499858592/0.04400327699841 s; diagnostics
+191.73584875899542/192.34160630899714 s. These CPU cells are not clearly slower.
+Saved notebook outputs and metadata are unchanged; source cells2,5,11,12 changed.
+The user's executed run record, checkpoint folder, datasets, dependency files,
+journal and backend settings were not edited. All scratch outputs are removed
+after reporting; the approved cache is retained.

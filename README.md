@@ -29,6 +29,20 @@ See [the RAISE 512 rebuild guide](docs/rebuild-raise512-run1.md) for the complet
 
 Current results: [V3 comparison report](docs/results-v3.md).
 
+Notebook 04 loader controls:
+
+| Environment variable | Default and meaning |
+| --- | --- |
+| `V3_DATA` | `otf`; `png` keeps the original dataset path. |
+| `V3_MAIN_THREADS` | 1 main-process torch CPU thread. |
+| `V3_WORKERS` | 6 OTF training workers; PNG retains its platform-based count. |
+| `V3_EVAL_WORKERS` | 4 for val, test and train-eval; workers stop after each pass. |
+| `V3_PREFETCH_IMAGES` | 128 images ahead per worker; 32 training groups of four. |
+| `V3_PREFETCH` | Unset; optional training group-count override. Explicit 4 means only 16 images ahead. |
+| `V3_SOURCE`, `V3_CACHE_ROOT` | Decode unless a cache root is supplied. |
+
+Ordered delivery remains enabled. See [all controls and saved run settings](docs/notebook-otf-verification.md#controls).
+
 ## Data and citations
 
 The `raise512-run1` source is RAISE. Cite it as [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](ImageSets/README.md#citations-and-terms) RAISE is for **non-commercial research and educational purposes**.

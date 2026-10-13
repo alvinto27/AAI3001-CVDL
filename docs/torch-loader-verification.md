@@ -6,6 +6,14 @@ in step 7. This is the step 7 record. [Step 8](notebook-otf-verification.md)
 now connects the notebook, transfers uint8 and joins small worker groups in the
 parent; the float32 and whole-worker-batch contract below is historical.
 
+Current defaults: a 128-image lead per training worker, derived as 32 groups
+of four images. Explicit `prefetch_factor` still overrides that derived count.
+Notebook `V3_PREFETCH_IMAGES=128` controls the image budget; `V3_PREFETCH` is an
+optional group-count override, not a default of four groups. Main torch threads
+are 1 (`V3_MAIN_THREADS`); val/test/train-eval use four nonpersistent workers
+(`V3_EVAL_WORKERS`), separate from training `V3_WORKERS`. See the
+[notebook controls](notebook-otf-verification.md#controls) for the run record.
+
 ## Notebook data contract
 
 Notebook cells 2, 8, 11, 12, 25 and the model/trainer cells were inspected.
@@ -76,8 +84,10 @@ keys contain no worker/order state. No balanced class sampling is used.
 Default buffer is 1,024 **images**, stored as uint8 until emitted. Its payload
 is 768 MiB/worker at 512 and 192 MiB/worker at 256, plus one source photo,
 metadata, decoder/torch working memory and batch/pin queues. Paired mode stores
-half as many pair items for the same image capacity. Default prefetch is four
-batches per worker after decode scheduling checks; returned tensors are float32.
+half as many pair items for the same image capacity. The historical step 7
+prefetch was four whole batches per worker (128 images at batch32); returned
+tensors were float32. The current uint8 small-group loader derives tasks from
+128 images instead, so reducing group size does not reduce that lead.
 Default in_order=True keeps the prescribed worker batch order.
 
 `source="decode"` always reads masters, with OMP=1. `source="cache"` requires
@@ -97,6 +107,11 @@ Preview arrays are cleared when the dataset is copied to a new worker.
 
 ## Correctness and counts
 
+The [performance-default checks](notebook-otf-verification.md#performance-default-checks-2026-10-13)
+record the later 85-test suite, ordered old/new prefetch parity, four-worker full
+validation, asynchronous PC/L4 windows, and early-stop worker cleanup.
+The tables below retain the original step 7 verification results.
+
 | Check | Result |
 | --- | --- |
 | Decode/cache, all tiles | Eight train photos: each RAISE camera/orientation plus DIV2K 0001/0002. At 512: 640 train images, 320 val pairs. At 256: 2,432 train images, 1,216 val pairs. Zero pixel/frame differences; train and val keys. |
@@ -106,7 +121,7 @@ Preview arrays are cleared when the dataset is copied to a new worker.
 | Legacy loader | 2,000 uniformly spread pairs from the 49,796-entry profile match original clean/stego PNG pixels; zero differences. 197.099656 s. |
 | Parity time | 103.066557 s for both sizes, source modes/purposes and worker comparison. |
 | Counts time | 14.161691 s. Train variants=2 doubles count; default selected train photos=1,381. |
-| Tests | Final suite: 79 passed (45 source/manifest/settings/core/cache/loader, plus 34 engine/batch/prepare). Five new loader tests also prove unordered scheduling preserves the keyed sample set. |
+| Step 7 tests | 79 passed (45 source/manifest/settings/core/cache/loader, plus 34 engine/batch/prepare). Five new loader tests also prove unordered scheduling preserves the keyed sample set. |
 
 | Tile size | Train images/epoch | Val images | Test images | Total images |
 | --- | ---: | ---: | ---: | ---: |
@@ -181,7 +196,8 @@ win. Unordered delivery adds 4.1% over ordered prefetch4 for decode here, but
 batch arrival order is not reproducible. **Ordered remains the default.**
 Cache gain over its prefetch1 baseline is only 0.82%, with different page
 residency; no robust large cache gain is claimed. Prefetch4 is the chosen
-production default. The buffer payload remains unchanged; extra batches add
+step 7 whole-batch default, not the current small-group count. The buffer
+payload remains unchanged; extra batches add
 host memory. In particular, the 256/cache6 low disk reading reflects warm pages.
 
 ### L4 joint checks

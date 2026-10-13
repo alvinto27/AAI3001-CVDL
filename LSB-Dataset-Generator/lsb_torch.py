@@ -359,10 +359,25 @@ class FixedPairs(Dataset):
         return image_tensor(clean,cm["embedding_seed_key"],0,False,dtype),image_tensor(stego,sm["embedding_seed_key"],1,False,dtype),index
 
 
+def prefetch_for_images(images_per_task,prefetch_images=128):
+    """Round the per-worker image lead up to whole loader tasks."""
+    if images_per_task<=0 or prefetch_images<=0:
+        raise ValueError("task images and prefetch images must be positive")
+    return (prefetch_images+images_per_task-1)//images_per_task
+
+
 def training_loader(dataset,batch_size=32,num_workers=8,pin_memory=True,persistent_workers=True,
-                    prefetch_factor=4,in_order=True,group_images=4):
+                    prefetch_factor=None,in_order=True,group_images=4,prefetch_images=128):
     """No shuffle=True; retain all worker tails. Paired batch size is pairs."""
-    group_items=max(1,group_images//(2 if dataset.corpus.settings.paired_batches else 1)) if group_images else batch_size
+    if batch_size<=0 or group_images<0:
+        raise ValueError("batch size must be positive and group images nonnegative")
+    images_per_item=2 if dataset.corpus.settings.paired_batches else 1
+    group_items=max(1,group_images//images_per_item) if group_images else batch_size
+    task_images=min(group_items,batch_size)*images_per_item
+    derived=prefetch_for_images(task_images,prefetch_images)
+    prefetch_factor=derived if prefetch_factor is None else prefetch_factor
+    if prefetch_factor<=0:
+        raise ValueError("prefetch factor must be positive")
     kwargs=dict(batch_size=min(group_items,batch_size),num_workers=num_workers,pin_memory=pin_memory,
                 persistent_workers=persistent_workers and num_workers>0,worker_init_fn=initialize_worker,
                 drop_last=False,in_order=in_order)

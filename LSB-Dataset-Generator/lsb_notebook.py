@@ -5,7 +5,7 @@ import json
 import numpy as np
 import pandas as pd
 from lsb_torch import (torch,RunSettings,Corpus,TrainingImages,FixedPairs,PairSubset,
-                       training_loader,DataLoader)
+                       training_loader,DataLoader,prefetch_for_images)
 
 
 def fixed_subset(dataset,count,seed=0):
@@ -39,19 +39,31 @@ class NotebookData:
                                             for s,d in (("val",self.val),("test",self.test))}}
         self.pairs=pd.concat([self.fixed_train.frame,self.val.frame,self.test.frame],ignore_index=True)
 
-    def loaders(self,batch_size,workers,pin_memory,prefetch=4):
-        self.record.update(workers=workers,prefetch_factor=prefetch,in_order=True,group_images=4,
-                           batch_images=batch_size,tensor_dtype="uint8")
-        kwargs=dict(num_workers=workers,pin_memory=pin_memory,persistent_workers=workers>0)
-        if workers:
-            kwargs.update(multiprocessing_context="spawn",prefetch_factor=prefetch)
+    def loaders(self,batch_size,workers,pin_memory,prefetch=None,*,eval_workers=4,prefetch_images=128):
+        if workers<0 or eval_workers<0:
+            raise ValueError("worker counts must be nonnegative")
         paired=self.corpus.settings.paired_batches
-        train=training_loader(self.train,batch_size=max(1,batch_size//2) if paired else batch_size,
-                              num_workers=workers,pin_memory=pin_memory,prefetch_factor=prefetch)
-        val=DataLoader(self.val,batch_size=max(1,batch_size//2),**kwargs)
-        test=DataLoader(self.test,batch_size=max(1,batch_size//2),**kwargs)
+        train_batch=max(1,batch_size//2) if paired else batch_size
+        pair_batch=max(1,batch_size//2)
+        task_images=min(2 if paired else 4,train_batch)*(2 if paired else 1)
+        train_prefetch=prefetch_for_images(task_images,prefetch_images) if prefetch is None else prefetch
+        eval_prefetch=prefetch_for_images(pair_batch*2,prefetch_images)
+        self.record.update(workers=workers,eval_workers=eval_workers,main_threads=torch.get_num_threads(),
+                           prefetch_images=prefetch_images,prefetch_override=prefetch,
+                           prefetch_factor=train_prefetch,train_prefetch_images=task_images*train_prefetch,
+                           eval_prefetch_factor=eval_prefetch,eval_persistent_workers=False,
+                           in_order=True,group_images=4,batch_images=batch_size,
+                           tensor_dtype=self.corpus.settings.tensor_dtype)
+        # Evaluation is intermittent: release workers/photo arrays after each pass.
+        kwargs=dict(num_workers=eval_workers,pin_memory=pin_memory,persistent_workers=False)
+        if eval_workers:
+            kwargs.update(multiprocessing_context="spawn",prefetch_factor=eval_prefetch)
+        train=training_loader(self.train,batch_size=train_batch,num_workers=workers,
+                              pin_memory=pin_memory,prefetch_factor=prefetch,prefetch_images=prefetch_images)
+        val=DataLoader(self.val,batch_size=pair_batch,**kwargs)
+        test=DataLoader(self.test,batch_size=pair_batch,**kwargs)
         diagnostic=fixed_subset(self.fixed_train,min(1000,len(self.fixed_train)),0)
-        train_eval=DataLoader(diagnostic,batch_size=max(1,batch_size//2),**kwargs)
+        train_eval=DataLoader(diagnostic,batch_size=pair_batch,**kwargs)
         return train,val,test,train_eval
 
     def print_record(self):
