@@ -588,6 +588,37 @@ high at that point. This was not tested.
   - a session cache, tests, and 17 work steps.
   - No new package is necessary. rawpy, NumPy, Pillow, PyYAML, PyTorch, and
     Lightning are already in `pyproject.toml`.
+- The Worker updated the plan for overlapped tiles in commit `18ef1fa`.
+  - Tile grid per landscape photo (rows x columns = tiles). Portrait photos
+    swap rows and columns.
+
+    | Camera | 512 grid | 256 grid |
+    | --- | --- | --- |
+    | D7000 | 7 x 10 = 70 | 13 x 20 = 260 |
+    | D90 | 6 x 9 = 54 | 12 x 17 = 204 |
+    | D40 | 4 x 6 = 24 | 8 x 12 = 96 |
+
+  - Totals for one grid over all 1,000 photos: 65,184 tiles at 512 and
+    243,120 tiles at 256.
+  - Mode 2 embeds into the full photo. The seeds do not depend on the tile
+    size, so 256 and 512 runs see the same stego photo.
+  - A changed pixel in an overlap marks each tile that contains it as
+    stego: 2 tiles at an edge overlap, up to 4 at a corner.
+  - In new mode 1 runs, the generator embeds each overlapping tile
+    independently.
+  - Memory for one D7000 clean + stego float32 bag at 512: about 420 MiB,
+    30% more than with the crop.
+  - The earlier speed, memory, and 34.5% label-1 results are historical crop
+    results. The values for overlapped tiles are Pending.
+- Set up SSH to the team VM with one shared connection (OpenSSH
+  ControlMaster). Thus Tailscale SSH check mode asks for a login only one
+  time in each session.
+  - VM: NVIDIA L4, 8 vCPUs, 31 GB RAM, about 100 GB of free disk.
+  - The repository is at `/srv/aai3001/AAI3001-CVDL`, on branch `main`.
+  - The RAISE NEFs are already on the VM.
+- The ROCm-Works team (a separate orchestrator) is standing down. Agreed
+  rules: announce PC GPU jobs in the shared orchestrator room. ROCm-Works
+  writes only in `rocm-perf/` and makes no commits.
 
 ### Found
 
@@ -852,6 +883,32 @@ of 2 trials), against the PC target of 340 tiles/s:
   - In mode 2, the generator embeds into the whole photo. Thus bpp applies
     to all photo pixels, and runs with 256 and 512 tiles see the same stego
     photo.
+- Generator decisions (user, 2026-10-13), from the open decisions in the
+  plan:
+  1. Training variants: support both fixed variants and new settings in each
+     epoch. Validation and test stay fixed.
+  2. Class balance: keep the natural balance. The tile CNN trains on single
+     tiles in mode 1. Mode 2 is for a future aggregation (MIL) model. Build
+     mode 1 on the fly first.
+  3. Capacity: if the payload does not fit, lower the bpp to fit. Record
+     the effective bpp.
+  4. Session cache: one full-photo `.npy` file per photo. The pre-built
+     datasets may be deleted after the on-the-fly loader works, but only if
+     all of these are true:
+     - mode 1 replay is byte-identical on all 49,796 pairs;
+     - notebook 04 trains from the loader;
+     - the small records are kept;
+     - the team agrees for the shared VM copy.
+  5. Mix tiles from many photos with a bounded shuffle queue.
+  6. Speed work must give byte-identical results only: a mask-free path,
+     labels from changed indices, and a sort replacement with an identical
+     result. Do not use a new random-selection algorithm without a new
+     approval.
+  7. Evaluation uses the full legacy settings mix for now. Harder training
+     comes only from the training settings.
+  8. Fixed-size MIL batches: decide later.
+- All execution for this team runs on the team VM. The VM checkout will
+  move to branch `yx` after the user pushes it.
 
 ### Next
 
@@ -862,8 +919,13 @@ of 2 trials), against the PC target of 340 tiles/s:
   See the master decision above.
 - Pending, deferred: a short real speed test on Kaggle (4 CPU cores).
   Kaggle is not a priority now.
-- Pending: loss or sampling balance for the about 34.5% label-1 tiles.
+- Done: loss or sampling balance for the label-1 tiles. The user chose the
+  natural class balance (generator decision 2).
 - Done: the Worker wrote the on-the-fly generator design plan for both
   modes: [docs/plan-otf-generator.md](plan-otf-generator.md) (`4d1036b`).
-- Pending: the Worker updates the plan for overlapped tiles.
-- Pending: the user answers the open decisions in the plan.
+- Done: the Worker updated the plan for overlapped tiles (`18ef1fa`).
+- Done: the user answered the open decisions in the plan. See the generator
+  decisions above.
+- Pending: the Worker records these decisions in the plan.
+- Pending: move the VM checkout to `yx`, then do plan step 1 (freeze the
+  photo and tile records).
