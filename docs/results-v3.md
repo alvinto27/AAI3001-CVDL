@@ -14,11 +14,12 @@ appendix with extra plots and checks for that run.
 - V3b kept the raw residual and replaced BatchNorm with GroupNorm.
 - V3c combined clipping and GroupNorm. It is batch-independent in both train
   and evaluation modes.
-- V3c is the baseline because it has the best test accuracy at 0.5, and its
-  best threshold is close to 0.5. Its test accuracy was 0.9858, AUC was
-  0.9982, and P_E was 0.0139.
+- V3c is the baseline because it is batch-independent (GroupNorm) and adds
+  clipping with no clear loss in detection. The goal of v3c was not to beat
+  v3a. Its test accuracy was 0.9858, AUC was 0.9982, and P_E was 0.0139.
 - Each version has one run and one seed. V3a used an NVIDIA L4. V3b and v3c
-  used an AMD RX 9070 XT. Small differences of about 0.002 P_E can be chance.
+  used an AMD RX 9070 XT. Run-to-run noise is not measured, so small P_E
+  differences (about 0.002) may not be real.
 - Plane k=1 at low bpp is the main weak spot. V3c P_E was 0.1123 for plane
   k=1 at 0.05-0.15 bpp.
 
@@ -60,8 +61,10 @@ may be too high at that point. This possible cause was not tested.
 
 The V3a metrics came from the VM file
 `/srv/aai3001/AAI3001-CVDL/checkpoints/lightning_logs/version_5/metrics.csv`.
-The V3b metrics came from
-`checkpoints/lightning_logs/version_2/metrics.csv`. The V3c metrics came from
+The V3b metrics came from the PC file
+`checkpoints/lightning_logs/version_2/metrics.csv`. Git tracks copies of both
+at `logs/csv/run/metrics.csv` in each run folder (commit `3787b14`). The V3c
+metrics came from
 `checkpoints/baseline_kv_xunet_v3_clip3_group/logs/csv/run/metrics.csv`.
 
 ## 4. Test results
@@ -148,7 +151,8 @@ also shown.
 | V3c | Validation | 0.9905 / 0.041141 | 0.992560 | 0.998016 | 0.987599 |
 
 The V3a all-clean check fails in train mode: most clean images are called
-stego. V3b and v3c remain accurate in all-clean and all-stego checks. A real
+stego. V3b and v3c remain accurate in the all-clean check. V3c also remains
+accurate in the all-stego check; v3b was not given that check. A real
 detector must classify one image without needing a batch that contains both
 classes. GroupNorm computes its statistics within each image, so it removes
 this batch dependence. V3c's maximum train/evaluation logit difference on
@@ -159,9 +163,11 @@ for v3c; it was not run for v3a or v3b.
 
 ## 7. Decision and caveats
 
-V3c is the current baseline because it is batch-independent, has the best
-accuracy at 0.5, and has a best threshold near 0.5. Its P_E is within the
-observed run-to-run noise of v3a.
+V3c is the current baseline because it is batch-independent (GroupNorm) and
+adds clipping with no clear loss in detection. The goal of v3c was not to beat
+v3a. V3c also has the best accuracy at 0.5 and a best threshold near 0.5. Its
+P_E is 0.0019 higher than v3a. This difference is small, but run-to-run noise
+is not measured, so this report cannot say whether it is real.
 
 V3a still has lower overall P_E (0.0120 versus 0.0139) and lower plane k=1
 P_E (0.0503 versus 0.0626). It is not the baseline because BatchNorm still

@@ -2,8 +2,12 @@
 
 Date: 2026-10-12
 
-This report records one run with one seed. V3b is the current baseline
-candidate, not a claim about all images or all embedding tools.
+> **Superseded.** V3c (clip 3 plus GroupNorm) replaced v3b as the baseline on
+> 2026-10-12. See the [V3 comparison report](results-v3.md). This report stays
+> as a detailed appendix for the v3b run.
+
+This report records one run with one seed. It is not a claim about all images
+or all embedding tools.
 
 ## 1. Summary
 
@@ -18,8 +22,10 @@ candidate, not a claim about all images or all embedding tools.
   0.997 on validation samples.
 - K=1 remains the weak spot, especially at low payload size. Its P_E was
   0.0437 for the lowest label and 0.0585 for the plane label.
-- V3b is the current baseline candidate because it is batch-independent.
-- Next: test v3c, which adds clipping at T=3 to GroupNorm.
+- V3b was the baseline candidate when this report was written, because it is
+  batch-independent. V3c later replaced it.
+- The next test was v3c, which adds clipping at T=3 to GroupNorm. It is done;
+  see the [V3 comparison report](results-v3.md).
 
 ## 2. Setup and reproduction
 
@@ -107,8 +113,10 @@ See the [journal](journal.md) for both diagnoses and the
 *Figure 1. Per-epoch loss, accuracy, validation P_E, and validation AUC. The
 vertical line marks the learning-rate drop before epoch 6.*
 
-The source is the local-only
-`checkpoints/lightning_logs/version_2/metrics.csv`. Its epoch-1 train loss
+The source is the PC file `checkpoints/lightning_logs/version_2/metrics.csv`.
+A tracked copy is at
+`checkpoints/baseline_kv_xunet_v3_noclip_group/logs/csv/run/metrics.csv`.
+Its epoch-1 train loss
 0.1643 and validation P_E 0.02683 match `logs/v3b_pc.log`. Training and
 validation metrics are on separate CSV rows; the plot joins them by epoch.
 
@@ -276,7 +284,8 @@ the historical labels, which describe the same embedding.
 | V3b epoch 9 | 0.9831 | 0.9971 | 0.0157 | 0.0437 / 0.0585 | Train and eval modes |
 
 Clipping alone closed the evaluation gap. GroupNorm removes batch dependence
-at a small detection cost, mostly at k=1. V3b is the current baseline candidate.
+at a small detection cost, mostly at k=1. V3b was the baseline candidate at
+this point; v3c later replaced it.
 
 V3a ran on the L4; v3b ran on ROCm with the conv1 fix. Small differences
 (roughly +/-0.002 P_E) may be run-to-run noise. That figure is a caution, not a
@@ -297,18 +306,24 @@ from hardware and run variation.
 - The test-optimal threshold is descriptive; a threshold for use on new data
   must be chosen from validation data and checked independently.
 
-Local-only records are under
-`checkpoints/baseline_kv_xunet_v3_noclip_group/`: checkpoints,
-`test_predictions.csv`, `test_predictions_per_setting.csv`, four heatmaps,
-and the executed notebook. The training log is `logs/v3b_pc.log`.
-These paths are ignored by git and do not work on GitHub. The report figures
-are committed copies or CPU plots made from those records.
+Run records are under `checkpoints/baseline_kv_xunet_v3_noclip_group/`.
+Git tracks `test_predictions.csv`, `test_predictions_per_setting.csv`, the
+four heatmaps, and `logs/csv/run/metrics.csv` (commit `3787b14`). Git ignores
+the `.ckpt` model files and the executed notebook `v3b_pc_9070xt.ipynb`. The
+model files are on the VM; see the [checkpoints guide](../checkpoints/README.md).
+The training log `logs/v3b_pc.log` was deleted after its numbers were
+recorded here. The report figures are committed copies or CPU plots made from
+those records.
 
 ## 10. Next steps
 
-- Pending: v3c, clip 3 plus GroupNorm, one change from v3b.
-- Pending: update notebook 04 with live TensorBoard and per-epoch curves.
-- Pending: log validation false-alarm and miss rates at 0.5 each epoch.
+- Done: v3c, clip 3 plus GroupNorm, one change from v3b. See the
+  [V3 comparison report](results-v3.md).
+- Done: notebook 04 has TensorBoard logging and per-epoch curves (`4a890d5`).
+- Done: notebook 04 logs validation false-alarm and miss rates at 0.5 each
+  epoch (`4a890d5`).
+
+Open work now lives in the [V3 comparison report](results-v3.md#8-next-steps).
 
 Related files:
 

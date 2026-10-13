@@ -13,8 +13,9 @@ podman exec -d -w /work aai3001 bash -c \
 ```
 
 Keep the log until the run has been checked and its results are recorded in
-the journal or a results report. The current folder is empty; its previous
-v3b and v3c logs were recorded in the reports before cleanup.
+the journal or a results report. The v3b and v3c logs were deleted after
+their numbers were recorded in the reports. The v3a VM log is kept in
+`logs/v3a_legacy_from_vm/`. Other files here are local task logs.
 
 ## Do not commit
 
