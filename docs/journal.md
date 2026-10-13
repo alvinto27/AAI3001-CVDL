@@ -969,6 +969,48 @@ Confirmation by ROCm-Works (2026-10-13):
 
   With the current fix, the removal of the variable costs almost no speed.
 
+ROCm-Works v2 conv1 fix proposal (2026-10-13):
+
+- The proposal is a drop-in replacement for
+  `notebooks/rocm_conv1_wgrad.py`. It keeps class `UnfoldWgradConv2d`, the
+  same `from_conv` call, and the same `state_dict` keys. No notebook change
+  is needed.
+- The weight-gradient matrix multiplication reads strided views of the
+  unfold buffer. This removes a copy of about 10 ms per step. Defaults
+  change from 4 images x piece 4096 to 8 images x piece 1024.
+- The docstring says not to set
+  `MIOPEN_GEMM_ENFORCE_BACKEND=5`. The constructor rejects `groups != 1` and
+  padding other than `"same"`.
+- The self-check compares with a float64 CPU reference at batch sizes 1, 20,
+  and 32. Forward and data gradients are unchanged.
+- Maximum relative error against float64 for weight / bias gradients:
+
+  | Batch | Weight | Bias |
+  | ---: | ---: | ---: |
+  | 1 | 4.8e-7 | 1.6e-7 |
+  | 20 | 6.1e-7 | 1.6e-7 |
+  | 32 | 5.8e-7 | 1.5e-7 |
+
+- Fixed-seed loss at steps 1 / 50 / 100 / 200:
+  - No fix: 0.7302 / 0.1119 / 0.0111 / 0.00272.
+  - Proposal run 1: 0.7302 / 0.1140 / 0.0115 / 0.00280.
+  - Proposal run 2: 0.7302 / 0.1138 / 0.0113 / 0.00273.
+  - The difference comes from GPU summation order and is the same size as
+    the current version.
+- PC speed at batch 32 with the variable unset:
+
+  | Data | No fix | Current fix | Proposal |
+  | --- | ---: | ---: | ---: |
+  | Synthetic, 3 fresh runs | 188 ms median | 102.8 ms median | 91.6 / 87.1 / 87.1 ms (an earlier set of 3 runs: median 87.8 ms) |
+  | Real data, 200 steps | - | 99.3 ms (322 images/s) | 85.6 ms (374 images/s) |
+
+  At batch 20, the proposal took 56.9 ms. Peak GPU memory for one batch-32
+  step was 2.91 GB, the same as the current version. The fix has no effect
+  on the VM because it is active only on ROCm.
+- User decision (2026-10-13): approved. Pending implementation: after step
+  3, the Worker copies the proposal file into `notebooks/` and runs its
+  self-check once on the PC GPU.
+
 #### Frozen photo and tile records (step 1)
 
 | File | Data rows |
@@ -1232,7 +1274,8 @@ Confirmation by ROCm-Works (2026-10-13):
 - Done: ROCm-Works confirmed the affected step count (most likely 10 of
   21,810 steps in each of v3b and v3c) and measured the step time without
   the variable. See "ROCm caution, cause found".
-- Pending: v2 conv1 fix proposal (exact file, diff, float64 checks), then a
-  user decision.
+- Approved by the user (2026-10-13); Pending implementation: after step 3,
+  the Worker copies the v2 conv1 fix proposal into `notebooks/` and runs its
+  self-check once on the PC GPU.
 - Pending: VM machine type decision, after the step 7 loader speed
   measurement.
