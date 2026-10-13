@@ -126,17 +126,19 @@ class Monitor:
         self.thread=threading.Thread(target=self._run,daemon=True)
     def _run(self):
         while not self.stop.is_set():
-            cpu=read=rss=pss=0
+            cpu=read=rss=pss=main_cpu=0
             for proc in [self.process]+self.process.children(recursive=True):
                 try:
                     t=proc.cpu_times()
                     cpu+=t.user+t.system
+                    if proc.pid==self.process.pid:
+                        main_cpu=t.user+t.system
                     read+=proc.io_counters().read_bytes
                     rss+=proc.memory_info().rss
                     pss+=getattr(proc.memory_full_info(),"pss",0)
                 except (psutil.NoSuchProcess,psutil.AccessDenied):
                     pass
-            sample=dict(time=time.perf_counter(),cpu=cpu,read=read,rss=rss,pss=pss)
+            sample=dict(time=time.perf_counter(),cpu=cpu,main_cpu=main_cpu,read=read,rss=rss,pss=pss)
             if self.gpu:
                 try:
                     sample["gpu_util"]=float(check_output(["nvidia-smi","--query-gpu=utilization.gpu",
@@ -156,6 +158,7 @@ class Monitor:
         first,last=points[0],points[-1]
         duration=last["time"]-first["time"]
         return dict(cpu_percent=max(0,(last["cpu"]-first["cpu"])/duration*100),
+                    main_cpu_percent=max(0,(last["main_cpu"]-first["main_cpu"])/duration*100),
                     disk_read_MB_per_second=max(0,(last["read"]-first["read"])/duration/1e6),
                     peak_rss_bytes=max(s["rss"] for s in points),peak_pss_bytes=max(s["pss"] for s in points),
                     gpu_util_mean=float(np.mean([s["gpu_util"] for s in points if "gpu_util" in s])) if self.gpu else None)
@@ -167,7 +170,8 @@ def shutdown(loader,iterator=None):
     if iterator is not None:
         for _ in iterator:
             pass
-    active=getattr(loader,"_iterator",None)
+    underlying=getattr(loader,"loader",loader)
+    active=getattr(underlying,"_iterator",None)
     if active is not None:
         active._shutdown_workers()
         codes=[worker.exitcode for worker in active._workers]
@@ -178,7 +182,8 @@ def shutdown(loader,iterator=None):
 
 def speed(root,cache,source,size,workers,seconds,prefetch,in_order):
     settings=RunSettings(source=source,cache_root=str(cache) if source=="cache" else None,tile_size=size)
-    dataset=BenchStream(Corpus(root,settings))
+    corpus=Corpus(root,settings)
+    dataset=BenchStream(corpus,photo_limit=len(corpus.selected))
     loader=training_loader(dataset,batch_size=32,num_workers=workers,pin_memory=True,
                            prefetch_factor=prefetch,in_order=in_order)
     monitor=Monitor()
@@ -192,7 +197,7 @@ def speed(root,cache,source,size,workers,seconds,prefetch,in_order):
     for batch,labels,indices in iterator:
         images+=len(batch)
         batches+=1
-        check(batch.dtype==torch.float32 and batch.is_pinned(),"dummy consumer contract/pin mismatch")
+        check(batch.dtype==torch.uint8 and batch.is_pinned(),"dummy consumer contract/pin mismatch")
         if time.perf_counter()-filled>=seconds:
             break
     end=time.perf_counter()
@@ -218,7 +223,7 @@ def idle_gpu():
     return gpu
 
 
-def gpu_joint(root,cache,workers,notebook,prefetch,in_order,steps):
+def gpu_joint(root,cache,workers,notebook,prefetch,in_order,steps,gpu_only=False):
     before=idle_gpu()
     torch.manual_seed(0)
     torch.backends.cudnn.benchmark=True
@@ -234,10 +239,15 @@ def gpu_joint(root,cache,workers,notebook,prefetch,in_order,steps):
         exec(compile(ast.Module(body=nodes,type_ignores=[]),f"notebook-cell-{index}","exec"),namespace)
     net=namespace["XuNet"](clip_t=3.0,norm="group").to("cuda").train()
     optimizer=torch.optim.AdamW(net.parameters(),lr=1e-3,weight_decay=1e-4)
-    dataset=BenchStream(Corpus(root,RunSettings(source="cache",cache_root=str(cache))))
-    loader=training_loader(dataset,batch_size=32,num_workers=workers,pin_memory=True,
-                           prefetch_factor=prefetch,in_order=in_order)
-    iterator=iter(loader)
+    if gpu_only:
+        fixed=torch.randint(0,256,(32,3,512,512),dtype=torch.uint8,device="cuda")
+        fixed_targets=torch.arange(32,device="cuda",dtype=torch.long)%2
+        torch.cuda.synchronize()
+    else:
+        dataset=BenchStream(Corpus(root,RunSettings(source="cache",cache_root=str(cache))))
+        loader=training_loader(dataset,batch_size=32,num_workers=workers,pin_memory=True,
+                               prefetch_factor=prefetch,in_order=in_order)
+        iterator=iter(loader)
     monitor=Monitor(gpu=True)
     monitor.start()
     start=time.perf_counter()
@@ -245,12 +255,15 @@ def gpu_joint(root,cache,workers,notebook,prefetch,in_order,steps):
     waits=[]
     for step in range(steps):
         wait=time.perf_counter()
-        images,targets,_=next(iterator)
-        waits.append(time.perf_counter()-wait)
+        if gpu_only:
+            images,targets=fixed,fixed_targets
+        else:
+            images,targets,_=next(iterator)
+        waits.append(0.0 if gpu_only else time.perf_counter()-wait)
         if step==0:
             first_wait=waits[-1]
         optimizer.zero_grad(set_to_none=True)
-        images=images.to("cuda",non_blocking=True)
+        images=images.to("cuda",non_blocking=True).float()
         targets=targets.to("cuda",non_blocking=True)
         loss=torch.nn.functional.cross_entropy(net(images),targets)
         if step%50==0:
@@ -265,9 +278,12 @@ def gpu_joint(root,cache,workers,notebook,prefetch,in_order,steps):
     torch.cuda.synchronize()
     end=time.perf_counter()
     resource=monitor.finish(steady_start,end)
-    dataset.stop_production()
-    exit_codes=shutdown(loader,iterator)
-    return dict(status="PASS",worker_exit_codes=exit_codes,gate="gpu",idle_before=before,steps=steps,batch_size=32,precision="32-true",
+    if gpu_only:
+        exit_codes=[]
+    else:
+        dataset.stop_production()
+        exit_codes=shutdown(loader,iterator)
+    return dict(status="PASS",gpu_only=gpu_only,worker_exit_codes=exit_codes,gate="gpu",idle_before=before,steps=steps,batch_size=32,precision="32-true",
                 clip_t=3,norm="group",workers=workers,prefetch_factor=prefetch,in_order=in_order,total_seconds=end-start,
                 first_batch_wait=first_wait,steady_steps=steps-20,steady_seconds=end-steady_start,
                 images_per_second=(steps-20)*32/(end-steady_start),
@@ -275,11 +291,46 @@ def gpu_joint(root,cache,workers,notebook,prefetch,in_order,steps):
                 loader_wait_fraction=sum(waits[20:])/(end-steady_start),**resource)
 
 
+def mixing(root,cache,workers):
+    reports=[]
+    for size in (512,256):
+        snapshots={}
+        for group in (0,4):
+            dataset=BenchStream(Corpus(root,RunSettings(source="cache",cache_root=str(cache),tile_size=size)))
+            loader=training_loader(dataset,batch_size=32,num_workers=workers,pin_memory=True,
+                                   prefetch_factor=4,group_images=group)
+            offsets=sorted((v,k) for k,v in dataset.corpus.offsets.items())
+            starts=np.array([v for v,k in offsets])
+            worker_by_photo={r["photo_id"]:w for w in range(workers)
+                             for r in dataset.corpus.train_schedule(0)[w::workers]}
+            photos,worker_counts,hashes_by_key=[],[],{}
+            iterator=iter(loader)
+            for batch_number in range(200):
+                images,labels,indices=next(iterator)
+                names=[offsets[int(np.searchsorted(starts,int(i)//2,side="right")-1)][1] for i in indices]
+                photos.append(len(set(names)))
+                worker_counts.append(len({worker_by_photo[n] for n in names}))
+                for image,index in zip(images,indices):
+                    hashes_by_key[int(index)]=hashlib.sha256(image.numpy().tobytes()).hexdigest()
+            dataset.stop_production()
+            codes=shutdown(loader,iterator)
+            snapshots[group]=hashes_by_key
+            reports.append(dict(tile_size=size,group_images=group,batches=200,
+                                distinct_photos_mean=float(np.mean(photos)),distinct_photos_min=min(photos),
+                                distinct_workers_mean=float(np.mean(worker_counts)),distinct_workers_min=min(worker_counts),
+                                worker_exit_codes=codes))
+        common=set(snapshots[0])&set(snapshots[4])
+        check(all(snapshots[0][key]==snapshots[4][key] for key in common),"mixing changed keyed pixels")
+        reports[-1]["common_keys_checked"]=len(common)
+        reports[-1]["keyed_mismatches"]=0
+    return dict(status="PASS",gate="mixing",results=reports)
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--repo-root",type=Path,required=True)
     p.add_argument("--cache-root",type=Path,required=True)
-    p.add_argument("--gate",choices=["parity","legacy","counts","speed","gpu"],required=True)
+    p.add_argument("--gate",choices=["parity","legacy","counts","speed","gpu","mixing"],required=True)
     p.add_argument("--source",choices=["cache","decode"],default="cache")
     p.add_argument("--tile-size",type=int,default=512)
     p.add_argument("--workers",type=int,default=8)
@@ -288,6 +339,7 @@ def main():
     p.add_argument("--prefetch",type=int,default=1)
     p.add_argument("--unordered",action="store_true")
     p.add_argument("--steps",type=int,default=300)
+    p.add_argument("--gpu-only",action="store_true")
     args=p.parse_args()
     torch.set_num_threads(1)
     root,cache=args.repo_root.resolve(),args.cache_root.resolve()
@@ -301,10 +353,12 @@ def main():
     elif args.gate=="speed":
         check(args.seconds>=120,"at least 120seconds requested")
         report=speed(root,cache,args.source,args.tile_size,args.workers,args.seconds,args.prefetch,not args.unordered)
+    elif args.gate=="mixing":
+        report=mixing(root,cache,args.workers)
     else:
         check(args.notebook is not None,"notebook path required")
         check(args.steps>=30,"at least 30 joint steps")
-        report=gpu_joint(root,cache,args.workers,args.notebook,args.prefetch,not args.unordered,args.steps)
+        report=gpu_joint(root,cache,args.workers,args.notebook,args.prefetch,not args.unordered,args.steps,args.gpu_only)
     report["wall_seconds"]=time.perf_counter()-start
     print(json.dumps(report,indent=2),flush=True)
 

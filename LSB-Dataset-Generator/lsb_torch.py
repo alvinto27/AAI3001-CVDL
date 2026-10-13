@@ -5,7 +5,7 @@ import csv
 import math
 import os
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from pathlib import Path
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -40,6 +40,7 @@ class RunSettings:
     buffer_size: int = 1024  # images, not float32 tensors or photo count
     augment: bool = True
     paired_batches: bool = False
+    tensor_dtype: str = "uint8"
 
     def __post_init__(self):
         if not self.sources or len(set(self.sources)) != len(self.sources) or set(self.sources)-{"raise","div2k"}:
@@ -57,6 +58,8 @@ class RunSettings:
             raise ValueError("train_photo_fraction must be in (0,1]")
         if any(type(v) is not bool for v in (self.fixed_variants,self.augment,self.paired_batches)):
             raise ValueError("variant/augmentation/pair flags must be Boolean")
+        if self.tensor_dtype not in ("uint8", "float32"):
+            raise ValueError("tensor_dtype must be uint8 or float32")
         if self.source not in ("decode","cache") or (self.source == "cache" and not self.cache_root):
             raise ValueError("source is decode or cache with cache_root")
         if type(self.buffer_size) is not int or self.buffer_size < 2:
@@ -84,9 +87,9 @@ def _rng(seed, epoch, domain):
     return np.random.default_rng(np.random.SeedSequence([seed,epoch,domain]))
 
 
-def image_tensor(array, entropy, label, augment):
-    """Float32 CHW 0..255, same independent flip/flip/rot90 distributions."""
-    image = torch.from_numpy(array).permute(2,0,1).to(dtype=torch.float32)
+def image_tensor(array, entropy, label, augment, dtype=torch.float32):
+    """CHW 0..255, same keyed flip/flip/rot90 operations at either dtype."""
+    image = torch.from_numpy(array).permute(2,0,1).to(dtype=dtype)
     if augment:
         words=np.random.SeedSequence(list(entropy)+[0x415547,label]).generate_state(2)
         generator=torch.Generator().manual_seed(int(words[0]) | (int(words[1])<<32))
@@ -183,7 +186,7 @@ class Corpus:
 
     @property
     def run_record(self):
-        return dict(source=self.settings.source,grid=self.settings.grid,tile_size=self.settings.tile_size,
+        return dict(settings=asdict(self.settings),source=self.settings.source,grid=self.settings.grid,tile_size=self.settings.tile_size,
                     run_seed=self.settings.run_seed,train_photo_fraction=self.settings.train_photo_fraction,
                     train_photo_selection=self.selection_record,source_weights=self.settings.source_weights,
                     variants_per_tile=self.settings.variants_per_tile,fixed_variants=self.settings.fixed_variants,
@@ -238,12 +241,13 @@ class TrainingImages(IterableDataset):
             del photo
 
     def _output(self,item):
+        dtype=getattr(torch,self.corpus.settings.tensor_dtype)
         if self.corpus.settings.paired_batches:
             clean,stego,index,entropy=item
-            return (image_tensor(clean,entropy,0,self.corpus.settings.augment),
-                    image_tensor(stego,entropy,1,self.corpus.settings.augment),index)
+            return (image_tensor(clean,entropy,0,self.corpus.settings.augment,dtype),
+                    image_tensor(stego,entropy,1,self.corpus.settings.augment,dtype),index)
         image,label,index,entropy=item
-        return image_tensor(image,entropy,label,self.corpus.settings.augment),label,index
+        return image_tensor(image,entropy,label,self.corpus.settings.augment,dtype),label,index
 
     def __iter__(self):
         initialize_worker(0)
@@ -272,7 +276,7 @@ class FixedPairs(Dataset):
     profile overlap_full_mix: every tile from both frozen sources and run1 mix.
     profile legacy_v6: RAISE run1 keys/rows; purpose all exposes all 49,796 pairs.
     """
-    def __init__(self,corpus: Corpus,purpose="val",profile="overlap_full_mix"):
+    def __init__(self,corpus: Corpus,purpose="val",profile="overlap_full_mix",photo_ids=None):
         if purpose not in ("train","val","test","all") or profile not in ("overlap_full_mix","legacy_v6"):
             raise ValueError("invalid purpose/profile")
         if profile=="overlap_full_mix" and purpose=="all":
@@ -288,11 +292,12 @@ class FixedPairs(Dataset):
         if profile=="legacy_v6":
             for original in corpus.legacy_rows():
                 record=corpus.by_id.get(original["photo_id"])
-                if record is not None and (purpose=="all" or record["split"]==purpose):
+                if (record is not None and (purpose=="all" or record["split"]==purpose) and
+                        (photo_ids is None or record["photo_id"] in photo_ids)):
                     self.entries.append((record,int(original["tile_row"]),int(original["tile_col"]),1,original))
         else:
             for record in corpus.photos:
-                if record["split"]!=purpose:
+                if record["split"]!=purpose or (photo_ids is not None and record["photo_id"] not in photo_ids):
                     continue
                 ys,xs=grid_axes(record,"overlap_last",corpus.settings.tile_size)
                 for row in range(len(ys)):
@@ -322,7 +327,7 @@ class FixedPairs(Dataset):
             table.append(dict(cover_id=identity,pair_id=identity,source_photo=record["photo_id"],
                 camera_model=record["camera_model"] or "not_applicable",tile_row=row,tile_col=col,
                 k=kwargs["k"],bit_mode=kwargs["bit_mode"],method=kwargs["method"],placement=kwargs["placement"],
-                payload_kind=kwargs["payload"],bpp_actual=effective,photo_index=int(record["photo_index"]),
+                payload_kind=kwargs["payload"],stride=kwargs.get("stride"),bpp_actual=effective,photo_index=int(record["photo_index"]),
                 source=record["source"],grid=grid,tile_size=corpus.settings.tile_size,y=ys[row],x=xs[col],
                 requested_bpp=requested,effective_bpp=effective,clipped=clipped,variant=variant,split=record["split"]))
         self.frame=pd.DataFrame(table)
@@ -350,15 +355,72 @@ class FixedPairs(Dataset):
             seed=OTFSeed(self.corpus.settings.run_seed,self.purpose,0,variant,self.corpus.settings.fixed_variants)
             clean,cm=make_sample(self._last_photo,record,spec,self.corpus.evaluation_config,seed,"clean")
             stego,sm=make_sample(self._last_photo,record,spec,self.corpus.evaluation_config,seed,"stego")
-        return image_tensor(clean,cm["embedding_seed_key"],0,False),image_tensor(stego,sm["embedding_seed_key"],1,False),index
+        dtype=getattr(torch,self.corpus.settings.tensor_dtype)
+        return image_tensor(clean,cm["embedding_seed_key"],0,False,dtype),image_tensor(stego,sm["embedding_seed_key"],1,False,dtype),index
 
 
 def training_loader(dataset,batch_size=32,num_workers=8,pin_memory=True,persistent_workers=True,
-                    prefetch_factor=4,in_order=True):
+                    prefetch_factor=4,in_order=True,group_images=4):
     """No shuffle=True; retain all worker tails. Paired batch size is pairs."""
-    kwargs=dict(batch_size=batch_size,num_workers=num_workers,pin_memory=pin_memory,
+    group_items=max(1,group_images//(2 if dataset.corpus.settings.paired_batches else 1)) if group_images else batch_size
+    kwargs=dict(batch_size=min(group_items,batch_size),num_workers=num_workers,pin_memory=pin_memory,
                 persistent_workers=persistent_workers and num_workers>0,worker_init_fn=initialize_worker,
                 drop_last=False,in_order=in_order)
     if num_workers:
         kwargs.update(multiprocessing_context="spawn",prefetch_factor=prefetch_factor)
-    return DataLoader(dataset,**kwargs)
+    loader=DataLoader(dataset,**kwargs)
+    return MixedLoader(loader,batch_size) if group_images else loader
+
+
+class PairSubset(Dataset):
+    """Fixed pair/frame indices for QUICK and diagnostic subsets."""
+    def __init__(self,dataset,indices):
+        self.dataset=dataset
+        self.indices=list(map(int,indices))
+        self.frame=dataset.frame.iloc[self.indices].reset_index(drop=True)
+    def __len__(self):
+        return len(self.indices)
+    def __getitem__(self,index):
+        clean,stego,_=self.dataset[self.indices[index]]
+        return clean,stego,index
+
+
+class MixedLoader:
+    """Join ready worker groups in the parent, retaining tails and sample keys.
+
+    Single-device Lightning accepts arbitrary sized iterables. Ordered groups
+    rotate across workers. Only one final batch plus the small groups is held.
+    """
+    def __init__(self,loader,batch_size):
+        self.loader=loader
+        self.dataset=loader.dataset
+        self.batch_size=batch_size
+        self.pin_memory=loader.pin_memory
+
+    def __len__(self):
+        return math.ceil(len(self.dataset)/self.batch_size)
+
+    def __iter__(self):
+        pending=[]
+        count=0
+        for group in self.loader:
+            start=0
+            while start<len(group[-1]):
+                take=min(self.batch_size-count,len(group[-1])-start)
+                pending.append(tuple(part[start:start+take] for part in group))
+                count+=take
+                start+=take
+                if count==self.batch_size:
+                    yield self._join(pending)
+                    pending,count=[],0
+        if pending:
+            yield self._join(pending)
+
+    def _join(self,groups):
+        parts=tuple(torch.cat([group[i] for group in groups]) for i in range(3))
+        return tuple(part.pin_memory() for part in parts) if self.pin_memory and groups[0][0].is_pinned() else parts
+
+    def shutdown(self):
+        iterator=getattr(self.loader,"_iterator",None)
+        if iterator is not None:
+            iterator._shutdown_workers()

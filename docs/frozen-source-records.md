@@ -1,7 +1,8 @@
 # Frozen source records
 
-Status: plan step 1 complete, 2026-10-13. The generator and loader are not
-implemented. Records cover 1,000 RAISE photos and 900 DIV2K images.
+Status: plan step 1 complete, 2026-10-13. The generator, loader and
+[notebook integration](notebook-otf-verification.md) are now verified.
+Records cover 1,000 RAISE photos and 900 DIV2K images.
 
 ## Files and identities
 
@@ -154,5 +155,6 @@ Done: full source decode and grid cutting in
 [step 4 embed core](embed-core-verification.md) is also verified.
 The [Mode 1 sample API](mode1-verification.md) composes these helpers.
 The [Mode 1 torch loader](torch-loader-verification.md) uses the frozen splits
-and identities. Pending: Mode 2 tile labels and notebook integration.
+and identities. [Notebook integration](notebook-otf-verification.md) is also
+verified. Pending: Mode 2 tile labels and user-run full OTF training.
 Source terms and citations remain in the [ImageSets guide](../ImageSets/README.md#citations-and-terms).

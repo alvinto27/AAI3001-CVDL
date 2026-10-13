@@ -57,7 +57,10 @@ cache is optional. Training uses a bounded uint8 shuffle buffer and stable
 sample keys; evaluation exposes fixed pairs and a metadata frame. See
 [loader verification](../docs/torch-loader-verification.md) for the notebook
 contract, epoch controls, source selection, counts, and throughput checks.
-Notebook 04 is not changed in this step.
+Notebook 04 now connects these helpers in [step 8](../docs/notebook-otf-verification.md).
+The loader transfers uint8 groups across workers; the notebook converts to
+float32 on the device. `tensor_dtype="float32"` and `group_images=0` retain
+reference paths for checks.
 
 ## Setup
 

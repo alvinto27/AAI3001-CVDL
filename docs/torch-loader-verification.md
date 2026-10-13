@@ -1,7 +1,10 @@
 # Mode 1 PyTorch loader
 
 Status: plan step 7 complete. Parity/count checks, throughput checks, joint
-GPU checks and all unit tests passed. Notebook 04 was read but not changed.
+GPU checks and all unit tests passed. Notebook 04 was read but not changed
+in step 7. This is the step 7 record. [Step 8](notebook-otf-verification.md)
+now connects the notebook, transfers uint8 and joins small worker groups in the
+parent; the float32 and whole-worker-batch contract below is historical.
 
 ## Notebook data contract
 

@@ -59,7 +59,7 @@ class TorchTests(unittest.TestCase):
         self.assertEqual(next_epoch,expected)
         self.assertEqual(set(single),set(next_epoch))
         self.assertTrue(all(single[i]!=next_epoch[i] for i in single if i%2==1))
-        loader._iterator._shutdown_workers()
+        loader.shutdown()
     def test_decode_cache_and_fixed_variants(self):
         for row in self.photos:
             build_entry(row,self.root/"cache",self.root)
@@ -94,11 +94,60 @@ class TorchTests(unittest.TestCase):
             for i in (0,len(a)-1):
                 for left,right in zip(a[i][:2],b[i][:2]):
                     np.testing.assert_array_equal(left.numpy(),right.numpy())
-                    self.assertEqual(str(left.dtype),"torch.float32")
+                    self.assertEqual(str(left.dtype),"torch.uint8")
                     self.assertGreaterEqual(float(left.min()),0)
                     self.assertLessEqual(float(left.max()),255)
         dataset=TrainingImages(self.corpus(RunSettings(tile_size=256)))
         self.assertEqual(len(dataset),4*9*2)
+    def test_uint8_exact_float_path(self):
+        s=RunSettings(tile_size=256,buffer_size=8)
+        byte_ds=TrainingImages(self.corpus(s))
+        float_ds=TrainingImages(self.corpus(dataclasses.replace(s,tensor_dtype="float32")))
+        byte_loader=training_loader(byte_ds,batch_size=8,num_workers=0,pin_memory=False)
+        float_loader=training_loader(float_ds,batch_size=8,num_workers=0,pin_memory=False)
+        for left,right in zip(byte_loader,float_loader):
+            self.assertTrue(left[0].float().equal(right[0]))
+            self.assertTrue(left[1].equal(right[1]))
+            self.assertTrue(left[2].equal(right[2]))
+        vals=[{**r,"split":"val"} for r in self.photos]
+        a=FixedPairs(self.corpus(s,vals),"val")
+        b=FixedPairs(self.corpus(dataclasses.replace(s,tensor_dtype="float32"),vals),"val")
+        self.assertTrue(a[0][0].float().equal(b[0][0]))
+        self.assertTrue(a[0][1].float().equal(b[0][1]))
+
+    def test_small_groups_mix_workers_without_key_changes(self):
+        ds=TrainingImages(self.corpus(RunSettings(tile_size=256,buffer_size=8)))
+        worker_by_photo={r["photo_id"]:w for w in range(2)
+                         for r in ds.corpus.train_schedule(0)[w::2]}
+        mixed=training_loader(ds,batch_size=8,num_workers=2,pin_memory=False,group_images=4)
+        iterator=iter(mixed)
+        first=next(iterator)
+        workers={worker_by_photo[f"example{int(i)//18}"] for i in first[2]}
+        self.assertEqual(workers,{0,1})
+        for _ in iterator:
+            pass
+        mixed.shutdown()
+        raw=training_loader(ds,batch_size=8,num_workers=2,pin_memory=False,group_images=0)
+        expected=hashes(raw)
+        raw._iterator._shutdown_workers()
+        actual=hashes(training_loader(ds,batch_size=8,num_workers=2,pin_memory=False,group_images=4))
+        self.assertEqual(expected,actual)
+        self.assertEqual(len(actual),len(ds))
+        self.assertEqual(len(mixed),9)
+
+    def test_notebook_fixed_subset_and_complete_bins(self):
+        from lsb_notebook import fixed_subset,complete_bpp_bins
+        vals=[{**r,"split":"val"} for r in self.photos]
+        pairs=FixedPairs(self.corpus(RunSettings(tile_size=256),vals),"val")
+        a=fixed_subset(pairs,8,0)
+        b=fixed_subset(pairs,8,0)
+        self.assertTrue(a.frame.equals(b.frame))
+        self.assertEqual(len(a),8)
+        self.assertEqual(a[0][2],0)
+        bins=complete_bpp_bins([.00001,.0499878,.05,.15,.30,.50,.60])
+        self.assertFalse(bins.isna().any())
+        self.assertEqual(list(bins.value_counts()),[3,1,1,1,1])
+
     def test_source_weight_epoch_length_and_paired_contract(self):
         s=RunSettings(tile_size=256,buffer_size=8,paired_batches=True,source_weights={"div2k":2.0})
         dataset=TrainingImages(self.corpus(s))

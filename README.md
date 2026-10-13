@@ -33,7 +33,7 @@ Current results: [V3 comparison report](docs/results-v3.md).
 
 The `raise512-run1` source is RAISE. Cite it as [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](ImageSets/README.md#citations-and-terms) RAISE is for **non-commercial research and educational purposes**.
 
-DIV2K has [frozen source records](docs/frozen-source-records.md); the builder reads its PNG headers. Training integration is Pending. Cite it as [E. Agustsson and R. Timofte, “NTIRE 2017 Challenge on Single Image Super-Resolution: Dataset and Study,” IEEE Conference on Computer Vision and Pattern Recognition (CVPR) Workshops, July 2017.](ImageSets/README.md#citations-and-terms) The official page says DIV2K is for **academic research purposes only** and that copyright belongs to the original owners.
+DIV2K has [frozen source records](docs/frozen-source-records.md); the builder reads its PNG headers. Notebook 04 now uses the [OTF loader by default](docs/notebook-otf-verification.md), with a PNG fallback. Full OTF training is a user action. Cite it as [E. Agustsson and R. Timofte, “NTIRE 2017 Challenge on Single Image Super-Resolution: Dataset and Study,” IEEE Conference on Computer Vision and Pattern Recognition (CVPR) Workshops, July 2017.](ImageSets/README.md#citations-and-terms) The official page says DIV2K is for **academic research purposes only** and that copyright belongs to the original owners.
 
 See the [ImageSets README](ImageSets/README.md) for source details, terms, and download links.
 
