@@ -783,30 +783,42 @@ of 2 trials), against the PC target of 340 tiles/s:
 - The user decided the training platform and the data upload:
   - Kaggle notebooks will run the training.
   - Upload only one master image set to Kaggle, one time. Do not upload the
-    NEFs or the other image sets. (Later in this entry: a NEF master is one
-    of the open options.)
+    NEFs or the other image sets. (Superseded: the user withdrew "do not
+    upload the NEFs" later on 2026-10-13. The NEFs are now the master set.
+    See the master decision below.)
 - Proposed, Pending user approval: the master set is 8-bit RGB full-photo
   PNG files, one file per photo, cropped to the tile grid. It goes in a
   private Kaggle dataset. The RAISE terms allow only non-commercial research
-  and education. (Later in this entry: the master-source benchmark made the
-  master choice open again. See the next items.)
+  and education. (Superseded: the user chose the NEFs as the master set
+  later on 2026-10-13. See the master decision below.)
 - For each 16-bit to 8-bit conversion, use the high byte (`x >> 8`). Never
   use division by 257 with rounding.
-- Pending user decision: the master source. The recorded options are:
+- The master source was open at this point. The user decided it next (see
+  the following item). The recorded options were:
   - NEF master (about 17 GB, keeps the raw data). Make a one-time 8-bit
     cache in each session, or decode directly when enough CPUs are
     available.
   - 16-bit PNG master (about 74 GB). Direct load is faster. It does not keep
     the raw data.
+- Master decision (user, 2026-10-13): the 1,000 RAISE NEFs (about 17 GB)
+  are the single master set. Upload them one time, to Google Drive, Kaggle,
+  or both.
+  - This decision supersedes the earlier "do not upload the NEFs" line and
+    the 8-bit PNG master proposal. Those lines stay above as history.
+  - Reasons: the NEF set is the smallest upload. It keeps the raw sensor
+    data for a possible later raw-domain noise model. It reproduces the
+    current tiles exactly (42 of 42 photos byte-identical).
+  - On machines with few CPUs, make a one-time 8-bit cache in each session.
+    On machines with enough CPUs, decode the NEFs directly.
 
 ### Next
 
 - Pending: the open items from the 2026-10-12 V3c entry are unchanged.
 - Done: the Worker measured embed -> tile on the fly on whole photos. See
   "Embed -> tile benchmark on whole photos" above.
-- Pending: user decision on the master source (NEF or 16-bit PNG). This item
-  replaces the earlier approval item for the 8-bit master format and crop.
+- Done: user decision on the master source. The NEFs are the master set.
+  See the master decision above.
 - Pending: a short real speed test on Kaggle (4 CPU cores).
 - Pending: loss or sampling balance for the about 34.5% label-1 tiles.
-- Pending: write a generator design plan for both modes, with on-the-fly
-  generation.
+- Pending: the Worker writes the on-the-fly generator design plan for both
+  modes (`docs/plan-otf-generator.md`).
