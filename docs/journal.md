@@ -635,6 +635,21 @@ high at that point. This was not tested.
   - DIV2K is about 14% of all tiles.
 - Moved the VM checkout from `main` to `yx` (fast-forward to `18ef1fa`).
   The teammate's untracked `modelling/` folder was not touched.
+- The Worker did plan step 1: froze the photo and tile records. Commit
+  `63e4f59`.
+  - Builder: `scripts/build_manifests.py`, with tests in
+    `tests/test_build_manifests.py`.
+  - Record and runbook:
+    [docs/frozen-source-records.md](frozen-source-records.md).
+  - The build ran on the VM from a scratch copy. Two builds gave
+    byte-identical CSV files. The PC copies match the VM copies by SHA-256.
+  - Input: `ImageSets/RAISE/tiles512-records/manifest.csv` (SHA-256
+    `400f0b3e823f088183316c4948e983fb74b6808acb4059cf9eb8506fcb35f6fb`).
+    The VM dataset copy has no `records/` folder. Thus this preparation
+    record is the canonical input.
+  - README fixes: the root README and `ImageSets/README.md` no longer say
+    that DIV2K is unused. `ImageSets/README.md` now allows the reviewed
+    `data/raise` and `data/div2k` CSV files in git.
 
 ### Found
 
@@ -853,6 +868,41 @@ of 2 trials), against the PC target of 340 tiles/s:
   V3a ran on the VM L4 with CUDA, so it is not affected.
 - New runs of this team run on the VM only.
 
+#### Frozen photo and tile records (step 1)
+
+| File | Data rows |
+| --- | ---: |
+| `data/raise/photo_manifest.csv` | 1,000 |
+| `data/raise/legacy_tile_manifest.csv` | 49,796 |
+| `data/div2k/photo_manifest.csv` | 900 |
+| `data/div2k/split_seed0.csv` | 900 |
+
+- There are 1,900 unique photo IDs and indices: RAISE 0-999 (the full sorted
+  list) and DIV2K 1000-1899. All 1,900 master paths exist on the VM. The
+  original cover IDs and indices are kept.
+- RAISE split, in photos:
+
+  | Camera | Train | Val | Test |
+  | --- | ---: | ---: | ---: |
+  | D7000 | 500 | 107 | 107 |
+  | D90 | 195 | 42 | 41 |
+  | D40 | 6 | 1 | 1 |
+  | Total | 701 | 150 | 149 |
+
+  The join to `data/raise/split_seed0.csv` gave no mismatch. The
+  Orchestrator also checked it: 0 mismatches over 49,796 tiles.
+- DIV2K split, seed 0, PCG64 permutation:
+
+  | Split | Photos | Tiles at 512 | Tiles at 256 |
+  | --- | ---: | ---: | ---: |
+  | Train | 680 | 8,276 | 32,216 |
+  | Val | 120 | 1,456 | 5,720 |
+  | Test | 100 | 1,228 | 4,808 |
+
+- Overlap totals at 512 / 256: RAISE 65,184 / 243,120; DIV2K 10,960 /
+  42,744. These match the plan values.
+- Nine unit tests pass on the VM.
+
 ### Decided
 
 - The user confirmed the reason for the v3c baseline. The goal of v3c is not
@@ -1011,7 +1061,10 @@ of 2 trials), against the PC target of 340 tiles/s:
   decisions above.
 - Done: the Worker recorded these decisions in the plan (`e96ad9f`).
 - Done: moved the VM checkout to `yx`.
-- Pending: plan step 1. Freeze the RAISE and DIV2K photo and tile records,
-  and the DIV2K split CSV.
+- Done: plan step 1. Froze the RAISE and DIV2K photo and tile records, and
+  the DIV2K split CSV (`63e4f59`).
+- Pending: step 2, the source step. Convert NEF and PNG to 8-bit, and cut
+  the overlap and legacy grids. The output must be byte-identical to the
+  stored clean tiles.
 - Pending: ROCm-Works float64 layer check; then confirm or qualify the v3b
   and v3c PC results.
