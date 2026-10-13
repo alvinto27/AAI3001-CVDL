@@ -1090,11 +1090,13 @@ relative error against float64:
   - The VM checkout changes only by fast-forward after a push.
 - ROCm caution: the status changes from "open" to "cause found". See
   "ROCm caution, cause found" under Found.
-- Proposed, Pending user approval: remove the `MIOPEN_GEMM_ENFORCE_BACKEND=5`
-  default from notebook 04, and keep the conv1 unfold fix. Restart each PC
-  kernel that has the variable set. A find-db cleanup is not necessary for
-  correctness.
-- Pending user decision: re-run v3b and v3c, or not.
+- Approved by the user (2026-10-13); Pending implementation: remove the
+  `MIOPEN_GEMM_ENFORCE_BACKEND=5` default from notebook 04, and keep the
+  conv1 unfold fix. Restart each PC kernel that has the variable set. A
+  find-db cleanup is not necessary for correctness. The Worker applies this
+  change after step 2.
+- Re-runs of v3b and v3c (user, 2026-10-13): on hold for now. V3c stays the
+  baseline, but it is marked as not a clean baseline.
 
 ### Next
 
