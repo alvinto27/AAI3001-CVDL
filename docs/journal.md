@@ -559,6 +559,19 @@ high at that point. This was not tested.
     `[..., 1]` for the embedding.
   - The embed step was a copy of the engine without the mask and
     `EmbedResult` tail. Only that tail was removed.
+- Compared NEF and 16-bit RGB PNG as the single master source.
+  - CPU only, AMD Ryzen 7 7700. Input: 42 train photos (32 D7000, 5 D90,
+    5 D40). One-core timings were pinned to one CPU with threads=1.
+  - No repository code changed. The Worker deleted the temporary files
+    (about 12 GB).
+  - The Worker installed two packages in the container only:
+    opencv-python-headless 5.0.0.93 and pypng 0.20220715.0. They are lost
+    if the container is recreated.
+- Context from the user:
+  - The Kaggle TPU v5e-8 had a queue (position #525). The TPU is not the plan.
+  - The user reviewed the paid Colab tiers. The user already has 400 GB of
+    Google storage (Google AI Plus, student plan). Storage is not a limit,
+    and no paid plan is necessary now.
 
 ### Found
 
@@ -686,6 +699,67 @@ or read one full-photo PNG (compression level 1).
   about 0.1875 bpp. The original `_draw_settings` limits the bpp draw to the
   capacity.
 
+#### Master-source benchmark: NEF versus 16-bit PNG
+
+Exactness against the stitched stored clean tiles, 42 photos:
+
+| Conversion to 8 bits | Byte-identical photos |
+| --- | ---: |
+| NEF -> 8-bit crop | 42 / 42 |
+| 16-bit PNG -> high byte (`x >> 8`) | 42 / 42 |
+| 16-bit PNG -> `round(x/257)` | 0 / 42 |
+| 16-bit PNG -> `floor(x/257)` | 0 / 42 |
+| 16-bit PNG -> `round(x/256)` | 0 / 42 |
+
+- Each mismatch was +/-1 in one channel value. For example, `round(x/257)`
+  changed 390,661,093 of 1,575,223,296 values.
+
+Load time per photo, median / p90 in ms, on one CPU:
+
+| Camera | NEF -> 8-bit crop | 16-bit PNG decode + shift + crop (OpenCV default) |
+| --- | ---: | ---: |
+| D7000 | 827.96 / 871.48 | 388.34 / 396.40 |
+| D90 | 593.33 / 622.39 | 298.07 / 304.61 |
+| D40 | 286.29 / 308.90 | 144.97 / 146.92 |
+
+- rawpy 0.27.1 with LibRaw 0.22.1 uses OpenMP threads. Without
+  `OMP_NUM_THREADS=1`, one decode uses about 3 CPUs. One D7000 probe took
+  422 ms wall time this way. Set `OMP_NUM_THREADS=1` in the loader workers.
+- The OpenCV default PNG encoder was the fastest that was tested. OpenCV 5
+  writes its default PNG at level 1 with the RLE strategy. An explicit
+  level 1 uses a different strategy and decoded slower (D7000 607.86 ms).
+- Pillow reads 16-bit RGB PNG only as 8-bit. PyPNG keeps 16 bits, but it
+  took about 14 s per D7000 photo.
+
+File size per photo, median MiB:
+
+| Camera | NEF | 16-bit PNG (OpenCV default) |
+| --- | ---: | ---: |
+| D7000 | 20.28 | 76.25 |
+| D90 | 10.27 | 56.19 |
+| D40 | 5.34 | 28.89 |
+
+- Extrapolated to 1,000 photos, the 16-bit PNG set is about 68.65 GiB
+  (73.71 GB). The NEF set is about 17 GB. An 8-bit cropped PNG cache would
+  be about 19.39 GiB. This is an estimate.
+
+DataLoader, 4 workers, full embed -> tile pipeline, output tiles/s (median
+of 2 trials), against the PC target of 340 tiles/s:
+
+| Source | Tiles/s | Result |
+| --- | ---: | --- |
+| NEF, direct decode | 269.58 | Fail (79% of target) |
+| 16-bit PNG, explicit level 1 | 332.53 | Fail |
+| 16-bit PNG, OpenCV default | 393.02 | Pass |
+| Stitch stored 8-bit tiles | 432.87 | Pass |
+
+- Peak RSS was about 1.5 GiB per worker.
+- These are PC measurements, not Kaggle measurements.
+- One-time conversion with 4 processes, extrapolated from 42 photos to
+  1,000: NEF -> 8-bit decode only takes about 4.1 min. NEF -> 16-bit plus PNG
+  encode (OpenCV default) takes about 6.9 min. The encode time of the 8-bit
+  cache was not measured.
+
 ### Decided
 
 - The user confirmed the reason for the v3c baseline. The goal of v3c is not
@@ -709,18 +783,30 @@ or read one full-photo PNG (compression level 1).
 - The user decided the training platform and the data upload:
   - Kaggle notebooks will run the training.
   - Upload only one master image set to Kaggle, one time. Do not upload the
-    NEFs or the other image sets.
+    NEFs or the other image sets. (Later in this entry: a NEF master is one
+    of the open options.)
 - Proposed, Pending user approval: the master set is 8-bit RGB full-photo
   PNG files, one file per photo, cropped to the tile grid. It goes in a
   private Kaggle dataset. The RAISE terms allow only non-commercial research
-  and education.
+  and education. (Later in this entry: the master-source benchmark made the
+  master choice open again. See the next items.)
+- For each 16-bit to 8-bit conversion, use the high byte (`x >> 8`). Never
+  use division by 257 with rounding.
+- Pending user decision: the master source. The recorded options are:
+  - NEF master (about 17 GB, keeps the raw data). Make a one-time 8-bit
+    cache in each session, or decode directly when enough CPUs are
+    available.
+  - 16-bit PNG master (about 74 GB). Direct load is faster. It does not keep
+    the raw data.
 
 ### Next
 
 - Pending: the open items from the 2026-10-12 V3c entry are unchanged.
 - Done: the Worker measured embed -> tile on the fly on whole photos. See
   "Embed -> tile benchmark on whole photos" above.
-- Pending: user approval of the master format and crop.
+- Pending: user decision on the master source (NEF or 16-bit PNG). This item
+  replaces the earlier approval item for the 8-bit master format and crop.
 - Pending: a short real speed test on Kaggle (4 CPU cores).
 - Pending: loss or sampling balance for the about 34.5% label-1 tiles.
-- Pending: write a generator design plan for both modes.
+- Pending: write a generator design plan for both modes, with on-the-fly
+  generation.
