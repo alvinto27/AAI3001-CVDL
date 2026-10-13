@@ -749,6 +749,13 @@ high at that point. This was not tested.
   - Workers yield small groups, and the main process joins groups from all
     workers into each batch. The loader yields uint8; the notebook converts
     it to float32 on the device. A callback calls `set_epoch` at each epoch.
+- On the user's decision, the Orchestrator deleted the image folders of
+  `Datasets/raise512-run1` on the VM: `clean/`, `stego/`, and `masks/`, with
+  49,796 PNG files in each folder. It kept 99 MB: `labels.csv`,
+  `metadata.csv`, `done.jsonl`, `run.log`, `run_config.yaml`, and
+  `splits/split_seed0.csv`. The split hash equals
+  `data/raise/split_seed0.csv`.
+
 - The user ran the first full OTF v3c run on the VM L4. The executed record
   is `notebooks/runs/04_v3c_otf_2026-10-13.ipynb` (commit `973f010`, SHA-256
   `3f167964...4bc9`, equal to the VM file). Settings were `V3_DATA=otf`,
@@ -1436,6 +1443,17 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   `legacy_tile_manifest.csv`. The `masks/` folder is 507 MB, can be
   regenerated, and need not be kept.
 
+#### Run1 image deletion effect
+
+- VM disk changed from 144 GB used / 49 GB free to 107 GB used / 87 GB
+  free (56%). No process used the folder. The teammate's `modelling/`
+  notebook does not refer to it.
+- `V3_DATA=png` no longer works on the VM because its images are gone.
+  `V3_EVAL_PROFILE=legacy_v6` recreates the same 49,796 pairs from the NEFs;
+  step 5 verified byte identity. Notebook 02 still works on old PNG-path
+  predictions because `labels.csv` remains. The rebuild guide can recreate
+  the images. Teammates' PC copies are not affected.
+
 ### Decided
 
 - The user confirmed the reason for the v3c baseline. The goal of v3c is not
@@ -1651,10 +1669,12 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Done: the user's first full OTF v3c run on the VM. Its checkpoint is
   `baseline_kv_xunet_v3_clip3_group_otf`; a `legacy_v6` test is Pending if
   a like-for-like comparison is needed.
-- Pending, after step 8: team agreement, then delete
-  `Datasets/raise512-run1` on the VM. The `V3_DATA=png` path needs that
-  folder; the OTF `legacy_v6` profile replaces it.
-- Pending: tell teammates that the VM checkout is on branch `yx`.
+- Done: after step 8, team agreement was recorded and
+  `Datasets/raise512-run1` image folders were deleted on the VM. The kept
+  records are described above.
+- Pending: tell teammates that the VM checkout is on branch `yx`, and that
+  the `raise512-run1` images are gone on the VM. `V3_DATA=png` there needs a
+  rebuild.
 - Later: Mode 2. Fixes 4 and 5 are queued after Mode 2.
 - Done: the VM machine type decision after step 7: keep `g2-standard-8`.
 - VM machine decision (user, 2026-10-13): keep `g2-standard-8`:
