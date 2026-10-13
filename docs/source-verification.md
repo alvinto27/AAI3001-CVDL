@@ -125,4 +125,5 @@ Done: [shared settings and seed helpers](settings-and-seeds.md).
 Done: [shared embed core and mask-free API](embed-core-verification.md).
 The [Mode 1 sample API](mode1-verification.md) now composes these source
 helpers with shared settings and embedding. Pending: Mode 2 changed-index tile
-labels and the loader. Cache construction is not part of this source check.
+labels and the loader. Cache construction is not part of this source check;
+see the separate [session-cache verification](cache-verification.md).

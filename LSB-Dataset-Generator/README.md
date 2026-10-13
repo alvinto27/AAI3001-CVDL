@@ -43,7 +43,13 @@ for its API and measured CPU timings.
 and mask-free embedding. `replay_legacy()` accepts a frozen legacy tile row.
 Both return owned RGB8 pixels and provenance metadata. See
 [Mode 1 verification](../docs/mode1-verification.md) for the API and replay checks.
-No loader, torch Dataset, or cache is included.
+No loader or torch Dataset is included in Mode 1.
+
+`lsb_cache.build_entry()` and `scripts/build_cache.py` build/resume the separate
+full-photo RGB8 NPY cache. `load_cached()` strictly rejects stale or missing
+entries without decoding in their place. See
+[session cache verification](../docs/cache-verification.md) for format, commands,
+validation, read timings, and the approved VM cache location.
 
 ## Setup
 
