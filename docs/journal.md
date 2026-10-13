@@ -683,6 +683,16 @@ high at that point. This was not tested.
     there is no in-place option.
   - Check script: `scripts/check_embed_fast.py`. Tests:
     `tests/test_embed_fast.py`.
+- The Worker did plan step 5. Commit `fc87b9c`. The full record is
+  [docs/mode1-verification.md](mode1-verification.md).
+  - `LSB-Dataset-Generator/lsb_mode1.py` provides `make_sample()` and
+    `replay_legacy()` for clean or stego samples. It uses `lsb_source`,
+    `lsb_settings`, and `lsb_engine.embed_fast`; it does not copy their
+    logic.
+  - `lsb_source.py` gained `tile_at()` for direct tile lookup, sharing grid
+    checks with `iter_tiles`.
+  - Check script: `scripts/check_mode1.py`. Tests:
+    `tests/test_lsb_mode1.py`.
 
 ### Found
 
@@ -1164,6 +1174,31 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   output but was slower in all 6 tested cases. For example, full photo,
   dense: sort 92.5 ms versus mark 183.6 ms. The sort is unchanged.
 
+#### Mode 1 verification (step 5)
+
+- First gate: 500 legacy pairs from 12 NEFs, covering all 6 camera and
+  orientation groups. Placement counts were contiguous 166, stride 163, and
+  random 171. There were 0 clean or stego pixel mismatches. Wall time was
+  10.1 s.
+- Full gate: all 49,796 clean and stego pairs from the 1,000 NEFs, each
+  decoded once, with 8 processes and `OMP_NUM_THREADS=1`. There were 0
+  mismatches. Wall time was 724.3 s.
+  - Summed worker time: NEF decode 3,534.8 s (about 3.5 s per photo), cut
+    plus embed 209.1 s (about 4.2 ms per pair), and PNG read plus compare
+    2,025.6 s. These phases overlap, so they do not add to wall time.
+- OTF checks on 8 photos (each RAISE camera/orientation group and DIV2K
+  0001/0002), with `overlap_last` at 512 and 256, including edge tiles:
+  - Repeat calls were identical in bytes and metadata.
+  - 32 validation/test cases were unchanged when `run_seed` and epoch
+    changed. 16 train cases changed with both.
+  - 16 fixed-variant cases were identical at epochs 0, 1, 5, and 100.
+  - 16 forced lower-to-fit cases with request 10 bpp recorded
+    `clipped=True`; for example, a 512 tile had effective 0.00299 bpp and
+    98 bytes.
+  - Two serial orders and 4 processes gave identical output: 816 sample
+    calls and 0 mismatches.
+- 68 unit tests pass.
+
 ### Decided
 
 - The user confirmed the reason for the v3c baseline. The goal of v3c is not
@@ -1350,8 +1385,10 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Done: v2 conv1 fix implementation (`60f5c17`).
 - Done: step 4, one embed core plus a mask-free fast path (`c2bdb53`). See
   [docs/embed-core-verification.md](embed-core-verification.md).
-- Pending, in progress: step 5, mode 1 in the shared pipeline, byte-identical
-  to `raise512-run1` for all 49,796 pairs.
+- Done: step 5, mode 1 in the shared pipeline (`fc87b9c`). See
+  [docs/mode1-verification.md](mode1-verification.md).
+- Pending, in progress: step 6, the full-photo `.npy` cache on the VM at
+  `/srv/aai3001/otf-cache/v1/`, with cache checks and read-speed measurements.
 - VM machine decision (user, 2026-10-13): keep `g2-standard-8` for now:
   one L4, 8 vCPUs (4 cores x 2 threads), and 32 GB RAM. Decide whether to
   change it after step 7 measures whether the VM CPU and disk can feed the L4
