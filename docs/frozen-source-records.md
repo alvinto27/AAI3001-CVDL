@@ -31,6 +31,40 @@ decode is performed. DIV2K dimensions come from RGB8 PNG headers, including
 header checksum validation. DIV2K has blank camera and legacy-grid fields;
 noise is `not_applicable`. RAISE noise is `disabled`.
 
+## Preserved run1 labels and metadata
+
+These deterministic gzip files preserve the original run1 CSV records, not
+images. `run1_labels.csv.gz` stores the clean/stego labels and split records;
+`run1_metadata.csv.gz` stores the original generation settings and results.
+They were compressed on the PC with `gzip -n -c` (no timestamp or file name).
+Before compression, both originals matched the VM copies byte-for-byte by
+SHA-256. Recompression produced identical gzip bytes. Decompression matched
+both original SHA-256 values and passed a byte comparison.
+
+| Stored file under `data/raise/` | Source under `Datasets/raise512-run1/` | Original bytes | Gzip bytes |
+| --- | --- | ---: | ---: |
+| `run1_labels.csv.gz` | `labels.csv` | 19,806,781 | 3,307,725 |
+| `run1_metadata.csv.gz` | `metadata.csv` | 15,485,145 | 3,180,260 |
+
+| Record | Original CSV SHA-256 | Gzip SHA-256 |
+| --- | --- | --- |
+| Labels | `3195008b55d8b9d4673038c9abca6af5e9d028496b0c64ad57399c4333bb511b` | `b88ff3b0fbe6a8ded80e758d1ae3e1bef8c960f528cdcaa3284dc07dc33d386f` |
+| Metadata | `fdc6d413fdae6e6962da10124f6a767aee3b53e70586a227f966a82bfa3f0be3` | `d2811cea5b5a959c23c1d78a815e1aeee957b160c38a6b5d82f8e733d4aecbc3` |
+
+Decompress to a separate directory, not into the existing dataset:
+
+```sh
+mkdir -p restored-run1
+ gzip -cd data/raise/run1_labels.csv.gz > restored-run1/labels.csv
+ gzip -cd data/raise/run1_metadata.csv.gz > restored-run1/metadata.csv
+sha256sum restored-run1/labels.csv restored-run1/metadata.csv
+```
+
+Compare the output hashes with the original CSV hashes above. The dataset
+`masks/` and `records/` directories are not kept in git; masks can be regenerated.
+No dataset files were changed or deleted. Any later dataset deletion requires
+a separate user decision.
+
 ## Split and count checks
 
 RAISE split rows are joined through metadata, labels, and preparation tiles.

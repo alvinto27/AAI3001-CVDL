@@ -37,6 +37,17 @@ DIV2K has [frozen source records](docs/frozen-source-records.md); the builder re
 
 See the [ImageSets README](ImageSets/README.md) for source details, terms, and download links.
 
+### RAISE records in git (`data/raise/`)
+
+- `selection.csv` and `split_seed0.csv`: selected source photos and fixed splits.
+- `photo_manifest.csv` and `legacy_tile_manifest.csv`: source identities and tile grids.
+- `run1_labels.csv.gz` and `run1_metadata.csv.gz`: deterministic gzip copies of
+  `Datasets/raise512-run1/labels.csv` and `metadata.csv`. See
+  [hashes and decompression instructions](docs/frozen-source-records.md#preserved-run1-labels-and-metadata).
+
+Dataset `masks/` and `records/` are not kept in git. Masks can be regenerated.
+Dataset files remain local; this record preservation does not delete them.
+
 ## Train on the Spot VM
 
 The `gcp-aai3001` VM is a Spot VM. Google can stop it at any time, with a 120-second notice.
