@@ -51,6 +51,14 @@ entries without decoding in their place. See
 [session cache verification](../docs/cache-verification.md) for format, commands,
 validation, read timings, and the approved VM cache location.
 
+`lsb_torch.RunSettings`, `Corpus`, `TrainingImages`, and `FixedPairs` provide
+the Mode 1 PyTorch boundary. Masters are decoded by default; the verified session
+cache is optional. Training uses a bounded uint8 shuffle buffer and stable
+sample keys; evaluation exposes fixed pairs and a metadata frame. See
+[loader verification](../docs/torch-loader-verification.md) for the notebook
+contract, epoch controls, source selection, counts, and throughput checks.
+Notebook 04 is not changed in this step.
+
 ## Setup
 
 The standalone tool needs these packages:
