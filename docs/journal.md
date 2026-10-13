@@ -1018,9 +1018,25 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   At batch 20, the proposal took 56.9 ms. Peak GPU memory for one batch-32
   step was 2.91 GB, the same as the current version. The fix has no effect
   on the VM because it is active only on ROCm.
-- User decision (2026-10-13): approved. Pending implementation: after step
-  3, the Worker copies the proposal file into `notebooks/` and runs its
-  self-check once on the PC GPU.
+- User decision (2026-10-13): approved. The Worker implemented the proposal
+  after step 3 and ran its self-check on the PC GPU.
+- Worker commit `60f5c17` replaced `notebooks/rocm_conv1_wgrad.py` with the
+  proposal file, unchanged. Its SHA-256 is
+  `afe4a475322d0660a1877c08d1d6398d6ffa22eb55133c7339982c23b11f2301`, the
+  same as the proposal. The class, `from_conv` parameters, and `state_dict`
+  keys are unchanged. Notebook 04 and other docs are unchanged.
+- The PC GPU self-check ran once in the `aai3001` container with no MIOpen
+  variables set. Maximum relative error against float64, weight / bias:
+
+  | Batch | Weight | Bias | Result |
+  | ---: | ---: | ---: | --- |
+  | 1 | 5.561e-7 | 1.550e-7 | PASS |
+  | 20 | 6.125e-7 | 1.619e-7 | PASS |
+  | 32 | 6.430e-7 | 1.534e-7 | PASS |
+
+  All pass the rule `<= 1e-5`. The self-check covers only weight and bias
+  gradients. Forward and data gradients still use MIOpen and were checked
+  earlier by ROCm-Works.
 
 #### Frozen photo and tile records (step 1)
 
@@ -1294,8 +1310,8 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   [docs/source-verification.md](source-verification.md).
 - Done: step 3, the shared settings and seed helpers (`967cfd4`). See
   [docs/settings-and-seeds.md](settings-and-seeds.md).
-- Pending, in progress: v2 conv1 fix implementation.
-- Pending: step 4, one embed core plus a mask-free fast path.
+- Done: v2 conv1 fix implementation (`60f5c17`).
+- Pending, in progress: step 4, one embed core plus a mask-free fast path.
 - VM machine decision (user, 2026-10-13): keep `g2-standard-8` for now:
   one L4, 8 vCPUs (4 cores x 2 threads), and 32 GB RAM. Decide whether to
   change it after step 7 measures whether the VM CPU and disk can feed the L4
@@ -1314,8 +1330,6 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Done: ROCm-Works confirmed the affected step count (most likely 10 of
   21,810 steps in each of v3b and v3c) and measured the step time without
   the variable. See "ROCm caution, cause found".
-- Approved by the user (2026-10-13); Pending implementation: after step 3,
-  the Worker copies the v2 conv1 fix proposal into `notebooks/` and runs its
-  self-check once on the PC GPU.
+- Done: v2 conv1 fix implementation and PC self-check (`60f5c17`).
 - Pending: VM machine type decision, after the step 7 loader speed
   measurement.
