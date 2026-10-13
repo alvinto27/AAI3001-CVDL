@@ -662,6 +662,17 @@ high at that point. This was not tested.
     `overlap_last` (512 and 256).
   - Check script: `scripts/check_sources.py`. Tests:
     `tests/test_lsb_source.py`.
+- The Worker did plan step 3. Commit `967cfd4`. The full record is
+  [docs/settings-and-seeds.md](settings-and-seeds.md).
+  - `LSB-Dataset-Generator/lsb_settings.py` holds the settings draws moved
+    from `lsb_batch.py`. The logic is unchanged, and `lsb_batch.py` imports
+    it.
+  - It keeps the legacy seed key
+    `SeedSequence([seed, cover_index, variant, stream])`: stream 0 is for
+    settings and stream 1 is for embedding. It adds a versioned on-the-fly
+    seed key.
+  - Check script: `scripts/check_settings.py`. Tests:
+    `tests/test_lsb_settings.py`.
 
 ### Found
 
@@ -1072,6 +1083,34 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   threads (8 vCPUs). The check also read PNG files at the same time. Thus
   this is not a clean speed measurement.
 
+#### Settings and seeds (step 3)
+
+- OTF key v1 fields, in order: version, purpose (train 1 / val 2 / test 3),
+  seed, epoch, carrier (tile 1 / photo 2), photo index, grid ID (none 0 /
+  `topleft_crop` 1 / `overlap_last` 2), tile size, tile row, tile column,
+  variant (from 1), and stream (settings 0 / embedding 1).
+- Training uses `run_seed` and epoch. Epoch 0 is used for fixed variants.
+  Validation and test always use seed 1 and epoch 0, so their embedding does
+  not change between runs. A photo carrier in mode 2 sets grid, size, row,
+  and column to 0.
+- Lower-to-fit applies only to the new OTF path. It draws the requested size,
+  lowers it to the largest payload that fits, and records requested and
+  effective bpp and bytes, capacity, and a clipped flag. A carrier that
+  cannot hold 1 byte fails.
+- The legacy path is unchanged. It clips range upper bounds and fails on
+  oversized fixed values.
+- Legacy regression on the VM: all 49,796 stego rows were redrawn. There
+  were 0 mismatches in all 11 fields (bit mode, k, method, placement, start,
+  start_random, stride, payload kind, payload bytes, size kind, and size
+  value). Placement counts were random 16,564, stride 16,623, and contiguous
+  16,609. Redraw time was 13.2 s.
+- For the 33,232 non-random rows, the start check used the engine's own
+  payload and unit-selection functions. It did not embed images.
+- Real `generate()` on covers 000003 (random), 000004 (stride), and 000005
+  (contiguous) produced stego PNG files byte-identical to the stored files.
+- 60 tests pass on the VM: 26 new source/manifest/settings tests and 34
+  existing batch/engine/prepare tests.
+
 ### Decided
 
 - The user confirmed the reason for the v3c baseline. The goal of v3c is not
@@ -1253,9 +1292,10 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   the DIV2K split CSV (`63e4f59`).
 - Done: step 2, the source step (`a7feb63`). See
   [docs/source-verification.md](source-verification.md).
-- Pending, in progress: the notebook 04 change (remove the
-  `MIOPEN_GEMM_ENFORCE_BACKEND=5` default).
-- Pending, in progress: step 3, the shared settings and seed helpers.
+- Done: step 3, the shared settings and seed helpers (`967cfd4`). See
+  [docs/settings-and-seeds.md](settings-and-seeds.md).
+- Pending, in progress: v2 conv1 fix implementation.
+- Pending: step 4, one embed core plus a mask-free fast path.
 - VM machine decision (user, 2026-10-13): keep `g2-standard-8` for now:
   one L4, 8 vCPUs (4 cores x 2 threads), and 32 GB RAM. Decide whether to
   change it after step 7 measures whether the VM CPU and disk can feed the L4
