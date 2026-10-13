@@ -9,6 +9,7 @@
 - [Frozen RAISE and DIV2K source records](frozen-source-records.md)
 - [Full-photo source API and verification](source-verification.md)
 - [Shared settings draws and seed keys](settings-and-seeds.md)
+- [Shared embed core and mask-free verification](embed-core-verification.md)
 - [Rebuild the RAISE 512 dataset](rebuild-raise512-run1.md)
 
 ## Local data folders

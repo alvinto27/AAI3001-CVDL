@@ -122,4 +122,6 @@ were written. Scratch logs, code copies, and test outputs are removed after
 verification; this record retains the measured result.
 
 Done: [shared settings and seed helpers](settings-and-seeds.md).
-Pending: embedding-core work. Cache construction is not part of this check.
+Done: [shared embed core and mask-free API](embed-core-verification.md).
+Pending: changed-index tile labels and the shared pipeline. Cache construction
+is not part of this source check.

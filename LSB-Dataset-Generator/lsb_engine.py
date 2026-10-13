@@ -251,7 +251,7 @@ def _match_values(
     return result.astype(np.uint8)
 
 
-def embed(
+def _embed_core(
     carrier: np.ndarray,
     bit_mode: str,
     k: int,
@@ -264,15 +264,9 @@ def embed(
     payload: str = "random_bytes",
     payload_bytes: int | None = None,
     bpp: float | None = None,
-) -> tuple[np.ndarray, np.ndarray, EmbedResult]:
-    """Embed one generated payload into an RGB carrier.
-
-    Exactly one of ``payload_bytes`` and ``bpp`` must be supplied.  Payload
-    bits are MSB-first
-    and a partial final field receives random padding bits.  In lowest-bit mode
-    with ``k=8``, match is exactly replace because each target whole byte has
-    only one valid carrier value.
-    """
+    return_changed_units: bool = False,
+) -> tuple[np.ndarray, np.ndarray, dict, np.ndarray | None]:
+    """Single numerical path; optional outputs consume no random numbers."""
     carrier, height, width, total_units = _validate_carrier(carrier)
     _validate_generator(rng)
     if bit_mode not in {"lowest", "plane"}:
@@ -322,11 +316,12 @@ def embed(
         after = _match_values(before, fields, bit_mode, k, rng)
     flat[selected] = after
 
-    mask = np.zeros((height, width), dtype=np.bool_)
-    mask.reshape(-1)[selected // 3] = True
-    changed = int(np.count_nonzero(before != after))
-    selected_cache = selected if placement == "random" else None
-    result = EmbedResult(
+    differences = before != after
+    changed = int(np.count_nonzero(differences))
+    changed_units = selected[differences] if return_changed_units else None
+    if changed_units is not None:
+        changed_units.setflags(write=False)
+    metadata = dict(
         bit_mode=bit_mode,
         k=k,
         method=method,
@@ -339,9 +334,73 @@ def embed(
         units_used=units_used,
         units_changed=changed,
         bpp_actual=payload_bit_count / float(height * width),
-        _selected_units=selected_cache,
+    )
+    return stego, selected, metadata, changed_units
+
+
+def embed(
+    carrier: np.ndarray,
+    bit_mode: str,
+    k: int,
+    method: str,
+    placement: str,
+    rng: np.random.Generator,
+    *,
+    start: int | None = None,
+    stride: int = 1,
+    payload: str = "random_bytes",
+    payload_bytes: int | None = None,
+    bpp: float | None = None,
+) -> tuple[np.ndarray, np.ndarray, EmbedResult]:
+    """Embed a generated payload; preserve the original pixels/mask/result API.
+
+    Exactly one of payload_bytes and bpp is required. Payload bits are
+    MSB-first; a partial last field gets random padding. Lowest-k=8 match
+    equals replace. The mask marks selection, not numerical changes.
+    """
+    stego, selected, metadata, _ = _embed_core(
+        carrier, bit_mode, k, method, placement, rng, start=start, stride=stride,
+        payload=payload, payload_bytes=payload_bytes, bpp=bpp,
+    )
+    mask = np.zeros(stego.shape[:2], dtype=np.bool_)
+    mask.reshape(-1)[selected // 3] = True
+    result = EmbedResult(
+        **metadata, _selected_units=selected if placement == "random" else None
     )
     return stego, mask, result
+
+
+def embed_fast(
+    carrier: np.ndarray,
+    bit_mode: str,
+    k: int,
+    method: str,
+    placement: str,
+    rng: np.random.Generator,
+    *,
+    start: int | None = None,
+    stride: int = 1,
+    payload: str = "random_bytes",
+    payload_bytes: int | None = None,
+    bpp: float | None = None,
+    return_changed_units: bool = False,
+) -> tuple[np.ndarray, dict, np.ndarray | None]:
+    """Mask-free (stego, public metadata, optional changed unit indices).
+
+    Always copies the clean carrier. Metadata matches EmbedResult's public
+    fields and retains the cheap units_changed count. No selection cache is
+    retained; no changed-index array is built unless requested. Changed units
+    are increasing, read-only np.intp indices, not selected-but-unchanged units.
+    RNG calls/state exactly match embed(). This record is not an extract result.
+    """
+    if type(return_changed_units) is not bool:
+        raise TypeError("return_changed_units must be Boolean")
+    stego, _, metadata, changed_units = _embed_core(
+        carrier, bit_mode, k, method, placement, rng, start=start, stride=stride,
+        payload=payload, payload_bytes=payload_bytes, bpp=bpp,
+        return_changed_units=return_changed_units,
+    )
+    return stego, metadata, changed_units
 
 
 def _units_for_result(
@@ -407,4 +466,4 @@ def extract(
     return np.packbits(bits[:payload_bit_count], bitorder="big").tobytes()
 
 
-__all__ = ["EmbedResult", "embed", "extract"]
+__all__ = ["EmbedResult", "embed", "embed_fast", "extract"]

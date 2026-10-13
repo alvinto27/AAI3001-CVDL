@@ -34,6 +34,11 @@ The existing batch route keeps its legacy draws and four-integer seeds.
 See the [settings and seed record](../docs/settings-and-seeds.md) for the
 separate versioned OTF route and its lower-to-fit size policy.
 
+`lsb_engine.embed_fast()` uses the same numerical core as `embed()` but skips
+the pixel mask and selection cache. It returns public metadata and optional
+actual changed-unit indices. See the [embed-core verification](../docs/embed-core-verification.md)
+for its API and measured CPU timings.
+
 ## Setup
 
 The standalone tool needs these packages:

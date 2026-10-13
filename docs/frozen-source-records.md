@@ -116,5 +116,7 @@ Do not push. Remove the scratch copies and test outputs after review.
 
 Done: full source decode and grid cutting in
 [plan step 2 verification](source-verification.md) and
-[step 3 settings/seed helpers](settings-and-seeds.md). Pending: embedding work.
+[step 3 settings/seed helpers](settings-and-seeds.md). The
+[step 4 embed core](embed-core-verification.md) is also verified.
+Pending: tile labels, pipeline, and loader work.
 Source terms and citations remain in the [ImageSets guide](../ImageSets/README.md#citations-and-terms).

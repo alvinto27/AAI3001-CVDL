@@ -115,8 +115,10 @@ The redraw check calls the engine's own `_make_payload()` and
 `_select_units()` for the 33,232 contiguous/stride rows. It produces no stego
 images during that check. Random-placement start/stride are absent by the
 engine contract. No payload-prefix or start RNG logic is copied. The only
-mirrored arithmetic is units-used calculation from `lsb_engine.py` lines
-302-303 and 307 (bits per unit and ceiling division).
+mirrored arithmetic is units-used calculation from pre-step-4
+`lsb_engine.py` at commit `967cfd4`, lines 302-303 and 307 (bits per unit and
+ceiling division). The later [core refactor](embed-core-verification.md)
+changes line numbers, not that calculation.
 
 The three-cover check uses the real batch `generate()` entry point and engine.
 Two empty non-image files precede the three original tile names in scratch,
