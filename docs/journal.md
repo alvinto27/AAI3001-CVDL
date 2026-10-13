@@ -823,6 +823,27 @@ of 2 trials), against the PC target of 340 tiles/s:
   encode (OpenCV default) takes about 6.9 min. The encode time of the 8-bit
   cache was not measured.
 
+#### ROCm caution, open
+
+- The ROCm-Works team reported this on 2026-10-13. In a fixed-seed loss
+  check, the setup with `MIOPEN_GEMM_ENFORCE_BACKEND=5` gave a different
+  loss path from all earlier runs:
+
+  | Step | Loss with the variable | Loss in earlier runs |
+  | ---: | ---: | ---: |
+  | 50 | 0.367 | about 0.11 |
+  | 200 | 0.0038 | 0.0027 |
+
+- The ROCm switch in notebook 04 sets this variable by default.
+- The cause is not known. It can be normal run-to-run variation, or a wrong
+  gradient in a layer.
+- The ROCm-Works worker is checking each convolution layer against a
+  float64 reference, with and without the variable.
+- Until that check is done, do not treat PC results from notebook 04 with
+  the ROCm switch on as final. This applies to the v3b and v3c PC runs.
+  V3a ran on the VM L4 with CUDA, so it is not affected.
+- New runs of this team run on the VM only.
+
 ### Decided
 
 - The user confirmed the reason for the v3c baseline. The goal of v3c is not
@@ -983,3 +1004,5 @@ of 2 trials), against the PC target of 340 tiles/s:
 - Done: moved the VM checkout to `yx`.
 - Pending: plan step 1. Freeze the RAISE and DIV2K photo and tile records,
   and the DIV2K split CSV.
+- Pending: ROCm-Works float64 layer check; then confirm or qualify the v3b
+  and v3c PC results.

@@ -2,6 +2,8 @@
 
 Date: 2026-10-12
 
+> **Caution (2026-10-13):** the v3b and v3c PC results are not final until an open ROCm check is done; see the [journal item](journal.md#rocm-caution-open).
+
 This report compares three fixes for the first steganalysis baseline. V3c is
 the current baseline. The [V3b report](results-v3b.md) is a detailed
 appendix with extra plots and checks for that run.
