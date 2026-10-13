@@ -39,6 +39,12 @@ the pixel mask and selection cache. It returns public metadata and optional
 actual changed-unit indices. See the [embed-core verification](../docs/embed-core-verification.md)
 for its API and measured CPU timings.
 
+`lsb_mode1.make_sample()` composes full-photo tile access, shared settings/seeds,
+and mask-free embedding. `replay_legacy()` accepts a frozen legacy tile row.
+Both return owned RGB8 pixels and provenance metadata. See
+[Mode 1 verification](../docs/mode1-verification.md) for the API and replay checks.
+No loader, torch Dataset, or cache is included.
+
 ## Setup
 
 The standalone tool needs these packages:

@@ -146,6 +146,23 @@ def topleft_crop(pixels: np.ndarray, record: Mapping) -> np.ndarray:
     return pixels[:ys[-1] + 512, :xs[-1] + 512]
 
 
+def tile_at(pixels: np.ndarray, record: Mapping, grid_policy: str,
+            tile_size: int, row: int, column: int) -> SourceTile:
+    """Direct validated tile view; use the same frozen axes as iter_tiles."""
+    _validate_pixels(pixels, record)
+    ys, xs = grid_axes(record, grid_policy, tile_size)
+    if (type(row) is not int or type(column) is not int
+            or not 0 <= row < len(ys) or not 0 <= column < len(xs)):
+        raise ValueError("tile row/column outside recorded grid")
+    return _tile_view(pixels, record, grid_policy, tile_size, row, column, ys, xs)
+
+
+def _tile_view(pixels, record, grid_policy, tile_size, row, column, ys, xs):
+    y, x = ys[row], xs[column]
+    return SourceTile(pixels[y:y + tile_size, x:x + tile_size], record["photo_id"],
+                      grid_policy, tile_size, row, column, y, x)
+
+
 def iter_tiles(pixels: np.ndarray, record: Mapping, grid_policy: str = "overlap_last",
                tile_size: int = 512) -> Iterator[SourceTile]:
     """Yield row-major tile views and identities. Do not mutate these views."""
@@ -153,5 +170,4 @@ def iter_tiles(pixels: np.ndarray, record: Mapping, grid_policy: str = "overlap_
     ys, xs = grid_axes(record, grid_policy, tile_size)
     for r, y in enumerate(ys):
         for c, x in enumerate(xs):
-            yield SourceTile(pixels[y:y + tile_size, x:x + tile_size], record["photo_id"],
-                             grid_policy, tile_size, r, c, y, x)
+            yield _tile_view(pixels, record, grid_policy, tile_size, r, c, ys, xs)

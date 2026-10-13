@@ -10,6 +10,7 @@
 - [Full-photo source API and verification](source-verification.md)
 - [Shared settings draws and seed keys](settings-and-seeds.md)
 - [Shared embed core and mask-free verification](embed-core-verification.md)
+- [Mode 1 sample API and legacy replay](mode1-verification.md)
 - [Rebuild the RAISE 512 dataset](rebuild-raise512-run1.md)
 
 ## Local data folders
