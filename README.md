@@ -45,6 +45,34 @@ Notebook 04 loader controls:
 
 Ordered delivery remains enabled. See [all controls and saved run settings](docs/notebook-otf-verification.md#controls) and [compile verification and safety checks](docs/notebook-compile-verification.md).
 
+### Run notebook 04 without Jupyter
+
+Create an env file with `QUICK` and any `V3_*` controls. Use a new output folder
+for each run. The runner sets `V3_OUTPUT_ROOT` inside that folder; do not put it
+in the env file.
+
+```text
+QUICK=False
+V3_DATA=otf
+V3_SOURCE=cache
+V3_CACHE_ROOT=/path/to/otf-cache/v1
+V3_RUN_NAME=my-run
+```
+
+```sh
+python scripts/run_notebook.py --env-file run.env --output runs-out/my-run
+```
+
+`--notebook` selects another input notebook; `--set V3_WORKERS=4` overrides an
+env-file value. The runner reads the source notebook but does not edit it. It
+saves `executed.ipynb` and `status.json` after each code cell, and writes a
+live `run.log`. The status heartbeat updates every 10 seconds. Check
+`status.json` for `done` and exit code 0 before using results. A failed or
+interrupted run exits non-zero and keeps its partial notebook and traceback.
+Notebook checkpoints, predictions, figures and settings records remain under
+`runs-out/my-run/checkpoints/<run name>/`; the status file lists them. Git
+ignores `runs-out/`. The runner refuses a nonempty output folder.
+
 ## Data and citations
 
 The `raise512-run1` source is RAISE. Cite it as [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](ImageSets/README.md#citations-and-terms) RAISE is for **non-commercial research and educational purposes**.
