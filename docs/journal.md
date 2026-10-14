@@ -1826,6 +1826,14 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   - Manifest maxima are 70 / 260 for RAISE and 16 / 64 for DIV2K at 512 /
     256. Step 17, the pre-built Mode 2 writer, is deferred. No MIL model or
     notebook change was made.
+- The user set G4 disk throughput to 400 MB/s with 3,000 IOPS. The PC
+  `~/.ssh/config` now has a Tailscale host entry for `rtx6000pro`.
+- Commits `5e9d8c3`, `0541ae0`, `d5352ac`, `088a747`, and `33e5e31` updated
+  the parallel resumable master upload, speed-test file limit and epoch
+  handling, setup build tools, job open-file limit, and runner soft-limit
+  logging.
+- The first G4 job proof was `g4-quick-proof-1`: QUICK, decode, 32 train
+  workers, 16 evaluation workers, compile default.
 
 ### Found
 
@@ -2016,6 +2024,30 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   us-central1 reached 25% and europe-west2 18%. No region was clearly safer.
   us-central1 had High availability and was the cheapest tested option.
 
+#### G4 speed and first-job proof
+
+- Speed test on 1,381 photos and 107,900 images per epoch:
+  - Cold reads: cache 427.2 MB/s; masters 435.2 MB/s. Before the disk
+    change, reads were about 145 MB/s.
+  - GPU-only: compiled 2,243.5 images/s (about 70 it/s at batch 32);
+    eager 1,635.4 images/s.
+  - Cache loader plus GPU: compiled 2,140-2,147 images/s; eager
+    1,570-1,584 images/s. These were short, partly warm windows.
+  - Cache loader only at 4/8/16 workers: 1,208 / 1,889 / 2,212 images/s.
+    Decode loader only at 16/24/32/40 workers: 1,883 / 2,702 / 3,003 /
+    3,193 images/s, using 15-20 of 48 cores.
+  - First-epoch lower bounds: cache 87.5 s, disk-bound at 37.4 GB; decode
+    48.1 s, GPU-bound at 15.7 GB of masters. A compiled epoch is about 48 s
+    on G4 versus about 4.1 min on the PC.
+- First proof booted at 13:13:08Z, started the job at 13:13:20Z, uploaded to
+  the Pi at 13:13:48Z, and shut down at about 13:14Z.
+  - Notebook execution failed at cell 12 in the validation loader. Spawned
+    workers raised `FileNotFoundError` in `SemLock._rebuild` after the watch
+    SSH session closed. Ubuntu logind `RemoveIPC=yes` deleted the user's
+    POSIX semaphores in `/dev/shm`. The open-file limit was 65,536.
+  - Data source decode was confirmed. The fix is commit `6e0323a`, which
+    makes `RemoveIPC=no` and restarts logind. It is not yet applied on G4.
+
 ### Decided
 
 - The cache inside the PC checkout is allowed only when git ignores it.
@@ -2032,10 +2064,23 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   `europe-north1` location. Keep it separate from the Seoul L4 project and
   billing pool. Commit `2b84127` points submit.sh and the docs to
   `us-central1-c` and $1.63/h.
-- Disk decision (user, 2026-10-14): raise throughput to about 400 MB/s,
-  about +$10.40 per month. The VM must be stopped first.
+- Disk decision (user, 2026-10-14): raise throughput to 400 MB/s with
+  3,000 IOPS, about +$10.40 per month. The VM was stopped for this change.
 - Start without metadata is now off: the service sends pending results and
   shuts down. The next boot must set `job-mode=maintenance` in the console.
+- Do not SSH into G4 during a job. Watch through the Pi. Apply the
+  `RemoveIPC=no` fix by hand in a later maintenance boot.
+- G4 data source decision (user): use decode. Forty decode workers give 1.5
+  times the GPU rate, and no new caches are needed for new datasets. Decode
+  and training at the same time are not measured yet.
+- Source diversity is tentative, not final: RAISE plus ALASKA#2
+  (uncompressed colour PPM from alaska.utt.fr, not the Kaggle JPEG set,
+  CC BY-NC-ND) plus LSDIR (training subset and official validation/test;
+  image licence to check). DIV2K leaves the plan, but its files stay on
+  disk. Re-evaluate the current best model on the new test sets as the new
+  baseline. Balance sampling by source and hold out some ALASKA cameras for
+  testing.
+
 - G4 policy: timeout defaults to 100 min and refuses values above max-run
   minus 15. Missing job mode is off. Maintenance runs only when explicitly
   set. Each job checks out the job commit and runs `uv sync --locked`.
@@ -2050,14 +2095,12 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Done: VM fix 4 and fix 5 measurements. Fix 4 has no reliable VM gain;
   fix 5 was already verified above.
 - Done: removed VM scratch `~/otf-dev/eval-yx` after the VM returned.
-- Pending: user raises G4 disk throughput to about 400 MB/s.
-- Pending: maintenance boot for `setup.sh` speed work: cache versus decode,
-  eager and compiled.
-- Pending: one QUICK job through console metadata to prove boot -> run -> Pi
-  -> shutdown.
-- Pending: G4 speed is not measured. Test cache 4/8/16 workers and decode
-  16/24/32/40 workers, eager and compiled, for 150 steady steps.
-- Pending: setup.sh parallel upload (Worker_2, in progress).
+- Pending: proof 2 (`g4-quick-proof-2`), with no SSH during the run. The
+  user starts the VM.
+- Pending: apply `RemoveIPC=no` on G4 in maintenance mode.
+- Pending: measure decode plus training speed and validation time on G4.
+- Pending: dataset download plan, per-source balanced sampler, and licence
+  checks.
 - Later: Part 3, gcloud on the Pi.
 - Pending: user decision on moving the VM to Taiwan if Seoul stays Limited.
 - Done (user, 2026-10-14): chose option A, keep the photo-owned evaluation
