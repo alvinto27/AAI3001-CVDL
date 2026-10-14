@@ -17,6 +17,7 @@
 - [Notebook OTF integration and QUICK checks](notebook-otf-verification.md)
 - [Notebook diagnostic speed and parity checks](notebook-diagnostics-verification.md)
 - [Notebook optional compile switch and verification](notebook-compile-verification.md)
+- [G4 batch runner and first-boot steps](g4-batch-runner.md)
 - [Rebuild the RAISE 512 dataset](rebuild-raise512-run1.md)
 
 ## Local data folders
