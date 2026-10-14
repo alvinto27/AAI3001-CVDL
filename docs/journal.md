@@ -1843,6 +1843,10 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - The first full G4 run was `g4-full-1`: `QUICK=False`, decode, 32 train
   workers, 16 evaluation workers, compile default, run name `g4-otf-full-1`,
   and a 60 min timeout.
+- The Worker parallelized notebook 04 diagnostic pair preload in commit
+  `57274c7`. `lsb_torch.preload_pairs` and `PreloadedPairs` are used by
+  notebook 04 cells 2 and 29. `V3_DIAG_WORKERS` is optional and defaults to
+  `EVAL_WORKERS`. README and `docs/notebook-otf-verification.md` were updated.
 
 ### Found
 
@@ -2093,6 +2097,29 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   measured. Candidates: Lightning per-step overhead (logging, metrics) and
   CPU contention for the main process.
 - Cell 29 diagnostics took 499.5 s, 31% of runtime, with the GPU idle.
+
+#### Parallel diagnostic preload
+
+- On the PC in decode mode, 1,000 pairs per split, old serial preload took
+  299.95 s for train (611 photos) plus 121.69 s for validation (261 photos),
+  421.6 s total. GPU checks took seconds.
+- New preload times, train / validation:
+
+  | Workers | Train | Validation |
+  | ---: | ---: | ---: |
+  | 4 | 91.07 s | 41.98 s |
+  | 8 | 57.63 s | 29.57 s |
+  | 15 | 53.42 s | 30.83 s |
+
+- SHA-256 values for all 2,000 pairs were identical before and after at 4,
+  8, and 15 workers: train `35b79849...f2f0`, validation
+  `17eda82c...2f16`. Cache output had the same bytes. QUICK CHECK lines and
+  diagnostic pair IDs were identical. All 15 cells passed.
+- With the cache, parallel preload was slower: at 8 workers, train /
+  validation was 11.80 / 10.12 s versus serial 8.14 / 4.59 s. Use
+  `V3_DIAG_WORKERS=0` for cache runs if needed.
+- Tests: `test_lsb_torch` 16 passed and `test_notebook_diagnostics` 3 passed.
+
 - Best epoch was 8 (validation P_E 0.0142, AUC 0.9976). Test accuracy was
   0.9833, AUC 0.9976, and P_E 0.0162. Per-source P_E was RAISE 0.010948
   (9,728 pairs) and DIV2K 0.052524 (1,228 pairs).
@@ -2156,8 +2183,8 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Done: first full 10-epoch G4 run using decode (`g4-full-1`).
 - Pending, optional: sample `nvidia-smi` every 10 s and include `boot.log`
   in the uploaded folder.
-- Pending: speed up or make optional cell 29 diagnostics on G4; it uses
-  about 8.3 min per run with the GPU idle.
+- Pending: measure cell 29 time on the next G4 run. Expected time is about
+  1.5-2.5 min instead of 8.3 min; this is not measured yet.
 - Pending: the DIV2K weakness remains (P_E about 5 times RAISE); continue
   the source-diversity plan.
 - Pending: dataset download plan, per-source balanced sampler, and licence
