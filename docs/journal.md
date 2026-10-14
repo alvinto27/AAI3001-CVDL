@@ -749,6 +749,13 @@ high at that point. This was not tested.
   - Workers yield small groups, and the main process joins groups from all
     workers into each batch. The loader yields uint8; the notebook converts
     it to float32 on the device. A callback calls `set_epoch` at each epoch.
+- The user ran the PC full OTF v3c run. The executed record is
+  `notebooks/runs/04_v3c_otf_pc_2026-10-13.ipynb` (commit `728db2b`).
+  Training used the RX 9070 XT, decode, 8 workers, and fixes 1-3.
+  Training epochs took 5:02-5:05, and whole epochs with validation took
+  7:19-7:24. The user stopped the diagnostics cell after more than 45 min.
+- The VM was preempted once during a Worker test on 2026-10-13 and was off
+  overnight. The user restarted it. No user data was lost.
 - On the user's decision, the Orchestrator deleted the image folders of
   `Datasets/raise512-run1` on the VM: `clean/`, `stego/`, and `masks/`, with
   49,796 PNG files in each folder. It kept 99 MB: `labels.csv`,
@@ -1355,6 +1362,48 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   exit codes were 0. The earlier `terminate called without an active
   exception` was benchmark shutdown behavior, not a loader fault.
 
+#### End-of-day OTF and PC diagnosis
+
+- PC validation P_E for epochs 0-9 was 0.0374, 0.0294, 0.0272, 0.0210,
+  0.0254, 0.0161, 0.0160, 0.0149, 0.0154, and 0.0158. The best epoch was
+  7. Test on the same 21,912 images and order as the VM run: accuracy 0.9813,
+  AUC 0.9974, P_E 0.0173. RAISE P_E was 0.0115, DIV2K 0.0619, and k=1
+  0.0555.
+- VM comparison: accuracy 0.9818, AUC 0.9975, P_E 0.0170; RAISE 0.0112,
+  DIV2K 0.0574, and k=1 0.0559.
+- PC diagnostics did not finish: decode ran at 0 workers and reached about
+  14,000 photo decodes before the user stopped the kernel at 23:44. The
+  breakdown cell did not run in the record. Eight idle persistent training
+  workers were swapped out during testing; swap reached 7.9 of 8.2 GB.
+- Native TF32 flags are matmul off and cuDNN on. On the L4, 3 runs each gave
+  GPU-only / cache-loader images/s: native 285.9 / 277.9, both on 280.4 /
+  270.2, and both off 271.0 / 265.3. TF32 changes logits by about 5e-4
+  relative to float64; with TF32 off the difference is 2.5e-7.
+- The PC diagnosis found small groups of 4 with prefetch 4, giving only 16
+  images ahead per worker instead of 128. Decode bursts stalled ordered
+  batches (p95 555 ms). The main join and pin copy cost about 5.7 ms; 16
+  main torch threads made the join 40 ms instead of 2.8 ms. Eight idle
+  persistent validation workers held 4.24 GB PSS.
+- On 8,640 images, the fixes gave:
+
+  | Case | Images/s |
+  | --- | ---: |
+  | PC GPU-only, fixed real batch | 366.0 |
+  | PC decode, old prefetch 4 groups | 289.2 |
+  | PC decode, new 128 images | 384.5 |
+  | L4 GPU-only, fixed real batch | 284.6 |
+  | L4 cache, old | 277.3 |
+  | L4 cache, new | 276.2 |
+
+- PC memory was 4.68 GB main plus 11.15 GB for 8 train workers. L4 memory
+  was 2.75 GB main plus 7.47 GB for 6 workers. Full PC validation took
+  103.6 s with 8 persistent workers and 136.0 s with 4 non-persistent
+  workers; metrics were identical. Keys, labels, and bytes matched in 200
+  batches at both tile sizes. QUICK passed all 15 cells. 85 tests pass.
+- In decode mode, validation workers decode the same NEF several times when
+  one photo's batches go to different workers: 51 decodes with 2 workers and
+  101 with 4 for 1,600 pairs. Decoding used 96% of worker time.
+
 #### Notebook OTF verification (step 8)
 
 - Distinct photos per batch, 200 cache batches with 6 workers, mean / minimum:
@@ -1628,6 +1677,9 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   (one photo per evaluation worker, decode once, same order) after Mode 2.
 - Reporting rule (user): workers report only at task end, when blocked, or
   when a decision is needed.
+- TF32 decision (user, 2026-10-13): keep the notebook's native flags
+  (matmul TF32 off, cuDNN TF32 on). Do not add a switch. The PC run had no
+  TF32 and the VM run had TF32, but their test results were the same.
 
 ### Next
 
@@ -1666,15 +1718,18 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   (`8c4e549`).
 - Done: step 8, notebook 04 connected to the OTF loader (`f3dca17`). See
   [docs/notebook-otf-verification.md](notebook-otf-verification.md).
-- Done: the user's first full OTF v3c run on the VM. Its checkpoint is
-  `baseline_kv_xunet_v3_clip3_group_otf`; a `legacy_v6` test is Pending if
-  a like-for-like comparison is needed.
+- Done: the user's first full OTF v3c runs on the VM and PC. The VM
+  checkpoint is `baseline_kv_xunet_v3_clip3_group_otf`; the PC record is
+  `notebooks/runs/04_v3c_otf_pc_2026-10-13.ipynb` (`728db2b`). A `legacy_v6`
+  test is Pending if a like-for-like comparison is needed.
 - Done: after step 8, team agreement was recorded and
   `Datasets/raise512-run1` image folders were deleted on the VM. The kept
   records are described above.
 - Pending: tell teammates that the VM checkout is on branch `yx`, and that
   the `raise512-run1` images are gone on the VM. `V3_DATA=png` there needs a
   rebuild.
+- Pending: user decision on whether to run the VM checkpoint with
+  `legacy_v6`.
 - Later: Mode 2. Fixes 4 and 5 are queued after Mode 2.
 - Done: the VM machine type decision after step 7: keep `g2-standard-8`.
 - VM machine decision (user, 2026-10-13): keep `g2-standard-8`:
@@ -1703,3 +1758,72 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   the variable. See "ROCm caution, cause found".
 - Done: v2 conv1 fix implementation and PC self-check (`60f5c17`).
 - Done: VM machine type decision after step 7: keep `g2-standard-8`.
+
+## 2026-10-14 — PC cache, diagnostics, and compile benchmark
+
+### Did
+
+- The Worker built a PC cache after the user's decision that a cache inside
+  the checkout is allowed only when git ignores it. Commit `e78a1a0`.
+  - Path: `Datasets/otf-cache/v1` in the container, or
+    `/work/Datasets/otf-cache/v1`.
+  - Eight workers built 1,900 photos in 170.4 s. Size was 52.76 GB.
+  - Verification passed with 0 mismatches. The 1,900 JSON records equal the
+    VM cache except for `master_mtime_ns`; aggregate SHA-256 was
+    `bde842a0...e482`.
+  - Git was installed in container `aai3001`. This is lost if the container
+    is recreated.
+- The Worker fixed the OTF diagnostic in commit `ff06623`. It reads each
+  selected photo once and keeps only sampled tiles. The printed CHECK lines
+  stayed identical.
+- The Worker benchmarked `torch.compile` in commit `dd8cb60`, with advice
+  from ROCm-Works in `rocm-perf/notes/compile_advice_nb04.txt`.
+  - `V3_COMPILE=off` is the default; `default` enables compile. Compile is
+    in place just before fit. Checkpoints keep the same keys and resume in
+    both directions.
+- Training workers now shut down after fit. This freed about 10.0 GB of PC
+  RAM for 8 workers.
+
+### Found
+
+- The diagnostic fix reduced times as follows:
+
+  | Run | Before | After |
+  | --- | ---: | ---: |
+  | QUICK PC | 194.1 s | 17.3 s |
+  | Full VM cache | 371.6 s | 100.5 s |
+  | Full PC decode | >45 min, incomplete | 464.6 s |
+
+- PC breakdown from Notebook 02 on the PC predictions (scratch output):
+  overall P_E 0.017296, AUC 0.997441; RAISE 9,728 pairs P_E 0.011513;
+  DIV2K 1,228 pairs P_E 0.061889.
+- Compile correctness against eager gradients was 2.4e-7 on the PC and
+  2.4e-7 on the L4 with TF32 off in the check. With native TF32 on, the L4
+  difference was 4.9e-4, a TF32 effect. QUICK compile smoke runs passed on
+  both PC and VM.
+- Steady images/s, eager -> compiled:
+
+  | Case | Eager | Compiled |
+  | --- | ---: | ---: |
+  | PC decode, 8 workers | 380.3 | 474.9 |
+  | PC cache, 6 workers | 379.5 | 462.2 |
+  | PC GPU-only | 369.2 | 457.8 |
+  | L4 cache, 6 workers | 279.6 | 332.4 |
+  | L4 GPU-only | 287.5 | 348.8 |
+
+- The first compiled step took 14.9 s on the PC and 30-36 s on the L4.
+
+### Decided
+
+- The cache inside the PC checkout is allowed only when git ignores it.
+- The compile default is Pending user decision. The current default remains
+  `V3_COMPILE=off`.
+
+### Next
+
+- Pending: user decision on the compile default.
+- Pending: the user's one-epoch PC cache test.
+- Later: Mode 2 steps 18-19, fix 4 (background join and pinned copy), and
+  fix 5 (one photo per evaluation worker, decode once, same order).
+- Pending: tell teammates that the VM is on branch `yx` and that the
+  `raise512-run1` images are gone on the VM.
