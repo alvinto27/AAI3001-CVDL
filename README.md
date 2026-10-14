@@ -41,8 +41,9 @@ Notebook 04 loader controls:
 | `V3_PREFETCH_IMAGES` | 128 images ahead per worker; 32 training groups of four. |
 | `V3_PREFETCH` | Unset; optional training group-count override. Explicit 4 means only 16 images ahead. |
 | `V3_SOURCE`, `V3_CACHE_ROOT` | Decode unless a cache root is supplied. |
+| `V3_COMPILE` | `off` by default; `default` compiles the training network in place. Other modes are rejected. TF32 flags stay at their native values. |
 
-Ordered delivery remains enabled. See [all controls and saved run settings](docs/notebook-otf-verification.md#controls).
+Ordered delivery remains enabled. See [all controls and saved run settings](docs/notebook-otf-verification.md#controls) and [compile verification and safety checks](docs/notebook-compile-verification.md).
 
 ## Data and citations
 
