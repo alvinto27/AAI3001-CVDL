@@ -1,7 +1,7 @@
 # G4 batch job: setup, run, send results, stop
 
-The Spot VM `rtx6000pro` is in `europe-north1-a`. It has one RTX PRO 6000.
-Its external IP changes at boot. The machine costs about $2.03 per hour when
+The Spot VM `rtx6000pro` is in `us-central1-c`. It has one RTX PRO 6000.
+Its external IP changes at boot. The machine costs about $1.63 per hour when
 running. **Do not start it just to test these scripts.** Its GCE maximum run
 duration is 120 minutes from boot, with action **Stop**. Maintenance mode does
 not bypass that limit.

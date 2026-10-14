@@ -23,7 +23,7 @@ while (($#)); do
     esac
 done
 INSTANCE=rtx6000pro
-ZONE=europe-north1-a
+ZONE=us-central1-c
 if [[ $ACTION == run ]]; then
     [[ -f $ENV_FILE ]] || { echo 'run needs --env-file FILE' >&2; exit 2; }
     ENV_FILE=$(realpath "$ENV_FILE")
