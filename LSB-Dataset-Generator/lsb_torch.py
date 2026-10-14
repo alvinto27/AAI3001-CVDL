@@ -4,6 +4,8 @@ from __future__ import annotations
 import csv
 import math
 import os
+import queue
+import threading
 import zlib
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -501,26 +503,32 @@ class OrderedPairLoader:
 
 
 class MixedLoader:
-    """Join ready worker groups in the parent, retaining tails and sample keys.
+    """Join and pin ordered groups in a bounded producer thread.
 
-    Single-device Lightning accepts arbitrary sized iterables. Ordered groups
-    rotate across workers. Only one final batch plus the small groups is held.
+    The iterator owns its stop signal. Dropping it releases the producer and
+    workers even when the producer is waiting for queue space. Each epoch
+    starts a new worker set, so a shared set_epoch value is read afresh.
     """
     def __init__(self,loader,batch_size):
         self.loader=loader
         self.dataset=loader.dataset
         self.batch_size=batch_size
         self.pin_memory=loader.pin_memory
+        self._producer=None
 
     def __len__(self):
         return math.ceil(len(self.dataset)/self.batch_size)
 
-    def __iter__(self):
+    def _joined_batches(self,stop):
         pending=[]
         count=0
         for group in self.loader:
+            if stop.is_set():
+                break
             start=0
             while start<len(group[-1]):
+                if stop.is_set():
+                    return
                 take=min(self.batch_size-count,len(group[-1])-start)
                 pending.append(tuple(part[start:start+take] for part in group))
                 count+=take
@@ -528,14 +536,84 @@ class MixedLoader:
                 if count==self.batch_size:
                     yield self._join(pending)
                     pending,count=[],0
-        if pending:
+        if pending and not stop.is_set():
             yield self._join(pending)
+
+    def __iter__(self):
+        if self._producer is not None:
+            raise RuntimeError("the preceding mixed iterator is still active")
+        stop=threading.Event()
+        ready=queue.Queue(maxsize=2)
+
+        def offer(item):
+            while not stop.is_set():
+                try:
+                    ready.put(item,timeout=0.1)
+                    return
+                except queue.Full:
+                    pass
+
+        def produce():
+            failure=None
+            try:
+                for batch in self._joined_batches(stop):
+                    if stop.is_set():
+                        break
+                    offer(("batch",batch))
+            except BaseException as error:
+                failure=(error,error.__traceback__)
+            finally:
+                try:
+                    self._stop_workers()
+                except BaseException as error:
+                    if failure is None:
+                        failure=(error,error.__traceback__)
+                offer(("done",failure))
+
+        thread=threading.Thread(target=produce,name="mixed-loader-join",daemon=False)
+        state=(stop,thread)
+        self._producer=state
+        thread.start()
+        try:
+            while True:
+                try:
+                    kind,value=ready.get(timeout=0.1)
+                except queue.Empty:
+                    if not thread.is_alive():
+                        raise RuntimeError("mixed loader producer stopped without a result")
+                    continue
+                if kind=="done":
+                    if value is not None:
+                        error,traceback=value
+                        raise error.with_traceback(traceback)
+                    break
+                yield value
+        finally:
+            stop.set()
+            thread.join(timeout=30)
+            if thread.is_alive():
+                raise RuntimeError("mixed loader producer did not stop within 30 seconds")
+            if self._producer is state:
+                self._producer=None
 
     def _join(self,groups):
         parts=tuple(torch.cat([group[i] for group in groups]) for i in range(3))
         return tuple(part.pin_memory() for part in parts) if self.pin_memory and groups[0][0].is_pinned() else parts
 
-    def shutdown(self):
+    def _stop_workers(self):
         iterator=getattr(self.loader,"_iterator",None)
         if iterator is not None:
-            iterator._shutdown_workers()
+            try:
+                iterator._shutdown_workers()
+            finally:
+                self.loader._iterator=None
+
+    def shutdown(self):
+        if self._producer is not None:
+            stop,thread=self._producer
+            stop.set()
+            thread.join(timeout=30)
+            if thread.is_alive():
+                raise RuntimeError("mixed loader producer did not stop within 30 seconds")
+            self._producer=None
+        self._stop_workers()

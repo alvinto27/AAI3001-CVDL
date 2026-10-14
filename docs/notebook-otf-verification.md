@@ -367,6 +367,59 @@ abort/shutdown warning. The loader first stops scheduling new photos and
 drains only tasks already in flight before worker shutdown, rather than
 generating the rest of a split.
 
+### Background training join and pin (2026-10-14)
+
+`MixedLoader` now runs the worker-group iteration, `torch.cat` join and
+`pin_memory()` copy in one producer thread. Its output queue holds at most two
+batches. The consumer still gets the same ordered batches. The thread stops
+when the epoch ends, the caller drops its iterator, an error occurs, or
+`shutdown()` runs. The producer shuts down training workers before it exits;
+`set_epoch()` starts a fresh worker set. No new environment setting was added.
+
+The first PC check used the notebook XuNet clip3/GroupNorm model, AdamW,
+batch32, 4 cache workers, 30 warm-up and 300 measured optimizer steps. The
+model compiled only its inner network in `default` mode, as notebook 04 does.
+The old main-thread costs were measured without changing production code:
+
+| Mode | Step mean | Wait for next group | Join including pin | Pin part | Main fetch total |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Compiled | 70.891 ms | 0.241 ms | 6.588 ms (9.3% of step) | 4.007 ms | 7.040 ms |
+| Eager | 88.616 ms | 0.218 ms | 5.163 ms (5.8% of step) | 2.847 ms | 5.559 ms |
+
+The join plus pin cost exceeded the 2% decision limit in both modes, so the
+background thread was implemented. The matched speed windows used the same
+model and 9,600 measured images. Only window boundaries synchronized the GPU.
+
+| PC mode/source/workers | Old images/s | New images/s | Change | Old / new mean main fetch |
+| --- | ---: | ---: | ---: | ---: |
+| Compiled/cache/4 | 467.441 | 471.979 | +0.97% | 6.916 / 1.643 ms |
+| Compiled/cache/4 repeat | 471.018 | 468.836 | -0.46% | 6.709 / 1.756 ms |
+| Eager/cache/4 | 356.897 | 379.820 | +6.42% | 5.408 / 0.051 ms |
+| Compiled/decode/6 | 457.638 | 470.392 | +2.79% | 14.759 / 9.527 ms |
+
+The compiled/cache difference changes sign on repetition. It is **not** a
+reliable model-speed gain; eager/cache improves in this window. The joined
+batch remains pinned when requested; the unpinned and zero-worker routes also
+pass. At 512, each joined batch contains 32 x 3 x 512 x 512 uint8 bytes
+(24 MiB). Two queued batches can hold 48 MiB of extra pinned image payload;
+a third prepared batch waiting for queue space raises the bound to 72 MiB.
+Labels and keys add less than 2 KiB at this bound. These are capacity bounds,
+not a measured increase in process PSS. No VM speed measurement was run while
+the Spot VM was unavailable; VM speed is Pending.
+
+The old/new 200-batch stream hashes match at 0, 2 and 4 workers, and the
+six-worker stream retains SHA-256
+`32bd10352c3e2c3d6a5c4600632bd0f962c9528975572e162bb973f7acc99075`
+for 6,400 images. The producer transfers its original exception traceback to
+the consumer; a unit test verifies it. In a four-worker PC cache check, cleanup
+after an early iterator drop took 0.469 s, a caught interrupt 0.471 s, and
+explicit `shutdown()` 0.474 s. Each left zero producer threads and workers.
+A two-epoch drain with `set_epoch()` also left zero threads and workers.
+A scratch PC QUICK run executed all 15 notebook code cells in 53.240 s;
+Lightning fit end had zero producer threads and zero workers. Unit suites:
+75 shared tests and 34 generator tests passed. Notebook 04, dependency files,
+checkpoint originals and the project journal were not changed.
+
 ### Why four-worker decode validation remains slow
 
 A controlled first-1,600-pair check used 100 full32-image batches:

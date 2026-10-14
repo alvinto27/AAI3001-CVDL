@@ -5,6 +5,7 @@ import json
 import gc
 import multiprocessing
 import time
+import threading
 import shutil
 import sys
 import tempfile
@@ -244,6 +245,54 @@ class TorchTests(unittest.TestCase):
             pass
         gc.collect()
         self.assertEqual({p.pid for p in multiprocessing.active_children()},before)
+
+    def test_background_join_drop_shutdown_epoch_and_error(self):
+        ds=TrainingImages(self.corpus(RunSettings(tile_size=256,buffer_size=8)))
+        for workers,pin in ((0,False),(2,False),(0,True),(2,True),(4,True)):
+            loader=training_loader(ds,batch_size=8,num_workers=workers,pin_memory=pin)
+            before={p.pid for p in multiprocessing.active_children()}
+            iterator=iter(loader)
+            first=next(iterator)
+            self.assertEqual(len(first[-1]),8)
+            self.assertEqual(first[0].is_pinned(),pin and torch.cuda.is_available())
+            del iterator
+            gc.collect()
+            self.assertFalse([t for t in threading.enumerate() if t.name=="mixed-loader-join"])
+            self.assertEqual({p.pid for p in multiprocessing.active_children()},before)
+            ds.set_epoch(1)
+            next_epoch=list(loader)
+            self.assertEqual(sum(len(batch[-1]) for batch in next_epoch),len(ds))
+            self.assertFalse([t for t in threading.enumerate() if t.name=="mixed-loader-join"])
+            ds.set_epoch(0)
+            iterator=iter(loader)
+            next(iterator)
+            try:
+                raise KeyboardInterrupt
+            except KeyboardInterrupt:
+                loader.shutdown()
+            successor=iter(loader)
+            next(successor)
+            del iterator
+            gc.collect()
+            self.assertIsNotNone(loader._producer)
+            del successor
+            gc.collect()
+            self.assertFalse([t for t in threading.enumerate() if t.name=="mixed-loader-join"])
+            self.assertEqual({p.pid for p in multiprocessing.active_children()},before)
+        loader=training_loader(ds,batch_size=8,num_workers=2,pin_memory=False)
+        def failure(groups):
+            raise ValueError("join failed in producer")
+        loader._join=failure
+        try:
+            next(iter(loader))
+        except ValueError as error:
+            self.assertEqual(str(error),"join failed in producer")
+            self.assertIn("failure",''.join(__import__('traceback').format_tb(error.__traceback__)))
+        else:
+            self.fail("producer error must reach the consumer")
+        loader.shutdown()
+        self.assertFalse([t for t in threading.enumerate() if t.name=="mixed-loader-join"])
+        self.assertFalse(multiprocessing.active_children())
 
     def test_ordered_prefetch_equality(self):
         ds=TrainingImages(self.corpus(RunSettings(tile_size=256,buffer_size=8)))
