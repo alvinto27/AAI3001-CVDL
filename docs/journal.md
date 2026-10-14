@@ -1934,7 +1934,20 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   5.19/0.87/0.86 s after.
 - Clean stop took about 0.47 s with no thread or worker left. QUICK PC cache
   passed all 15 cells in 48.8 s. 76 shared tests and 34 generator tests pass.
-- VM speed is Pending because the VM is down.
+- VM fix 4 check: L4, cache, 6 workers, batch 32, 30 warmup plus 300
+  steady steps, native TF32 flags. Compared old `fe23238` with new
+  `cfbf71f`:
+
+  | Mode | Old images/s | New images/s | Repeat old -> new |
+  | --- | ---: | ---: | ---: |
+  | Eager | 280.38 | 278.72 (-0.59%) | 274.92 -> 274.48 (-0.16%) |
+  | Compiled | 336.60 | 334.60 (-0.60%) | 336.69 -> 336.51 (-0.05%) |
+
+  Main-thread fetch time fell from about 11.7-12.2 ms to 0.07-0.09 ms
+  per step, but throughput did not change. The L4 is the limit. Fix 4 has
+  no reliable VM gain; it helps PC eager (+6.4%) and PC decode (+2.8%).
+- The VM returned at about 17:23 +08 and fast-forwarded to `cfbf71f`. The
+  scratch folder `~/otf-dev/eval-yx` was removed.
 
 ### Decided
 
@@ -1954,7 +1967,9 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   (`22e61a9`).
 - Pending: MIL batching and model design, when photo-level work starts; the
   user will decide then.
-- Pending: remove VM scratch `~/otf-dev/eval-yx` when the VM is back.
+- Done: VM fix 4 and fix 5 measurements. Fix 4 has no reliable VM gain;
+  fix 5 was already verified above.
+- Done: removed VM scratch `~/otf-dev/eval-yx` after the VM returned.
 - Pending: user decision on moving the VM to Taiwan if Seoul stays Limited.
 - Done (user, 2026-10-14): chose option A, keep the photo-owned evaluation
   loader for all sources as one code path. Accepted cache-mode cost: about
