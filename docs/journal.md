@@ -1797,6 +1797,19 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - The user ran short PC notebook 04 tests with commit `dd8cb60`,
   `V3_COMPILE=default`, `QUICK=False`, and the RX 9070 XT. The user stopped
   them by hand and deleted the outputs afterward.
+- The headless runner `scripts/run_notebook.py` was added in commit
+  `b237003`. It supports an env file and `--set` settings. `QUICK` must be
+  explicit. It uses a git-ignored empty output folder, puts
+  `V3_OUTPUT_ROOT` inside it, and saves `executed.ipynb` and `status.json`
+  after every code cell. It also writes a 10 s heartbeat and live `run.log`.
+- The G4 run-and-stop kit was added in commits `9919f86` and `eddf21a`.
+  Its files are under `scripts/g4/`; the record is
+  [docs/g4-batch-runner.md](g4-batch-runner.md). It includes setup, systemd
+  job, submit, speed-test, and cache-verification scripts.
+  - `build_cache.py` supports `--allow-high-workers`; the default limit of
+    1-8 workers is unchanged. A builder uses about 1 GiB RAM.
+  - A 12-photo subset built with 8 and 12 workers was byte-identical.
+
 - The Worker limited compile helper threads in commit `22e61a9`. With
   `V3_COMPILE=default`, the notebook sets
   `TORCHINDUCTOR_COMPILE_THREADS=4`; an explicit value overrides it.
@@ -1949,6 +1962,29 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - The VM returned at about 17:23 +08 and fast-forwarded to `cfbf71f`. The
   scratch folder `~/otf-dev/eval-yx` was removed.
 
+#### Headless runner and G4 kit checks
+
+- In PC test mode, QUICK ran all 15 cells with exit 0 and delivered 26 files
+  to the Pi inbox. A wrong Pi host created a pending record; it delivered on
+  the next boot. Failing and timeout runs uploaded their results and reached
+  shutdown. Repeated job IDs were skipped. Simulated kills resent starting,
+  running, and partial-folder records on the next boot.
+- Spot preemption gives about 30 s. Upload then usually fails, so the next
+  boot resends it.
+- The G4 kit was not contacted. The G4 plan is `rtx6000pro` in
+  `europe-north1-a`, `g4-standard-48` Spot, about $2.03/h, with a 2 h maximum
+  run duration and Stop action. It is separate from the Seoul L4 project and
+  billing pool. Budget "Credit Spending" is $383.45, with alerts at
+  26/52/78/90%.
+- Job timeout defaults to 100 min and refuses values above max-run minus
+  15 min. Missing job mode is off: send pending results, then shut down.
+  Maintenance runs only when explicitly selected. Each job checks out its
+  commit and runs `uv sync --locked`.
+- Upload retry budget is 300 s per boot, after waiting up to 30 s for Tailscale
+  and Pi DNS. Results go to `rpi400-server` `cvdl-inbox` through write-only
+  rrsync into `/srv/cvdl-results`. Masters upload from the PC; the cache is
+  rebuilt on G4 with 40 workers.
+
 ### Decided
 
 - The cache inside the PC checkout is allowed only when git ignores it.
@@ -1959,6 +1995,14 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Plan steps 15, 16, 18, and 19 are Done. Step 17 is deferred. Mode 2 is
   on-the-fly only for now.
 - Fix 5 is Done for evaluation (`cc3aeed`).
+- G4 decision (user, 2026-10-14): use `rtx6000pro` in
+  `europe-north1-a`, `g4-standard-48` Spot, at about $2.03/h, with a 2 h
+  maximum run and Stop action. Keep it in a separate project and billing
+  pool from the Seoul L4. The budget is "Credit Spending" ($383.45) with
+  alerts at 26/52/78/90%.
+- G4 policy: timeout defaults to 100 min and refuses values above max-run
+  minus 15. Missing job mode is off. Maintenance runs only when explicitly
+  set. Each job checks out the job commit and runs `uv sync --locked`.
 
 ### Next
 
@@ -1970,6 +2014,13 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Done: VM fix 4 and fix 5 measurements. Fix 4 has no reliable VM gain;
   fix 5 was already verified above.
 - Done: removed VM scratch `~/otf-dev/eval-yx` after the VM returned.
+- Pending: first real G4 boot in maintenance mode: inbox key, setup base
+  (with user approval of the Tailscale login), upload masters, build and
+  verify the cache, run the speed test, then run one QUICK job through console
+  metadata to prove boot -> run -> Pi -> shutdown.
+- Pending: G4 speed is not measured. Test cache 4/8/16 workers and decode
+  16/24/32/40 workers, eager and compiled, for 150 steady steps.
+- Later: Part 3, gcloud on the Pi.
 - Pending: user decision on moving the VM to Taiwan if Seoul stays Limited.
 - Done (user, 2026-10-14): chose option A, keep the photo-owned evaluation
   loader for all sources as one code path. Accepted cache-mode cost: about
