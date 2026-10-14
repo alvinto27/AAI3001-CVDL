@@ -71,14 +71,20 @@ def loader_capacity(train, workers, seconds, warmup, source):
         before = sum(cpu_ticks(pid) for pid in worker_pids)
         main_before = time.process_time()
         begin = time.monotonic()
+        exhausted = False
         while time.monotonic() - begin < seconds:
-            images, _, _ = next(iterator)
+            try:
+                images, _, _ = next(iterator)
+            except StopIteration:
+                exhausted = True  # The whole epoch was faster than the timing window.
+                break
             fetched += images.shape[0]
         duration = time.monotonic() - begin
         cpu_seconds = ((sum(cpu_ticks(pid) for pid in worker_pids) - before) /
                        os.sysconf("SC_CLK_TCK") + time.process_time() - main_before)
         result = {"source": source, "workers": workers, "warmup_batches": warmup,
                   "timed_images": fetched, "timed_seconds": duration,
+                  "epoch_exhausted": exhausted,
                   "loader_images_per_second": fetched / duration,
                   "cpu_core_equivalents": cpu_seconds / duration,
                   "cpu_percent_of_machine": 100 * cpu_seconds / duration / (os.cpu_count() or 1)}
