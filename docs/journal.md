@@ -1783,6 +1783,9 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
     both directions.
 - Training workers now shut down after fit. This freed about 10.0 GB of PC
   RAM for 8 workers.
+- The user ran short PC notebook 04 tests with commit `dd8cb60`,
+  `V3_COMPILE=default`, `QUICK=False`, and the RX 9070 XT. The user stopped
+  them by hand and deleted the outputs afterward.
 
 ### Found
 
@@ -1812,17 +1815,37 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   | L4 GPU-only | 287.5 | 348.8 |
 
 - The first compiled step took 14.9 s on the PC and 30-36 s on the L4.
+- Steady compiled PC tests, as shown by the progress bar:
+
+  | PC test | Training speed | Validation per epoch |
+  | --- | ---: | ---: |
+  | Decode, 6 workers, epoch 1 | 13.54 it/s (about 433 images/s) | about 2 min |
+  | Cache, 6 workers, epoch 0 | over 13 it/s (partly warm) | about 20 s |
+  | Cache, 6 workers, epochs 1 / 2 | 13.85 / 13.87 it/s (about 443 images/s) | about 20 s |
+
+- During the cache run, the GPU was 100% busy at 251-255 W, 85-86 C,
+  and 2,940-3,120 MHz. Each of 6 cache workers used about 21% CPU. The GPU
+  limits the long run at about 13.86 it/s, below the short GPU-only result
+  of 14.3 it/s (about 458 images/s).
+- Cache-test validation P_E for epochs 0-2 was 0.0353, 0.0332, and 0.0247.
+- Estimated full PC time with cache and compile is about 4:03 training plus
+  0:20 validation per epoch, or about 44 min for 10 epochs. Decode without
+  compile is about 7:20 per epoch, or about 73 min for 10 epochs.
+- Sixteen idle `torch.compile` helper processes stayed alive. Each used about
+  410 MB RSS, and available PC RAM was about 6.3 GB.
 
 ### Decided
 
 - The cache inside the PC checkout is allowed only when git ignores it.
-- The compile default is Pending user decision. The current default remains
-  `V3_COMPILE=off`.
+- PC run default (user, 2026-10-14): use the cache at
+  `/work/Datasets/otf-cache/v1`, 4 training workers, and
+  `V3_COMPILE=default`. Four workers are not measured yet; confirm them in
+  the next full PC run. The expected speed is about 13.86 it/s.
 
 ### Next
 
-- Pending: user decision on the compile default.
-- Pending: the user's one-epoch PC cache test.
+- Pending: confirm the 4-worker PC setting in the next full PC run.
+- Pending: limit or close the idle `torch.compile` helper processes (Worker).
 - Later: Mode 2 steps 18-19, fix 4 (background join and pinned copy), and
   fix 5 (one photo per evaluation worker, decode once, same order).
 - Pending: tell teammates that the VM is on branch `yx` and that the
