@@ -1935,8 +1935,11 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   user will decide then.
 - Pending: remove VM scratch `~/otf-dev/eval-yx` when the VM is back.
 - Pending: user decision on moving the VM to Taiwan if Seoul stays Limited.
-- Pending: user decision on the cache-mode slowdown: accept it, or use the
-  old evaluation loader when a cache is set.
+- Done (user, 2026-10-14): chose option A, keep the photo-owned evaluation
+  loader for all sources as one code path. Accepted cache-mode cost: about
+  +3.7 s per PC validation (about +45 s per 10-epoch PC run, about 1.5%),
+  about +6.3 s per VM validation, and about +0.4 GB peak PSS per evaluation
+  worker.
 - Pending: fix 4 (background join and pinned copy).
 
 - Done (user, 2026-10-14): told teammates that the VM is on branch `yx`,
