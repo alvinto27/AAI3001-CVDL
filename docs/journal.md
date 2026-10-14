@@ -1848,5 +1848,6 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Pending: limit or close the idle `torch.compile` helper processes (Worker).
 - Later: Mode 2 steps 18-19, fix 4 (background join and pinned copy), and
   fix 5 (one photo per evaluation worker, decode once, same order).
-- Pending: tell teammates that the VM is on branch `yx` and that the
-  `raise512-run1` images are gone on the VM.
+- Done (user, 2026-10-14): told teammates that the VM is on branch `yx`,
+  the `raise512-run1` images are gone on the VM, and `V3_DATA=png` there
+  needs a rebuild.
