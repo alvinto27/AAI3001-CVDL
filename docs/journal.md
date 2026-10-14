@@ -2087,9 +2087,11 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   images/s). Validation took 11-12 s per epoch.
 - The GPU was 100% busy in every training sample, with peak memory 3,645 MiB
   and about 420 W. CPU use was about 36-40%. The GPU did not wait for the
-  decode loader. The steady 55 it/s is below the 70 it/s GPU-only test
-  because the live generator also uses the GPU; this was not measured
-  separately.
+  decode loader. LSB embedding runs on the CPU in the loader workers
+  (`lsb_torch.py`). Steady training was about 55 it/s, below the 70 it/s
+  GPU-only test and the 67 it/s short loader+GPU test. The cause is not
+  measured. Candidates: Lightning per-step overhead (logging, metrics) and
+  CPU contention for the main process.
 - Cell 29 diagnostics took 499.5 s, 31% of runtime, with the GPU idle.
 - Best epoch was 8 (validation P_E 0.0142, AUC 0.9976). Test accuracy was
   0.9833, AUC 0.9976, and P_E 0.0162. Per-source P_E was RAISE 0.010948
