@@ -2,7 +2,7 @@
 # First-boot setup and separate upload/cache/speed steps for rtx6000pro.
 set -euo pipefail
 STEP=${1:-}
-[[ -n $STEP ]] || { echo 'Usage: setup.sh {base|upload|cache|speed} [--host IP] [--inbox-key FILE] [--workers N]' >&2; exit 2; }
+[[ -n $STEP ]] || { echo 'Usage: setup.sh {base|upload|cache|speed} [--host IP] [--inbox-key FILE] [--workers N] [--streams N]' >&2; exit 2; }
 shift
 REPO_URL=https://github.com/alvinto27/AAI3001-CVDL.git
 REPO_DIR="$HOME/AAI3001-CVDL"
@@ -11,6 +11,7 @@ CACHE_ROOT="$HOME/otf-cache/v1"
 HOST=
 INBOX_KEY="$HOME/.ssh/cvdl-g4-inbox"
 SSH_KEY="$HOME/.ssh/cvdl-g4"
+STREAMS=10
 CACHE_WORKERS=$(( $(nproc) - 8 ))
 (( CACHE_WORKERS < 1 )) && CACHE_WORKERS=1
 while (($#)); do
@@ -18,6 +19,7 @@ while (($#)); do
         --host) HOST=${2:?missing host}; shift 2 ;;
         --inbox-key) INBOX_KEY=${2:?missing key}; shift 2 ;;
         --workers) CACHE_WORKERS=${2:?missing worker count}; shift 2 ;;
+        --streams) STREAMS=${2:?missing stream count}; shift 2 ;;
         *) echo "Unknown argument: $1" >&2; exit 2 ;;
     esac
 done
@@ -61,15 +63,7 @@ case "$STEP" in
         ;;
     upload)
         [[ -n $HOST ]] || { echo 'upload needs --host EXTERNAL_IP' >&2; exit 2; }
-        [[ -f $SSH_KEY ]] || { echo "Missing PC SSH key: $SSH_KEY" >&2; exit 2; }
-        for folder in RAISE DIV2K_train_HR DIV2K_valid_HR; do
-            [[ -d "$SOURCE_DIR/ImageSets/$folder" ]] || { echo "Missing master folder $folder" >&2; exit 2; }
-            echo "Upload $folder (safe to resume)"
-            rsync -a --partial --append-verify --info=progress2 \
-                -e "ssh -i $SSH_KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
-                "$SOURCE_DIR/ImageSets/$folder/" "yangxuan@$HOST:$REPO_DIR/ImageSets/$folder/"
-        done
-        echo 'Upload complete. Do not copy Datasets/otf-cache.'
+        exec bash "$SOURCE_DIR/scripts/g4/upload_masters.sh" --host "$HOST" --streams "$STREAMS" --ssh-key "$SSH_KEY"
         ;;
     cache)
         [[ -x "$REPO_DIR/.venv/bin/python" ]] || { echo 'Run base first' >&2; exit 2; }

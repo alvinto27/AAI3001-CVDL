@@ -51,7 +51,17 @@ masters. The service starts on the next boot, not during setup.
 ## Masters, cache and short speed check (separate steps)
 
 The PC has the masters. Copy only those three folders **from the PC**, not
-from the Seoul VM. `rsync --append-verify` resumes interrupted files:
+from the Seoul VM. `setup.sh upload` runs `scripts/g4/upload_masters.sh`: it
+splits all master files into disjoint lists (largest first, dealt round-robin)
+and runs **10 parallel `rsync` streams** (`--streams N` changes this, 1 to 32)
+with `--partial --append-verify`, a cheaper SSH cipher and no compression.
+It is resumable: rerun the same command after any stop, and a half-copied file
+continues. If any stream fails, the script prints its error and exits non-zero.
+At the end it compares the file count and total bytes of each folder with the
+PC and exits non-zero on a difference. Measured on the first real G4 boot: one
+stream gave only about 3.5 MB/s (about 100 minutes for the data); 10 streams
+gave about 20–21 MB/s, and 22.15 GB (RAISE 1,011 files, DIV2K train 800,
+DIV2K valid 100) took about 25 minutes. The PC CPU and load were not the limit.
 
 ```sh
 bash scripts/g4/setup.sh upload --host EXTERNAL_IP
@@ -70,7 +80,13 @@ overrides it. `build_cache.py` still defaults to a maximum of eight workers;
 the G4 step uses an explicit high-worker option. **Budget about 1 GiB of RAM
 per builder worker** (up to about 40 GiB at 40 workers), not a measured peak.
 This is below the G4's 180 GB RAM, even with the input/cache page cache;
-stop or lower `--workers` if memory pressure appears.
+stop or lower `--workers` if memory pressure appears. Measured on the first
+real boot with 40 workers: build wall time **363.047 s** for 1,900 photos
+(52,761,268,224 array bytes, 52,763,054,963 file bytes), an average write rate
+of about **145 MB/s**. That is disk-limited: it matches the 140 MB/s Hyperdisk
+baseline, not the CPU. The strict verify pass took 5.17 s with 0 mismatches
+and the record digest matched the reference above. About 11 GiB RAM was in use
+at the moment of one check, far below the 1 GiB per worker budget.
 
 `speed` first runs `sync` and drops the Linux page cache with sudo. It reads
 48 training cache photos, drops the page cache again, then reads 48 training
@@ -140,6 +156,11 @@ the next boot resends the files available on disk.
 3. From the PC run `setup.sh upload --host EXTERNAL_IP`. On the VM run
    `setup.sh cache`; verify the 1,900 records. Then run `setup.sh speed` and
    inspect the cold rates and loader/GPU comparison.
+   **Next boot after the first setup:** the service treats a start without
+   `job-mode` metadata as **off**: it sends pending results and shuts down at
+   once. To run `setup.sh speed` (the first setup boot skipped it), set
+   `job-mode=maintenance` in the console **before** starting the VM, then
+   connect over SSH with the new external IP.
 4. Stop the maintenance VM (`sudo shutdown -h now`). In the Google Cloud
    console replace instance metadata with these keys, then start it again:
 
