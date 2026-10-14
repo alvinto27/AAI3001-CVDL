@@ -16,6 +16,7 @@ cannot silently resume the PNG baseline. `V3_RUN_NAME` overrides the name.
 | `V3_CACHE_ROOT` | Empty; required for cache source. |
 | `V3_MAIN_THREADS` | 1; explicit main-process torch CPU thread count, also in reused kernels. |
 | `V3_WORKERS` | 6 training workers. |
+| `V3_PRIME_NEXT_EPOCH` | `off`; `on` prepares the next epoch using the same workers during fit validation. Never primes sanity validation or after the last epoch. |
 | `V3_EVAL_WORKERS` | 4 for val, test and train-eval; nonpersistent, released after each pass. |
 | `V3_DIAG_WORKERS` | `V3_EVAL_WORKERS`; reads the diagnostics cell's 1,000 train and 1,000 validation pairs, one photo per task, in the original order. |
 | `V3_PREFETCH_IMAGES` | 128 images ahead per worker; rounded up to whole tasks. |
@@ -538,3 +539,43 @@ bytes). Old serial times were 299.95 s (611 photos, train) and 121.69 s
 57.63 s and 29.57 s, 15 workers 53.42 s and 30.83 s. With the cache source the
 serial path takes 8.14 s and 4.59 s, so worker start-up makes the parallel path
 slower there (8 workers: 11.80 s and 10.12 s).
+
+## Optional next-epoch priming
+
+Set `V3_PRIME_NEXT_EPOCH=on` to reset the **same** persistent training
+workers and start their next epoch during fit validation. The current epoch
+must finish before its shared epoch value changes. The switch defaults to
+`off` until a full G4 run measures validation CPU contention. It does not
+prime during the sanity check or after the final epoch. `shutdown()` closes
+in-flight priming and worker processes. The old reservoir (1,024 uint8 images
+per worker) still exists; no second training worker pool or buffer is added.
+Buffer payload is about 0.75 GiB per worker: about 3 GiB at four PC workers
+or 24 GiB at 32 G4 workers, before decoded photo arrays, process memory,
+shared-memory queues and validation's independent workers. These are
+estimates, **not** measured peak RAM. Priming competes with evaluation workers
+for CPU and disk; it can make validation slower.
+
+PC exactness check: three complete epochs at 0.005 train-photo fraction with
+4 and 8 workers, both decode and cache. SHA-256 covered the bytes of every
+image, label and index in batch order. Old and primed hashes matched in all
+12 comparisons. A Lightning CPU test saved `last.ckpt` after epoch 0, resumed
+for epochs 1-2, and matched an uninterrupted three-epoch batch stream.
+The QUICK notebook passed all 15 code cells with `on`, and runner cleanup
+reported no remaining workers or join threads.
+
+PC boundary test (0.05 photo fraction, four workers, two complete epochs,
+16 validation pairs in two workers, minimum 12 seconds validation):
+
+| source | mode | validation duration | validation end to next batch 75 |
+| --- | --- | ---: | ---: |
+| decode | off | 12.00 s | 11.59 s |
+| decode | on | 12.00 s | 3.28 s |
+| cache | off | 12.00 s | 2.32 s |
+| cache | on | 12.00 s | 1.15 s |
+
+The 12-second window includes a sleep after the short actual validation pass.
+With no artificial wait, decode validation itself took 3.11 s (off) or
+3.61 s (on); priming had not finished and the boundary to batch 75 was
+11.52 s (off) or 7.97 s (on). Thus this check demonstrates overlap but does
+not predict the G4 gain. G4 uses 16 evaluation and 32 training workers; its
+validation slowdown and memory peak need measurement.

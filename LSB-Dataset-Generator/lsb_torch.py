@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import csv
+from concurrent.futures import ThreadPoolExecutor
 import math
 import os
 import queue
 import threading
+import weakref
 import zlib
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -536,6 +538,88 @@ class PreloadedPairs(Dataset):
         return self.pairs[index]
 
 
+class PrimedTrainingLoader:
+    """Prime persistent training workers during validation, with unchanged keys.
+
+    Close only a fully consumed epoch iterator, then set the shared epoch and
+    reset the *same* DataLoader. No worker spawn or second shuffle buffer is
+    needed. The first batch is kept until Lightning requests the next epoch.
+    """
+    def __init__(self,loader):
+        if not isinstance(loader,MixedLoader):
+            raise TypeError("priming requires a mixed training loader")
+        self._active=loader
+        self._future=None
+        self._executor=None
+        self.dataset=loader.dataset
+        self.batch_size=loader.batch_size
+        self.pin_memory=loader.pin_memory
+
+    @property
+    def loader(self):
+        return self._active.loader
+
+    def __len__(self):
+        return len(self._active)
+
+    def prime_next(self,epoch):
+        if self._future is not None:
+            raise RuntimeError("the next epoch is already being primed")
+        if self._active._producer is not None:
+            if self._active._batches_yielded!=len(self._active):
+                raise RuntimeError("cannot prime while the current epoch is running")
+            # Lightning may stop at len(loader) without asking for StopIteration.
+            # Finish the old generator's natural cleanup, keeping workers alive.
+            previous=self._active._current_iterator() if self._active._current_iterator else None
+            if previous is None:
+                raise RuntimeError("completed epoch iterator disappeared before priming")
+            previous.close()
+        self.dataset.set_epoch(epoch)
+        self._executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix="prime-train")
+
+        def start():
+            iterator=iter(self._active)
+            try:
+                return iterator,next(iterator)
+            except BaseException:
+                iterator.close()
+                raise
+        self._future=self._executor.submit(start)
+
+    def __iter__(self):
+        if self._future is None:
+            return iter(self._active)
+        try:
+            iterator,first=self._future.result()
+        except BaseException:
+            self.shutdown()
+            raise
+        self._executor.shutdown(wait=True)
+        self._executor=None
+        self._future=None
+
+        def stream():
+            try:
+                yield first
+                yield from iterator
+            finally:
+                iterator.close()
+        return stream()
+
+    def shutdown(self):
+        try:
+            if self._future is not None:
+                try:
+                    iterator,_=self._future.result()
+                    iterator.close()
+                finally:
+                    self._executor.shutdown(wait=True)
+                    self._executor=None
+                    self._future=None
+        finally:
+            self._active.shutdown()
+
+
 class MixedLoader:
     """Join and pin ordered groups in a bounded producer thread.
 
@@ -549,6 +633,8 @@ class MixedLoader:
         self.batch_size=batch_size
         self.pin_memory=loader.pin_memory
         self._producer=None
+        self._batches_yielded=0
+        self._current_iterator=None
 
     def __len__(self):
         return math.ceil(len(self.dataset)/self.batch_size)
@@ -574,8 +660,14 @@ class MixedLoader:
             yield self._join(pending)
 
     def __iter__(self):
+        iterator=self._iterate()
+        self._current_iterator=weakref.ref(iterator)
+        return iterator
+
+    def _iterate(self):
         if self._producer is not None:
             raise RuntimeError("the preceding mixed iterator is still active")
+        self._batches_yielded=0
         stop=threading.Event()
         ready=queue.Queue(maxsize=2)
 
@@ -633,6 +725,7 @@ class MixedLoader:
                         raise error.with_traceback(traceback)
                     break
                 batches+=1
+                self._batches_yielded=batches
                 yield value
         finally:
             natural=batches==len(self) and not failed
@@ -649,6 +742,7 @@ class MixedLoader:
             finally:
                 if self._producer is state:
                     self._producer=None
+                self._current_iterator=None
 
     def _join(self,groups):
         parts=tuple(torch.cat([group[i] for group in groups]) for i in range(3))

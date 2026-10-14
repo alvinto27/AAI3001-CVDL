@@ -17,7 +17,7 @@ from PIL import Image
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"LSB-Dataset-Generator"))
 from lsb_torch import (torch,Corpus,RunSettings,TrainingImages,FixedPairs,PairSubset,
                        OrderedPairLoader,MixedLoader,training_loader,prefetch_for_images,
-                       preload_pairs,PreloadedPairs)
+                       preload_pairs,PreloadedPairs,PrimedTrainingLoader)
 from lsb_cache import build_entry
 from test_lsb_source import record
 
@@ -140,6 +140,114 @@ class TorchTests(unittest.TestCase):
         self.assertEqual(expected,actual)
         self.assertEqual(len(actual),len(ds))
         self.assertEqual(len(mixed),9)
+
+    def test_prime_next_epoch_preserves_three_streams_and_releases_workers(self):
+        settings=RunSettings(tile_size=256,buffer_size=8)
+        corpus=self.corpus(settings)
+        baseline=TrainingImages(corpus)
+        old=training_loader(baseline,batch_size=8,num_workers=2,pin_memory=False)
+        primed_dataset=TrainingImages(corpus)
+        prime=PrimedTrainingLoader(training_loader(primed_dataset,batch_size=8,
+                                                  num_workers=2,pin_memory=False))
+        children={p.pid for p in multiprocessing.active_children()}
+        worker_pids=None
+        try:
+            for epoch in range(3):
+                baseline.set_epoch(epoch)
+                expected=[(tuple(t.numpy().tobytes() for t in batch)) for batch in old]
+                actual=[(tuple(t.numpy().tobytes() for t in batch)) for batch in prime]
+                self.assertEqual(actual,expected)
+                current_pids=[p.pid for p in prime.loader._iterator._workers]
+                if worker_pids is not None:
+                    self.assertEqual(current_pids,worker_pids)  # No respawn at epoch boundaries.
+                worker_pids=current_pids
+                if epoch<2:
+                    prime.prime_next(epoch+1)
+            old.shutdown()
+            prime.shutdown()
+            current=[p for p in multiprocessing.active_children() if p.pid not in children]
+            self.assertEqual(current,[])
+        finally:
+            old.shutdown()
+            prime.shutdown()
+        # A resumed loader started at epoch 2 must yield exactly the same stream.
+        resumed=TrainingImages(corpus)
+        resumed.set_epoch(2)
+        last=training_loader(resumed,batch_size=8,num_workers=2,pin_memory=False)
+        try:
+            self.assertEqual(actual,[tuple(t.numpy().tobytes() for t in batch) for batch in last])
+        finally:
+            last.shutdown()
+
+    def test_prime_resume_from_last_checkpoint_matches_uninterrupted_stream(self):
+        import lightning as L
+        from lightning.pytorch.callbacks import ModelCheckpoint
+        corpus=self.corpus(RunSettings(tile_size=256,buffer_size=8))
+        seen=[]
+
+        class Probe(L.LightningModule):
+            def __init__(self):
+                super().__init__()
+                self.weight=torch.nn.Parameter(torch.ones(()))
+            def training_step(self,batch,batch_idx):
+                image,label,index=batch
+                digest=hashlib.sha256()
+                for part in batch:
+                    digest.update(part.numpy().tobytes())
+                seen.append((int(self.trainer.current_epoch),digest.hexdigest()))
+                return self.weight*image[:,0,0,0].float().mean()
+            def validation_step(self,batch,batch_idx):
+                return None
+            def configure_optimizers(self):
+                return torch.optim.SGD(self.parameters(),lr=0.00001)
+
+        def fit(max_epochs,folder,ckpt_path=None):
+            dataset=TrainingImages(corpus)
+            loader=PrimedTrainingLoader(training_loader(dataset,batch_size=8,
+                                              num_workers=2,pin_memory=False))
+            class Epoch(L.Callback):
+                def on_fit_start(self,trainer,pl_module):
+                    dataset.set_epoch(int(trainer.current_epoch))
+                def on_train_epoch_start(self,trainer,pl_module):
+                    dataset.set_epoch(int(trainer.current_epoch))
+                def on_validation_start(self,trainer,pl_module):
+                    if not trainer.sanity_checking and trainer.current_epoch+1<trainer.max_epochs:
+                        loader.prime_next(int(trainer.current_epoch)+1)
+            checkpoint=ModelCheckpoint(dirpath=str(folder),save_last=True,save_top_k=0)
+            trainer=L.Trainer(max_epochs=max_epochs,accelerator="cpu",devices=1,
+                logger=False,enable_progress_bar=False,enable_model_summary=False,
+                num_sanity_val_steps=0,callbacks=[Epoch(),checkpoint],
+                default_root_dir=str(folder))
+            val=torch.utils.data.DataLoader(torch.utils.data.TensorDataset(torch.zeros(1,1)),batch_size=1)
+            try:
+                trainer.fit(Probe(),loader,val,ckpt_path=ckpt_path)
+            finally:
+                loader.shutdown()
+            return checkpoint.last_model_path
+
+        reference=fit(3,self.root/"uninterrupted")
+        expected=seen[:]
+        seen.clear()
+        first=fit(1,self.root/"interrupted")
+        self.assertTrue(Path(first).is_file())
+        fit(3,self.root/"resumed",ckpt_path=first)
+        self.assertEqual(seen,expected)
+
+    def test_prime_rejects_running_epoch_and_shutdown_cleans_future(self):
+        dataset=TrainingImages(self.corpus(RunSettings(tile_size=256,buffer_size=8)))
+        prime=PrimedTrainingLoader(training_loader(dataset,batch_size=8,num_workers=2,pin_memory=False))
+        children={p.pid for p in multiprocessing.active_children()}
+        try:
+            current=iter(prime)
+            next(current)
+            with self.assertRaisesRegex(RuntimeError,"current epoch is running"):
+                prime.prime_next(1)
+            current.close()
+            prime.prime_next(1)
+            prime.shutdown()
+            self.assertFalse([p for p in multiprocessing.active_children() if p.pid not in children])
+        finally:
+            prime.shutdown()
 
     def test_notebook_fixed_subset_and_complete_bins(self):
         from lsb_notebook import fixed_subset,complete_bpp_bins
