@@ -15,6 +15,7 @@
 - [Full-photo session cache and read checks](cache-verification.md)
 - [Mode 1 PyTorch loader and contract checks](torch-loader-verification.md)
 - [Notebook OTF integration and QUICK checks](notebook-otf-verification.md)
+- [Notebook diagnostic speed and parity checks](notebook-diagnostics-verification.md)
 - [Rebuild the RAISE 512 dataset](rebuild-raise512-run1.md)
 
 ## Local data folders

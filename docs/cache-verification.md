@@ -101,10 +101,16 @@ It created 1,900 NPY files, 1,900 entry JSON records, one header JSON, and
 The strict `check_cache.py --gate verify` pass completed in 13.751310 seconds.
 It checked all 1,900 arrays and current master files: zero hash mismatches,
 52,761,268,224 array bytes, and all source/version/shape checks passed.
-The team VM was off and SSH timed out. No saved local copy of its 1,900 entry
-JSON records was available, so the requested PC-versus-VM JSON fingerprint
-comparison is **Pending**. Do not start the VM only for this comparison; run it
-when the VM or a saved read-only copy of its records becomes available.
+The VM was initially off, so the comparison was pending at build time. After
+it started, all 1,900 PC and VM entry JSON records matched field-for-field
+once `master_mtime_ns` (machine-local) was removed. SHA-256 of the sorted
+`photo_id -> normalized-record-SHA-256` map was
+`bde842a00a9060d2a3b5e6c9e214a5d6f976a52f3e494f503a1290a93c8ae482`
+on both machines; zero missing or mismatched records. The comparison read the
+VM cache only; it did not modify that cache. Git 2.43.0 was installed with
+`apt` in the PC container for the ignored-path check. That installation is
+lost if container `aai3001` is recreated; install Git there again before
+building an in-checkout cache.
 
 ## Isolated decode scaling
 
