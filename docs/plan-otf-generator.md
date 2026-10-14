@@ -1,6 +1,6 @@
 # Plan: on-the-fly LSB generator
 
-Status: design only. Implementation has not started.
+Status: working design. Mode 2 steps 15–16 and 18–19 are implemented; the pre-built writer in step 17 is deferred.
 
 The user approved two cover sources on 2026-10-13: 1,000 selected RAISE
 NEFs and 900 DIV2K HR PNGs, for both training and testing. A **NEF** is a
@@ -1015,15 +1015,15 @@ Keep the complete mode 2 interfaces in mind during shared-module design.
 Start after the mode 1 loader and notebook path work. Pending team approval
 for image removal does not block mode 2 development; keep the images meanwhile.
 
-| Order | Small task | Check |
-| ---: | --- | --- |
-| 15 | Add full-photo mode 2 using the shared source and embedding core. | Bpp uses full photo area; fixed seeds give the same stego photo at 256/512. |
-| 16 | Add changed-index labels for every containing overlap tile. | One/two/four-tile labels and distinct pixel counts equal the full comparison. |
-| 17 | Connect mode 2 pre-built output and natural-frequency tile/photo records. | Common writer/loader pixels and labels agree, including unchanged tiles. |
-| 18 | Add mode 2 loader output and the bag adapter interface, not an MIL model. | One photo per bag, correct counts, deterministic variants, and no fake images. |
-| 19 | Benchmark mode 2 for both sources on the VM. | Record throughput, natural source/label frequencies, memory, and source/cache identity. Actual full model training remains user-run. |
-| Later | Choose MIL batching/model details when approved. | Preserve the fixed source, full-photo seeds, geometry, and label interface. |
-| Later | Add other platform or two-GPU execution only after approval. | Choose and test distributed assignment and equal steps at that time. |
+| Order | Small task | Check | Status |
+| ---: | --- | --- | --- |
+| 15 | Add full-photo mode 2 using the shared source and embedding core. | Bpp uses full photo area; fixed seeds give the same stego photo at 256/512. | Complete; [verification](mode2-verification.md). |
+| 16 | Add changed-index labels for every containing overlap tile. | One/two/four-tile labels and distinct pixel counts equal the full comparison. | Complete; [verification](mode2-verification.md). |
+| 17 | Connect mode 2 pre-built output and natural-frequency tile/photo records. | Common writer/loader pixels and labels agree, including unchanged tiles. | Deferred: on-the-fly only. |
+| 18 | Add mode 2 loader output and the bag adapter interface, not an MIL model. | One photo per bag, correct counts, deterministic variants, and no fake images. | Complete; [verification](mode2-verification.md). |
+| 19 | Benchmark mode 2 for both sources on the VM and PC. | Record throughput, natural source/label frequencies, memory, and source/cache identity. Actual full model training remains user-run. | Complete; [verification](mode2-verification.md). |
+| Later | Choose MIL batching/model details when approved. | Preserve the fixed source, full-photo seeds, geometry, and label interface. | Pending. |
+| Later | Add other platform or two-GPU execution only after approval. | Choose and test distributed assignment and equal steps at that time. | Pending. |
 
 Before mode 1 release or image deletion, complete its source identity,
 49,796-pair replay, and notebook OTF checks. Before mode 2 release, also pass

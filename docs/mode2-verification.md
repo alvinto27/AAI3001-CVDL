@@ -1,8 +1,8 @@
 # Mode 2 full-photo verification
 
-Status: Phase B steps 15–16 complete, 2026-10-13. Baseline: `9c3bf0b`.
-This change adds the library, tests and this record. It does not connect a
-loader, notebook, pre-built writer or MIL model. No training was run.
+Status: Phase B steps 15–16 complete (2026-10-13); on-the-fly steps 18–19
+complete (2026-10-14). Step 17 (pre-built writer) is deferred. The notebook,
+writer and MIL model are not connected. No training was run.
 
 ## Library contract
 
@@ -224,9 +224,128 @@ podman exec -w /work aai3001 python scripts/check_mode1.py --repo-root /work --g
 podman exec -w /work aai3001 python scripts/check_mode1.py --repo-root /work --gate otf
 ```
 
-Documentation links/anchors and `git diff --check` passed. Scratch scripts,
-logs, mirrored VM code and temporary caches were removed. User notebook 04
-edits, checkpoints, datasets, executed notebooks, journal, dependencies and
-backend state were not changed. No push was made. Steps 17–19 remain outside
-this change: writer/loader integration and future photo-bag work need their
-own approval. See the [design plan](plan-otf-generator.md).
+Documentation links/anchors and `git diff --check` passed for steps 15–16.
+That work did not change the notebook, checkpoints, datasets, journal or
+backend. Step 17 remains deferred; steps 18–19 follow below. See the
+[design plan](plan-otf-generator.md).
+
+## On-the-fly loader and photo bags (steps 18–19)
+
+[`lsb_mode2_torch.py`](../LSB-Dataset-Generator/lsb_mode2_torch.py)
+reuses the Mode 1 `Corpus` inventory, selected train schedule, source/cache
+readers, configuration, and worker setup. Its map-style `Mode2Photos` dataset
+assigns **one whole photo to one worker task**. Each task reads its source
+once, calls `embed_photo` once, and cuts all clean and embedded tiles via
+`iter_photo_tiles`. Training uses variant 1, per-epoch seeds unless
+`fixed_variants=True`; validation/test always use their frozen seed and epoch.
+Only `overlap_last`, one photo variant, uint8 and independent image output
+are accepted. More than one photo variant per epoch remains a later policy.
+
+`TileLoader` emits `(images, actual_change_labels, stable_keys, side_records)`.
+Images are `B x 3 x T x T` uint8; the consumer converts them to float32.
+The side record is the complete Mode 2 tile record: photo/source/camera,
+original grid coordinates/start, clean or embedded role, both change counts,
+actual label and full-photo settings. No unchanged embedded tile is removed
+or relabeled. The keyed training augmentation is optional: it uses separate
+clean/embedded roles and tile coordinates in a stream **separate from the
+photo embedding seed**. Reference comparisons and CPU measurements below set
+augmentation off to compare original pixels. Photo tasks arrive in fixed
+index order across worker counts; the training output can use a bounded
+cross-photo image shuffle (default 1,024 images). Prefetch is specified in
+images and rounded up against the largest whole-photo task (at least one
+task/worker). At the 128-image default this is one task per worker; a smaller
+photo can therefore prepare fewer than 128 images. The last tile batch is
+short, never padded or dropped. `set_epoch` uses shared
+memory so persistent workers see the next epoch.
+
+`BagLoader` emits one `PhotoBag` with exactly one real photo output: clean or
+embedded, not both mixed together. Its `tiles` are `N x 3 x T x T` uint8 in
+row-major grid order. `tile_labels` has length `N`. Separate fields record
+`photo_embedded`, `photo_actual_changed`, `photo_label`, and the
+`photo_label_rule="any_changed_tile"`; the label is 1 only when at least
+one tile changed. A clean bag always has both flags false and label 0.
+Side records retain the clean/embedded sample IDs. `batch_size=1` yields a
+bag; larger batch sizes yield a list of bags without padding. This is an
+interface, **not** an MIL model or a fixed-`N` batching scheme. The grid
+maximum is 70 tiles at 512 and 260 at 256 for RAISE; DIV2K maxima are
+16 and 64. `N` is the actual count for each bag, not this limit.
+
+### Pixel, label, seed and regression checks
+
+Three synthetic-loader tests use exact partial-overlap geometry, 256 tiles,
+source decode and cache, worker counts 0/2/4, train/val/test, and the direct
+`embed_photo` + `iter_photo_tiles` reference. All pixel bytes, labels and
+complete JSON side records match, including unchanged embedded tiles. An
+independent work-item assertion counts **one source read and one embed** for
+a photo. The train epoch changes embedded bytes; `fixed_variants=True`
+keeps them fixed. Val/test remain fixed even after `set_epoch`. Bag tests
+confirm no mixed photo, grid count/order, exact tile labels, photo-label
+rule, no padding and identical photo order/labels across workers. Keyed
+training augmentation yields identical output across 0/2/4 workers.
+
+A second read-only check used **six real photos** (one RAISE and one DIV2K
+in each train/val/test split). It compared loader output against the direct
+reference for both decode and cache at 0/2/4 workers: **18 cases**, zero
+pixel, label, side-record or bag failures. It checked full bag identity and
+real tile counts. The cache was read only.
+
+Mode 1 source was unchanged. To guard against accidental changes in the
+200-batch stream, the first **6,400 images** (keys, labels and uint8 bytes)
+from the 6-worker cache loader produced the same SHA-256 for the frozen
+`HEAD` Mode 1 module and the current module:
+
+```text
+32bd10352c3e2c3d6a5c4600632bd0f962c9528975572e162bb973f7acc99075
+```
+
+The final PC suites passed **72 shared tests** (including four new Mode 2
+loader tests) and 34 generator tests. The four new tests also passed in VM
+CPU-only scratch. No training, GPU job or notebook edit was made for these
+checks.
+
+### CPU throughput and proportional RAM
+
+Both machines used OMP=1 and no GPU work. The VM had no GPU process or
+notebook kernel before its cases; the PC had no user notebook kernel. Each
+case used the same first 128 seed-0 training photo tasks at 512: **9,808
+images**, or **256 separate clean/embedded bags**, from both sources.
+The timer includes source read, full-photo embedding, labels, tile creation,
+transfer from worker processes, shuffle for tiles, and Python iteration;
+it excludes inventory/cache-session setup. PSS is the largest observed sum
+of parent plus child proportional memory, sampled every eight outputs.
+It is not a kernel-enforced maximum. Rates are single-run observations,
+not full-epoch or GPU training rates.
+
+| Platform / source / workers | Tile images/s | Tile peak PSS GB | Bags/s | Bag peak PSS GB |
+| --- | ---: | ---: | ---: | ---: |
+| PC / cache / 4 | 512.1 | 4.41 | 14.88 | 3.04 |
+| PC / cache / 6 | 505.7 | 5.30 | 14.94 | 4.04 |
+| PC / decode / 8 | 326.0 | 6.00 | 8.96 | 4.41 |
+| VM / cache / 4 | 268.5 | 4.16 | 8.59 | 2.61 |
+| VM / cache / 6 | 286.9 | 4.97 | 8.22 | 3.70 |
+| VM / decode / 8 | 136.1 | 6.04 | 3.77 | 4.61 |
+
+A separate full 512 training epoch through cache6 yielded **107,900 tile
+images from 1,381 selected train photos** on both machines: PC 127.477 s
+(846.43 images/s), VM 252.010 s (428.16 images/s). The difference from
+the first-128-photo rates includes startup, page-cache state, photo mix and
+large-stream amortization; do not infer a controlled cache speedup from
+these unlike windows. Peak sampled PSS was 5.73 GB on PC and 5.27 GB on VM.
+
+### Natural training labels
+
+The full cache6 epoch on both machines produced the **same** per-source
+counts. Each embedded photo has an equally sized clean output, but unchanged
+embedded tiles stay label 0. No class balancing, source weights or loss
+weights were applied. Percentages below are positive labels divided by all
+real output tiles, with the stego-only percentage given separately.
+
+| Source | Clean + embedded tiles | Actual label 1 | All-tile label 1 | Embedded-tile label 1 |
+| --- | ---: | ---: | ---: | ---: |
+| RAISE | 91,348 | 27,008 | 29.5661% | 59.1321% |
+| DIV2K | 16,552 | 5,870 | 35.4640% | 70.9280% |
+| Combined | 107,900 | 32,878 | 30.4708% | 60.9416% |
+
+The table is the natural **training** mix for seed 0 at 512; it differs from
+the fixed validation profile above. No source weighting or class-frequency
+correction is applied.
