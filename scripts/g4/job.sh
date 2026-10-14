@@ -84,6 +84,22 @@ deliver() {
     if [[ ! -f $INBOX_KEY ]]; then note "Missing inbox key: $INBOX_KEY"; return 1; fi
     if (( DELIVERY_BUDGET <= 0 )); then note "Pi retry budget exhausted for $id"; return 1; fi
     end=$((SECONDS + DELIVERY_BUDGET))
+    local ready=0 ready_end=$((SECONDS + 30))
+    (( ready_end > end )) && ready_end=$end
+    while (( SECONDS < ready_end )); do
+        if { [[ $MODE == test ]] || tailscale status >/dev/null 2>&1; } && \
+           getent ahostsv4 "$INBOX_HOST" >/dev/null 2>&1; then
+            ready=1
+            break
+        fi
+        sleep 1
+    done
+    if (( ready == 0 )); then
+        note "Tailscale or $INBOX_HOST unavailable; leave $id pending"
+        spent=$((SECONDS - began))
+        DELIVERY_BUDGET=$((DELIVERY_BUDGET - spent))
+        return 1
+    fi
     while (( SECONDS < end )); do
         remain=$((end - SECONDS))
         connect=5; (( remain < connect )) && connect=$remain
@@ -116,6 +132,8 @@ deliver_pending() {
         [[ $(field "$id" delivered) == yes ]] && continue
         note "Resend pending $id before new job"
         started=$(field "$id" started-at); ended=$(field "$id" ended-at); code=$(field "$id" exit-code)
+        [[ -n $ended ]] || ended=$(stamp)  # Detection time after an abrupt stop.
+        [[ -n $code ]] || code=unknown
         if deliver "$id"; then
             write_record "$id" delivered "$started" "$ended" "$code" yes
         else
@@ -124,14 +142,19 @@ deliver_pending() {
     done
 }
 
-meta_value job-mode maintenance
+meta_value job-mode off
 JOB_MODE=$META_RESULT
 if [[ $JOB_MODE == maintenance ]]; then
     note 'Maintenance mode: no upload, no shutdown (GCE max duration still applies).'
     exit 0
 fi
-[[ $JOB_MODE == run ]] || { note "Unknown job-mode: $JOB_MODE; stop"; shutdown_vm; exit 2; }
 DELIVERY_BUDGET=$RETRY_SECONDS
+if [[ $JOB_MODE != run ]]; then
+    deliver_pending
+    note "Job mode $JOB_MODE: pending results sent if possible; stop"
+    shutdown_vm
+    [[ $JOB_MODE == off ]] && exit 0 || exit 2
+fi
 JOB_ID=
 STARTED=
 EXIT_CODE=0
@@ -201,8 +224,9 @@ if [[ $MODE == production ]]; then
     if [[ -n $(git status --porcelain) ]]; then note 'Dirty checkout; refuse git checkout'; exit 2; fi
     if ! git fetch origin yx; then note 'Git fetch failed'; exit 2; fi
     if ! git checkout --detach "$COMMIT"; then note 'Git checkout failed'; exit 2; fi
+    if ! "$HOME/.local/bin/uv" sync --locked; then note 'uv sync --locked failed'; exit 2; fi
 else
-    note "TEST: skip checkout for $COMMIT (existing local repository)"
+    note "TEST: skip checkout and uv sync for $COMMIT (keep PC ROCm container intact)"
 fi
 note "Run $JOB_ID commit=$COMMIT timeout=${TIMEOUT_MIN}m"
 if [[ $MODE == test ]]; then

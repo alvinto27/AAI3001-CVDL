@@ -1,15 +1,22 @@
 # G4 batch job: setup, run, send results, stop
 
 The Spot VM `rtx6000pro` is in `europe-north1-a`. It has one RTX PRO 6000.
-Its external IP changes at boot. The machine costs about $1.63 per hour when
+Its external IP changes at boot. The machine costs about $2.03 per hour when
 running. **Do not start it just to test these scripts.** Its GCE maximum run
 duration is 120 minutes from boot, with action **Stop**. Maintenance mode does
 not bypass that limit.
 
 The boot service is enabled only after setup. It reads **instance** metadata
-(not project metadata). In maintenance mode it does not run work or shut down.
+(not project metadata). Its default mode is **off**: it resends pending
+results and shuts down. Set `job-mode=maintenance` explicitly to keep it up.
 In run mode it sends pending results, runs one new job, tries to send its files
 to the Pi for no more than five minutes in total, and calls `shutdown -h now`.
+The service uses systemd `Type=exec`, so it does not delay the boot target.
+The service has `TimeoutStopSec=120s`. A Spot preemption may give only about
+30 seconds: an upload can fail, and the next boot resends the partial folder.
+Records left in `starting` or `running` with `delivered=no` are also resent.
+If a stop gives no exit code, the recovered record says `unknown`; its end time
+is the next boot's detection time, not the exact stop time.
 It records each job at `runs-out/.g4-state/jobs/<job-id>.record` on the VM disk.
 The record includes start and end time, exit code, state and delivery status.
 The VM disk survives a normal stop. An interrupted upload remains pending and
@@ -58,20 +65,30 @@ checks all 1,900 arrays against the G4 masters. It also checks that the
 `bde842a00a9060d2a3b5e6c9e214a5d6f976a52f3e494f503a1290a93c8ae482`.
 Only `master_mtime_ns` is ignored. The cache build is resumable. It needs
 about 53 GB plus room for the 21 GB masters, code, dependencies and results.
+G4 defaults to `nproc - 8` cache builders (40 on 48 vCPUs); `--workers N`
+overrides it. `build_cache.py` still defaults to a maximum of eight workers;
+the G4 step uses an explicit high-worker option. **Budget about 1 GiB of RAM
+per builder worker** (up to about 40 GiB at 40 workers), not a measured peak.
+This is below the G4's 180 GB RAM, even with the input/cache page cache;
+stop or lower `--workers` if memory pressure appears.
 
 `speed` first runs `sync` and drops the Linux page cache with sudo. It reads
-a bounded first-pass sample of training cache photos; this is **not** a full
-cold epoch. Its report gives MB/s, photos, logical bytes and kernel-attributed
-storage bytes. If kernel-attributed reads are below 80% of sampled bytes,
-`likely_cold` is false and the estimate must not be treated as cold. It estimates
-the first full training epoch's cache read time
-from the sample rate and the train photo bytes. It then measures notebook-04
-loader **and** model training at 4, 8 and 16 workers, eager and compiled:
-12 warmup and 32 timed steps each. It compares the estimated cold read time
-to the estimated steady training epoch time at the fastest worker count. Aim
-for five minutes total; compilation can make it longer. The report is under
-`runs-out/g4-speed-*.json`. Do not call a cached or first-pass sample a measured
-full cold epoch.
+48 training cache photos, drops the page cache again, then reads 48 training
+master photos. Neither first-pass sample is a full cold epoch. The report
+gives MB/s, photos, logical bytes and kernel-attributed storage bytes. If
+physical reads are below 80% of sampled bytes, `likely_cold` is false:
+do not treat that rate as cold. It measures **loader only, without GPU** at
+4/8/16 cache workers (15 seconds each) and 16/24/32/40 decode workers
+(40 seconds each), with process and worker CPU use. It also measures
+notebook-04 loader **plus** model training at 4/8/16 cache workers, eager and
+compiled, and both modes on a fixed GPU batch: 20 warmup and **150 timed
+steps** each. Allow about 10–12 minutes. The report compares the best cache
+and decode loader rates to the fastest GPU-only rate. For each first-epoch
+estimate it takes the slower of disk read time, CPU loader time, and GPU
+training time. This is a lower bound because those tasks can overlap and
+there is other work. Cache disk time uses train cache bytes (about 38 GB);
+decode disk time uses train master bytes. The report is under
+`runs-out/g4-speed-*.json`.
 
 ## Submit a run
 
@@ -81,6 +98,7 @@ without starting the VM:
 ```sh
 bash scripts/g4/submit.sh run --env-file path/to/job.env --dry-run
 bash scripts/g4/submit.sh maintenance --dry-run
+bash scripts/g4/submit.sh off --dry-run
 bash scripts/g4/submit.sh status --dry-run
 ```
 
@@ -92,8 +110,10 @@ simple `V3_RUN_NAME`; for a full run use `QUICK=False`, `V3_DATA=otf`,
 `job-env` instance metadata, sets `job-mode=run`, `job-id`, `job-commit`,
 `job-timeout-min`, and `max-run-minutes`, then starts the stopped VM. It refuses
 an already-running VM. The default commit is `origin/yx`. Set `--commit SHA`
-to pin another reachable commit. The checkout must be clean; Git fetch and
-checkout failures prevent training.
+to pin another reachable commit. The checkout must be clean. Git fetch and
+checkout failures prevent training. After checkout, the job runs
+`uv sync --locked` to match the pinned environment; failure uploads the error
+files and shuts down.
 
 The default runner timeout is **100 minutes**. The job refuses a timeout above
 `max-run-minutes - 15` (default maximum: 120). The reserve leaves time for
@@ -104,8 +124,51 @@ also logs GPU use, memory, power and temperature every 60 seconds in
 before using its results. The Pi receives `<job-id>/` under
 `/srv/cvdl-results`; the inbox account cannot read back. Each `rsync` attempt
 has a bounded SSH connection timeout. A Pi outage leaves the VM record
-`delivered=no`; the next run tries it first. A Spot preemption can interrupt
-a transfer; the next boot resends it.
+`delivered=no`; the next run tries it first. Before each attempt, it waits
+up to 30 seconds (inside the five-minute retry budget) for Tailscale and
+`rpi400-server` name resolution. A Spot preemption can interrupt a transfer;
+the next boot resends the files available on disk.
+
+## First real boot checklist (in order)
+
+1. In the Google Cloud console set **instance metadata** `job-mode=maintenance`,
+   then start the VM. Get its new external IP. The service does not exist yet
+   on the first setup boot, but set this value for the next boot too.
+2. Copy the inbox key from the PC with the `scp` command above. Copy and run
+   `setup.sh base` over SSH. Approve the Tailscale URL printed by `tailscale up`.
+   Check NVIDIA, CUDA and free disk in the summary.
+3. From the PC run `setup.sh upload --host EXTERNAL_IP`. On the VM run
+   `setup.sh cache`; verify the 1,900 records. Then run `setup.sh speed` and
+   inspect the cold rates and loader/GPU comparison.
+4. Stop the maintenance VM (`sudo shutdown -h now`). In the Google Cloud
+   console replace instance metadata with these keys, then start it again:
+
+   | Key | QUICK smoke-test value |
+   | --- | --- |
+   | `job-mode` | `run` |
+   | `job-id` | `g4-quick-YYYYMMDDTHHMMSSZ` (new, one folder name) |
+   | `job-commit` | `origin/yx` (after this change is pushed) |
+   | `job-timeout-min` | `20` |
+   | `max-run-minutes` | `120` |
+   | `job-env` | Literal multi-line text below, not a filename |
+
+   ```text
+   QUICK=True
+   V3_DATA=otf
+   V3_SOURCE=cache
+   V3_CACHE_ROOT=/home/yangxuan/otf-cache/v1
+   V3_RUN_NAME=g4-quick
+   V3_WORKERS=8
+   V3_EVAL_WORKERS=4
+   V3_COMPILE=off
+   ```
+
+5. Confirm boot service `cvdl-g4-job` ran, the Pi received
+   `/srv/cvdl-results/<job-id>/status.json` and `executed.ipynb`, its status is
+   `done` with exit code 0, and the VM shut down. The write-only key cannot
+   inspect the Pi: check with the Pi admin account. A plain console start with
+   missing `job-mode` now **sends pending folders and shuts down**, not idle
+   maintenance. For maintenance later, set the mode explicitly each time.
 
 ## PC-only checks
 

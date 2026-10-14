@@ -50,8 +50,13 @@ Masters and existing datasets are never changed or deleted.
 The cache may be outside the checkout. It may be inside the checkout only when
 `git check-ignore -q <cache-root>` succeeds from the repository root. The
 builder refuses an in-checkout path when Git reports that it is not ignored,
-when the check fails, or when Git is unavailable. The worker limit remains
-1 through 8. `check_cache.py` and the loader had no separate cache-location
+when the check fails, or when Git is unavailable. The default worker limit
+remains 1 through 8. The G4-only setup uses explicit `--allow-high-workers`
+with `--workers "$(($(nproc)-8))"`: the opt-in accepts at most 64 workers
+and cannot exceed detected CPUs. Budget about 1 GiB RAM per builder process;
+40 builders need up to about 40 GiB on the 180 GB G4. Use fewer if memory
+pressure appears. Output bytes do not depend on worker count.
+`check_cache.py` and the loader had no separate cache-location
 rule to change; they continue to validate cache contents and never create a
 cache implicitly.
 

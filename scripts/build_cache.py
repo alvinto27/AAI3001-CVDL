@@ -53,10 +53,13 @@ def main():
     p.add_argument("--repo-root",type=Path,required=True)
     p.add_argument("--cache-root",type=Path,required=True)
     p.add_argument("--workers",type=int,default=8)
+    p.add_argument("--allow-high-workers",action="store_true",
+                   help="opt in to at most 64 CPU workers on a high-RAM machine")
     args=p.parse_args()
     root,cache=args.repo_root.resolve(),args.cache_root.resolve()
-    if not 1<=args.workers<=8:
-        raise ValueError("workers must be 1..8")
+    maximum=min(64,os.cpu_count() or 8) if args.allow_high_workers else 8
+    if not 1<=args.workers<=maximum:
+        raise ValueError(f"workers must be 1..{maximum}")
     validate_cache_location(root,cache)
     os.umask(0o002)
     initialize_cache(cache)

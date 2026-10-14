@@ -2,8 +2,8 @@
 # Submit one metadata job and boot rtx6000pro. --dry-run needs no gcloud install.
 set -euo pipefail
 ACTION=${1:-}
-[[ $ACTION == run || $ACTION == maintenance || $ACTION == status ]] || {
-    echo 'Usage: submit.sh {run|maintenance|status} [--env-file FILE] [--commit SHA] [--timeout-min 100] [--dry-run]' >&2
+[[ $ACTION == run || $ACTION == maintenance || $ACTION == off || $ACTION == status ]] || {
+    echo 'Usage: submit.sh {run|maintenance|off|status} [--env-file FILE] [--commit SHA] [--timeout-min 100] [--dry-run]' >&2
     exit 2
 }
 shift
@@ -63,6 +63,6 @@ if [[ $ACTION == run ]]; then
         --metadata="job-mode=run,job-id=$JOB_ID,job-commit=$COMMIT,job-timeout-min=$TIMEOUT,max-run-minutes=$MAX_RUN" \
         --metadata-from-file="job-env=$ENV_FILE"
 else
-    execute gcloud compute instances add-metadata "$INSTANCE" --zone="$ZONE" --metadata=job-mode=maintenance
+    execute gcloud compute instances add-metadata "$INSTANCE" --zone="$ZONE" --metadata="job-mode=$ACTION"
 fi
 execute gcloud compute instances start "$INSTANCE" --zone="$ZONE"

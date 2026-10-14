@@ -2,7 +2,7 @@
 # First-boot setup and separate upload/cache/speed steps for rtx6000pro.
 set -euo pipefail
 STEP=${1:-}
-[[ -n $STEP ]] || { echo 'Usage: setup.sh {base|upload|cache|speed} [--host IP] [--inbox-key FILE]' >&2; exit 2; }
+[[ -n $STEP ]] || { echo 'Usage: setup.sh {base|upload|cache|speed} [--host IP] [--inbox-key FILE] [--workers N]' >&2; exit 2; }
 shift
 REPO_URL=https://github.com/alvinto27/AAI3001-CVDL.git
 REPO_DIR="$HOME/AAI3001-CVDL"
@@ -11,10 +11,13 @@ CACHE_ROOT="$HOME/otf-cache/v1"
 HOST=
 INBOX_KEY="$HOME/.ssh/cvdl-g4-inbox"
 SSH_KEY="$HOME/.ssh/cvdl-g4"
+CACHE_WORKERS=$(( $(nproc) - 8 ))
+(( CACHE_WORKERS < 1 )) && CACHE_WORKERS=1
 while (($#)); do
     case "$1" in
         --host) HOST=${2:?missing host}; shift 2 ;;
         --inbox-key) INBOX_KEY=${2:?missing key}; shift 2 ;;
+        --workers) CACHE_WORKERS=${2:?missing worker count}; shift 2 ;;
         *) echo "Unknown argument: $1" >&2; exit 2 ;;
     esac
 done
@@ -71,9 +74,11 @@ case "$STEP" in
     cache)
         [[ -x "$REPO_DIR/.venv/bin/python" ]] || { echo 'Run base first' >&2; exit 2; }
         [[ -d "$REPO_DIR/ImageSets/RAISE" ]] || { echo 'Run upload first' >&2; exit 2; }
+        [[ $CACHE_WORKERS =~ ^[0-9]+$ ]] || { echo '--workers must be a positive integer' >&2; exit 2; }
         mkdir -p "$CACHE_ROOT"
+        echo "Build cache with $CACHE_WORKERS workers (reserve about 1 GiB RAM per worker)."
         (cd "$REPO_DIR" && OMP_NUM_THREADS=1 .venv/bin/python scripts/build_cache.py \
-            --repo-root "$REPO_DIR" --cache-root "$CACHE_ROOT" --workers 8 && \
+            --repo-root "$REPO_DIR" --cache-root "$CACHE_ROOT" --workers "$CACHE_WORKERS" --allow-high-workers && \
             OMP_NUM_THREADS=1 .venv/bin/python scripts/check_cache.py \
             --repo-root "$REPO_DIR" --cache-root "$CACHE_ROOT" --gate verify && \
             .venv/bin/python scripts/g4/verify_cache.py "$CACHE_ROOT")
