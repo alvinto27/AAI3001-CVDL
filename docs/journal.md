@@ -1781,6 +1781,13 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   - `V3_COMPILE=off` is the default; `default` enables compile. Compile is
     in place just before fit. Checkpoints keep the same keys and resume in
     both directions.
+- Worker_2 completed fix 5 in commit `cc3aeed`, after the original Worker
+  session ended during the task. Details are in
+  [docs/notebook-otf-verification.md](notebook-otf-verification.md).
+  - Evaluation gives each worker whole photos with `PhotoPairTasks` and
+    `OrderedPairLoader`. The parent restores the original pair order and
+    batch boundaries. It uses 4 non-persistent workers; 0 workers also works.
+    Early close drains only in-flight tasks.
 - Training workers now shut down after fit. This freed about 10.0 GB of PC
   RAM for 8 workers.
 - The user ran short PC notebook 04 tests with commit `dd8cb60`,
@@ -1883,6 +1890,31 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   | VM cache | 268.5 / 8.6 | 286.9 / 8.2 | - |
   | VM decode | - | - | 136.1 / 3.8 |
 
+#### Evaluation worker fix (fix 5)
+
+- At 512 with 4 workers, photo reads and time changed as follows:
+
+  | Case | Photo reads before -> after | Time before -> after | Peak worker PSS before -> after |
+  | --- | ---: | ---: | ---: |
+  | PC decode val | 810 -> 270 | 135.6 -> 47.2 s | 2.41 -> 2.81 GB |
+  | PC decode test | 745 -> 249 | 133.8 -> 46.6 s | 2.33 -> 2.78 GB |
+  | PC cache val | 810 -> 270 | 19.9 -> 23.6 s | 2.08 -> 2.46 GB |
+  | VM cache val | 810 -> 270 | 68.6 -> 74.9 s | 1.88 -> 2.27 GB |
+
+- The cache slowdown is from parent re-stacking (5.4 of 17.0 s). It was
+  not changed because safe copies are required.
+- Validation (11,238 pairs) and test (10,956 pairs) were byte-identical
+  before and after. Decode/cache, 512/256, and 0/2/4 workers were identical.
+  Train-eval 1,000 pairs were identical, with 554 reads instead of 1,000.
+  `test_predictions.csv` from best epoch 7 (21,912 rows) was byte-identical.
+  The Mode 1 fingerprint `32bd1035...9075` was unchanged.
+- QUICK PC cache passed all 15 cells in 55.4 s. Evaluation shutdown took
+  0.47-0.65 s, with no leftover workers. The Seoul Spot VM was stopped twice
+  on 2026-10-14 and restarted once in between, up at 16:23 +08. The first
+  restart failed because the zone had no L4 capacity. Spot availability was
+  Limited in Seoul (11-20% preemption, $0.39/h), High in Taiwan ($0.60/h),
+  and Medium in Singapore (20%+, $0.63/h). Nothing was lost.
+
 ### Decided
 
 - The cache inside the PC checkout is allowed only when git ignores it.
@@ -1892,7 +1924,7 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   the next full PC run. The expected speed is about 13.86 it/s.
 - Plan steps 15, 16, 18, and 19 are Done. Step 17 is deferred. Mode 2 is
   on-the-fly only for now.
-
+- Fix 5 is Done for evaluation (`cc3aeed`).
 
 ### Next
 
@@ -1901,8 +1933,12 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   (`22e61a9`).
 - Pending: MIL batching and model design, when photo-level work starts; the
   user will decide then.
-- Pending: fix 4 (background join and pinned copy) and fix 5 (one photo per
-  evaluation worker, decode once, same order).
+- Pending: remove VM scratch `~/otf-dev/eval-yx` when the VM is back.
+- Pending: user decision on moving the VM to Taiwan if Seoul stays Limited.
+- Pending: user decision on the cache-mode slowdown: accept it, or use the
+  old evaluation loader when a cache is set.
+- Pending: fix 4 (background join and pinned copy).
+
 - Done (user, 2026-10-14): told teammates that the VM is on branch `yx`,
   the `raise512-run1` images are gone on the VM, and `V3_DATA=png` there
   needs a rebuild.
