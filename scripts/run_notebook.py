@@ -15,6 +15,7 @@ import multiprocessing
 import os
 from pathlib import Path
 import re
+import resource
 import signal
 import subprocess
 import sys
@@ -136,6 +137,15 @@ def cleanup_workers(namespace, log):
     return {"remaining_workers": remaining, "remaining_join_threads": threads}
 
 
+def raise_open_file_limit():
+    """Raise the soft open-file limit; many loader workers need more than 1024."""
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    wanted = 65536 if hard == resource.RLIM_INFINITY else min(hard, 65536)
+    if soft != resource.RLIM_INFINITY and soft < wanted:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (wanted, hard))
+    return resource.getrlimit(resource.RLIMIT_NOFILE)
+
+
 def run(args):
     notebook_path = args.notebook.resolve()
     if not notebook_path.is_file():
@@ -155,6 +165,7 @@ def run(args):
         if key == "QUICK" or key == "PRED_PATH" or key.startswith("V3_"):
             os.environ.pop(key)
     os.environ.update(settings)
+    OPEN_FILE_LIMIT = raise_open_file_limit()  # inherited by loader workers
     os.chdir(ROOT)
     sys.path.insert(0, str(ROOT))
 
@@ -227,6 +238,7 @@ def run(args):
                 print(message, flush=True)
 
             emit("Headless notebook: " + str(notebook_path))
+            emit(f"Open-file limit (soft, hard): {OPEN_FILE_LIMIT}")
             emit("Effective settings: " + json.dumps(settings, sort_keys=True))
             shell = TerminalInteractiveShell.instance(user_ns=namespace, simple_prompt=True)
             shell.enable_matplotlib("inline")

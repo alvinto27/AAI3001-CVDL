@@ -10,6 +10,7 @@ WorkingDirectory=@REPO@
 ExecStart=/usr/bin/bash /home/@USER@/.local/lib/cvdl-g4/job.sh
 TimeoutStartSec=infinity
 TimeoutStopSec=120s
+LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
