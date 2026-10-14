@@ -1836,6 +1836,13 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   workers, 16 evaluation workers, compile default.
 - The second G4 proof used job ID `g4-quick-proof-2` with the same settings
   and no SSH login to G4 during the run.
+- The Worker applied the RemoveIPC fix in a maintenance boot, using checkout
+  `f9fb3fd`. The boot ran from 13:54:26Z to 13:58Z. It changed
+  `busctl RemoveIPC` from true to false through
+  `/etc/systemd/logind.conf.d/cvdl-no-remove-ipc.conf`.
+- The first full G4 run was `g4-full-1`: `QUICK=False`, decode, 32 train
+  workers, 16 evaluation workers, compile default, run name `g4-otf-full-1`,
+  and a 60 min timeout.
 
 ### Found
 
@@ -2067,6 +2074,32 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - This confirms the `RemoveIPC` cause: with the same settings and no SSH
   session ending, the run did not fail.
 
+#### RemoveIPC and first full G4 run
+
+- The semaphore survived a full SSH logout for a `setsid` holder and for a
+  `systemd-run --uid` service holder.
+- G4 booted at 14:02:12Z. The runner ran from 14:02:26Z to 14:29:08Z
+  (1,602.27 s), with 15/15 cells and exit 0. Pi upload finished at
+  14:29:12Z with 50 MB. The VM was offline at about 14:30-14:31Z. Billed
+  time was about 28.5 min, about $0.77.
+- Fit took 967.3 s (16.1 min). Epoch 0 took 2:25 at 23.2 it/s, including
+  compile. Epochs 1-9 took about 1:00 each at about 55 it/s (about 1,770
+  images/s). Validation took 11-12 s per epoch.
+- The GPU was 100% busy in every training sample, with peak memory 3,645 MiB
+  and about 420 W. CPU use was about 36-40%. The GPU did not wait for the
+  decode loader. The steady 55 it/s is below the 70 it/s GPU-only test
+  because the live generator also uses the GPU; this was not measured
+  separately.
+- Cell 29 diagnostics took 499.5 s, 31% of runtime, with the GPU idle.
+- Best epoch was 8 (validation P_E 0.0142, AUC 0.9976). Test accuracy was
+  0.9833, AUC 0.9976, and P_E 0.0162. Per-source P_E was RAISE 0.010948
+  (9,728 pairs) and DIV2K 0.052524 (1,228 pairs).
+- Comparison: L4 full OTF P_E 0.0170 (RAISE 0.011153, DIV2K 0.057410);
+  PC P_E 0.0173 (RAISE 0.0115, DIV2K 0.0619). These are single-seed
+  results, so small differences are within run-to-run noise. Training time
+  was about 74 min on L4, about 7:20 per PC epoch with validation, and about
+  1:12 on G4.
+
 ### Decided
 
 - The cache inside the PC checkout is allowed only when git ignores it.
@@ -2103,6 +2136,8 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - G4 policy: timeout defaults to 100 min and refuses values above max-run
   minus 15. Missing job mode is off. Maintenance runs only when explicitly
   set. Each job checks out the job commit and runs `uv sync --locked`.
+- G4 decode decision (user, 2026-10-14): 32 decode workers are the default
+  for G4 runs.
 
 ### Next
 
@@ -2115,11 +2150,14 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   fix 5 was already verified above.
 - Done: removed VM scratch `~/otf-dev/eval-yx` after the VM returned.
 - Done: proof 2 (`g4-quick-proof-2`) passed end to end without SSH.
-- Pending: apply `RemoveIPC=no` on G4 in maintenance mode.
-- Pending: first full 10-epoch G4 run using decode.
+- Done: applied `RemoveIPC=no` on G4 in maintenance mode.
+- Done: first full 10-epoch G4 run using decode (`g4-full-1`).
 - Pending, optional: sample `nvidia-smi` every 10 s and include `boot.log`
   in the uploaded folder.
-- Pending: measure decode plus training speed and validation time on G4.
+- Pending: speed up or make optional cell 29 diagnostics on G4; it uses
+  about 8.3 min per run with the GPU idle.
+- Pending: the DIV2K weakness remains (P_E about 5 times RAISE); continue
+  the source-diversity plan.
 - Pending: dataset download plan, per-source balanced sampler, and licence
   checks.
 - Later: Part 3, gcloud on the Pi.
