@@ -1788,6 +1788,10 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
     `OrderedPairLoader`. The parent restores the original pair order and
     batch boundaries. It uses 4 non-persistent workers; 0 workers also works.
     Early close drains only in-flight tasks.
+- The Worker completed fix 4 with Worker_2 review fixes in commit `05ecedc`.
+  Details are in [docs/notebook-otf-verification.md](notebook-otf-verification.md).
+  `MixedLoader` now slices, joins, and pins batches in one background thread
+  with a queue of 2 batches. There is no new setting or notebook change.
 - Training workers now shut down after fit. This freed about 10.0 GB of PC
   RAM for 8 workers.
 - The user ran short PC notebook 04 tests with commit `dd8cb60`,
@@ -1915,6 +1919,23 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   Limited in Seoul (11-20% preemption, $0.39/h), High in Taiwan ($0.60/h),
   and Medium in Singapore (20%+, $0.63/h). Nothing was lost.
 
+#### Background join and pinned-copy fix (fix 4)
+
+- Before the change, main-thread join plus pin took 6.59 ms of 70.9 ms
+  compiled per step (9.3%) and 5.16 ms of 88.6 ms eager (5.8%).
+- PC throughput after 30 warmup steps, before -> after:
+  compiled + cache, 4 workers 467.4 -> 472.0 and a repeated run 471.0 ->
+  468.8; eager + cache 356.9 -> 379.8 (+6.4%); compiled + decode, 6 workers
+  457.6 -> 470.4 (+2.8%). The compiled cache result has no reliable gain.
+- Extra pinned memory was at most about 72 MiB. Identity stayed exact for
+  200 batches at 0/2/4 workers; the fingerprint stayed
+  `32bd1035...9075`; epochs 2 and 3 matched the previous run. First-batch
+  times for epochs 1/2/3, 4 workers, were 5.20/0.86/0.87 s before and
+  5.19/0.87/0.86 s after.
+- Clean stop took about 0.47 s with no thread or worker left. QUICK PC cache
+  passed all 15 cells in 48.8 s. 76 shared tests and 34 generator tests pass.
+- VM speed is Pending because the VM is down.
+
 ### Decided
 
 - The cache inside the PC checkout is allowed only when git ignores it.
@@ -1940,7 +1961,7 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   +3.7 s per PC validation (about +45 s per 10-epoch PC run, about 1.5%),
   about +6.3 s per VM validation, and about +0.4 GB peak PSS per evaluation
   worker.
-- Pending: fix 4 (background join and pinned copy).
+- Done: fix 4, background join and pinned copy (`05ecedc`).
 
 - Done (user, 2026-10-14): told teammates that the VM is on branch `yx`,
   the `raise512-run1` images are gone on the VM, and `V3_DATA=png` there
