@@ -16,7 +16,7 @@ import numpy as np
 from PIL import Image
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"LSB-Dataset-Generator"))
 from lsb_torch import (torch,Corpus,RunSettings,TrainingImages,FixedPairs,PairSubset,
-                       OrderedPairLoader,training_loader,prefetch_for_images)
+                       OrderedPairLoader,MixedLoader,training_loader,prefetch_for_images)
 from lsb_cache import build_entry
 from test_lsb_source import record
 
@@ -263,13 +263,28 @@ class TorchTests(unittest.TestCase):
             next_epoch=list(loader)
             self.assertEqual(sum(len(batch[-1]) for batch in next_epoch),len(ds))
             self.assertFalse([t for t in threading.enumerate() if t.name=="mixed-loader-join"])
+            retained={p.pid for p in multiprocessing.active_children()}-before
+            self.assertEqual(len(retained),workers)
+            ds.set_epoch(2)
+            self.assertEqual(sum(len(batch[-1]) for batch in loader),len(ds))
+            self.assertEqual({p.pid for p in multiprocessing.active_children()}-before,retained)
             ds.set_epoch(0)
+            iterator=iter(loader)
+            next(iterator)
+            del iterator
+            gc.collect()
+            self.assertEqual({p.pid for p in multiprocessing.active_children()},before)
             iterator=iter(loader)
             next(iterator)
             try:
                 raise KeyboardInterrupt
             except KeyboardInterrupt:
-                loader.shutdown()
+                del iterator
+                gc.collect()
+            self.assertEqual({p.pid for p in multiprocessing.active_children()},before)
+            iterator=iter(loader)
+            next(iterator)
+            loader.shutdown()
             successor=iter(loader)
             next(successor)
             del iterator
@@ -293,6 +308,45 @@ class TorchTests(unittest.TestCase):
         loader.shutdown()
         self.assertFalse([t for t in threading.enumerate() if t.name=="mixed-loader-join"])
         self.assertFalse(multiprocessing.active_children())
+
+    def test_background_done_between_timeout_and_thread_check(self):
+        import queue as standard_queue
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        instances=[]
+        class ForcedEmpty(standard_queue.Queue):
+            def __init__(self,*args,**kwargs):
+                super().__init__(*args,**kwargs)
+                self.done=threading.Event()
+                self.forced=False
+                self.rechecked=False
+                instances.append(self)
+            def put(self,item,*args,**kwargs):
+                super().put(item,*args,**kwargs)
+                if item[0]=="done":
+                    self.done.set()
+            def get(self,block=True,timeout=None):
+                if timeout is not None and not self.forced:
+                    self.forced=True
+                    if not self.done.wait(5):
+                        raise AssertionError("producer did not publish done")
+                    while any(t.name=="mixed-loader-join" for t in threading.enumerate()):
+                        time.sleep(.001)
+                    raise standard_queue.Empty
+                return super().get(block,timeout)
+            def get_nowait(self):
+                self.rechecked=True
+                return super().get_nowait()
+        class EmptyLoader:
+            dataset=range(0)
+            pin_memory=False
+            _iterator=None
+            def __iter__(self):
+                return iter(())
+        with patch('lsb_torch.queue',SimpleNamespace(Queue=ForcedEmpty,Empty=standard_queue.Empty,
+                                                     Full=standard_queue.Full)):
+            self.assertEqual(list(MixedLoader(EmptyLoader(),8)),[])
+        self.assertTrue(instances[0].rechecked)
 
     def test_ordered_prefetch_equality(self):
         ds=TrainingImages(self.corpus(RunSettings(tile_size=256,buffer_size=8)))

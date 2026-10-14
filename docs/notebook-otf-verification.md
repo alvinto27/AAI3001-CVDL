@@ -372,9 +372,10 @@ generating the rest of a split.
 `MixedLoader` now runs the worker-group iteration, `torch.cat` join and
 `pin_memory()` copy in one producer thread. Its output queue holds at most two
 batches. The consumer still gets the same ordered batches. The thread stops
-when the epoch ends, the caller drops its iterator, an error occurs, or
-`shutdown()` runs. The producer shuts down training workers before it exits;
-`set_epoch()` starts a fresh worker set. No new environment setting was added.
+at epoch end but leaves persistent workers alive for the next epoch. A drop,
+interrupt, error or `shutdown()` stops both thread and workers. `set_epoch()`
+updates the shared epoch value before the retained workers start a new iterator.
+No new environment setting was added.
 
 The first PC check used the notebook XuNet clip3/GroupNorm model, AdamW,
 batch32, 4 cache workers, 30 warm-up and 300 measured optimizer steps. The
@@ -414,11 +415,47 @@ for 6,400 images. The producer transfers its original exception traceback to
 the consumer; a unit test verifies it. In a four-worker PC cache check, cleanup
 after an early iterator drop took 0.469 s, a caught interrupt 0.471 s, and
 explicit `shutdown()` 0.474 s. Each left zero producer threads and workers.
-A two-epoch drain with `set_epoch()` also left zero threads and workers.
-A scratch PC QUICK run executed all 15 notebook code cells in 53.240 s;
-Lightning fit end had zero producer threads and zero workers. Unit suites:
-75 shared tests and 34 generator tests passed. Notebook 04, dependency files,
-checkpoint originals and the project journal were not changed.
+A two-epoch drain with `set_epoch()` also left zero threads and workers in
+the first implementation; the persistent-worker correction below supersedes
+that worker lifetime only. A scratch PC QUICK run executed all 15 notebook
+code cells in 53.240 s; Lightning fit end had zero producer threads and zero
+workers. The first suite had 75 shared tests and 34 generator tests. Notebook
+04, dependency files, checkpoint originals and the project journal were not
+changed.
+
+#### Epoch-end race and persistent workers (review correction)
+
+If a queue read times out as the producer exits, the consumer checks the queue
+once more before it reports a missing result. A unit test forces the producer
+to put `done` between the timeout and the thread-state check. Normal epochs now
+retain the same persistent worker PIDs, as the old loader did. Early drop,
+interrupt, error, and `shutdown()` still stop them. The `fe23238` loader
+and corrected loader each processed complete earlier epochs at train photo
+fraction 0.07,
+then hashed the first 200 batches of epoch 2 and epoch 3 (32 images per batch).
+Each hash covers ordered image bytes, labels and keys. All six old/new hashes
+match. Four workers retained the same four PIDs through three epochs.
+
+| Workers | Epoch 2 SHA-256 | Epoch 3 SHA-256 |
+| ---: | --- | --- |
+| 0 | `1ac2e2b84bdb461ba742128bd6d7e54ab35b24ca374643669d72f77473973f18` | `ba83480f5a8cff191f034459b51436de1b928a8899c6b501072d2998263fff4d` |
+| 2 | `ab9bc807c47bfcad281f3e370642b0d3af2369e8be5b3716fe46b0939dd0e62b` | `90edb86b77820c89217883622df94d10b20c3d645a024e281f7ff49146b38d1c` |
+| 4 | `ef7739e6431a41bf0af6415f863b016a17e41de00d2e51e432f410bf2525c4ff` | `e19d5f6d178961c09a003d9a7132ac2d5c1f90aad352546bae25e1b3bcddea0e` |
+
+Time from `iter(loader)` through the first batch, PC cache, seconds:
+
+| Workers | Old epoch 1 / 2 / 3 | Corrected epoch 1 / 2 / 3 |
+| ---: | --- | --- |
+| 0 | 1.100 / 0.764 / 0.750 | 1.055 / 0.713 / 0.735 |
+| 2 | 3.104 / 0.778 / 0.766 | 3.089 / 0.788 / 0.763 |
+| 4 | 5.201 / 0.859 / 0.865 | 5.193 / 0.871 / 0.861 |
+
+After a normal epoch four workers remained alive; a dropped next-epoch
+iterator stopped all four in 0.466 s, a caught interrupt in 0.465 s and
+`shutdown()` in 0.464 s. Each left zero producer threads and workers.
+The corrected PC cache QUICK run passed all 15 cells in 48.796 s; fit end had
+zero threads and workers. Final suites: 76 shared and 34 generator tests pass.
+The VM remains unavailable for speed measurement.
 
 ### Why four-worker decode validation remains slow
 

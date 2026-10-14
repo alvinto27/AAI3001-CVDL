@@ -506,8 +506,8 @@ class MixedLoader:
     """Join and pin ordered groups in a bounded producer thread.
 
     The iterator owns its stop signal. Dropping it releases the producer and
-    workers even when the producer is waiting for queue space. Each epoch
-    starts a new worker set, so a shared set_epoch value is read afresh.
+    workers even when the producer is waiting for queue space. Normal epochs
+    keep persistent workers; set_epoch updates their shared epoch value.
     """
     def __init__(self,loader,batch_size):
         self.loader=loader
@@ -549,52 +549,72 @@ class MixedLoader:
             while not stop.is_set():
                 try:
                     ready.put(item,timeout=0.1)
-                    return
+                    return True
                 except queue.Full:
                     pass
+            return False
 
         def produce():
             failure=None
+            completed=False
             try:
                 for batch in self._joined_batches(stop):
-                    if stop.is_set():
+                    if stop.is_set() or not offer(("batch",batch)):
                         break
-                    offer(("batch",batch))
+                else:
+                    completed=not stop.is_set()
             except BaseException as error:
                 failure=(error,error.__traceback__)
             finally:
-                try:
-                    self._stop_workers()
-                except BaseException as error:
-                    if failure is None:
-                        failure=(error,error.__traceback__)
+                if not completed or failure is not None:
+                    try:
+                        self._stop_workers()
+                    except BaseException as error:
+                        if failure is None:
+                            failure=(error,error.__traceback__)
                 offer(("done",failure))
 
         thread=threading.Thread(target=produce,name="mixed-loader-join",daemon=False)
         state=(stop,thread)
         self._producer=state
         thread.start()
+        batches=0
+        failed=False
         try:
             while True:
                 try:
                     kind,value=ready.get(timeout=0.1)
                 except queue.Empty:
-                    if not thread.is_alive():
+                    if thread.is_alive():
+                        continue
+                    # It may have put its last result just after the timeout.
+                    try:
+                        kind,value=ready.get_nowait()
+                    except queue.Empty:
                         raise RuntimeError("mixed loader producer stopped without a result")
-                    continue
                 if kind=="done":
                     if value is not None:
                         error,traceback=value
+                        failed=True
                         raise error.with_traceback(traceback)
                     break
+                batches+=1
                 yield value
         finally:
-            stop.set()
+            natural=batches==len(self) and not failed
+            if not natural:
+                stop.set()
             thread.join(timeout=30)
             if thread.is_alive():
+                stop.set()
+                thread.join(timeout=30)
                 raise RuntimeError("mixed loader producer did not stop within 30 seconds")
-            if self._producer is state:
-                self._producer=None
+            try:
+                if not natural:
+                    self._stop_workers()
+            finally:
+                if self._producer is state:
+                    self._producer=None
 
     def _join(self,groups):
         parts=tuple(torch.cat([group[i] for group in groups]) for i in range(3))
