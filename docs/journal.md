@@ -1834,6 +1834,8 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   logging.
 - The first G4 job proof was `g4-quick-proof-1`: QUICK, decode, 32 train
   workers, 16 evaluation workers, compile default.
+- The second G4 proof used job ID `g4-quick-proof-2` with the same settings
+  and no SSH login to G4 during the run.
 
 ### Found
 
@@ -2048,6 +2050,23 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   - Data source decode was confirmed. The fix is commit `6e0323a`, which
     makes `RemoveIPC=no` and restarts logind. It is not yet applied on G4.
 
+#### G4 job proof 2
+
+- The runner ran from 13:22:51.96Z to 13:26:11.93Z (199.96 s). Pi upload
+  finished at about 13:26:14Z, and the VM was offline by 13:26:29Z, about
+  4 min uptime.
+- The Pi result was done, exit 0, with 15/15 code cells and 0 tracebacks.
+  It contains the checkpoint, test predictions, heatmaps, and curves.
+  The best checkpoint was
+  `best-epoch01-val_pe0.1562-val_auc0.8789.ckpt`.
+- Cell times: settings 8.5 s, loaders 17.6 s, fit 106.3 s (epoch 0
+  includes about 65 s compile), evaluation 45.3 s, and Notebook 02 17.3 s.
+- QUICK test results were accuracy 0.7812, AUC 0.8633, and P_E 0.1250.
+  These are QUICK results only and are not real measurements. Peak sampled
+  GPU memory was 1,521 MiB, but sampling ran only 60 s and was sparse.
+- This confirms the `RemoveIPC` cause: with the same settings and no SSH
+  session ending, the run did not fail.
+
 ### Decided
 
 - The cache inside the PC checkout is allowed only when git ignores it.
@@ -2095,9 +2114,11 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Done: VM fix 4 and fix 5 measurements. Fix 4 has no reliable VM gain;
   fix 5 was already verified above.
 - Done: removed VM scratch `~/otf-dev/eval-yx` after the VM returned.
-- Pending: proof 2 (`g4-quick-proof-2`), with no SSH during the run. The
-  user starts the VM.
+- Done: proof 2 (`g4-quick-proof-2`) passed end to end without SSH.
 - Pending: apply `RemoveIPC=no` on G4 in maintenance mode.
+- Pending: first full 10-epoch G4 run using decode.
+- Pending, optional: sample `nvidia-smi` every 10 s and include `boot.log`
+  in the uploaded folder.
 - Pending: measure decode plus training speed and validation time on G4.
 - Pending: dataset download plan, per-source balanced sampler, and licence
   checks.
