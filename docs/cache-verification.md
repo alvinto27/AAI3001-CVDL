@@ -47,6 +47,14 @@ file locks for concurrent writers, a disk-space preflight, and group-readable/
 writable cache files. The shared cache root uses group aai3001 and setgid.
 Masters and existing datasets are never changed or deleted.
 
+The cache may be outside the checkout. It may be inside the checkout only when
+`git check-ignore -q <cache-root>` succeeds from the repository root. The
+builder refuses an in-checkout path when Git reports that it is not ignored,
+when the check fails, or when Git is unavailable. The worker limit remains
+1 through 8. `check_cache.py` and the loader had no separate cache-location
+rule to change; they continue to validate cache contents and never create a
+cache implicitly.
+
 ## Commands
 
 Run copied code from VM scratch, not from a writable VM checkout. Before the
@@ -67,6 +75,36 @@ OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
 For tests, set TMPDIR to a temporary subfolder **inside** the approved cache
 root. Remove that test folder after tests. Long jobs can run in the background
 with logs in code scratch; keep the real cache when cleaning scratch.
+
+On the PC, the Git-ignored cache is inside the checkout and uses the container
+path `/work/Datasets/otf-cache/v1`:
+
+```sh
+podman exec -w /work aai3001 python scripts/build_cache.py \
+  --repo-root /work --cache-root /work/Datasets/otf-cache/v1 --workers 8
+podman exec -w /work aai3001 python scripts/check_cache.py \
+  --repo-root /work --cache-root /work/Datasets/otf-cache/v1 --gate verify
+```
+
+The builder runs `git check-ignore` before it creates or resumes this cache.
+
+## PC cache build (2026-10-14)
+
+The PC container did not include Git, so Git 2.43.0 was installed in the
+container before the build. `git check-ignore` then confirmed that
+`/work/Datasets/otf-cache/v1` is ignored by the checkout. The build used the
+maximum allowed eight workers, OMP=1, and completed in 170.430413 seconds.
+It created 1,900 NPY files, 1,900 entry JSON records, one header JSON, and
+1,901 persistent lock files. Cache content is 52,763,054,963 bytes
+(about 52.76 GB or 49.15 GiB); allocated storage is 52,773,285,888 bytes.
+
+The strict `check_cache.py --gate verify` pass completed in 13.751310 seconds.
+It checked all 1,900 arrays and current master files: zero hash mismatches,
+52,761,268,224 array bytes, and all source/version/shape checks passed.
+The team VM was off and SSH timed out. No saved local copy of its 1,900 entry
+JSON records was available, so the requested PC-versus-VM JSON fingerprint
+comparison is **Pending**. Do not start the VM only for this comparison; run it
+when the VM or a saved read-only copy of its records becomes available.
 
 ## Isolated decode scaling
 

@@ -6,6 +6,7 @@ import json
 import multiprocessing as mp
 import os
 import shutil
+import subprocess
 import sys
 import time
 from collections import Counter
@@ -28,6 +29,25 @@ def inventory(root):
     return result
 
 
+def validate_cache_location(root, cache):
+    """Allow an in-checkout cache only when Git confirms it is ignored."""
+    root,cache=Path(root).resolve(),Path(cache).resolve()
+    if not cache.is_relative_to(root):
+        return
+    try:
+        result=subprocess.run(["git","check-ignore","-q","--",str(cache)],cwd=root,
+                              check=False,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,
+                              text=True)
+    except FileNotFoundError as error:
+        raise ValueError("cache is inside the checkout, but git is unavailable; refusing because ignored status cannot be verified (workers must be 1..8)") from error
+    if result.returncode==0:
+        return
+    if result.returncode==1:
+        raise ValueError("cache inside the checkout must be ignored by git (workers must be 1..8)")
+    detail=result.stderr.strip() or f"git check-ignore exited {result.returncode}"
+    raise ValueError(f"could not verify that the in-checkout cache is ignored: {detail} (workers must be 1..8)")
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--repo-root",type=Path,required=True)
@@ -35,8 +55,9 @@ def main():
     p.add_argument("--workers",type=int,default=8)
     args=p.parse_args()
     root,cache=args.repo_root.resolve(),args.cache_root.resolve()
-    if cache.is_relative_to(root) or not 1<=args.workers<=8:
-        raise ValueError("cache must be outside checkout; workers 1..8")
+    if not 1<=args.workers<=8:
+        raise ValueError("workers must be 1..8")
+    validate_cache_location(root,cache)
     os.umask(0o002)
     initialize_cache(cache)
     photos=inventory(root)
