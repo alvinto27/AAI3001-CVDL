@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import resource
 import subprocess
 import sys
 import time
@@ -154,7 +155,17 @@ def train_measure(train, XuNet, mode, workers, warmup, steps, gpu_only=False):
         torch.cuda.empty_cache()
 
 
+def raise_open_file_limit():
+    """Many loader workers share tensors through file descriptors; 1024 is too few."""
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    wanted = hard if hard != resource.RLIM_INFINITY else 1048576
+    if soft < min(wanted, 65536):
+        resource.setrlimit(resource.RLIMIT_NOFILE, (min(wanted, 65536), hard))
+    print("Open-file limit:", resource.getrlimit(resource.RLIMIT_NOFILE), flush=True)
+
+
 def main():
+    raise_open_file_limit()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cache-root", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
