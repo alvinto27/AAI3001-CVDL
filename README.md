@@ -37,8 +37,8 @@ Notebook 04 loader controls:
 | `V3_DATA` | `otf`; `png` keeps the original dataset path. |
 | `V3_MAIN_THREADS` | 1 main-process torch CPU thread. |
 | `V3_WORKERS` | 6 OTF training workers; PNG retains its platform-based count. |
-| `V3_EVAL_WORKERS` | 4 for val, test and train-eval; workers stop after each pass. |
-| `V3_PREFETCH_IMAGES` | 128 images ahead per worker; 32 training groups of four. |
+| `V3_EVAL_WORKERS` | 4 for val, test and train-eval; each worker owns whole-photo evaluation tasks and stops after each pass. |
+| `V3_PREFETCH_IMAGES` | 128 images ahead per worker; 32 training groups of four. Evaluation rounds the lead to whole-photo tasks (one task at 512 validation). |
 | `V3_PREFETCH` | Unset; optional training group-count override. Explicit 4 means only 16 images ahead. |
 | `V3_SOURCE`, `V3_CACHE_ROOT` | Decode unless a cache root is supplied. |
 | `V3_COMPILE` | `off` by default; `default` compiles the training network in place. Other modes are rejected. TF32 flags stay at their native values. |

@@ -400,6 +400,106 @@ class PairSubset(Dataset):
         return clean,stego,index
 
 
+class PhotoPairTasks(Dataset):
+    """One evaluation task per photo, regardless of pair table order.
+
+    Return local pair indices so the parent can restore even a stratified
+    PairSubset's original, non-photo-major order without rereading photos.
+    """
+    def __init__(self,dataset):
+        self.dataset=dataset
+        base=dataset.dataset if isinstance(dataset,PairSubset) else dataset
+        if not isinstance(base,FixedPairs):
+            raise TypeError("photo-owned evaluation needs FixedPairs or PairSubset")
+        groups={}
+        for local in range(len(dataset)):
+            original=dataset.indices[local] if isinstance(dataset,PairSubset) else local
+            photo_id=base.entries[original][0]["photo_id"]
+            groups.setdefault(photo_id,[]).append(local)
+        self.groups=list(groups.values())
+        self.max_images=max((2*len(group) for group in self.groups),default=2)
+
+    def __len__(self):
+        return len(self.groups)
+
+    def __getitem__(self,index):
+        indices=self.groups[index]
+        pairs=[self.dataset[local] for local in indices]
+        return (torch.tensor(indices,dtype=torch.int64),
+                torch.stack([pair[0] for pair in pairs]),
+                torch.stack([pair[1] for pair in pairs]))
+
+
+class OrderedPairLoader:
+    """Restore pair order and old batch boundaries after photo-owned tasks.
+
+    Worker processes are short-lived, including when a caller drops an
+    iterator during a Lightning sanity check or interrupts an evaluation.
+    """
+    def __init__(self,dataset,batch_size,num_workers=4,pin_memory=True,prefetch_images=128):
+        if batch_size<=0 or num_workers<0:
+            raise ValueError("batch size must be positive and workers nonnegative")
+        tasks=PhotoPairTasks(dataset)
+        prefetch=prefetch_for_images(tasks.max_images,prefetch_images)
+        kwargs=dict(batch_size=None,num_workers=num_workers,pin_memory=pin_memory,
+                    persistent_workers=False,worker_init_fn=initialize_worker)
+        if num_workers:
+            kwargs.update(multiprocessing_context="spawn",prefetch_factor=prefetch)
+        self.loader=DataLoader(tasks,**kwargs)
+        self.dataset=dataset
+        self.batch_size=batch_size
+        self.pin_memory=pin_memory
+        self.prefetch_factor=prefetch
+        self.num_workers=num_workers
+        self.persistent_workers=False
+
+    def __len__(self):
+        return math.ceil(len(self.dataset)/self.batch_size)
+
+    def __iter__(self):
+        iterator=None
+        pending={}
+        next_index=0
+        batch=[]
+        try:
+            iterator=iter(self.loader)
+            for indices,clean,stego in iterator:
+                for offset,local in enumerate(indices.tolist()):
+                    if local in pending or local<next_index:
+                        raise ValueError("duplicate evaluation pair index")
+                    pending[local]=(clean[offset],stego[offset])
+                while next_index in pending:
+                    c,s=pending.pop(next_index)
+                    batch.append((c,s,next_index))
+                    next_index+=1
+                    if len(batch)==self.batch_size:
+                        yield self._batch(batch)
+                        batch=[]
+            if next_index!=len(self.dataset) or pending:
+                raise ValueError("evaluation tasks omitted pair indices")
+            if batch:
+                yield self._batch(batch)
+        finally:
+            if hasattr(iterator,"_shutdown_workers"):
+                try:
+                    if next_index<len(self.dataset) and self.num_workers:
+                        # Stop scheduling new photos, then consume only tasks
+                        # already in flight before closing the result queue.
+                        iterator._sampler_iter=iter(())
+                        for _ in iterator:
+                            pass
+                finally:
+                    iterator._shutdown_workers()
+
+    @staticmethod
+    def _batch(batch):
+        clean=torch.stack([pair[0] for pair in batch])
+        stego=torch.stack([pair[1] for pair in batch])
+        if batch[0][0].is_pinned():
+            clean,stego=clean.pin_memory(),stego.pin_memory()
+        return clean,stego,torch.tensor([pair[2] for pair in batch],dtype=torch.int64)
+
+
 class MixedLoader:
     """Join ready worker groups in the parent, retaining tails and sample keys.
 

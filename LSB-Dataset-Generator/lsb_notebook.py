@@ -5,7 +5,7 @@ import json
 import numpy as np
 import pandas as pd
 from lsb_torch import (torch,RunSettings,Corpus,TrainingImages,FixedPairs,PairSubset,
-                       training_loader,DataLoader,prefetch_for_images)
+                       training_loader,OrderedPairLoader,prefetch_for_images)
 
 
 def fixed_subset(dataset,count,seed=0):
@@ -47,23 +47,24 @@ class NotebookData:
         pair_batch=max(1,batch_size//2)
         task_images=min(2 if paired else 4,train_batch)*(2 if paired else 1)
         train_prefetch=prefetch_for_images(task_images,prefetch_images) if prefetch is None else prefetch
-        eval_prefetch=prefetch_for_images(pair_batch*2,prefetch_images)
+        train=training_loader(self.train,batch_size=train_batch,num_workers=workers,
+                              pin_memory=pin_memory,prefetch_factor=prefetch,prefetch_images=prefetch_images)
+        # Group pairs by photo in a worker, then restore their fixed table order.
+        kwargs=dict(batch_size=pair_batch,num_workers=eval_workers,pin_memory=pin_memory,
+                    prefetch_images=prefetch_images)
+        val=OrderedPairLoader(self.val,**kwargs)
+        test=OrderedPairLoader(self.test,**kwargs)
+        diagnostic=fixed_subset(self.fixed_train,min(1000,len(self.fixed_train)),0)
+        train_eval=OrderedPairLoader(diagnostic,**kwargs)
         self.record.update(workers=workers,eval_workers=eval_workers,main_threads=torch.get_num_threads(),
                            prefetch_images=prefetch_images,prefetch_override=prefetch,
                            prefetch_factor=train_prefetch,train_prefetch_images=task_images*train_prefetch,
-                           eval_prefetch_factor=eval_prefetch,eval_persistent_workers=False,
+                           eval_prefetch_factor=val.prefetch_factor,
+                           eval_prefetch_by_split={"val":val.prefetch_factor,"test":test.prefetch_factor,
+                                                   "train_eval":train_eval.prefetch_factor},
+                           eval_task="one_photo",eval_persistent_workers=False,
                            in_order=True,group_images=4,batch_images=batch_size,
                            tensor_dtype=self.corpus.settings.tensor_dtype)
-        # Evaluation is intermittent: release workers/photo arrays after each pass.
-        kwargs=dict(num_workers=eval_workers,pin_memory=pin_memory,persistent_workers=False)
-        if eval_workers:
-            kwargs.update(multiprocessing_context="spawn",prefetch_factor=eval_prefetch)
-        train=training_loader(self.train,batch_size=train_batch,num_workers=workers,
-                              pin_memory=pin_memory,prefetch_factor=prefetch,prefetch_images=prefetch_images)
-        val=DataLoader(self.val,batch_size=pair_batch,**kwargs)
-        test=DataLoader(self.test,batch_size=pair_batch,**kwargs)
-        diagnostic=fixed_subset(self.fixed_train,min(1000,len(self.fixed_train)),0)
-        train_eval=DataLoader(diagnostic,batch_size=pair_batch,**kwargs)
         return train,val,test,train_eval
 
     def print_record(self):

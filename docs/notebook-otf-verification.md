@@ -31,8 +31,9 @@ Recommended VM controls: `V3_SOURCE=cache`,
 `V3_CACHE_ROOT=/srv/aai3001/otf-cache/v1`, `V3_WORKERS=6`,
 `V3_EVAL_WORKERS=4`, `V3_MAIN_THREADS=1`, `V3_PREFETCH_IMAGES=128`.
 Leave `V3_PREFETCH` unset to derive 32 four-image training groups. Evaluation
-uses the same image budget: four 32-image pair batches per worker at full batch32.
-Its workers stop after each pass, so their photo arrays do not occupy RAM during
+uses the same image budget rounded to whole-photo tasks. At 512, validation
+uses one photo task (up to 140 images) per worker in flight. Its workers stop
+after each pass, so their photo arrays do not occupy RAM during
 training. The record includes both worker counts, thread count, requested image
 budget, effective training lead, derived factors and any explicit override.
 The notebook prints the full settings/selected-photo record and saves
@@ -275,6 +276,97 @@ separately above. All train worker exits were zero. VM checks required zero L4
 utilization, no compute process and no notebook kernel before each test. They
 used mirrored scratch code, the retained cache, and a read-only live checkout.
 
+### Photo-owned fixed evaluation (2026-10-14)
+
+Val, test, and the notebook's 1,000-pair train-eval subset now assign each
+photo's pairs to one worker task. The parent restores the fixed pair-table
+order and original batch boundaries, including the stratified subset order.
+Each evaluation iterator uses four nonpersistent workers by default; zero
+workers also works. `V3_PREFETCH_IMAGES` now applies to a *whole photo task*:
+round 128 images up by the largest task size in that split. For 512 validation,
+one task can contain 140 images, so its factor is one. Training is unchanged.
+
+Full-pass read-only checks (512, batch 16, four workers, uint8, no pinning)
+used the same SHA-256 over ordered clean/stego batch bytes and pair indices
+before and after. All 11,238 validation pairs had SHA-256
+`8646835299a9f6936acf7cd1fb4165bfa8b8ef043ffe76e7fea06fd3552053de`.
+
+| Platform/source/split | Old reads / seconds / peak worker PSS | New reads / seconds / peak worker PSS |
+| --- | --- | --- |
+| PC decode val | 810 / 135.627 / 2.409 GB | 270 / 47.174 / 2.808 GB |
+| PC cache val | 810 / 19.879 / 2.081 GB | 270 / 23.620 / 2.462 GB |
+| VM cache val | 810 / 68.603 / 1.880 GB | 270 / 74.897 / 2.273 GB |
+| PC decode test (10,956 pairs) | 745 / 133.784 / 2.329 GB | 249 / 46.561 / 2.783 GB |
+
+The full test pass has identical before/after SHA-256
+`455c0a2f3e5fc146e59988d75a7835d6b0c5cf834d8747463db99609e2732e77`.
+Photo-owned decode cuts full-pass time by about 2.9x. Cache is slower by
+18.8% on this PC pass and 9.2% on the VM pass. This is a measured trade-off,
+not a claim that cache evaluation is faster. In a separate warm-cache pass
+without hashing, parent-side `torch.stack` for 703 restored batches took
+5.392 s of 17.001 s total. Old loading collated those batches in workers;
+photo-sized transfers and parent regrouping add cost when source reads are
+already cheap. The independent warm-cache pass is not a matched old/new speed
+comparison. Retain the photo-owner policy because it removes duplicate decode
+reads and restores exact outputs; a copy-free parent path needs a separate
+worker-lifetime and memory test.
+
+All times include startup and shutdown; PSS samples are summed worker peaks,
+not parent or GPU memory.
+
+The PC full-stream identity checks use batch16 and hash each ordered batch's
+clean pixels, stego pixels and pair indices. The pair position fixes its
+clean=0/stego=1 labels. At 512, all val, test and train-eval (1,000 pairs)
+streams matched the old zero-worker loader in decode and cache with zero, two
+and four new workers. New photo reads equalled distinct photos: val 270,
+test 249, train-eval 611. The 512 train-eval digest was
+`436ad58b9095198f9973611fa1b02ba02e70df3fd6ea266510e783356faf40c0`.
+
+At 256, PC cache streams matched at zero, two and four new workers for
+42,204 validation pairs (270 photos; SHA-256
+`a054df0ff5cf3d1cc690da903560229bf464f85b624813389c59ca7d2def7c63`),
+41,088 test pairs (249 photos; SHA-256
+`547861c2c800c7ee4b4a1418d3914bc5f9d6a766f371d896c53acfc7a2f786e1`),
+and 1,000 train-eval pairs (554 photos; SHA-256
+`142ca70569066ce2987cf767c7bc920175fd0e0aed2b6e5bbe62515d0104c1f4`).
+Old zero-worker decode and new two/four-worker decode train-eval matched
+this last digest; new decode read exactly 554 photos instead of 1,000.
+Old and new zero-worker decode validation also matched the cache digest.
+
+After the Spot VM returned, all 16 saved VM val/test 256 identity files
+were reviewed: old zero-worker and new zero/two/four-worker streams matched
+in both decode and cache, with 270 val / 249 test reads for every new pass.
+The remote benchmark helper had omitted `fixed_subset` for the train split:
+its seven saved train files instead process all 202,572 train pairs and do
+**not** verify notebook train-eval. The correct 1,000-pair train-eval checks
+above were performed on the PC. One extra VM full-train case was interrupted
+by preemption and is not needed for notebook train-eval. The VM 512 full-cache
+validation benchmark above used code files whose SHA-256 values match the
+final local code and was completed before the preemption. No VM measurement
+needed for this task remains Pending.
+
+A read-only fixed checkpoint (`best-epoch07-val_pe0.0149-val_auc0.9976.ckpt`)
+produced 21,912 test prediction rows with identical before/after CSV bytes,
+SHA-256 `9ab54c66e9e098126b76441e284294e61045d185043de19dd26efa138495b6f6`.
+No original checkpoint or output was edited. A 200-batch, 6,400-image
+six-worker Mode 1 training prefix retained SHA-256
+`32bd10352c3e2c3d6a5c4600632bd0f962c9528975572e162bb973f7acc99075`
+(batch image bytes, labels, then keys). Unit checks passed 13 loader tests,
+74 shared tests, and 34 generator tests. A scratch PC cache QUICK run executed
+all 15 code cells in 55.374 s, including both epochs, sanity validation,
+test predictions and notebook 02's four heatmaps. It wrote outputs to scratch only.
+
+A direct early-close check used eight validation photos and four workers:
+two-batch sanity-style close 0.645 s, one-batch iterator drop 0.619 s,
+and a caught interrupt after two batches 0.614 s. An instrumented second
+all-cell QUICK run took 53.769 s; actual Lightning sanity-check worker
+shutdown took 0.475 s. Its six later evaluation shutdowns took
+0.474–0.496 s. Each had four workers before and zero alive after. No workers
+remained after the direct cases either; the 13-test loader suite emitted no
+abort/shutdown warning. The loader first stops scheduling new photos and
+drains only tasks already in flight before worker shutdown, rather than
+generating the rest of a split.
+
 ### Why four-worker decode validation remains slow
 
 A controlled first-1,600-pair check used 100 full32-image batches:
@@ -297,8 +389,8 @@ First-photo loads take0.6674019240017515–0.6784606350047397 s; first fetch tak
 24.02033233642578 ms). Device transfer totals0.09216743254661561 s; host
 transfer calls0.010391062052804045 s. Validation-step host spans total
 2.6321538840056746 s, mainly including GPU completion. Epoch AUC/P_E work takes
-0.002354937998461537 s. Main-process CPU totals3.52 s. Evaluation prefetch
-remains four full batches/128 images; it was not reduced by this change.
+0.002354937998461537 s. Main-process CPU totals3.52 s. In that earlier
+check, evaluation prefetch was four full batches/128 images.
 
 A two-epoch, one-step-per-epoch, zero-rate Lightning fit verified true retained
 worker reuse: the same eight PIDs took24.04181039600371 s on the first prefix
@@ -308,10 +400,10 @@ prefix decoding. Separate `Trainer.validate` calls tear workers down and are
 not a valid warm-worker comparison. The full103.56 s before-pass above was
 fresh, so earlier warm workers did not cause that particular advantage.
 
-Proposal only, not implemented: assign all tiles from each evaluation photo to
-one worker, decode once, then restore canonical output order; or use the approved
-cache where available. More workers or deeper queues do not remove duplicated
-photo loading. The four-worker nonpersistent design is unchanged.
+The preceding measurements and proposal describe the earlier pair-batch
+loader. The photo-owned implementation and new measurements are in the section
+above. More workers or deeper queues alone cannot remove repeated photo reads.
+The four-worker nonpersistent policy is unchanged.
 
 ### Early stop, interruption and QUICK
 

@@ -2,6 +2,9 @@
 import dataclasses
 import hashlib
 import json
+import gc
+import multiprocessing
+import time
 import shutil
 import sys
 import tempfile
@@ -11,7 +14,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"LSB-Dataset-Generator"))
-from lsb_torch import Corpus,RunSettings,TrainingImages,FixedPairs,training_loader,prefetch_for_images
+from lsb_torch import (torch,Corpus,RunSettings,TrainingImages,FixedPairs,PairSubset,
+                       OrderedPairLoader,training_loader,prefetch_for_images)
 from lsb_cache import build_entry
 from test_lsb_source import record
 
@@ -183,7 +187,7 @@ class TorchTests(unittest.TestCase):
         self.assertTrue(train.loader.persistent_workers)
         for loader in evaluation:
             self.assertEqual(loader.num_workers,4)
-            self.assertEqual(loader.prefetch_factor,4)
+            self.assertEqual(loader.prefetch_factor,prefetch_for_images(loader.loader.dataset.max_images))
             self.assertFalse(loader.persistent_workers)
         self.assertEqual(adapter.record['eval_workers'],4)
         self.assertEqual(adapter.record['prefetch_images'],128)
@@ -192,10 +196,54 @@ class TorchTests(unittest.TestCase):
         train,*evaluation=adapter.loaders(8,0,False,4,eval_workers=0,prefetch_images=64)
         self.assertEqual(adapter.record['prefetch_factor'],4)
         self.assertEqual(adapter.record['prefetch_override'],4)
-        self.assertEqual(adapter.record['eval_prefetch_factor'],8)
+        self.assertEqual(adapter.record['eval_prefetch_factor'],32)  # Empty validation, one pair fallback.
         self.assertTrue(all(loader.num_workers==0 for loader in evaluation))
         with self.assertRaises(ValueError):
             adapter.loaders(32,4,False,eval_workers=-1)
+
+    def test_photo_owned_evaluation_order_batches_and_reads(self):
+        from unittest.mock import patch
+        rows=[{**r,"split":"val"} for r in self.photos]
+        ds=FixedPairs(self.corpus(RunSettings(tile_size=256),rows),"val")
+        # Stratified order revisits photos. Every photo must still be read once.
+        selections=[0,9,18,27,1,10,19,28,2,11,20,29,3]
+        for subset in (ds,PairSubset(ds,selections)):
+            old=list(torch.utils.data.DataLoader(subset,batch_size=4,num_workers=0))
+            old_bytes=[(c.numpy().tobytes(),s.numpy().tobytes(),idx.tolist()) for c,s,idx in old]
+            for workers in (0,2,4):
+                loader=OrderedPairLoader(subset,4,workers,False,prefetch_images=16)
+                with self.subTest(subset=len(subset),workers=workers):
+                    got=[(c.numpy().tobytes(),s.numpy().tobytes(),idx.tolist()) for c,s,idx in loader]
+                    self.assertEqual(got,old_bytes)
+                    self.assertEqual(len(loader),len(old))
+                    self.assertEqual(len(loader.loader.dataset.groups),4)
+            with patch.object(ds.corpus,'photo',wraps=ds.corpus.photo) as loads:
+                list(OrderedPairLoader(subset,4,0,False))
+                self.assertEqual(loads.call_count,4)
+
+    def test_photo_owned_iterator_drop_and_interrupt_release_workers(self):
+        rows=[{**r,"split":"val"} for r in self.photos]
+        ds=FixedPairs(self.corpus(RunSettings(tile_size=256),rows),"val")
+        loader=OrderedPairLoader(ds,4,2,False)
+        before={p.pid for p in multiprocessing.active_children()}
+        iterator=iter(loader)
+        next(iterator)
+        children=[p for p in multiprocessing.active_children() if p.pid not in before]
+        self.assertEqual(len(children),2)
+        start=time.perf_counter()
+        del iterator
+        gc.collect()
+        for child in children:
+            child.join(timeout=10)
+            self.assertFalse(child.is_alive())
+        self.assertLess(time.perf_counter()-start,12)
+        try:
+            for _ in loader:
+                raise KeyboardInterrupt
+        except KeyboardInterrupt:
+            pass
+        gc.collect()
+        self.assertEqual({p.pid for p in multiprocessing.active_children()},before)
 
     def test_ordered_prefetch_equality(self):
         ds=TrainingImages(self.corpus(RunSettings(tile_size=256,buffer_size=8)))
