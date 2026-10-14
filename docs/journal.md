@@ -1786,6 +1786,22 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - The user ran short PC notebook 04 tests with commit `dd8cb60`,
   `V3_COMPILE=default`, `QUICK=False`, and the RX 9070 XT. The user stopped
   them by hand and deleted the outputs afterward.
+- The Worker limited compile helper threads in commit `22e61a9`. With
+  `V3_COMPILE=default`, the notebook sets
+  `TORCHINDUCTOR_COMPILE_THREADS=4`; an explicit value overrides it.
+- The Worker completed Mode 2 steps 18 and 19 in commit `e84df32`. The full
+  record is [docs/mode2-verification.md](mode2-verification.md).
+  - New module: `LSB-Dataset-Generator/lsb_mode2_torch.py`. Each worker owns
+    whole photos, reads and embeds each photo once, and yields uint8 tiles
+    with actual-change labels and side records through a bounded 1,024-image
+    shuffle.
+  - Fixed evaluation keeps every validation/test tile in fixed order.
+    `BagLoader` gives one bag per photo, the real tile count, no padding,
+    per-tile labels, and photo-level fields. A photo is label 1 when any tile
+    changes.
+  - Manifest maxima are 70 / 260 for RAISE and 16 / 64 for DIV2K at 512 /
+    256. Step 17, the pre-built Mode 2 writer, is deferred. No MIL model or
+    notebook change was made.
 
 ### Found
 
@@ -1833,6 +1849,39 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   compile is about 7:20 per epoch, or about 73 min for 10 epochs.
 - Sixteen idle `torch.compile` helper processes stayed alive. Each used about
   410 MB RSS, and available PC RAM was about 6.3 GB.
+- Compile-helper limit results, PC cache, 6 workers, 300 steps:
+
+  | Measure | Before | After |
+  | --- | ---: | ---: |
+  | Compiler processes | 17 | 5 |
+  | Cold summed RSS | 9.44 GB | 3.03 GB |
+  | Cold summed PSS | 1.30 GB | 0.80 GB |
+  | Warm summed PSS | 0.53 GB | 0.49 GB |
+  | Warm images/s | 471.1 | 473.9 |
+  | Cold images/s | 409.9 | 417.9 |
+  | Warm first step | 5.4 s | 5.1 s |
+
+  Most RSS was shared pages. The real cold saving is about 0.5 GB.
+- Mode 2 parity used 6 real photos, decode and cache sources, train/val/test,
+  and 0, 2, and 4 workers. There were 0 pixel, record, label, or bag
+  mismatches against `lsb_mode2.iter_photo_tiles`. Mode 1 was unchanged:
+  200 batches and 6,400 images had fingerprint `32bd1035...9075` before and
+  after.
+- Full train epoch at 512, cache, 6 workers, 1,381 photos and 107,900 tiles:
+  PC 127.5 s (846 images/s, peak PSS 5.73 GB); VM 252.0 s (428 images/s,
+  peak PSS 5.27 GB).
+- Natural label-1 share at 512 was 27,008/91,348 (29.57%) for RAISE,
+  5,870/16,552 (35.46%) for DIV2K, and 32,878/107,900 (30.47%) combined.
+  No rebalancing or class weights were used.
+- Sample benchmark, 128 photos and 9,808 tiles in 256 bags, tile images/s /
+  bags/s:
+
+  | Source | 4 workers | 6 workers | 8 workers |
+  | --- | ---: | ---: | ---: |
+  | PC cache | 512.1 / 14.9 | 505.7 / 14.9 | - |
+  | PC decode | - | - | 326.0 / 9.0 |
+  | VM cache | 268.5 / 8.6 | 286.9 / 8.2 | - |
+  | VM decode | - | - | 136.1 / 3.8 |
 
 ### Decided
 
@@ -1841,13 +1890,19 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   `/work/Datasets/otf-cache/v1`, 4 training workers, and
   `V3_COMPILE=default`. Four workers are not measured yet; confirm them in
   the next full PC run. The expected speed is about 13.86 it/s.
+- Plan steps 15, 16, 18, and 19 are Done. Step 17 is deferred. Mode 2 is
+  on-the-fly only for now.
+
 
 ### Next
 
 - Pending: confirm the 4-worker PC setting in the next full PC run.
-- Pending: limit or close the idle `torch.compile` helper processes (Worker).
-- Later: Mode 2 steps 18-19, fix 4 (background join and pinned copy), and
-  fix 5 (one photo per evaluation worker, decode once, same order).
+- Done: limited compile helper processes with `TORCHINDUCTOR_COMPILE_THREADS=4`
+  (`22e61a9`).
+- Pending: MIL batching and model design, when photo-level work starts; the
+  user will decide then.
+- Pending: fix 4 (background join and pinned copy) and fix 5 (one photo per
+  evaluation worker, decode once, same order).
 - Done (user, 2026-10-14): told teammates that the VM is on branch `yx`,
   the `raise512-run1` images are gone on the VM, and `V3_DATA=png` there
   needs a rebuild.
