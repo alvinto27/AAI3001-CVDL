@@ -17,6 +17,7 @@ cannot silently resume the PNG baseline. `V3_RUN_NAME` overrides the name.
 | `V3_MAIN_THREADS` | 1; explicit main-process torch CPU thread count, also in reused kernels. |
 | `V3_WORKERS` | 6 training workers. |
 | `V3_EVAL_WORKERS` | 4 for val, test and train-eval; nonpersistent, released after each pass. |
+| `V3_DIAG_WORKERS` | `V3_EVAL_WORKERS`; reads the diagnostics cell's 1,000 train and 1,000 validation pairs, one photo per task, in the original order. |
 | `V3_PREFETCH_IMAGES` | 128 images ahead per worker; rounded up to whole tasks. |
 | `V3_PREFETCH` | Unset; optional old group-count override for training. Explicit 4 means 16 images ahead with groups4, not the new default. Ordered delivery remains enabled. |
 | `V3_TILE_SIZE` | 512; 256 supported. |
@@ -523,3 +524,17 @@ Saved notebook outputs and metadata are unchanged; source cells2,5,11,12 changed
 The user's executed run record, checkpoint folder, datasets, dependency files,
 journal and backend settings were not edited. All scratch outputs are removed
 after reporting; the approved cache is retained.
+
+## Parallel diagnostics preload
+
+The diagnostics cell used to decode every selected photo in the main process.
+`lsb_torch.preload_pairs` now reads each selected photo once in worker
+processes (`OrderedPairLoader`) and returns the pairs in the old order.
+PC check with decode source and 1,000 pairs per split: tensors, dtypes, order and
+`diagnostic_pair_ids` have identical SHA-256 digests to the old path (train
+`35b79849...f2f0a`, val `17eda82c...2f16`; the cache source gives the same
+bytes). Old serial times were 299.95 s (611 photos, train) and 121.69 s
+(261 photos, val). New times: 4 workers 91.07 s and 41.98 s, 8 workers
+57.63 s and 29.57 s, 15 workers 53.42 s and 30.83 s. With the cache source the
+serial path takes 8.14 s and 4.59 s, so worker start-up makes the parallel path
+slower there (8 workers: 11.80 s and 10.12 s).

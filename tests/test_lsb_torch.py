@@ -16,7 +16,8 @@ import numpy as np
 from PIL import Image
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"LSB-Dataset-Generator"))
 from lsb_torch import (torch,Corpus,RunSettings,TrainingImages,FixedPairs,PairSubset,
-                       OrderedPairLoader,MixedLoader,training_loader,prefetch_for_images)
+                       OrderedPairLoader,MixedLoader,training_loader,prefetch_for_images,
+                       preload_pairs,PreloadedPairs)
 from lsb_cache import build_entry
 from test_lsb_source import record
 
@@ -221,6 +222,27 @@ class TorchTests(unittest.TestCase):
             with patch.object(ds.corpus,'photo',wraps=ds.corpus.photo) as loads:
                 list(OrderedPairLoader(subset,4,0,False))
                 self.assertEqual(loads.call_count,4)
+
+    def test_preload_pairs_matches_serial_reads_in_order(self):
+        from unittest.mock import patch
+        rows=[{**r,"split":"val"} for r in self.photos]
+        ds=FixedPairs(self.corpus(RunSettings(tile_size=256),rows),"val")
+        selections=[0,9,18,27,1,10,19,28,2,11,20,29,3]
+        for subset in (ds,PairSubset(ds,selections)):
+            serial=[(subset[i][0].numpy().tobytes(),subset[i][1].numpy().tobytes(),i) for i in range(len(subset))]
+            for workers in (0,2,3):
+                with self.subTest(pairs=len(subset),workers=workers):
+                    pairs=preload_pairs(subset,workers,batch_size=5,prefetch_images=16)
+                    got=[(c.numpy().tobytes(),s.numpy().tobytes(),i) for c,s,i in pairs]
+                    self.assertEqual(got,serial)
+                    self.assertTrue(all(c.dtype==torch.uint8 and s.dtype==torch.uint8 for c,s,_ in pairs))
+                    dataset=PreloadedPairs(pairs)
+                    self.assertEqual(len(dataset),len(subset))
+                    self.assertIs(dataset[3],pairs[3])
+        with patch.object(ds.corpus,'photo',wraps=ds.corpus.photo) as loads:
+            preload_pairs(PairSubset(ds,selections),0)
+            self.assertEqual(loads.call_count,4)  # One decode per photo.
+        self.assertIsNone(ds._last_photo)
 
     def test_photo_owned_iterator_drop_and_interrupt_release_workers(self):
         rows=[{**r,"split":"val"} for r in self.photos]

@@ -502,6 +502,40 @@ class OrderedPairLoader:
         return clean,stego,torch.tensor([pair[2] for pair in batch],dtype=torch.int64)
 
 
+def preload_pairs(subset,workers=0,batch_size=16,prefetch_images=128):
+    """Decode a fixed pair subset once per photo, in parallel, keeping its order.
+
+    Returns [(clean, stego, subset_index), ...] with the exact uint8 tensors
+    that ``subset[i]`` yields; only the third item is the subset position.
+    One worker task owns one photo, so every photo is decoded once. Workers
+    exit when the pass ends. With ``workers=0`` it runs in this process.
+    """
+    loader=OrderedPairLoader(subset,batch_size,workers,False,prefetch_images=prefetch_images)
+    pairs=[]
+    for clean,stego,indices in loader:
+        for offset,index in enumerate(indices.tolist()):
+            pairs.append((clean[offset],stego[offset],index))
+    if [pair[2] for pair in pairs]!=list(range(len(subset))):
+        raise ValueError("preloaded pairs are incomplete or out of order")
+    if not workers:
+        base=subset.dataset if isinstance(subset,PairSubset) else subset
+        base._last_photo=None  # Release the last full-photo array.
+        base._last_id=None
+    return pairs
+
+
+class PreloadedPairs(Dataset):
+    """Read-only dataset over pairs returned by ``preload_pairs``."""
+    def __init__(self,pairs):
+        self.pairs=pairs
+
+    def __len__(self):
+        return len(self.pairs)
+
+    def __getitem__(self,index):
+        return self.pairs[index]
+
+
 class MixedLoader:
     """Join and pin ordered groups in a bounded producer thread.
 
