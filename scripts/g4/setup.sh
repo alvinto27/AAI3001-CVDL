@@ -53,6 +53,11 @@ case "$STEP" in
             "$REPO_DIR/scripts/g4/cvdl-g4-job.service" > "$service"
         sudo install -m 644 "$service" /etc/systemd/system/cvdl-g4-job.service
         rm -f "$service"
+        # logind deletes a user's POSIX semaphores in /dev/shm when the last SSH
+        # session ends (RemoveIPC=yes). That killed spawn workers of a running job.
+        sudo mkdir -p /etc/systemd/logind.conf.d
+        printf '[Login]\nRemoveIPC=no\n' | sudo tee /etc/systemd/logind.conf.d/cvdl-no-remove-ipc.conf >/dev/null
+        sudo systemctl restart systemd-logind
         sudo systemctl daemon-reload
         sudo systemctl enable cvdl-g4-job.service
         echo 'CHECK SUMMARY'
