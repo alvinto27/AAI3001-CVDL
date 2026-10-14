@@ -1847,6 +1847,12 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   `57274c7`. `lsb_torch.preload_pairs` and `PreloadedPairs` are used by
   notebook 04 cells 2 and 29. `V3_DIAG_WORKERS` is optional and defaults to
   `EVAL_WORKERS`. README and `docs/notebook-otf-verification.md` were updated.
+- The Worker added `scripts/g4/step_profile.py` in commit `e2bb160`. A G4
+  maintenance boot from 15:16Z to 15:32Z ran 13 decode variants at 400
+  steps with 32 workers, cache at 24 workers for 3 variants, and cache at
+  32 workers for 1 variant. Results are in the git-ignored
+  `runs-out/g4-step-profile/` folder. The Worker also diagnosed the
+  epoch-start stall on the PC; that diagnosis made no code change.
 
 ### Found
 
@@ -2120,6 +2126,25 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   `V3_DIAG_WORKERS=0` for cache runs if needed.
 - Tests: `test_lsb_torch` 16 passed and `test_notebook_diagnostics` 3 passed.
 
+#### G4 epoch-start profile
+
+- Steady G4 speed: raw fixed data 69.79 it/s (speed-test style 68.21);
+  Lightning fixed data 69.43-69.51 with progress bar, callback, and logging
+  on or off; Lightning plus decode with 32 workers 66.89-67.10; Lightning
+  plus warm cache with 24 workers 67.04-67.14. The loader adds about 0.5 ms
+  per step.
+- In `g4-full-1`, epochs 1-9 took 11-12 s for the first 75 steps, then
+  about 68.5 it/s steady (step 150 at 13 s and step 3,300 at 59 s). The
+  reported 55 it/s is the epoch average, including this stall.
+- At each epoch start, every `TrainingImages` worker fills its 1,024-image
+  shuffle buffer before yielding. Persistent workers do not keep the buffer.
+  The estimate of about 11 s from 1,024 images per worker at about 94 images/s
+  per worker is arithmetic, not a measurement. Cache is not expected to
+  remove this stall on G4.
+- PC short-schedule, no-GPU time to first batch, decode 8 / 32 workers was
+  6.1 / 4.8 s; cache 8 / 32 was 1.1 / 1.6 s. The buffer was not full, so
+  these values are not projected to G4.
+
 - Best epoch was 8 (validation P_E 0.0142, AUC 0.9976). Test accuracy was
   0.9833, AUC 0.9976, and P_E 0.0162. Per-source P_E was RAISE 0.010948
   (9,728 pairs) and DIV2K 0.052524 (1,228 pairs).
@@ -2154,6 +2179,11 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - G4 data source decision (user): use decode. Forty decode workers give 1.5
   times the GPU rate, and no new caches are needed for new datasets. Decode
   and training at the same time are not measured yet.
+- Epoch-start stall decision (user approval pending): Option 1 is to prime
+  the next epoch's loader during validation. It keeps the sequence
+  byte-identical but needs more engineering and memory. Option 2 is a smaller
+  `buffer_size`; it changes the shuffle and is rejected for now. Cache is
+  doubtful as a fix because each worker fills its buffer at every epoch start.
 - Source diversity is tentative, not final: RAISE plus ALASKA#2
   (uncompressed colour PPM from alaska.utt.fr, not the Kaggle JPEG set,
   CC BY-NC-ND) plus LSDIR (training subset and official validation/test;
@@ -2183,6 +2213,7 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Done: first full 10-epoch G4 run using decode (`g4-full-1`).
 - Pending, optional: sample `nvidia-smi` every 10 s and include `boot.log`
   in the uploaded folder.
+- Pending: user decision on the epoch-start stall fix.
 - Pending: measure cell 29 time on the next G4 run. Expected time is about
   1.5-2.5 min instead of 8.3 min; this is not measured yet.
 - Pending: the DIV2K weakness remains (P_E about 5 times RAISE); continue
