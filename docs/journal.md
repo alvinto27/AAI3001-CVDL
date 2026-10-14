@@ -1853,6 +1853,9 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   32 workers for 1 variant. Results are in the git-ignored
   `runs-out/g4-step-profile/` folder. The Worker also diagnosed the
   epoch-start stall on the PC; that diagnosis made no code change.
+- The Worker added persistent-worker priming in commit `d796971`.
+  `PrimedTrainingLoader` is in `lsb_torch`; notebook 04 cells 2, 12, and 19
+  use it. `V3_PRIME_NEXT_EPOCH` controls it and defaults off.
 
 ### Found
 
@@ -2145,6 +2148,25 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   6.1 / 4.8 s; cache 8 / 32 was 1.1 / 1.6 s. The buffer was not full, so
   these values are not projected to G4.
 
+#### Persistent-worker priming
+
+- Per-epoch SHA-256 of the full training stream, epochs 0-2, photo fraction
+  0.005: old and primed streams were identical for decode/4, decode/8,
+  cache/4, and cache/8 (12 of 12 comparisons). A last.ckpt resume after
+  epoch 0 matched an uninterrupted run.
+- QUICK notebook with priming on passed all 15 cells and cleaned up workers.
+  Tests: 41 passed, including 19 `test_lsb_torch` tests.
+- PC boundary timing at photo fraction 0.05, 4 workers, with validation held
+  at 12 s:
+
+  | Source | Old | Primed |
+  | --- | ---: | ---: |
+  | Decode, validation end to batch 75 | 11.594 s | 3.32 s |
+  | Cache, validation end to batch 75 | 2.316 s | 1.154 s |
+
+  Without forced 12 s validation, priming added about 0.41 s to validation.
+  Peak G4 RAM was not measured.
+
 - Best epoch was 8 (validation P_E 0.0142, AUC 0.9976). Test accuracy was
   0.9833, AUC 0.9976, and P_E 0.0162. Per-source P_E was RAISE 0.010948
   (9,728 pairs) and DIV2K 0.052524 (1,228 pairs).
@@ -2213,9 +2235,10 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Done: first full 10-epoch G4 run using decode (`g4-full-1`).
 - Pending, optional: sample `nvidia-smi` every 10 s and include `boot.log`
   in the uploaded folder.
-- Pending: user decision on the epoch-start stall fix.
-- Pending: measure cell 29 time on the next G4 run. Expected time is about
-  1.5-2.5 min instead of 8.3 min; this is not measured yet.
+- Pending: G4 measurement run `g4-prime-1` with decode, 32 workers, and
+  `V3_PRIME_NEXT_EPOCH=on`. It also measures the new cell 29 time. Then decide
+  the default.
+- The user stopped for the day at 2026-10-15 00:18 +08.
 - Pending: the DIV2K weakness remains (P_E about 5 times RAISE); continue
   the source-diversity plan.
 - Pending: dataset download plan, per-source balanced sampler, and licence
