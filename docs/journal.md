@@ -1971,11 +1971,17 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   running, and partial-folder records on the next boot.
 - Spot preemption gives about 30 s. Upload then usually fails, so the next
   boot resends it.
-- The G4 kit was not contacted. The G4 plan is `rtx6000pro` in
+- The G4 kit was not contacted. The initial G4 plan was `rtx6000pro` in
   `europe-north1-a`, `g4-standard-48` Spot, about $2.03/h, with a 2 h maximum
   run duration and Stop action. It is separate from the Seoul L4 project and
   billing pool. Budget "Credit Spending" is $383.45, with alerts at
   26/52/78/90%.
+- The first real G4 setup was attempted in `europe-north1`: zone a and then
+  zone b could not restart because of Spot stockout. The user deleted that VM
+  and created `rtx6000pro` in `us-central1-c`, project
+  `personal-compute-511601`, `g4-standard-48` Spot at $1.62936/h, with a 2 h
+  maximum and Stop action. It has a 200 GB Hyperdisk Balanced disk (3,000
+  IOPS, 140 MB/s).
 - Job timeout defaults to 100 min and refuses values above max-run minus
   15 min. Missing job mode is off: send pending results, then shut down.
   Maintenance runs only when explicitly selected. Each job checks out its
@@ -1984,6 +1990,31 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   and Pi DNS. Results go to `rpi400-server` `cvdl-inbox` through write-only
   rrsync into `/srv/cvdl-results`. Masters upload from the PC; the cache is
   rebuilt on G4 with 40 workers.
+
+#### First real G4 setup
+
+- The VM booted at 11:25:03Z and Worker_2 shut it down at 12:03:30Z,
+  about 38 min later. It had an NVIDIA RTX PRO 6000 Blackwell Server
+  Edition, 97,887 MiB, driver 595.91.07, CUDA available in torch, 48 vCPUs,
+  and 176 GiB RAM.
+- `setup.sh base` completed. Tailscale was 100.70.184.36; Tailscale SSH
+  was not used, and the user disabled key expiry. The inbox key was installed
+  and the job service was enabled.
+- One upload stream reached 3.5 MB/s; 10 parallel streams reached 20-21
+  MB/s. The 22.15 GB upload completed at 11:50:16Z. Counts and bytes matched
+  the PC: RAISE 1,011 files / 18,167,565,575 B; DIV2K train 800 /
+  3,533,759,878 B; DIV2K valid 100 / 449,507,452 B.
+- The 40-worker cache build took 363.047 s for 1,900 entries and
+  52,761,268,224 array bytes, about 145.3 MB/s average. Strict verification
+  passed with 0 hash mismatches, and the normalized record digest equals the
+  PC/VM reference. Free disk after was 114 GB.
+- G4-to-Pi inbox delivery passed and the test result was removed.
+
+#### G4 setup findings
+
+- Spot preemption graphs rose over the last about 3 days in several regions:
+  us-central1 reached 25% and europe-west2 18%. No region was clearly safer.
+  us-central1 had High availability and was the cheapest tested option.
 
 ### Decided
 
@@ -1995,11 +2026,16 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Plan steps 15, 16, 18, and 19 are Done. Step 17 is deferred. Mode 2 is
   on-the-fly only for now.
 - Fix 5 is Done for evaluation (`cc3aeed`).
-- G4 decision (user, 2026-10-14): use `rtx6000pro` in
-  `europe-north1-a`, `g4-standard-48` Spot, at about $2.03/h, with a 2 h
-  maximum run and Stop action. Keep it in a separate project and billing
-  pool from the Seoul L4. The budget is "Credit Spending" ($383.45) with
-  alerts at 26/52/78/90%.
+- G4 decision (user, 2026-10-14): use `rtx6000pro` in `us-central1-c`,
+  project `personal-compute-511601`, `g4-standard-48` Spot at $1.62936/h,
+  with a 2 h maximum run and Stop action. This replaces the refused
+  `europe-north1` location. Keep it separate from the Seoul L4 project and
+  billing pool. Commit `2b84127` points submit.sh and the docs to
+  `us-central1-c` and $1.63/h.
+- Disk decision (user, 2026-10-14): raise throughput to about 400 MB/s,
+  about +$10.40 per month. The VM must be stopped first.
+- Start without metadata is now off: the service sends pending results and
+  shuts down. The next boot must set `job-mode=maintenance` in the console.
 - G4 policy: timeout defaults to 100 min and refuses values above max-run
   minus 15. Missing job mode is off. Maintenance runs only when explicitly
   set. Each job checks out the job commit and runs `uv sync --locked`.
@@ -2014,12 +2050,14 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Done: VM fix 4 and fix 5 measurements. Fix 4 has no reliable VM gain;
   fix 5 was already verified above.
 - Done: removed VM scratch `~/otf-dev/eval-yx` after the VM returned.
-- Pending: first real G4 boot in maintenance mode: inbox key, setup base
-  (with user approval of the Tailscale login), upload masters, build and
-  verify the cache, run the speed test, then run one QUICK job through console
-  metadata to prove boot -> run -> Pi -> shutdown.
+- Pending: user raises G4 disk throughput to about 400 MB/s.
+- Pending: maintenance boot for `setup.sh` speed work: cache versus decode,
+  eager and compiled.
+- Pending: one QUICK job through console metadata to prove boot -> run -> Pi
+  -> shutdown.
 - Pending: G4 speed is not measured. Test cache 4/8/16 workers and decode
   16/24/32/40 workers, eager and compiled, for 150 steady steps.
+- Pending: setup.sh parallel upload (Worker_2, in progress).
 - Later: Part 3, gcloud on the Pi.
 - Pending: user decision on moving the VM to Taiwan if Seoul stays Limited.
 - Done (user, 2026-10-14): chose option A, keep the photo-owned evaluation
