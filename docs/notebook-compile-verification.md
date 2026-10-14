@@ -26,6 +26,42 @@ cache paths external before starting the kernel. `model_run_settings.json`
 next to the checkpoint records mode, compile target/options, live TF32 flags
 and torch version; the OTF data record also stores `compile_mode`.
 
+### Inductor helper limit (PC follow-up, 2026-10-14)
+
+With `V3_COMPILE=default`, notebook setup now uses the supported
+`TORCHINDUCTOR_COMPILE_THREADS` setting **before importing torch or Lightning**.
+It defaults to `4` instead of the PC's detected `16`; an explicit positive
+integer environment value takes precedence. Eager mode does not set it.
+See [PyTorch's compile-thread configuration](https://github.com/pytorch/pytorch/blob/v2.14.0/torch/_inductor/config.py).
+This limits the idle compiler helpers throughout training without relying
+on a private pool-shutdown call: a later tail batch or validation shape may
+still need compilation.
+
+Controlled PC ROCm measurements used the real OTF cache with six loader
+workers, 300 steps, 30 warmup and 8,640 timed images, in separate processes.
+Each thread setting had its own external empty cache for the cold run; its
+second run reused that cache. A compiler coordinator remains alongside the
+configured worker processes. Counts and sums below include that coordinator
+but **exclude** the six data-loader workers and Python resource tracker.
+PSS (proportional set size) apportions shared memory between processes;
+summing RSS (resident set size) counts those shared pages more than once.
+
+| Compiler workers | Cache | First step (s) | Steady images/s | Idle compiler processes | Their summed RSS | Their summed PSS |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| 16 | cold | 14.697 | 409.860 | 17 | 9.44 GB | 1.30 GB |
+| 4 | cold | 14.934 | 417.918 | 5 | 3.03 GB | 0.80 GB |
+| 16 | warm | 5.406 | 471.142 | 17 | 7.52 GB | 0.53 GB |
+| 4 | warm | 5.134 | 473.865 | 5 | 2.53 GB | 0.49 GB |
+
+Thus the limit removes 12 long-lived helpers, cuts summed RSS by about
+5–6.4 GB, and reduces PSS by about 0.50 GB cold / 0.04 GB warm; it does
+**not** free 5–6 GB of unique physical RAM, because much RSS is shared.
+Cold first-step time changed by +0.237 s; the warm first step improved
+0.272 s. Warm steady rate changed +0.6%, inside single-run variation, so
+there is no observed steady slowdown. With both thread settings, a separate
+fixed-batch compiled-vs-eager check gave identical relative errors: logits
+2.25e-7, loss 0, global gradients 2.40e-7 (all pass 1e-5).
+
 After fit, the notebook shuts down persistent training DataLoader workers
 before test and diagnostics. On the PC, an eight-worker cache-loader probe
 (with the normal prefetch of 128 images per worker) measured worker summed
