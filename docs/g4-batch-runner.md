@@ -39,7 +39,7 @@ ssh -i ~/.ssh/cvdl-g4 yangxuan@EXTERNAL_IP 'chmod 600 ~/.ssh/cvdl-g4-inbox; bash
 
 The inbox key permits only write-only `rsync` into `/srv/cvdl-results` on
 `rpi400-server`; it gives no shell or read access. Do not put the key in Git
-or a job folder. `base` installs apt tools and uv, clones the public `yx`
+or a job folder. `base` installs apt tools (including `build-essential` and `python3-dev`, which `torch.compile` needs) and uv, clones the public `yx`
 branch over HTTPS, runs `uv sync --locked` (CUDA torch on this VM), installs
 Tailscale, runs `tailscale up --hostname=rtx6000pro` **without** `--ssh`,
 installs the inbox key, and enables the boot service. Approve the printed

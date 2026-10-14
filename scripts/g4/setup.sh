@@ -27,7 +27,7 @@ case "$STEP" in
     base)
         [[ $(id -un) == yangxuan ]] || { echo 'Run base as yangxuan, not root' >&2; exit 2; }
         sudo apt-get update
-        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl git rsync openssh-client
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl git rsync openssh-client build-essential python3-dev
         if [[ ! -x "$HOME/.local/bin/uv" ]]; then curl -LsSf https://astral.sh/uv/install.sh | sh; fi
         if [[ ! -d "$REPO_DIR/.git" ]]; then git clone --branch yx --single-branch "$REPO_URL" "$REPO_DIR"; fi
         [[ $(git -C "$REPO_DIR" remote get-url origin) == "$REPO_URL" ]] || { echo 'Wrong repository origin' >&2; exit 2; }
