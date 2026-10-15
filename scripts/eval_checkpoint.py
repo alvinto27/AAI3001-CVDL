@@ -21,7 +21,7 @@ import torch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'LSB-Dataset-Generator'))
 from lsb_torch import Corpus, FixedPairs, OrderedPairLoader, RunSettings
-from map_demo import XuNet
+from map_demo import model_from_hparams
 
 
 def counts(labels, scores):
@@ -83,7 +83,7 @@ def evaluate(checkpoint, eval_yaml=ROOT / 'configs/raise512-run1.yaml', *, split
     ckpt = torch.load(checkpoint, map_location='cpu', weights_only=False)
     hparams = ckpt.get('hyper_parameters', {})
     norm = hparams.get('norm', 'group')
-    model = XuNet(clip_t=hparams.get('clip_t', 3.0), norm=norm).eval()
+    model = model_from_hparams(hparams).eval()
     state = {key.removeprefix('net.'): value for key, value in ckpt['state_dict'].items()}
     if len(state) != len(ckpt['state_dict']):
         raise ValueError('duplicate checkpoint keys')

@@ -104,6 +104,40 @@ class XuNet(nn.Module):
                         self.classifier.bias)
 
 
+class XuNetWide(XuNet):
+    """Notebook 05 wide model; same 32 px output cells and linear cell logits."""
+    def __init__(self, clip_t=3.0, norm='group', width=4):
+        super().__init__(clip_t=clip_t, norm=norm)
+        a, b, c, d, e = (16, 16*width, 32*width, 64*width, 128*width)
+        for name, ni, no, kernel in ((1,3,a,5),(2,a,b,5),(3,b,c,1),
+                                     (4,c,d,1),(5,d,e,1),(6,e,e,1),(7,e,d,1)):
+            setattr(self, f'conv{name}', nn.Conv2d(ni, no, kernel, padding=kernel//2))
+            setattr(self, f'bn{name}', make_norm(no, norm))
+        self.classifier = nn.Linear(d, 2)
+
+    def features(self, x):
+        x = self.kv(x)
+        if self.clip_t is not None:
+            x = torch.clamp(x, -self.clip_t, self.clip_t)
+        x = self.pool(torch.tanh(self.bn1(torch.abs(self.conv1(x)))))
+        x = self.pool(torch.tanh(self.bn2(self.conv2(x))))
+        for name in (3, 4, 5):
+            x = self.pool(F.relu(getattr(self, f'bn{name}')(getattr(self, f'conv{name}')(x))))
+        for name in (6, 7):
+            x = F.relu(getattr(self, f'bn{name}')(getattr(self, f'conv{name}')(x)))
+        return x
+
+
+def model_from_hparams(hparams):
+    model = hparams.get('model', 'xunet')
+    clip_t, norm = hparams.get('clip_t', 3.0), hparams.get('norm', 'group')
+    if model == 'xunet':
+        return XuNet(clip_t=clip_t, norm=norm)
+    if model == 'xunet_wide':
+        return XuNetWide(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)))
+    raise ValueError(f'unsupported checkpoint model: {model}')
+
+
 def as_tensor(image, device):
     return torch.from_numpy(np.ascontiguousarray(image)).permute(2, 0, 1).float().unsqueeze(0).to(device)
 
@@ -360,7 +394,7 @@ def main():
     ckpt = torch.load(CHECKPOINT, map_location='cpu', weights_only=False)
     hparams = ckpt.get('hyper_parameters', {})
     norm = hparams.get('norm', 'group')  # Old checkpoints have no recorded norm.
-    model = XuNet(clip_t=hparams.get('clip_t', 3.0), norm=norm).to(device).eval()
+    model = model_from_hparams(hparams).to(device).eval()
     state = {key.removeprefix('net.'): value for key, value in ckpt['state_dict'].items()}
     if len(state) != len(ckpt['state_dict']):
         raise ValueError('unexpected checkpoint key collision')

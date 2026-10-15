@@ -9,6 +9,7 @@
 - [On-the-fly generator design plan](plan-otf-generator.md)
 - [Optional G4 GPU LSB generator plan](plan-gpu-generator.md)
 - [G4 epoch overhead analysis and options](plan-epoch-overhead.md)
+- [Wide XuNet model-size comparison plan](plan-wide-xunet.md)
 - [Frozen RAISE and DIV2K source records](frozen-source-records.md)
 - [Full-photo source API and verification](source-verification.md)
 - [Shared settings draws and seed keys](settings-and-seeds.md)
