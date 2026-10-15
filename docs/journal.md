@@ -2364,6 +2364,29 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   8,276 (15%), from 1,381 photos (701 and 680). Validation has 11,238 tiles
   and test has 10,956.
 
+#### Source download and throughput checks
+
+- ALASKA download speed, various-size TIFF: Pi Wi-Fi, one connection with a
+  0.2 s pause 0.380 MB/s; 4 connections 1.191 MB/s (64 files, 95.449 s);
+  8 connections 1.503 MB/s (64 files, 68.872 s). Sixteen stopped after one
+  curl 28 timeout. PC Wi-Fi, 8 connections: 3.973 MB/s (25.699 s) and
+  3.592 MB/s (27.517 s), 0 errors. The PC reaches 21.5 MB/s from Cloudflare
+  on one connection; the 204 ms round trip to the ALASKA server is the limit.
+- The Pi uses Wi-Fi with `eth0` down. Its `/srv` is a 1 TB Crucial MX500
+  USB SSD with ext4.
+- The ALASKA index SHA-256 is `cd4bf8b9...0e91a54`. Its count columns are
+  wrong for Canon_EOS-60D (3,678 versus range 2,750) and Canon_EOS-500D
+  (1,872 versus 2,800). The ranges total 80,005.
+- LSDIR Hugging Face has shards 00-16 at 8.07-9.91 GB, about 155 GB total,
+  with sizes matching the GitHub issue #5 SHA list. It also has train_x2/x3/x4
+  (not used), `val1.tar.gz` at 765 MB, and no test archive. The released HR
+  PNGs are already shrunk 4x by the authors and will be used unchanged
+  (plan fix `ee300d0`).
+- Orchestrator analysis: 256 has 3.75 times the train images per epoch
+  (405,144 versus 107,900). Older PC numbers rose from 129 to 309 images/s
+  for decode and 418 to 1,326 for cache when moving 512 to 256. Per-tile
+  work, not decoding, limits 256. PyAV is not adopted.
+
 ### Decided
 
 - Pending user decision: G4 runs use `V3_PRIME_NEXT_EPOCH=on` as the
@@ -2381,6 +2404,18 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
     diversity helps.
 - Pending user approvals: accept the LSDIR terms on Hugging Face, read both
   licences, and tell teammates about DIV2K.
+- ALASKA subset decision (user, 2026-10-15): select evenly by camera model,
+  cap 250 per model, 39 models, 9,723 images, seed 0. Leica_Mono has 223.
+  Exclude FLATS/TEXTURES (1,472) and RAW_wesaturate (4,681). No split yet.
+  Commit `d664c01` contains `scripts/alaska_select.py` and
+  `data/alaska/selection_v1.csv`; the script reproduces the CSV byte for
+  byte.
+- Download decision: the PC downloads the ALASKA subset (N=8, started at
+  11:47:54). The Pi downloads full LSDIR (17 shards plus val1) and the other
+  ALASKA IDs as unattended systemd services, with ALASKA starting at 13:15
+  or later. The user later moves the Pi SSD to the PC to copy subsets.
+- Wait on 256 throughput work. Do a G4 256 speed test only when 256 or
+  Mode 2 step 17 enters the plan. Do not adopt PyAV now.
 - Pending user decision: run full PC training headlessly with
   `scripts/run_notebook.py` at the proven 13.6 it/s, or test the VS Code
   candidates. The two-epoch run confirms the headless speed.
@@ -2391,10 +2426,14 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   numbers. This is a separate approved change.
 - Pending: VS Code slowdown cause, by extension rollback or hidden-tab test.
 - Pending: prime default decision.
-- Pending: Worker_2 writes `docs/plan-new-sources.md` with pipeline
-  integration, splits, balancing, download design, and risks.
-- Pending user: accept the LSDIR terms on Hugging Face, read both licences,
-  and tell teammates about DIV2K.
+- Pending: Worker_2 sets up and proves the unattended Pi services, then
+  checks the PC ALASKA subset.
+- Pending: when the Pi SSD is unplugged, shut the Pi down first; G4 results
+  cannot be delivered because `cvdl-results` is on that SSD.
+- Pending: train/validation/test split and the 8 held-out cameras. D90 is
+  also in RAISE; Leica_Mono is monochrome.
+- Pending user: accept LSDIR terms on Hugging Face, read both licences, and
+  tell teammates about DIV2K.
 - Pending: leave `V3_DIAG_WORKERS` at its default parallel setting for
   decode; the serial diagnostic path took 458 s here versus about 88 s with
   8 workers.
