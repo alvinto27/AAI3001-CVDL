@@ -2293,6 +2293,12 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   Pixel XL lowest k=3 replace, and ALASKA Canon EOS700D plane k=4 replace.
 - Worker_2 ran map demo v2 with fixed settings in `scripts/map_demo.py`
   (`da97765`). Outputs are in `runs-out/map-demo-v2/`.
+- Commits `e68b958`, `57c24a1`, `e1186fd`, `00ce10c`, `fb3dfb7`, `f9ab8b3`,
+  `a30748d`, and `16c49d8` added notebook 05, no-clip support, the G4
+  bootstrap split, map checks, bpp-1 scoring, the R2 schedule, GPU-generator
+  design, and batch/precision speed-matrix support.
+- The user ran the no-normalisation G4 R1 job `g4-v4-r1b`; R2 was later
+  launched as `g4-v4-r2` and is still Pending.
 
 ### Found
 
@@ -2505,6 +2511,56 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   EOS700D is a smooth out-of-distribution image, with a false positive and
   inverted localization.
 
+#### XuNet v4 no-normalisation results
+
+- PC sanity run, reported by Worker_2: two full-data epochs with no
+  normalisation had validation P_E 0.0758 / 0.0438, versus v3c 0.0374 /
+  0.0294. There was no NaN. The pre-clip gradient norm was above 1 on
+  83-88% of logged steps, and loss spikes recovered within about 50 steps.
+- G4 R1 `g4-v4-r1b` completed from the local status record at 06:59:46Z to
+  07:30:35Z, exit 0, last cell 31. It used notebook 05, no normalisation,
+  LR 3e-4, one warm-up epoch, clip 1, 20 epochs, 32 workers, 16 evaluation
+  workers, and priming on. Fit took 1,627.427 s and the full elapsed time
+  was 1,848.801 s.
+- R1 best epoch 19 had validation P_E 0.0202 and AUC 0.9949. Validation P_E
+  spiked to 0.0590 at epoch 5. Test P_E was 0.022864 and AUC 0.989898,
+  versus `g4-prime-1` v3c 0.0165 and 0.9977. R1 breakdowns were k=1 0.0718,
+  RAISE 0.0179, and DIV2K 0.0615; v3c values were k=1 0.0579, RAISE 0.0114,
+  and DIV2K 0.0546. The best checkpoint filename starts `b9af8dba`.
+  Training loss stayed above validation loss and plateaued near 0.13,
+  indicating underfitting.
+- R1 map checks found no shift outside changed chunks in 36 of 36 cases.
+  Chunked versus whole-photo maps differed by at most 0.00064. The clean
+  ALASKA EOS700D false alarm fell from 0.554 to 0.037. However, k=1 random
+  detection was about 0.03 even at 0.5 bpp on ALASKA; detection was mainly
+  in smooth regions, so clean hot spots could hurt a top-k verdict.
+- The bpp-1 extra test used `configs/test-bpp1.yaml` from commit `fb3dfb7`.
+  The standard test hash stayed `fdd989f7...837`, and the scorer reproduced
+  P_E 0.0165 for v3c and 0.0229 for R1. At bpp 1, v3c P_E was 0.0125 and
+  R1 was 0.0187. k=1 missed at bpp 0.75-1.0: contiguous 1%, random 3%,
+  and stride 12-19%; 37% of stride stego pairs were clipped by capacity.
+- R2 `g4-v4-r2` started at 09:40Z with LR drops 5:0.3 and 20:0.1,
+  training k=1-4, 30 epochs, and the bpp-1 extra test. Validation P_E for
+  epochs 1-5 was 0.0684, 0.0407, 0.0323, 0.0391, and 0.0493; epoch 4 had
+  validation loss 0.475. Validation still includes k=5-8, which R2 does
+  not train on. Later R2 results are Pending.
+- R1 `nvidia.csv` had mean GPU utilisation 37.4% over 31 samples, with
+  12 samples at 0%. The GPU-generator PC profile found photo decode at 83%
+  of CPU work and embedding at about 8%; estimated gain was 0-25%.
+- Reported G4 failure `g4-v4-r1` at 06:42Z: the old installed `job.sh`
+  ignored `V3_NOTEBOOK` and ran notebook 04. It failed at cell 2 after about
+  7 s because `NORM` was not in `{batch, group}`. Later boots skipped the
+  recorded job ID. New job ID `g4-v4-r1b` fixed the run. Commit `e1186fd`
+  split `job.sh` into a stable bootstrap and checked-out `job_run.sh`.
+  Pending: one maintenance boot must install the bootstrap.
+- Reported Pi download state: LSDIR completed 18/18 files,
+  155,804,436,196 B, 0 failures, at 17:43 local. ALASKA reached
+  30,800/70,282 at 18:15 local with 0 failures.
+- The user installed gcloud CLI 589.0.0 in the PC user account. The
+  unversioned official archive matched SHA-256
+  `817026aec0adea0e2ee8ed3a1ba3eabfe9e5177581fbe16595a8fe495a601300`;
+  the versioned URL did not match its published digest.
+
 ### Decided
 
 - Pending user decision: G4 runs use `V3_PRIME_NEXT_EPOCH=on` as the
@@ -2551,6 +2607,17 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   (V3 tests e/f), chunked-versus-whole map equality, cell AUC, and photo P_E
   with k=1 reported. Train with per-cell labels and use a trained per-cell
   map for the photo verdict.
+- Map direction decision (user): use no normalisation because GroupNorm has
+  a spatial leak. Use new notebook `05_xunet_v4_nonorm.ipynb`, not notebook
+  04. It supports `V3_NORM` batch/group/none, `V3_EPOCHS`, `V3_LR`,
+  `V3_WARMUP_EPOCHS`, `V3_GRAD_CLIP` (0 disables clipping),
+  `V3_LR_DROPS`, `V3_TRAIN_YAML`, `V3_EXTRA_TESTS`, `V3_BATCH_SIZE`, and
+  `V3_PRECISION`. G4 selects it with `V3_NOTEBOOK`.
+- The GPU LSB generator is shelved. Its PC profile estimated a 0-25% gain,
+  not a measured result. Test batch sizes 32, 64, and 128 with precision 32
+  and BF16 in a G4 speed matrix instead.
+- The Orchestrator runs `scripts/g4/submit.sh` only after the user says
+  "go". Pending: user runs `gcloud auth login`.
 - MIL is dropped. Mode 2 step 17 and the bag design leave the plan.
 - New direction (user, 2026-10-15): use a spatial suspicion map. Train with
   exact per-cell labels from the cover/stego difference: the share of changed
@@ -2568,10 +2635,17 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Pending: VS Code slowdown cause, by extension rollback or hidden-tab test.
 - Pending: prime default decision.
 - Done: Worker_2 demoed maps from `g4-prime-1` best epoch 8.
-- Pending user: map-model design (normalisation, per-cell loss, crop policy,
-  and crop size).
+- Done: selected no normalisation for the map direction.
+- Pending user: per-cell loss, crop policy, and crop size for the map model.
 - Pending: choose the train/validation/test split and 8 held-out ALASKA
   cameras.
+- Pending: R2 `g4-v4-r2` results and the effect of validation k=5-8 are not
+  known.
+- Pending: one G4 maintenance boot installs the stable bootstrap from
+  `e1186fd`.
+- Pending: run the G4 speed matrix for batch sizes 32, 64, 128 and precision
+  32, BF16.
+- Pending: user runs `gcloud auth login`.
 - Pending: Worker_2 sets up and proves the unattended Pi services, then
   checks the PC ALASKA subset.
 - Pending: when the Pi SSD is unplugged, shut the Pi down first; G4 results
