@@ -2734,6 +2734,31 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   mask code change is not checked. Scattered low-bpp cells need soft or
   ignored labels. The tile label and map objective remain mismatched.
 
+#### ALASKA selection v2 and epoch-24 slowdown
+
+- Worker_3 added `scripts/alaska_scan.py` and `scripts/alaska_select_v2.py`
+  in commit `91ada60`. The scanner checks TIFF headers and uses SHA values
+  from `SHA256SUMS`; it scanned 57,439 Pi files in 46 s. The PC v1 copy has
+  9,723 SHA-verified files, all uncompressed RGB 8/8/8. Selection v2 is
+  seeded and order-independent, excludes flats, textures, RAW_wesaturate,
+  and Leica_Mono, uses 8 unseen models up to 250 each, prefers v1 photos,
+  and splits the other models into 13,500 train, 1,000 validation, and 1,700
+  seen-camera test photos.
+- The dry run is not final: 12,843 eligible IDs were missing and Pentax_K50
+  was not downloaded. Present files gave train 13,446 photos / 21,057 tiles /
+  21.19 GB; validation 987 / 1,525 / 1.54 GB; seen test 1,707 / 2,642 /
+  2.67 GB; unseen test 2,000 / 3,153 / 3.17 GB; total 18,140 / 28,377 /
+  28.57 GB. Of these, 6,624 photos were already on the PC from v1.
+- The leakage rule uses ID-order blocks of 10 consecutive photos, with one
+  split per block and an 11-ID minimum gap between splits. Block size 10 is
+  a guess, not a measurement. The final run waits for the ALASKA download.
+- Worker_2 found the epoch-24 slowdown in `scripts/run_notebook.py`: each
+  progress chunk was appended to the growing cell output, copying all prior
+  text. The training loop then waited and GPU/CPU use fell. A 3,000-write
+  PC microbenchmark took 0.014 / 2.678 / 12.957 / 38.738 s for starting
+  output 0 / 4 / 16 / 32 MiB. This is a logging bug only; the data stream and
+  R2/wide results are unchanged.
+
 ### Decided
 
 - Pending user decision: G4 runs use `V3_PRIME_NEXT_EPOCH=on` as the
@@ -2814,9 +2839,12 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   Leica_Mono because it is monochrome (`R=G=B`); keep Nikon_D90 in training.
   Use 30 models for about 13,500 train, 1,000 validation, and 1,700
   seen-camera test photos, split by contiguous ID blocks to reduce burst
-  leakage. Worker_3 builds selection v2; final run is Pending.
-- Worker_3 handles Pi data jobs. The Orchestrator does not monitor G4 runs;
-  a worker monitors them.
+  leakage. Six models with too few photos go to train only: Canon_PowerShot-G11,
+  Kodak_Z990, Pentax_K10D, Pentax_ist-DS, Sigma_SD10 (250 each), and
+  Nikon_D90 (395). This keeps the 11-ID gap. Selection v2 final run is
+  Pending.
+- Worker_2 does speed fixes first, then new-data code. Worker_3 handles Pi
+  data jobs. The Orchestrator does not monitor G4 runs; a worker monitors them.
 - Hypothesis, not tested: without normalisation, tanh inputs in layers 1-2
   are not scaled. They may saturate tanh and explain R1/R2 underfitting and
   validation spikes.
@@ -2862,10 +2890,11 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   8 workers.
 - Done: wide XuNet result and timing findings from Worker_2.
 - Done: LSDIR inventory from Worker_3. Pending: ALASKA download completion.
-- Pending: ALASKA selection v2, LSDIR subset, and per-source sampler.
-- Pending: persistent validation workers, which may remove the measured
-  18.8 s first-validation-batch wait without changing results.
-- Pending: cause of the epoch-24 slowdown.
+- Pending: logging-bug fix and persistent validation workers with parity
+  checks. The expected saving is about 14 min and $0.40 per 30-epoch run
+  (estimate: about 5 min late slowdown plus 9 min validation start-up).
+- Pending: ALASKA selection v2 final run after the download, LSDIR subset,
+  per-source sampler, and new-data code.
 - Pending: copy data to G4, estimated at 35-45 GB.
 - Pending, optional: measure miss rate against tile noise, run the denoise-
   and-compare demo, test tanh saturation, and run a filter linear probe.
