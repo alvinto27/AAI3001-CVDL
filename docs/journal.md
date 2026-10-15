@@ -2265,6 +2265,14 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   `V3_PRIME_NEXT_EPOCH=on`. It ran commit `ad8c754` through `origin/yx`.
   The user's live `notebooks/04` run and `checkpoints/pc-prime-test` were
   not changed.
+- Worker_2 ran a PC slowdown diagnosis after restarting the container. It
+  profiled 600 steps from committed notebook classes in a scratch copy from
+  HEAD. The user's shifted top cell made the fixed cell 14/19 extraction in
+  `step_profile.py` fail, so the scratch copy was used.
+- Worker_2 also ran the committed notebook headlessly with
+  `scripts/run_notebook.py`: decode, 6 workers, compile, priming off,
+  `V3_DIAG_WORKERS=0`, and 20% train-photo fraction. It stopped by SIGTERM
+  after epoch 2 on purpose.
 
 ### Found
 
@@ -2296,14 +2304,44 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   about 1 min; decode had taken about 47 s before. Priming contention is
   expected. The cause is not known. Worker_2 will profile after the run.
 
+#### PC slowdown diagnosis
+
+- Profiled steady speed, in it/s, with cuDNN benchmark false / true:
+
+  | Case | False | True |
+  | --- | ---: | ---: |
+  | Raw fixed | 13.36 | 13.29-13.30 |
+  | Lightning fixed | 13.41 | 13.28 |
+  | Lightning decode, 6 workers | 13.84 | 13.76 |
+  | Lightning cache, 4 workers | - | 13.74 |
+  | Raw cache, 4 workers | - | 13.79 |
+
+  Progress bar and callback toggles at decode/6 gave 13.81-13.84 it/s.
+  GPU power was 252-254 W at 3,100-3,145 MHz, with a 255 W cap, AUTO
+  performance, and no throttling.
+- The headless notebook reached 13.64 it/s: epochs 1 and 2 were at step 150
+  in 14 s and step 600 in 47 s. This matches the journal value of 13.54.
+- No system change was found: kernel 7.2.9 since October 11, the same
+  container image, no ROCm/mesa/amdgpu package change, and no
+  MIOPEN/HSA/HIP/ROCM overrides.
+- The VS Code Python extension changed to 2026.10.0 and `python-envs` to
+  1.40.0 at 09:03 +08 before the slow live runs. The Jupyter extension
+  2025.9.1 did not change. This is a candidate, not proof. VS Code rendering
+  on the same GPU is another candidate.
+
 ### Decided
 
 - Pending user decision: G4 runs use `V3_PRIME_NEXT_EPOCH=on` as the
   recommendation.
 - The PC default remains priming off pending the PC test.
+- Pending user decision: run full PC training headlessly with
+  `scripts/run_notebook.py` at the proven 13.6 it/s, or test the VS Code
+  candidates.
 
 ### Next
 
-- Pending: PC slowdown diagnosis.
+- Pending: `step_profile.py` finds cells by content instead of fixed cell
+  numbers. This is a separate approved change.
+- Pending: VS Code slowdown cause, by extension rollback or hidden-tab test.
 - Pending: prime default decision.
 - Pending: dataset plan for ALASKA#2 and LSDIR.
