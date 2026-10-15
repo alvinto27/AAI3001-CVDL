@@ -86,6 +86,25 @@ class TorchTests(unittest.TestCase):
         self.assertEqual({r["photo_id"] for r in first.train_schedule(0)},
                          {r["photo_id"] for r in first.train_schedule(10)})
         self.assertEqual(first.selection_record[0]["selected"],2)
+    def test_optional_evaluation_yaml_changes_only_bpp_draws(self):
+        import pandas as pd
+        original = Path(__file__).resolve().parents[1] / 'configs/raise512-run1.yaml'
+        expanded = Path(__file__).resolve().parents[1] / 'configs/test-bpp1.yaml'
+        self.assertEqual(original.read_text().replace('bpp: [0.05, 0.5]', 'bpp: [0.05, 1.0]'),
+                         expanded.read_text())
+        records = [{**r, 'split': 'test'} for r in self.photos]
+        default = FixedPairs(self.corpus(RunSettings(tile_size=256), records), 'test').frame
+        explicit = FixedPairs(self.corpus(RunSettings(tile_size=256,
+                              evaluation_yaml=str(original)), records), 'test').frame
+        wider = FixedPairs(self.corpus(RunSettings(tile_size=256,
+                             evaluation_yaml=str(expanded)), records), 'test').frame
+        pd.testing.assert_frame_equal(default, explicit)
+        fields = ['cover_id', 'source_photo', 'k', 'bit_mode', 'method', 'placement',
+                  'payload_kind', 'stride', 'source', 'grid', 'tile_size', 'y', 'x']
+        pd.testing.assert_frame_equal(default[fields], wider[fields])
+        self.assertTrue((default['requested_bpp'] != wider['requested_bpp']).any())
+        self.assertTrue(wider['requested_bpp'].max() > .5)
+
     def test_evaluation_keys_frame_contract_and_counts(self):
         required={"cover_id","source_photo","camera_model","tile_row","tile_col","k","bit_mode",
                   "method","placement","payload_kind","bpp_actual","photo_index","source","grid",

@@ -34,6 +34,7 @@ class RunSettings:
     tile_size: int = 512
     grid: str = "overlap_last"
     settings_yaml: str | None = None
+    evaluation_yaml: str | None = None  # None keeps the frozen run1 evaluation draws.
     variants_per_tile: int = 1
     fixed_variants: bool = False
     run_seed: int = 0
@@ -121,7 +122,7 @@ class Corpus:
         if len(self.by_id)!=len(self.photos):
             raise ValueError("duplicate photo identity")
         self.config=read_config(settings.settings_yaml or self.root/"configs/raise512-run1.yaml")
-        self.evaluation_config=read_config(self.root/"configs/raise512-run1.yaml")
+        self.evaluation_config=read_config(settings.evaluation_yaml or self.root/"configs/raise512-run1.yaml")
         self.selected=[]
         self.selection_record=[]
         groups={}
