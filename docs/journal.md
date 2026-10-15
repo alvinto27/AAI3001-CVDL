@@ -2638,9 +2638,29 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   A PC QUICK run with G4 settings, 32 workers and batch 32, was killed with
   exit 137 and `oom_kill=1`; G4 job files are not for the PC.
 - G4 wide run `xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_r2-20261015T121753Z-29499`
-  started at 12:18:14Z after the user said go. It uses `wide-1.env`,
-  commit `4f5fa5f`, and a 95-minute timeout. Result is Pending. The estimate
-  is about 67 min and about $1.82; this is not a measurement.
+  completed with exit 0 and no preemption. GCE started at 12:18:03Z and the
+  guest stopped at 13:19:01Z. Notebook time was 3,491.374 s, fit was
+  3,235.450 s, and VM time was about 60.97 min, or $1.66 at $1.63/hour
+  (estimate). Results were delivered to the Pi.
+- Standard test results, with 10,956 pairs, R2 -> wide: notebook P_E
+  0.025009 -> 0.019533, AUC 0.989593 -> 0.996092; at threshold 0.5,
+  clean false alarm 2.327% -> 1.396%, k=1-4 P_E 0.03029 -> 0.02373,
+  k=1 lowest miss 10.411% -> 10.264%, k=1 plane 12.400% -> 11.067%,
+  and k=8 lowest miss 4.628% -> 5.189%. RAISE P_E was 0.018503 ->
+  0.015111 and DIV2K 0.074104 -> 0.052932. Bpp-1 P_E/AUC was
+  0.019898/0.991922 -> 0.014878/0.997560. Low-bpp k=1 random miss was
+  56.57% -> 48.48%; low-bpp stride miss was 26.09% -> 27.83%.
+- Wide validation best epoch was 24 (1-based), P_E 0.017663. It had one
+  spike at epoch 5, P_E 0.0485, and recovered at the next epoch. Final
+  train loss was 0.1196 and validation loss 0.0886.
+- Wide timing found the early train phase 61.9 s, validation 13.2 s, and
+  the first validation batch wait 18.8 s; other gaps were below 0.5 s.
+  Curves took 0.41 s, scalars 0.24 s, and checkpoint 0.03 s. From epoch
+  24 zero-based, train time rose 61.9 -> 84.4, 99.6, 102.8, 105.3, 108.1,
+  111.1 s and validation was 29.2 s. Host data did not show growth: RAM
+  available 124.6 -> 123.3 GiB, RSS 10.84 -> 10.93 GiB, swap 0, and I/O
+  wait 0%; CPU 27.8 -> 16.8%, GPU 66.5 -> 44%, and power 298 -> 218 W.
+  This is an unknown epoch-dependent cause, not proof of a model fault.
 
 #### Pi data downloads
 
@@ -2787,8 +2807,14 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Source mix decision: sample each epoch at RAISE 40%, LSDIR 20%, and ALASKA
   40%. Keep RAISE validation/test fixed and add separate new-source sets.
   A per-source sampler is Pending.
-- Pending user: select the larger ALASKA training set of about 12,000-15,000
-  photos and the held-out camera list.
+- ALASKA selection decision (user): take more photos from the full download
+  and hold out 8 models for an unseen-camera test: Google_Pixel-XL,
+  Samsung_GalaxyS9plus-SM-G965F, Huawei_P20lite-ANE-LX1, Panasonic_DMC-TZ60,
+  Ricoh_GRDigital-III, Canon_EOS-60D, Sony_A7R, and Pentax_K50. Exclude
+  Leica_Mono because it is monochrome (`R=G=B`); keep Nikon_D90 in training.
+  Use 30 models for about 13,500 train, 1,000 validation, and 1,700
+  seen-camera test photos, split by contiguous ID blocks to reduce burst
+  leakage. Worker_3 builds selection v2; final run is Pending.
 - Worker_3 handles Pi data jobs. The Orchestrator does not monitor G4 runs;
   a worker monitors them.
 - Hypothesis, not tested: without normalisation, tanh inputs in layers 1-2
@@ -2834,12 +2860,12 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Pending: leave `V3_DIAG_WORKERS` at its default parallel setting for
   decode; the serial diagnostic path took 458 s here versus about 88 s with
   8 workers.
-- Pending: wide XuNet result and timing findings from Worker_2.
-- Done: LSDIR inventory from Worker_3. ALASKA download completion remains
-  Pending.
-- Pending: user decision on the larger ALASKA selection and held-out cameras;
-  suggested LSDIR subset is about 7,000 / 1,500 / 2,500 photos.
-- Pending: per-source sampler.
+- Done: wide XuNet result and timing findings from Worker_2.
+- Done: LSDIR inventory from Worker_3. Pending: ALASKA download completion.
+- Pending: ALASKA selection v2, LSDIR subset, and per-source sampler.
+- Pending: persistent validation workers, which may remove the measured
+  18.8 s first-validation-batch wait without changing results.
+- Pending: cause of the epoch-24 slowdown.
 - Pending: copy data to G4, estimated at 35-45 GB.
 - Pending, optional: measure miss rate against tile noise, run the denoise-
   and-compare demo, test tanh saturation, and run a filter linear probe.
