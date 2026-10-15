@@ -5,6 +5,7 @@
 - [V3b baseline results](results-v3b.md)
 - [V3 comparison results](results-v3.md)
 - [Noisy-cover dataset plan](plan-noisy-covers.md)
+- [ALASKA#2 and LSDIR source integration plan](plan-new-sources.md)
 - [On-the-fly generator design plan](plan-otf-generator.md)
 - [Frozen RAISE and DIV2K source records](frozen-source-records.md)
 - [Full-photo source API and verification](source-verification.md)
