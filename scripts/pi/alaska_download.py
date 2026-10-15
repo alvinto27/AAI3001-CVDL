@@ -33,6 +33,7 @@ WORKERS = 8
 SINGLE_MAX = 4 * 1024**2  # reserve enough for each in-flight TIFF plus a 50 GiB floor
 DIGESTS = ROOT / 'SHA256SUMS'
 failures = 0
+BASE_BYTES = 0
 failure_lock = threading.Lock()
 stop = threading.Event()
 verified: dict[int, tuple[str, int]] = {}
@@ -62,7 +63,7 @@ def tiff_ok(path: Path) -> bool:
 def record(state: str, note: str = '') -> None:
     status(ROOT, state=state, done=len(verified), total=TOTAL,
            bytes_=sum(size for _, size in verified.values()), failures=failures,
-           started=START, note=note)
+           started=START, note=note, baseline_bytes=BASE_BYTES)
 
 
 def selection() -> set[int]:
@@ -95,6 +96,8 @@ def existing(ids: list[int]) -> None:
     with DIGESTS.open('w') as stream:
         for number, (digest, _) in sorted(verified.items()):
             stream.write(f'{digest}  tiff_various_color/{number:05d}.tif\n')
+    global BASE_BYTES
+    BASE_BYTES = sum(size for _, size in verified.values())
     LOG.info('restart verified %d/%d files', len(verified), TOTAL)
     record('running', 'verified prior downloads')
 
@@ -205,7 +208,8 @@ def main() -> int:
             stream.write(f'{digest}  tiff_various_color/{number:05d}.tif\n')
     record('done', 'all files verified')
     summary(ROOT, done=len(verified), total=TOTAL,
-            bytes_=sum(size for _, size in verified.values()), failures=failures, started=START)
+            bytes_=sum(size for _, size in verified.values()), failures=failures,
+            started=START, baseline_bytes=BASE_BYTES)
     LOG.info('complete all %d TIFFs', TOTAL)
     return 0
 

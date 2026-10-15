@@ -27,11 +27,12 @@ def check_space(root: Path, incoming: int = 0) -> None:
 
 
 def status(root: Path, *, state: str, done: int, total: int, bytes_: int,
-           failures: int, started: dt.datetime, note: str = "") -> None:
+           failures: int, started: dt.datetime, note: str = "",
+           baseline_bytes: int = 0) -> None:
     now = dt.datetime.now(dt.timezone.utc)
     seconds = max((now - started).total_seconds(), 1)
     text = (f"state={state}\ndone={done}/{total}\nbytes={bytes_}\nfailures={failures}\n"
-            f"last_update={now.isoformat()}\nrate_MB_s={bytes_ / 1e6 / seconds:.3f}\n"
+            f"last_update={now.isoformat()}\nrate_MB_s={max(0, bytes_ - baseline_bytes) / 1e6 / seconds:.3f}\n"
             f"note={note}\n")
     temp = root / "STATUS.tmp"
     temp.write_text(text, encoding="utf-8")
@@ -39,11 +40,11 @@ def status(root: Path, *, state: str, done: int, total: int, bytes_: int,
 
 
 def summary(root: Path, *, done: int, total: int, bytes_: int, failures: int,
-            started: dt.datetime) -> None:
+            started: dt.datetime, baseline_bytes: int = 0) -> None:
     now = dt.datetime.now(dt.timezone.utc)
     seconds = max((now - started).total_seconds(), 1)
     (root / "SUMMARY").write_text(
         f"finished={now.isoformat()}\ndone={done}/{total}\nbytes={bytes_}\n"
-        f"failures={failures}\nwall_s={seconds:.1f}\nrate_MB_s={bytes_ / 1e6 / seconds:.3f}\n",
+        f"failures={failures}\nwall_s={seconds:.1f}\nrate_MB_s={max(0, bytes_ - baseline_bytes) / 1e6 / seconds:.3f}\n",
         encoding="utf-8",
     )

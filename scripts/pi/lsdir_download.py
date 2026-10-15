@@ -27,6 +27,7 @@ if len(EXPECTED) != 17:
     raise ValueError('expected 17 pinned shard digests')
 NAMES = [f'shard-{i:02d}.tar.gz' for i in range(17)] + ['val1.tar.gz']
 verified: dict[str, tuple[str, int]] = {}
+BASE_BYTES = 0
 failures = 0
 
 
@@ -41,7 +42,7 @@ def digest(path: Path) -> str:
 def record(state: str, note: str = '') -> None:
     status(ROOT, state=state, done=len(verified), total=len(NAMES),
            bytes_=sum(size for _, size in verified.values()), failures=failures,
-           started=START, note=note)
+           started=START, note=note, baseline_bytes=BASE_BYTES)
 
 
 def run_hf(name: str, expected_size: int, force: bool = False) -> bool:
@@ -83,7 +84,7 @@ def inspect(name: str) -> bool:
 
 
 def main() -> int:
-    global failures
+    global failures, BASE_BYTES
     # Xet may give an interrupted archive a new temporary suffix on restart.
     # Service KillMode=control-group guarantees no old downloader still writes
     # here; remove only abandoned incomplete files, never completed archives.
@@ -94,6 +95,7 @@ def main() -> int:
     for name in NAMES:
         if inspect(name):
             LOG.info('verified existing %s', name)
+    BASE_BYTES = sum(size for _, size in verified.values())
     record('running', 'checking archives')
     pending = [name for name in NAMES if name not in verified]
     round_ = 0
@@ -147,7 +149,7 @@ def main() -> int:
             stream.write(f'{verified[name][0]}  {name}\n')
     record('done', 'all files checked')
     summary(ROOT, done=len(verified), total=len(NAMES), bytes_=sum(size for _, size in verified.values()),
-            failures=failures, started=START)
+            failures=failures, started=START, baseline_bytes=BASE_BYTES)
     LOG.info('complete %d archives', len(NAMES))
     return 0
 
