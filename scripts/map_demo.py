@@ -55,7 +55,13 @@ class KVFilter(nn.Module):
 
 
 def make_norm(channels, norm):
-    return nn.BatchNorm2d(channels) if norm == 'batch' else nn.GroupNorm(8, channels)
+    if norm == 'none':
+        return nn.Identity()
+    if norm == 'batch':
+        return nn.BatchNorm2d(channels)
+    if norm == 'group':
+        return nn.GroupNorm(8, channels)
+    raise ValueError(f'unsupported checkpoint norm: {norm}')
 
 
 class XuNet(nn.Module):
@@ -334,25 +340,32 @@ def render(photo_id, cover, cases):
 
 
 def main():
-    global OUTPUT
+    global OUTPUT, CHECKPOINT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--fixed-settings', action='store_true',
                         help='compare classic lowest-bit k=1 and k=4 match; default preserves drawn settings')
+    parser.add_argument('--checkpoint', type=Path, default=CHECKPOINT)
+    parser.add_argument('--output', type=Path, default=None)
     args = parser.parse_args()
+    CHECKPOINT = args.checkpoint.resolve()
     if args.fixed_settings:
         OUTPUT = ROOT / 'runs-out/map-demo-v2'
+    if args.output is not None:
+        OUTPUT = args.output.resolve()
     OUTPUT.mkdir(parents=True, exist_ok=True)
     if not torch.cuda.is_available():
         raise RuntimeError('GPU required: run in aai3001 after checking live kernels')
     torch.set_num_threads(1)
     device = torch.device('cuda')
-    model = XuNet(clip_t=3.0, norm='group').to(device).eval()
     ckpt = torch.load(CHECKPOINT, map_location='cpu', weights_only=False)
+    hparams = ckpt.get('hyper_parameters', {})
+    norm = hparams.get('norm', 'group')  # Old checkpoints have no recorded norm.
+    model = XuNet(clip_t=hparams.get('clip_t', 3.0), norm=norm).to(device).eval()
     state = {key.removeprefix('net.'): value for key, value in ckpt['state_dict'].items()}
     if len(state) != len(ckpt['state_dict']):
         raise ValueError('unexpected checkpoint key collision')
     model.load_state_dict(state, strict=True)
-    print('CHECKPOINT', CHECKPOINT.name, 'epoch', ckpt['epoch'], 'strict=True',
+    print('CHECKPOINT', CHECKPOINT.name, 'epoch', ckpt['epoch'], 'norm', norm, 'strict=True',
           'state_keys', len(state), 'GPU', torch.cuda.get_device_name(0), flush=True)
     photos = input_photos()
     proof = prove_32(model, photos, device)
