@@ -19,7 +19,9 @@ from PIL import Image
 
 from common import MIN_FREE, check_space, setup, status, summary
 
-ROOT = Path('/srv/datasets/alaska/tiff_various_color')
+ROOT = Path('/srv/datasets/alaska')
+IMAGES = ROOT / 'tiff_various_color'
+IMAGES.mkdir(parents=True, exist_ok=True)
 SOURCE = Path(__file__).with_name('selection_v1.csv')
 START_AT = dt.datetime(2026, 10, 15, 13, 15, tzinfo=ZoneInfo('Asia/Singapore'))
 BASE = 'https://alaska.utt.fr/DATASETS/ALASKA_v2_TIFF_VariousSize_COLOR'
@@ -77,12 +79,12 @@ def existing(ids: list[int]) -> None:
     known = {}
     if DIGESTS.is_file():
         for line in DIGESTS.read_text().splitlines():
-            match = re.fullmatch(r'([a-f0-9]{64})  ([0-9]{5})\.tif', line)
+            match = re.fullmatch(r'([a-f0-9]{64})  tiff_various_color/([0-9]{5})\.tif', line)
             if not match:
                 raise ValueError('invalid SHA256SUMS record')
             known[int(match[2])] = match[1]
     for number in ids:
-        path = ROOT / f'{number:05d}.tif'
+        path = IMAGES / f'{number:05d}.tif'
         if number not in known or not path.is_file():
             continue
         if tiff_ok(path) and sha256(path) == known[number]:
@@ -91,15 +93,15 @@ def existing(ids: list[int]) -> None:
     # are re-fetched; verified files remain unchanged.
     with DIGESTS.open('w') as stream:
         for number, (digest, _) in sorted(verified.items()):
-            stream.write(f'{digest}  {number:05d}.tif\n')
+            stream.write(f'{digest}  tiff_various_color/{number:05d}.tif\n')
     LOG.info('restart verified %d/%d files', len(verified), TOTAL)
     record('running', 'verified prior downloads')
 
 
 def fetch(number: int) -> tuple[int, str, int, str]:
     name = f'{number:05d}.tif'
-    part = ROOT / (name + '.part')
-    final = ROOT / name
+    part = IMAGES / (name + '.part')
+    final = IMAGES / name
     delay = 600
     while not stop.is_set():
         if shutil.disk_usage(ROOT).free < MIN_FREE + WORKERS * SINGLE_MAX:
@@ -171,7 +173,7 @@ def main() -> int:
                 assert ident == number
                 verified[number] = (digest, size)
                 with DIGESTS.open('a') as stream:
-                    stream.write(f'{digest}  {number:05d}.tif\n')
+                    stream.write(f'{digest}  tiff_various_color/{number:05d}.tif\n')
                     stream.flush()
                     os.fsync(stream.fileno())
                 if len(verified) % 100 == 0:
@@ -185,7 +187,7 @@ def main() -> int:
         raise RuntimeError(f'incomplete: {len(verified)}/{TOTAL}')
     with DIGESTS.open('w') as stream:
         for number, (digest, _) in sorted(verified.items()):
-            stream.write(f'{digest}  {number:05d}.tif\n')
+            stream.write(f'{digest}  tiff_various_color/{number:05d}.tif\n')
     record('done', 'all files verified')
     summary(ROOT, done=len(verified), total=TOTAL,
             bytes_=sum(size for _, size in verified.values()), failures=failures, started=START)
