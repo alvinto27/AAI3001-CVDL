@@ -1,0 +1,21 @@
+[Unit]
+Description=CVDL LSDIR archive extraction and inventory (low priority)
+After=cvdl-lsdir.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/rpi400/cvdl-jobs
+ExecStart=/usr/bin/python3 /home/rpi400/cvdl-jobs/lsdir_extract.py
+Nice=19
+IOSchedulingClass=idle
+CPUWeight=20
+Restart=on-failure
+RestartSec=120
+RestartPreventExitStatus=78
+TimeoutStopSec=30
+KillMode=control-group
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
