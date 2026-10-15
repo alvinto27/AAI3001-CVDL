@@ -2,6 +2,7 @@
 
 - [Project journal](journal.md)
 - [Research checklist](research-checklist.md)
+- [Session handoff 2026-10-15](handoff-2026-10-15.md)
 - [V1 baseline results](results-v1-baseline.md)
 - [V3b baseline results](results-v3b.md)
 - [V3 comparison results](results-v3.md)
