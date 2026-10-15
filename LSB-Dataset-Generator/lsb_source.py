@@ -83,6 +83,22 @@ def _png8(path: Path) -> np.ndarray:
     return np.ascontiguousarray(pixels)
 
 
+def _tiff_rgb8(path: Path) -> np.ndarray:
+    """Read stored RGB samples without ICC conversion or orientation changes."""
+    with Image.open(path) as image:
+        tags = image.tag_v2
+        if (image.format != "TIFF" or image.mode != "RGB" or getattr(image, "n_frames", 1) != 1
+                or tuple(tags.get(258, ())) != (8, 8, 8)
+                or tags.get(259) != 1 or tags.get(262) != 2
+                or tags.get(274, 1) != 1 or tags.get(277) != 3
+                or tags.get(284, 1) != 1 or tags.get(338) is not None
+                or tuple(tags.get(339, (1, 1, 1))) != (1, 1, 1)):
+            raise ValueError("tiff_rgb8 requires one uncompressed, unrotated, three-channel RGB8 frame")
+        image.load()
+        pixels = np.array(image, copy=True)
+    return np.ascontiguousarray(pixels)
+
+
 def load_photo(record: Mapping, repo_root: Path) -> np.ndarray:
     """Return full oriented uint8 (H,W,3), with strict source/size validation."""
     relative = PurePosixPath(record["master_path"])
@@ -95,10 +111,10 @@ def load_photo(record: Mapping, repo_root: Path) -> np.ndarray:
             raise ValueError("RAW noise is not implemented")
         configure_source_worker()
         pixels = decode_raw_pixels(path)
-    elif source_type == "png8":
+    elif source_type in {"png8", "tiff_rgb8"}:
         if record.get("noise") != "not_applicable":
-            raise ValueError("png8 cannot use RAW noise")
-        pixels = _png8(path)
+            raise ValueError(f"{source_type} cannot use RAW noise")
+        pixels = _png8(path) if source_type == "png8" else _tiff_rgb8(path)
     else:
         raise ValueError(f"unsupported source_type: {source_type}")
     _validate_pixels(pixels, record)
@@ -127,6 +143,17 @@ def grid_axes(record: Mapping, grid_policy: str, tile_size: int) -> tuple[tuple[
                 raise ValueError(f"invalid recorded overlap {axis} starts/count")
             axes.append(values)
         return axes[0], axes[1]
+    if grid_policy == "trim512":
+        if tile_size != 512 or record["grid_policy"] != "trim512":
+            raise ValueError("trim512 requires the recorded 512 grid")
+        ys = tuple(r * 512 for r in range(h // 512))
+        xs = tuple(c * 512 for c in range(w // 512))
+        if (not ys or not xs or len(ys) != _integer(record, "overlap512_rows")
+                or len(xs) != _integer(record, "overlap512_cols")
+                or ";".join(map(str, ys)) != record["overlap512_y"]
+                or ";".join(map(str, xs)) != record["overlap512_x"]):
+            raise ValueError("invalid recorded trim512 starts/count")
+        return ys, xs
     if grid_policy == "topleft_crop":
         if tile_size != 512 or record["source"] != "raise" or record["legacy512_policy"] != "topleft_crop":
             raise ValueError("legacy grid is RAISE topleft_crop 512 only")

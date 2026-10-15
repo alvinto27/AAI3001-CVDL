@@ -68,10 +68,15 @@ def summary_rows(frame):
     return rows
 
 
-def evaluate(checkpoint, eval_yaml=ROOT / 'configs/raise512-run1.yaml', *, split='test', output, workers=6):
-    """Score one checkpoint and return the summary. Safe to import from a notebook."""
-    if split not in ('test', 'val') or workers < 0:
-        raise ValueError('split must be test or val; workers must be nonnegative')
+def evaluate(checkpoint, eval_yaml=ROOT / 'configs/raise512-run1.yaml', *, split='test', output,
+             workers=6, source=None, manifest_root=None):
+    """Score one frozen panel and return the summary; default is the standard test."""
+    if (split not in ('test','val','test_seen','test_unseen') or workers < 0
+            or source not in (None,'alaska','lsdir')
+            or (source is None and split not in ('test','val'))
+            or (source=='lsdir' and split not in ('test','val'))
+            or (source=='alaska' and split=='test')):
+        raise ValueError('unsupported source/split or worker count')
     start = time.perf_counter()
     torch.set_num_threads(1)
     checkpoint = Path(checkpoint).resolve()
@@ -90,8 +95,12 @@ def evaluate(checkpoint, eval_yaml=ROOT / 'configs/raise512-run1.yaml', *, split
     model.load_state_dict(state, strict=True)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
-    settings = RunSettings(evaluation_yaml=str(evaluation_yaml))
-    dataset = FixedPairs(Corpus(ROOT, settings), split)
+    settings = RunSettings(evaluation_yaml=str(evaluation_yaml),
+                           sources=(source,) if source else ('raise','div2k'),
+                           manifest_root=str(manifest_root) if manifest_root else None)
+    dataset = FixedPairs(Corpus(ROOT, settings), split, sources=(source,) if source else ('raise','div2k'))
+    if not len(dataset):
+        raise ValueError('selected evaluation panel is empty')
     loader = OrderedPairLoader(dataset, batch_size=16, num_workers=workers,
                                pin_memory=device.type == 'cuda', prefetch_images=128)
     pairs = dataset.frame
@@ -131,6 +140,7 @@ def evaluate(checkpoint, eval_yaml=ROOT / 'configs/raise512-run1.yaml', *, split
     info = dict(checkpoint=str(checkpoint), checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
                 norm=norm, clip_t=hparams.get('clip_t', 3.0), evaluation_yaml=str(evaluation_yaml),
                 split=split, workers=workers, settings_sha256=setting_digest,
+                source=source or 'standard', manifest_root=str(manifest_root) if manifest_root else None,
                 pairs=len(dataset), elapsed_seconds=time.perf_counter() - start, overall=summary[0])
     (output / 'run.json').write_text(json.dumps(info, indent=2) + '\n')
     print(json.dumps(info, indent=2), flush=True)
@@ -141,12 +151,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--checkpoint', type=Path, required=True)
     parser.add_argument('--eval-yaml', type=Path, default=ROOT / 'configs/raise512-run1.yaml')
-    parser.add_argument('--split', choices=('test', 'val'), default='test')
+    parser.add_argument('--split', choices=('test','val','test_seen','test_unseen'), default='test')
+    parser.add_argument('--source', choices=('alaska','lsdir'))
+    parser.add_argument('--manifest-root', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--workers', type=int, default=6)
     args = parser.parse_args()
     evaluate(args.checkpoint, args.eval_yaml, split=args.split,
-             output=args.output, workers=args.workers)
+             output=args.output, workers=args.workers, source=args.source,
+             manifest_root=args.manifest_root)
 
 
 if __name__ == '__main__':

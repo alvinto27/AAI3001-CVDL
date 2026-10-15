@@ -137,8 +137,8 @@ legacy_seed_sequence = _seed_sequence
 draw_legacy_settings = _draw_settings
 OTF_KEY_VERSION = 1
 FIXED_EVALUATION_SEED = 1
-PURPOSE_CODES = MappingProxyType({"train": 1, "val": 2, "test": 3})
-GRID_CODES = MappingProxyType({"none": 0, "topleft_crop": 1, "overlap_last": 2})
+PURPOSE_CODES = MappingProxyType({"train": 1, "val": 2, "test": 3, "test_seen": 4, "test_unseen": 5})
+GRID_CODES = MappingProxyType({"none": 0, "topleft_crop": 1, "overlap_last": 2, "trim512": 3})
 CARRIER_CODES = MappingProxyType({"tile": 1, "photo": 2})
 STREAM_CODES = MappingProxyType({"settings": 0, "embedding": 1})
 
@@ -164,8 +164,8 @@ def otf_seed_sequence(*, run_seed: int, purpose: str, epoch: int, photo_index: i
     if carrier == "photo":
         grid_id, tile_size, tile_row, tile_col = 0, 0, 0, 0
     elif (grid_policy == "none" or tile_size not in (256, 512)
-          or (grid_policy == "topleft_crop" and tile_size != 512)):
-        raise ValueError("tile keys require overlap 256/512 or top-left 512")
+          or (grid_policy in {"topleft_crop", "trim512"} and tile_size != 512)):
+        raise ValueError("tile keys require overlap 256/512, trim 512, or top-left 512")
     values = [OTF_KEY_VERSION, PURPOSE_CODES[purpose], seed, generation_epoch,
               CARRIER_CODES[carrier], photo_index, grid_id, tile_size,
               tile_row, tile_col, variant, STREAM_CODES[stream]]

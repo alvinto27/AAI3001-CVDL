@@ -40,6 +40,9 @@ class RunSettings:
     run_seed: int = 0
     train_photo_fraction: float = 1.0
     source_weights: dict[str, float] | None = None
+    source_mix: dict[str, float] | None = None
+    tiles_per_epoch: int | None = None
+    manifest_root: str | None = None
     source: str = "decode"
     cache_root: str | None = None
     buffer_size: int = 1024  # images, not float32 tensors or photo count
@@ -48,12 +51,14 @@ class RunSettings:
     tensor_dtype: str = "uint8"
 
     def __post_init__(self):
-        if not self.sources or len(set(self.sources)) != len(self.sources) or set(self.sources)-{"raise","div2k"}:
-            raise ValueError("sources must be a nonempty unique raise/div2k tuple")
+        if not self.sources or len(set(self.sources)) != len(self.sources) or set(self.sources)-{"raise","div2k","alaska","lsdir"}:
+            raise ValueError("sources must be a nonempty unique raise/div2k/alaska/lsdir tuple")
         if type(self.tile_size) is not int or self.tile_size not in (256,512) or self.grid not in ("overlap_last","topleft_crop"):
             raise ValueError("invalid tile size/grid")
         if self.grid == "topleft_crop" and (self.tile_size != 512 or self.sources != ("raise",)):
             raise ValueError("top-left training requires RAISE-only 512")
+        if set(self.sources)&{"alaska","lsdir"} and self.tile_size!=512:
+            raise ValueError("new sources require trim512 tiles")
         if type(self.variants_per_tile) is not int or self.variants_per_tile < 1:
             raise ValueError("positive variants_per_tile required")
         if type(self.run_seed) is not int or self.run_seed < 0:
@@ -69,6 +74,18 @@ class RunSettings:
             raise ValueError("source is decode or cache with cache_root")
         if type(self.buffer_size) is not int or self.buffer_size < 2:
             raise ValueError("buffer_size must be at least two images")
+        if self.source_mix is not None:
+            if set(self.sources)&{"alaska","lsdir"} and self.source!="decode":
+                raise ValueError("mixed new sources need master decode, not an incomplete cache")
+            if (self.source_weights is not None or not self.source_mix
+                    or set(self.source_mix)!=set(self.sources) or "div2k" in self.source_mix
+                    or type(self.tiles_per_epoch) is not int or self.tiles_per_epoch<1
+                    or any(type(v) not in (int,float) or v<=0 or not math.isfinite(v)
+                           for v in self.source_mix.values())
+                    or not math.isclose(sum(self.source_mix.values()),1.0,abs_tol=1e-8)):
+                raise ValueError("source_mix needs selected sources, weights summing to 1, and positive tiles_per_epoch")
+        elif self.tiles_per_epoch is not None:
+            raise ValueError("tiles_per_epoch needs source_mix")
         if self.source_weights is not None:
             if set(self.source_weights)-set(self.sources):
                 raise ValueError("weights apply to selected training sources only")
@@ -116,8 +133,11 @@ class Corpus:
     def __init__(self, repo_root, settings: RunSettings, *, records=None):
         self.root=Path(repo_root)
         self.settings=settings
+        manifests=Path(settings.manifest_root) if settings.manifest_root else self.root
         self.photos=(list(records) if records is not None else
-                     _rows(self.root/"data/raise/photo_manifest.csv")+_rows(self.root/"data/div2k/photo_manifest.csv"))
+                     _rows(self.root/"data/raise/photo_manifest.csv")+_rows(self.root/"data/div2k/photo_manifest.csv")+
+                     sum((_rows(manifests/f"data/{source}/photo_manifest.csv") for source in ("alaska","lsdir")
+                          if source in settings.sources),[]))
         self.by_id={r["photo_id"]:r for r in self.photos}
         if len(self.by_id)!=len(self.photos):
             raise ValueError("duplicate photo identity")
@@ -163,9 +183,45 @@ class Corpus:
         return load_cached(record,self.settings.cache_root,self.root,mmap=False,
                            verify_hash=False,verify_master_hash=False)
 
+    def effective_grid(self,record):
+        return record["grid_policy"] if record["source"] in {"alaska","lsdir"} else self.settings.grid
+
     def pairs_in_photo(self,record,grid="overlap_last"):
-        ys,xs=grid_axes(record,grid,self.settings.tile_size)
+        effective=self.effective_grid(record) if record["source"] in {"alaska","lsdir"} else grid
+        ys,xs=grid_axes(record,effective,self.settings.tile_size)
         return len(ys)*len(xs)*self.settings.variants_per_tile
+
+    def train_tile_schedule(self,epoch):
+        """Photo-grouped sampled tile tuples, with a new keyed draw each epoch."""
+        if self.settings.source_mix is None:
+            raise ValueError("tile schedule requires source_mix")
+        target=self.settings.tiles_per_epoch
+        names=list(self.settings.source_mix)
+        counts={source:int(round(target*self.settings.source_mix[source])) for source in names[:-1]}
+        counts[names[-1]]=target-sum(counts.values())
+        groups=[];repeats={}
+        for source in names:
+            candidates=[]
+            for record in self.selected:
+                if record["source"]!=source:continue
+                ys,xs=grid_axes(record,self.effective_grid(record),self.settings.tile_size)
+                candidates.extend((record,row,col,variant)
+                                  for row in range(len(ys)) for col in range(len(xs))
+                                  for variant in range(1,self.settings.variants_per_tile+1))
+            if not candidates:
+                raise ValueError(f"no train tiles for source {source}")
+            rng=_rng(self.settings.run_seed,epoch,zlib.crc32(source.encode()))
+            chosen=[]
+            while len(chosen)<counts[source]:
+                take=min(len(candidates),counts[source]-len(chosen))
+                chosen.extend(candidates[int(i)] for i in rng.permutation(len(candidates))[:take])
+            repeats[source]=max(0,counts[source]-len(candidates))
+            grouped={}
+            for record,row,col,variant in chosen:
+                grouped.setdefault(record["photo_id"],(record,[]))[1].append((row,col,variant))
+            groups.extend(grouped.values())
+        rng=_rng(self.settings.run_seed,epoch,0x534348)
+        return [groups[int(i)] for i in rng.permutation(len(groups))],repeats
 
     def train_schedule(self,epoch):
         rng=_rng(self.settings.run_seed,epoch,0x534348)
@@ -212,11 +268,20 @@ class TrainingImages(IterableDataset):
         self._epoch[0]=epoch  # call before starting next iterator, not mid-iteration
 
     def __len__(self):
-        count=sum(self.corpus.pairs_in_photo(r,self.corpus.settings.grid)
-                  for r in self.corpus.train_schedule(int(self._epoch.item())))
+        if self.corpus.settings.source_mix is not None:
+            count=self.corpus.settings.tiles_per_epoch
+        else:
+            count=sum(self.corpus.pairs_in_photo(r,self.corpus.settings.grid)
+                      for r in self.corpus.train_schedule(int(self._epoch.item())))
         return count if self.corpus.settings.paired_batches else count*2
 
     def batch_count(self,workers,batch_size):
+        if self.corpus.settings.source_mix is not None:
+            groups,_=self.corpus.train_tile_schedule(int(self._epoch.item()))
+            n=max(1,workers)
+            factor=1 if self.corpus.settings.paired_batches else 2
+            return sum(math.ceil(sum(len(tiles)*factor for _,tiles in groups[w::n])/batch_size)
+                       for w in range(n))
         schedule=self.corpus.train_schedule(int(self._epoch.item()))
         n=max(1,workers)
         factor=1 if self.corpus.settings.paired_batches else 2
@@ -245,6 +310,26 @@ class TrainingImages(IterableDataset):
                             yield stego,1,pair_id*2+1,entropy
             del photo
 
+    def _items_mixed(self,groups,epoch):
+        settings=self.corpus.settings
+        for record,tiles in groups:
+            photo=self.corpus.photo(record)
+            ys,xs=grid_axes(record,self.corpus.effective_grid(record),settings.tile_size)
+            for row,col,variant in tiles:
+                spec=TileSpec(self.corpus.effective_grid(record),settings.tile_size,row,col)
+                seed=OTFSeed(settings.run_seed,"train",epoch,variant,settings.fixed_variants)
+                clean,_=make_sample(photo,record,spec,self.corpus.config,seed,"clean")
+                stego,meta=make_sample(photo,record,spec,self.corpus.config,seed,"stego")
+                pair_id=(self.corpus.offsets[record["photo_id"]]+
+                         (row*len(xs)+col)*settings.variants_per_tile+variant-1)
+                entropy=meta["embedding_seed_key"]
+                if settings.paired_batches:
+                    yield clean,stego,pair_id,entropy
+                else:
+                    yield clean,0,pair_id*2,entropy
+                    yield stego,1,pair_id*2+1,entropy
+            del photo
+
     def _output(self,item):
         dtype=getattr(torch,self.corpus.settings.tensor_dtype)
         if self.corpus.settings.paired_batches:
@@ -259,11 +344,16 @@ class TrainingImages(IterableDataset):
         epoch=int(self._epoch.item())
         info=get_worker_info()
         worker,n=(0,1) if info is None else (info.id,info.num_workers)
-        schedule=self.corpus.train_schedule(epoch)[worker::n]
+        if self.corpus.settings.source_mix is None:
+            schedule=self.corpus.train_schedule(epoch)[worker::n]
+            items=self._items(schedule,epoch)
+        else:
+            groups,_=self.corpus.train_tile_schedule(epoch)
+            items=self._items_mixed(groups[worker::n],epoch)
         rng=_rng(self.corpus.settings.run_seed,epoch,0x425546+worker)
         limit=self.corpus.settings.buffer_size//(2 if self.corpus.settings.paired_batches else 1)
         buffer=[]
-        for item in self._items(schedule,epoch):
+        for item in items:
             if len(buffer)<limit:
                 buffer.append(item)
                 continue
@@ -281,8 +371,8 @@ class FixedPairs(Dataset):
     profile overlap_full_mix: every tile from both frozen sources and run1 mix.
     profile legacy_v6: RAISE run1 keys/rows; purpose all exposes all 49,796 pairs.
     """
-    def __init__(self,corpus: Corpus,purpose="val",profile="overlap_full_mix",photo_ids=None):
-        if purpose not in ("train","val","test","all") or profile not in ("overlap_full_mix","legacy_v6"):
+    def __init__(self,corpus: Corpus,purpose="val",profile="overlap_full_mix",photo_ids=None,sources=None):
+        if purpose not in ("train","val","test","test_seen","test_unseen","all") or profile not in ("overlap_full_mix","legacy_v6"):
             raise ValueError("invalid purpose/profile")
         if profile=="overlap_full_mix" and purpose=="all":
             raise ValueError("overlap evaluation requires an explicit purpose")
@@ -302,15 +392,16 @@ class FixedPairs(Dataset):
                     self.entries.append((record,int(original["tile_row"]),int(original["tile_col"]),1,original))
         else:
             for record in corpus.photos:
-                if record["split"]!=purpose or (photo_ids is not None and record["photo_id"] not in photo_ids):
+                if (record["split"]!=purpose or (sources is not None and record["source"] not in sources)
+                        or (photo_ids is not None and record["photo_id"] not in photo_ids)):
                     continue
-                ys,xs=grid_axes(record,"overlap_last",corpus.settings.tile_size)
+                ys,xs=grid_axes(record,corpus.effective_grid(record),corpus.settings.tile_size)
                 for row in range(len(ys)):
                     for col in range(len(xs)):
                         for variant in range(1,corpus.settings.variants_per_tile+1):
                             self.entries.append((record,row,col,variant,None))
         for record,row,col,variant,original in self.entries:
-            grid="topleft_crop" if original is not None else "overlap_last"
+            grid="topleft_crop" if original is not None else corpus.effective_grid(record)
             ys,xs=grid_axes(record,grid,corpus.settings.tile_size)
             if original is not None:
                 sequence=legacy_seed_sequence(corpus.evaluation_config.seed,int(original["cover_index"]),1,0)
@@ -356,7 +447,7 @@ class FixedPairs(Dataset):
             clean,cm=replay_legacy(self._last_photo,record,original,self.corpus.evaluation_config,"clean")
             stego,sm=replay_legacy(self._last_photo,record,original,self.corpus.evaluation_config,"stego")
         else:
-            spec=TileSpec("overlap_last",self.corpus.settings.tile_size,row,col)
+            spec=TileSpec(self.corpus.effective_grid(record),self.corpus.settings.tile_size,row,col)
             seed=OTFSeed(self.corpus.settings.run_seed,self.purpose,0,variant,self.corpus.settings.fixed_variants)
             clean,cm=make_sample(self._last_photo,record,spec,self.corpus.evaluation_config,seed,"clean")
             stego,sm=make_sample(self._last_photo,record,spec,self.corpus.evaluation_config,seed,"stego")

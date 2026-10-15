@@ -1,11 +1,13 @@
 # Documentation
 
 - [Project journal](journal.md)
+- [Research checklist](research-checklist.md)
 - [V1 baseline results](results-v1-baseline.md)
 - [V3b baseline results](results-v3b.md)
 - [V3 comparison results](results-v3.md)
 - [Noisy-cover dataset plan](plan-noisy-covers.md)
 - [ALASKA#2 and LSDIR source integration plan](plan-new-sources.md)
+- [ALASKA/LSDIR source code, manifest contract, and verification](plan-new-data-code.md)
 - [On-the-fly generator design plan](plan-otf-generator.md)
 - [Optional G4 GPU LSB generator plan](plan-gpu-generator.md)
 - [G4 epoch overhead analysis and options](plan-epoch-overhead.md)

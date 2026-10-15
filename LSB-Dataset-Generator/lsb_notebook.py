@@ -24,17 +24,34 @@ def fixed_subset(dataset,count,seed=0):
 
 
 class NotebookData:
-    def __init__(self,root,settings,*,quick=False,profile="overlap_full_mix",eval_pairs=16):
+    def __init__(self,root,settings,*,quick=False,profile="overlap_full_mix",eval_pairs=16,
+                 checkpoint_validation="standard"):
         self.corpus=Corpus(root,settings)
         self.train=TrainingImages(self.corpus)
         chosen={r["photo_id"] for r in self.corpus.selected}
         self.fixed_train=FixedPairs(self.corpus,"train",profile,photo_ids=chosen)
-        self.val=FixedPairs(self.corpus,"val",profile)
-        self.test=FixedPairs(self.corpus,"test",profile)
+        if checkpoint_validation not in {"standard","combined"}:
+            raise ValueError("checkpoint_validation must be standard or combined")
+        if profile!="overlap_full_mix" and set(settings.sources)&{"alaska","lsdir"}:
+            raise ValueError("new-source panels require overlap_full_mix; legacy_v6 is RAISE only")
+        self.checkpoint_validation=checkpoint_validation
+        self.val=FixedPairs(self.corpus,"val",profile,
+                            sources=("raise","div2k") if checkpoint_validation=="standard" else None)
+        self.test=FixedPairs(self.corpus,"test",profile,sources=("raise","div2k"))
+        self.extra_pairs={}
+        for source,splits in (("alaska",("val","test_seen","test_unseen")),
+                              ("lsdir",("val","test"))):
+            if source in settings.sources:
+                for split in splits:
+                    self.extra_pairs[f"{source}-{split}"]=FixedPairs(self.corpus,split,profile,sources=(source,))
         if quick:
             self.val=fixed_subset(self.val,eval_pairs,0)
             self.test=fixed_subset(self.test,eval_pairs,1)
+            self.extra_pairs={name:fixed_subset(dataset,eval_pairs,2+i)
+                              for i,(name,dataset) in enumerate(self.extra_pairs.items())}
         self.record={**self.corpus.run_record,"data":"otf","quick":quick,"eval_profile":profile,
+                     "checkpoint_validation":checkpoint_validation,
+                     "extra_pair_counts":{name:len(ds) for name,ds in self.extra_pairs.items()},
                      "quick_eval_pair_ids":{s:d.frame["cover_id"].tolist() if quick else None
                                             for s,d in (("val",self.val),("test",self.test))}}
         self.pairs=pd.concat([self.fixed_train.frame,self.val.frame,self.test.frame],ignore_index=True)

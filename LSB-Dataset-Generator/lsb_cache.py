@@ -47,6 +47,8 @@ def decode_version(source_type):
         import rawpy
         result.update(rawpy=rawpy.__version__, libraw=list(rawpy.libraw_version),
                       raw_settings=raw_settings_record(), raw_noise_hook="disabled")
+    elif source_type == "tiff_rgb8":
+        result.update(tiff_policy="uncompressed-RGB8-orientation1-stored-samples-no-ICC-transform-v1")
     elif source_type != "png8":
         raise CacheError(f"unsupported source_type {source_type}")
     return result
