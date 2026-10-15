@@ -2759,6 +2759,31 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   output 0 / 4 / 16 / 32 MiB. This is a logging bug only; the data stream and
   R2/wide results are unchanged.
 
+#### Validation-worker and logging fixes
+
+- Worker_2 committed speed fixes in `0d6d157`. `V3_PERSISTENT_WORKERS=on|off`
+  defaults on for notebook 05 validation only. Train workers already persist;
+  test and diagnostic workers remain short-lived. `OrderedPairLoader` keeps
+  workers after a complete pass, resets after a partial pass, and shuts down
+  explicitly during runner cleanup. `CellStream` now stores chunks in a list
+  and joins once, with identical final bytes.
+- Twenty-one tests passed, including persistent replay and partial-pass
+  regression tests. The standard test hash remains `fdd989f7...837`.
+- With priming on and PC 6/4 workers, the first 8 train-batch hashes matched
+  with persistence on and off: epoch 0 `8d19c9a8...ba6aa`, epoch 1
+  `8aab10a2...640a`. All 32 QUICK validation pairs matched on/off and across
+  epochs: `e215a95c...05c`.
+- PC validation first-batch wait fell from 4.780 s to 0.870 s in QUICK,
+  saving 3.91 s; a data-only probe fell from 4.584 s to 0.867 s. PC
+  process-tree PSS after validation rose from 2,880 to 4,573 MiB, an
+  increase of 1.69 GiB for four retained workers. A 16-worker G4 estimate is
+  +6.8 GiB, unverified; the wide run had more than 117 GiB available.
+- The R2 and wide fit-cell outputs reached 31.2 MiB at epoch 24 and 37.9 MiB
+  at epoch 29. Append-and-join for 32 MiB took 0.0048 s plus 0.0126 s with
+  identical bytes. A PC data-only epochs 20-27 probe had no slowdown; epoch
+  24 train was 1.117 s and validation 3.917 s. The data stream is not the
+  cause. Post-fix G4 timing is Pending.
+
 ### Decided
 
 - Pending user decision: G4 runs use `V3_PRIME_NEXT_EPOCH=on` as the
@@ -2890,11 +2915,14 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   8 workers.
 - Done: wide XuNet result and timing findings from Worker_2.
 - Done: LSDIR inventory from Worker_3. Pending: ALASKA download completion.
-- Pending: logging-bug fix and persistent validation workers with parity
-  checks. The expected saving is about 14 min and $0.40 per 30-epoch run
-  (estimate: about 5 min late slowdown plus 9 min validation start-up).
+- Done: logging-bug fix and persistent validation-worker parity checks.
+  Pending: measure the post-fix G4 timing. The expected saving is about 14 min
+  and $0.40 per 30-epoch run (estimate: about 5 min late slowdown plus 9 min
+  validation start-up).
 - Pending: ALASKA selection v2 final run after the download, LSDIR subset,
   per-source sampler, and new-data code.
+- Pending user: choose the checkpoint-selection validation set after
+  Worker_2 lists the options.
 - Pending: copy data to G4, estimated at 35-45 GB.
 - Pending, optional: measure miss rate against tile noise, run the denoise-
   and-compare demo, test tanh saturation, and run a filter linear probe.
