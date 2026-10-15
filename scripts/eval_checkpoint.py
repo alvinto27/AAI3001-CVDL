@@ -68,23 +68,17 @@ def summary_rows(frame):
     return rows
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--checkpoint', type=Path, required=True)
-    parser.add_argument('--eval-yaml', type=Path, default=ROOT / 'configs/raise512-run1.yaml')
-    parser.add_argument('--split', choices=('test', 'val'), default='test')
-    parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--workers', type=int, default=6)
-    args = parser.parse_args()
-    if args.workers < 0:
-        parser.error('--workers must be nonnegative')
+def evaluate(checkpoint, eval_yaml=ROOT / 'configs/raise512-run1.yaml', *, split='test', output, workers=6):
+    """Score one checkpoint and return the summary. Safe to import from a notebook."""
+    if split not in ('test', 'val') or workers < 0:
+        raise ValueError('split must be test or val; workers must be nonnegative')
     start = time.perf_counter()
     torch.set_num_threads(1)
-    checkpoint = args.checkpoint.resolve()
-    evaluation_yaml = args.eval_yaml.resolve()
-    output = args.output.resolve()
+    checkpoint = Path(checkpoint).resolve()
+    evaluation_yaml = Path(eval_yaml).resolve()
+    output = Path(output).resolve()
     if output.exists() and any(output.iterdir()):
-        parser.error(f'output must be empty: {output}')
+        raise ValueError(f'output must be empty: {output}')
     output.mkdir(parents=True, exist_ok=True)
     ckpt = torch.load(checkpoint, map_location='cpu', weights_only=False)
     hparams = ckpt.get('hyper_parameters', {})
@@ -97,8 +91,8 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     settings = RunSettings(evaluation_yaml=str(evaluation_yaml))
-    dataset = FixedPairs(Corpus(ROOT, settings), args.split)
-    loader = OrderedPairLoader(dataset, batch_size=16, num_workers=args.workers,
+    dataset = FixedPairs(Corpus(ROOT, settings), split)
+    loader = OrderedPairLoader(dataset, batch_size=16, num_workers=workers,
                                pin_memory=device.type == 'cuda', prefetch_images=128)
     pairs = dataset.frame
     setting_fields = ['cover_id','k','bit_mode','method','placement','payload_kind','stride',
@@ -136,10 +130,23 @@ def main():
     clipped.to_csv(output / 'clipped_by_placement.csv', index=False)
     info = dict(checkpoint=str(checkpoint), checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
                 norm=norm, clip_t=hparams.get('clip_t', 3.0), evaluation_yaml=str(evaluation_yaml),
-                split=args.split, workers=args.workers, settings_sha256=setting_digest,
+                split=split, workers=workers, settings_sha256=setting_digest,
                 pairs=len(dataset), elapsed_seconds=time.perf_counter() - start, overall=summary[0])
     (output / 'run.json').write_text(json.dumps(info, indent=2) + '\n')
     print(json.dumps(info, indent=2), flush=True)
+    return info, pd.DataFrame(summary)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--checkpoint', type=Path, required=True)
+    parser.add_argument('--eval-yaml', type=Path, default=ROOT / 'configs/raise512-run1.yaml')
+    parser.add_argument('--split', choices=('test', 'val'), default='test')
+    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--workers', type=int, default=6)
+    args = parser.parse_args()
+    evaluate(args.checkpoint, args.eval_yaml, split=args.split,
+             output=args.output, workers=args.workers)
 
 
 if __name__ == '__main__':

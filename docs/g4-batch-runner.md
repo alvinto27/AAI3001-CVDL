@@ -192,6 +192,44 @@ V3_PRIME_NEXT_EPOCH=on
 
 Run `bash scripts/g4/submit.sh run --env-file path/to/v4-r1.env --timeout-min 60 --dry-run` first; remove `--dry-run` only after review and approval. For the 20-epoch budget, measured full-data training has **107,900 train images / 32 = 3,372 steps per epoch** (rounded up), and `g4-prime-1` fit took 915 s over 10 epochs. Its full runner took 18:58 (1,138 s), including 87 s for diagnostic cell 29. Doubling fit and retaining the 223 s non-fit overhead estimates **2,053 s (34:13)** for 20 epochs. A 60-minute runner timeout leaves about 26 minutes above that estimate. The remaining VM time (at most 60 minutes, less boot and setup time) covers delivery and shutdown; the script's minimum reserve is 15 minutes. This is an estimate, not a guarantee: compilation, IO, or diagnostics can run longer. Do not use the incorrect 1,686-step estimate.
 
+### R2 full-data job (notebook 05)
+
+Use a **new** job ID. Make an env file with these exact lines. The R2 notebook
+commit must be on `origin/yx` before you submit the job. The VM still has the
+old installed one-file `job.sh`; it supports `V3_NOTEBOOK=05`, so R2 does not
+need the bootstrap install. Install the new bootstrap on a later maintenance
+boot (see the one-time step above).
+
+```text
+QUICK=False
+V3_NOTEBOOK=notebooks/05_xunet_v4_nonorm.ipynb
+V3_DATA=otf
+V3_SOURCE=decode
+V3_RUN_NAME=xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_r2
+V3_WORKERS=32
+V3_EVAL_WORKERS=16
+V3_COMPILE=default
+V3_PRIME_NEXT_EPOCH=on
+V3_EPOCHS=30
+V3_LR=3e-4
+V3_WARMUP_EPOCHS=1
+V3_GRAD_CLIP=1.0
+V3_NORM=none
+V3_LR_DROPS=5:0.3,20:0.1
+V3_TRAIN_YAML=configs/train-k1to4.yaml
+V3_EXTRA_TESTS=test-bpp1
+```
+
+Use `bash scripts/g4/submit.sh run --env-file path/to/v4-r2.env
+--timeout-min 75 --dry-run` to inspect the command. Do not start the G4
+without the user's approval. R1 measured 1,627 s to fit 20 epochs; 30 epochs
+estimate 2,441 s. Its test cell took 97 s and diagnostics took 86 s. Allow
+100–120 s for the new extra test, plus about 38 s for other work: the total
+estimate is **2,762–2,782 s (46–47 min)**. A 75-minute timeout leaves about
+28 minutes above this estimate. It is at most `120 - 15 = 105` minutes, so the
+job script accepts it. The VM maximum also needs room for boot, upload and
+shutdown. These are estimates, not guarantees.
+
 The default runner timeout is **100 minutes**. The job refuses a timeout above
 `max-run-minutes - 15` (default maximum: 120). The reserve leaves time for
 boot, upload and shutdown. `timeout` sends SIGTERM to the runner and then
