@@ -2581,6 +2581,35 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   `817026aec0adea0e2ee8ed3a1ba3eabfe9e5177581fbe16595a8fe495a601300`;
   the versioned URL did not match its published digest.
 
+#### G4 batch and precision speed matrix
+
+- Six hundred timed steps followed 50 warm-up steps for each configuration.
+  The run used decode, 32 workers, compile default, and no validation or
+  checkpoints. The complete attempt had six of six configurations. A first
+  attempt started at 11:02:01Z and was Spot-preempted at 11:08:08Z; the
+  second ran from 11:14:57Z to 11:23:28Z and shut down normally. Total VM
+  time was about 14 min 38 s, about $0.40 at the $1.63/hour estimate.
+- Results:
+
+  | Batch / precision | Steps/s | Images/s | Loader wait ms/step | GPU+transfer ms/step | Peak torch MiB |
+  | --- | ---: | ---: | ---: | ---: | ---: |
+  | 32 / fp32 | 81.74 | 2,615.72 | 0.797 | 11.437 | 1,925 |
+  | 32 / bf16 | 84.71 | 2,710.68 | 2.696 | 9.109 | 1,072 |
+  | 64 / fp32 | 40.21 | 2,573.36 | 3.566 | 21.304 | 3,781 |
+  | 64 / bf16 | 39.73 | 2,542.93 | 8.539 | 16.629 | 2,080 |
+  | 128 / fp32 | 20.87 | 2,671.68 | 0.865 | 47.045 | 7,493 |
+  | 128 / bf16 | 21.07 | 2,696.26 | 16.227 | 31.246 | 4,096 |
+
+  GPU-utilisation samples were few: 3-14 per configuration.
+- Analysis: images/s was about 2,540-2,710 for every configuration, so a
+  larger batch gave no gain. At fp32, GPU step time limited the run; at batch
+  128 it was 47.0 ms versus 0.9 ms loader wait. BF16 cut GPU time to 31.2 ms,
+  but loader wait became 16.2 ms. CPU data supply and fp32 GPU speed were
+  both near 2,700 images/s. Training steps are about half of a full-run
+  epoch: R2 fit was 2,868 s / 30 = 95.6 s per epoch, while 3,372 steps at
+  about 74 steps/s is about 46 s. Validation, checkpoints, and epoch
+  transitions take the other half.
+
 ### Decided
 
 - Pending user decision: G4 runs use `V3_PRIME_NEXT_EPOCH=on` as the
@@ -2634,8 +2663,13 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   `V3_LR_DROPS`, `V3_TRAIN_YAML`, `V3_EXTRA_TESTS`, `V3_BATCH_SIZE`, and
   `V3_PRECISION`. G4 selects it with `V3_NOTEBOOK`.
 - The GPU LSB generator is shelved. Its PC profile estimated a 0-25% gain,
-  not a measured result. Test batch sizes 32, 64, and 128 with precision 32
-  and BF16 in a G4 speed matrix instead.
+  not a measured result. The G4 speed matrix is Done.
+- Keep batch size 32. Pending user decision: use BF16; validation and
+  epoch-transition overhead; and data supply (preload or GPU generator) only
+  pay together with BF16.
+- Hypothesis, not tested: without normalisation, tanh inputs in layers 1-2
+  are not scaled. They may saturate tanh and explain R1/R2 underfitting and
+  validation spikes.
 - The Orchestrator runs `scripts/g4/submit.sh` only after the user says
   "go". The user signed in to gcloud; `submit.sh status` works from the PC.
 - MIL is dropped. Mode 2 step 17 and the bag design leave the plan.
@@ -2663,8 +2697,7 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   which were not in its training draw; interpret its comparison with care.
 - Pending: one G4 maintenance boot installs the stable bootstrap from
   `e1186fd`.
-- Pending: run the G4 speed matrix for batch sizes 32, 64, 128 and precision
-  32, BF16.
+- Done: G4 speed matrix for batch sizes 32, 64, 128 and precision 32/BF16.
 - Done: user signed in to gcloud; `submit.sh status` works from the PC.
 - Pending: Worker_2 sets up and proves the unattended Pi services, then
   checks the PC ALASKA subset.
