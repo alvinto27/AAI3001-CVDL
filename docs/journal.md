@@ -2539,11 +2539,31 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   P_E 0.0165 for v3c and 0.0229 for R1. At bpp 1, v3c P_E was 0.0125 and
   R1 was 0.0187. k=1 missed at bpp 0.75-1.0: contiguous 1%, random 3%,
   and stride 12-19%; 37% of stride stego pairs were clipped by capacity.
-- R2 `g4-v4-r2` started at 09:40Z with LR drops 5:0.3 and 20:0.1,
-  training k=1-4, 30 epochs, and the bpp-1 extra test. Validation P_E for
-  epochs 1-5 was 0.0684, 0.0407, 0.0323, 0.0391, and 0.0493; epoch 4 had
-  validation loss 0.475. Validation still includes k=5-8, which R2 does
-  not train on. Later R2 results are Pending.
+- R2 `g4-v4-r2` started at 09:40Z and ended at 10:32:03Z, with exit 0.
+  It used LR drops 5:0.3 and 20:0.1, training k=1-4, 30 epochs, and the
+  bpp-1 extra test. Fit took 2,868.338 s. Best epoch 19 (1-based epoch 20)
+  had validation P_E 0.0227 and AUC 0.9939. Validation P_E spikes were
+  0.0391 at epoch 4, 0.0407 at epoch 9, and 0.0369 at epoch 15, so spikes
+  continued at LR 9e-5. Validation still includes k=5-8, which R2 does not
+  train on.
+- Standard test P_E was R2 0.0250, R1 0.0229, and v3c 0.0165. The bpp-1
+  extra-test P_E was R2 0.0199, R1 0.0187, and v3c 0.0125.
+- At threshold 0.5, standard-test clean false-alarm rates were v3c 0.0071,
+  R1 0.0172, and R2 0.0233. P_E over k=1-4 stego only was v3c 0.0287,
+  R1 0.0367, and R2 0.0303. Miss rates were:
+
+  | Setting | v3c | R1 | R2 |
+  | --- | ---: | ---: | ---: |
+  | Lowest k=1 | 0.1584 | 0.1804 | 0.1041 |
+  | Plane k=1 | 0.1467 | 0.1867 | 0.1240 |
+  | Lowest k=8 | 0.0112 | 0.0309 | 0.0463 |
+  | Plane k=8 | 0.0015 | 0.0015 | 0.0183 |
+
+- R2 bpp-1 k=1 random miss rates were 0.604, 0.125, 0.032, 0.043, and
+  0.009 for the five increasing bpp bins from 0.05-0.15 through 0.75-1.0.
+- Training k=1-4 gave R2 the best k=1 detection of the three runs, but it
+  caused more clean false alarms and more misses at untrained k=5-8. R2
+  changed both the LR plan and the k range, so the cause is not separated.
 - R1 `nvidia.csv` had mean GPU utilisation 37.4% over 31 samples, with
   12 samples at 0%. The GPU-generator PC profile found photo decode at 83%
   of CPU work and embedding at about 8%; estimated gain was 0-25%.
@@ -2617,7 +2637,7 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   not a measured result. Test batch sizes 32, 64, and 128 with precision 32
   and BF16 in a G4 speed matrix instead.
 - The Orchestrator runs `scripts/g4/submit.sh` only after the user says
-  "go". Pending: user runs `gcloud auth login`.
+  "go". The user signed in to gcloud; `submit.sh status` works from the PC.
 - MIL is dropped. Mode 2 step 17 and the bag design leave the plan.
 - New direction (user, 2026-10-15): use a spatial suspicion map. Train with
   exact per-cell labels from the cover/stego difference: the share of changed
@@ -2639,13 +2659,13 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Pending user: per-cell loss, crop policy, and crop size for the map model.
 - Pending: choose the train/validation/test split and 8 held-out ALASKA
   cameras.
-- Pending: R2 `g4-v4-r2` results and the effect of validation k=5-8 are not
-  known.
+- Done: R2 `g4-v4-r2` completed. Its validation still includes k=5-8,
+  which were not in its training draw; interpret its comparison with care.
 - Pending: one G4 maintenance boot installs the stable bootstrap from
   `e1186fd`.
 - Pending: run the G4 speed matrix for batch sizes 32, 64, 128 and precision
   32, BF16.
-- Pending: user runs `gcloud auth login`.
+- Done: user signed in to gcloud; `submit.sh status` works from the PC.
 - Pending: Worker_2 sets up and proves the unattended Pi services, then
   checks the PC ALASKA subset.
 - Pending: when the Pi SSD is unplugged, shut the Pi down first; G4 results
