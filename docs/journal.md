@@ -2653,6 +2653,45 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   70,282 ALASKA files were downloaded, about 9,000 files/h after LSDIR
   finished; completion was estimated for 22:30-23:00. Pi `/srv` had 599 GB
   free.
+- Worker_3 finished the LSDIR unpack and inventory in commit `3b2e8a4`.
+  The HR set has 84,991 PNG files and 155,204,828,212 B; val1 has 1,000
+  PNG files. `inventory.csv`, `inventory_val1.csv`, and `extract/REPORT.md`
+  record shard, path, bytes, dimensions, colour type, bit depth, and SHA-256.
+  The unpack took 43 min from 12:05 to 12:47 UTC, used two workers, and had
+  0 failures. Pi `/srv` had 490 GB free after the unpack.
+
+#### LSDIR and source-mix findings
+
+- The HR count is 84,991. All files are RGB 8-bit PNG, with 0 duplicate
+  paths. One byte-identical pair exists:
+  `0022000/0021599.png` and `0022000/0021600.png`; drop one before splitting.
+  Width is 540 / 1,164 / 4,464 and height is 540 / 864 / 3,876 for
+  minimum / median / maximum. All photos have both sides at least 512.
+- A trimmed 512 grid gives 1 tile for 25,946 photos, 2 for 50,811, 3-5
+  for 1,823, and 6 or more for 6,411: 179,006 tiles total, mean 2.11.
+  These counts are from the inventory analysis.
+- Correction: val1 is the X2 low-resolution validation set. Its median is
+  500 x 367, and only 290 photos have both sides at least 512. It is not an
+  HR set. LSDIR validation and test will come from train shards.
+- ALASKA subset v1 has 9,723 photos at 512-1,024, about 1.56 tiles/photo
+  and about 15,200 tiles (estimate). RAISE train has 45,674 tiles from 701
+  photos and 3 cameras, about 65 tiles/photo. LSDIR HR is already shrunk 4x
+  by its authors and may be easier than camera output; report it separately.
+- ALASKA transfer rate stayed 3.031-3.084 MB/s.
+
+#### Source sampling decision
+
+- Use per-epoch sampling by source, not data deletion: RAISE 40%, LSDIR 20%,
+  and ALASKA 40%, about 45,000 tiles per epoch (estimate; current data has
+  53,950). Draw a fresh random 18,000 of 45,674 RAISE tiles each epoch.
+  Equal thirds was rejected because LSDIR is already shrunk and may create
+  easy-data shortcuts.
+- Keep RAISE validation and test unchanged. Give new sources extra
+  validation and test sets.
+- ALASKA 40% needs about 18,000 unique tiles per epoch, but subset v1 has
+  about 10,900 train tiles. A larger full-download selection of about
+  12,000-15,000 ALASKA training photos is proposed; user decision and the
+  held-out camera list are Pending.
 
 #### Map and data discussion
 
@@ -2745,6 +2784,11 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   subset is 3,000 train, 500 validation, and 1,000 test images from train
   shards, seeded and spread across shards, colour, both sides at least 512;
   val1 is an extra check set. User decision is Pending.
+- Source mix decision: sample each epoch at RAISE 40%, LSDIR 20%, and ALASKA
+  40%. Keep RAISE validation/test fixed and add separate new-source sets.
+  A per-source sampler is Pending.
+- Pending user: select the larger ALASKA training set of about 12,000-15,000
+  photos and the held-out camera list.
 - Worker_3 handles Pi data jobs. The Orchestrator does not monitor G4 runs;
   a worker monitors them.
 - Hypothesis, not tested: without normalisation, tanh inputs in layers 1-2
@@ -2791,7 +2835,11 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   decode; the serial diagnostic path took 458 s here versus about 88 s with
   8 workers.
 - Pending: wide XuNet result and timing findings from Worker_2.
-- Pending: LSDIR inventory from Worker_3 and ALASKA download completion.
-- Pending: LSDIR/ALASKA split decisions.
+- Done: LSDIR inventory from Worker_3. ALASKA download completion remains
+  Pending.
+- Pending: user decision on the larger ALASKA selection and held-out cameras;
+  suggested LSDIR subset is about 7,000 / 1,500 / 2,500 photos.
+- Pending: per-source sampler.
+- Pending: copy data to G4, estimated at 35-45 GB.
 - Pending, optional: measure miss rate against tile noise, run the denoise-
   and-compare demo, test tanh saturation, and run a filter linear probe.
