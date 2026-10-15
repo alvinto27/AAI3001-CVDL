@@ -2610,6 +2610,71 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   about 74 steps/s is about 46 s. Validation, checkpoints, and epoch
   transitions take the other half.
 
+#### Epoch overhead and monitoring
+
+- Worker_2 recorded the read-only epoch plan in `docs/plan-epoch-overhead.md`
+  (`679597f`). Commit `f777be2` added `scripts/host_monitor.py` and notebook
+  05 epoch timers. The standard test hash remains
+  `fdd989f7...837`; training code was not changed.
+- Normal G4 epochs in R1 and early R2 were about 79 s: train about 47 s,
+  validation 703 batches about 12 s, an unexplained train-to-validation or
+  epoch-end transition about 20 s, and checkpoint about 0.2 s (0.25 MiB).
+  The first epoch was about 121 s, including 43 s compile warm-up.
+- The earlier R2 overhead estimate was corrected. R2 epochs 24-29 had train
+  101.3 s versus 47.1 s, validation 27.2 s versus 12.3 s, and GPU samples
+  about 20% / 163 W versus 38% / 218 W. The cause is unknown. QUICK PC
+  timers show about 5 s waiting for the first validation batch each epoch;
+  this is a possible part of the 20 s gap, not yet confirmed on G4.
+
+#### Wide XuNet
+
+- Worker_2 added the opt-in wide model in `docs/plan-wide-xunet.md`
+  (`4f5fa5f`). `V3_MODEL=xunet|xunet_wide` and `V3_WIDTH=4` keep the same
+  front end and 32 px cell grid. No-norm parameters are 18,941 versus
+  594,381; counted work is 1.56 versus 5.03 GFLOP per 512 tile.
+- PC synthetic batch 32 was 6.706 versus 5.115 fp32 steps/s and 1,808 versus
+  2,762 MiB; BF16 was 16.134 versus 13.259 steps/s. The PC QUICK run used
+  batch 8, 6/4 workers, passed in 367.313 s, and all values were finite.
+  A PC QUICK run with G4 settings, 32 workers and batch 32, was killed with
+  exit 137 and `oom_kill=1`; G4 job files are not for the PC.
+- G4 wide run `xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_r2-20261015T121753Z-29499`
+  started at 12:18:14Z after the user said go. It uses `wide-1.env`,
+  commit `4f5fa5f`, and a 95-minute timeout. Result is Pending. The estimate
+  is about 67 min and about $1.82; this is not a measurement.
+
+#### Pi data downloads
+
+- Worker_3 added the LSDIR extractor in commit `3b2e8a4`: two workers,
+  Nice 19, idle I/O, and a 100 GiB free-space guard. It writes HR and val1
+  under `/srv/datasets/lsdir`, `inventory.csv`, and extractor state.
+  Measured extraction was 287.5 s per shard for two parallel shards, about
+  61 MB/s; total time was estimated at about 40 min for 85,241 files.
+- ALASKA transfer rate was 3.031 to 3.039 MB/s. At 20:08 +08, 47,800 of
+  70,282 ALASKA files were downloaded, about 9,000 files/h after LSDIR
+  finished; completion was estimated for 22:30-23:00. Pi `/srv` had 599 GB
+  free.
+
+#### Map and data discussion
+
+- At equal effective bpp and threshold 0.5, k=1 misses were contiguous
+  0% at 0.2-0.4 bpp and 1% at 0.4-1.0; random 10% / 4%; stride 7-30% /
+  4-18% with only 3-40 tiles per stride value. Contiguous k=1 letters /
+  random-bytes misses were 1.2% / 1.9%. The model did not use periodic or
+  payload structure; earlier high-bpp stride weakness was mostly capacity
+  clipping.
+- Scattered k=1 at 0.05 bpp changed about 1 in 120 values by +/-1, about 25
+  per 32 px cell. Clean and stego maps looked the same; photo score changed
+  from 0.0015 to 0.0030. This is below the photo's own noise per cell.
+- Discussion only, no runs: map(raw)-map(denoised) may provide a per-photo
+  reference but costs two passes and may remove natural noise. Physics/noise
+  and model weakness are separate limits. Random placement with encrypted
+  payload covers non-adaptive LSB tools, not adaptive WOW/S-UNIWARD/HILL or
+  efficient coding. Inception-style branches may target structured hiding,
+  but not random hiding. A wider model makes GPU work the limit, so BF16 is
+  the main speed lever. Per-cell labels are available from change masks; the
+  mask code change is not checked. Scattered low-bpp cells need soft or
+  ignored labels. The tile label and map objective remain mismatched.
+
 ### Decided
 
 - Pending user decision: G4 runs use `V3_PRIME_NEXT_EPOCH=on` as the
@@ -2667,6 +2732,21 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Keep batch size 32. Pending user decision: use BF16; validation and
   epoch-transition overhead; and data supply (preload or GPU generator) only
   pay together with BF16.
+- Wide XuNet is tested with the R2 recipe: train k=1-4, standard validation
+  and test including k=5-8. Pass criteria fixed before the run are k=1-4
+  P_E at threshold 0.5 below R2's 0.0303 by more than about 0.002, lowest
+  k=1 miss below 10.4%, clean false alarm no higher than 2.3%, and no
+  training blow-up. If it passes, it becomes the base model; otherwise move
+  to new data with XuNet.
+- Work order: wide XuNet result, then ALASKA and LSDIR subsets, then dense
+  per-cell training on the better base. Calibration, an inception front, and
+  SRNet remain ideas.
+- Use LSDIR and ALASKA subsets. Unpack all LSDIR on the Pi. Suggested LSDIR
+  subset is 3,000 train, 500 validation, and 1,000 test images from train
+  shards, seeded and spread across shards, colour, both sides at least 512;
+  val1 is an extra check set. User decision is Pending.
+- Worker_3 handles Pi data jobs. The Orchestrator does not monitor G4 runs;
+  a worker monitors them.
 - Hypothesis, not tested: without normalisation, tanh inputs in layers 1-2
   are not scaled. They may saturate tanh and explain R1/R2 underfitting and
   validation spikes.
@@ -2710,3 +2790,8 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Pending: leave `V3_DIAG_WORKERS` at its default parallel setting for
   decode; the serial diagnostic path took 458 s here versus about 88 s with
   8 workers.
+- Pending: wide XuNet result and timing findings from Worker_2.
+- Pending: LSDIR inventory from Worker_3 and ALASKA download completion.
+- Pending: LSDIR/ALASKA split decisions.
+- Pending, optional: measure miss rate against tile noise, run the denoise-
+  and-compare demo, test tanh saturation, and run a filter linear probe.
