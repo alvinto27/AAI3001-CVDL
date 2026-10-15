@@ -12,13 +12,16 @@ Rules (all seeded by VERSION+SEED+model+block, independent of file order):
 * Excluded: *_FLATS, *_TEXTURES, RAW_wesaturate (as in v1) and Leica_Mono (monochrome).
 * UNSEEN models: every photo of these models can only be test_unseen. UNSEEN_CAP per model,
   v1 photos first.
-* Other models ("seen"): the total photo budget TOTAL is spread evenly over the models
+* TRAIN_ONLY models (too small to keep a gap between splits): all their photos go to train.
+* Other models ("seen"): the rest of the photo budget TOTAL is spread evenly over them
   ("water-fill": every model gets the same number, a model with fewer photos gives all it has and
-  the remainder goes to the others). Each model total is split train/val/test_seen in the ratio
-  TRAIN:VAL:TEST_SEEN.
+  the remainder goes to the others). The VAL and TEST_SEEN totals are shared equally over these
+  models (largest remainder, seeded tie-break); the rest of each model's share is train.
 * Leakage rule: a model's photos, in ID order, are cut into BLOCKs of BLOCK consecutive photos.
   A whole block belongs to one split. Blocks of different splits are never next to each other
   (a block-wide gap stays empty) unless a model is too small to allow it (reported).
+* val and test_seen blocks come in runs of up to RUN blocks, so one border (and one empty guard
+  block) serves several blocks. Train blocks fill what is left.
 * Blocks are chosen by (more v1 photos first, then seeded hash); inside the chosen blocks, v1 photos
   are taken first.
 """
@@ -38,10 +41,17 @@ from alaska_select import INDEX, INDEX_SHA256, LINE, ROOT, model_name  # noqa: E
 VERSION = "ALASKA_v2_TIFF_VariousSize_COLOR/selection_v2"
 SEED = 0
 BLOCK = 10
+RUN = 3          # val/test blocks are placed in runs of up to RUN blocks (30 photos)
 UNSEEN = ["Google_Pixel-XL", "Samsung_GalaxyS9plus-SM-G965F", "Huawei_P20lite-ANE-LX1",
           "Panasonic_DMC-TZ60", "Ricoh_GRDigital-III", "Canon_EOS-60D", "Sony_A7R", "Pentax_K50"]
 DROP_MODELS = {"Leica_Mono"}
+# Decision (Orchestrator, 2026-10-15): these models have only 250-395 photos, so a 10-photo block
+# split would put blocks of different splits next to each other (ID gap 1-3, near-duplicate
+# leakage risk). They give all photos to train; val and test_seen come from the other models.
+TRAIN_ONLY = ["Canon_PowerShot-G11", "Kodak_Z990", "Pentax_K10D", "Pentax_ist-DS",
+              "Sigma_SD10", "Nikon_D90"]
 UNSEEN_CAP = 250
+MAX_USE = 0.75   # at most this share of a mixed model's photos is used, so empty blocks keep splits apart
 TRAIN, VAL, TEST_SEEN = 13500, 1000, 1700
 TOTAL = TRAIN + VAL + TEST_SEEN
 V1 = ROOT / "data/alaska/selection_v1.csv"
@@ -97,21 +107,27 @@ def split_model(photos: list[dict], quota: dict[str, int], model: str) -> tuple[
     for split in ("test_seen", "val", "train"):
         need = quota[split]
         got = 0
+        run = RUN if split != "train" else 1   # val/test blocks come in short runs: fewer borders
 
-        def blocked(b: int) -> bool:
-            return any(owner.get(x, split) != split for x in (b - 1, b + 1))
+        def clean(b: int, length: int) -> bool:
+            cells = range(b, b + length)
+            return (b + length <= len(blocks) and all(c not in owner for c in cells)
+                    and all(owner.get(x, split) == split for x in (b - 1, b + length)))
 
         while got < need:
-            free = [b for b in range(len(blocks)) if b not in owner]
-            clean = [b for b in free if not blocked(b)]
-            pool = clean
+            length = min(run, -(-(need - got) // BLOCK))
+            pool = [b for b in range(len(blocks)) if clean(b, length)]
             if not pool:
-                pool, fallbacks = free, fallbacks + 1
+                pool = [b for b in range(len(blocks)) if clean(b, 1)]
+                length = 1
+            if not pool:
+                pool, length, fallbacks = [b for b in range(len(blocks)) if b not in owner], 1, fallbacks + 1
             if not pool:
                 break
             best = min(pool, key=lambda b: (-sum(p["in_v1"] for p in blocks[b]), h(model, "block", b)))
-            owner[best] = split
-            got += len(blocks[best])
+            for c in range(best, best + length):
+                owner[c] = split
+                got += len(blocks[c])
     ids_split, ids_block = {}, {}
     for split in ("test_seen", "val", "train"):
         mine = [(b, p) for b, bl in enumerate(blocks) if owner.get(b) == split for p in bl]
@@ -160,17 +176,28 @@ def main() -> int:
         for p in pick:
             unseen_split[p["id"]] = "test_unseen"
     # Seen.
-    share = water_fill({m: len(by_model[m]) for m in seen}, TOTAL)
+    if any(m not in by_model for m in TRAIN_ONLY):
+        raise ValueError("a TRAIN_ONLY model has no photos")
     split_of, block_of, fallback = dict(unseen_split), {}, {}
     quotas = {}
+    for m in TRAIN_ONLY:
+        quotas[m] = {"train": len(by_model[m]), "val": 0, "test_seen": 0}
+    mixed = [m for m in seen if m not in TRAIN_ONLY]
+    share = water_fill({m: int(MAX_USE * len(by_model[m])) for m in mixed},
+                       TOTAL - sum(q["train"] for q in quotas.values()))
+    even = {}
+    for name, total in (("val", VAL), ("test_seen", TEST_SEEN)):
+        cap = {m: share[m] for m in mixed}
+        base, rem = divmod(total, len(mixed))
+        even[name] = {m: min(base, cap[m]) for m in mixed}
+        for m in sorted(mixed, key=lambda m: h(name, m))[:rem]:
+            even[name][m] = min(even[name][m] + 1, cap[m])
+    for m in mixed:
+        quotas[m] = {"val": even["val"][m], "test_seen": even["test_seen"][m],
+                     "train": share[m] - even["val"][m] - even["test_seen"][m]}
     for m in seen:
-        t = share[m]
-        val = round(t * VAL / TOTAL)
-        tst = round(t * TEST_SEEN / TOTAL)
-        q = {"val": val, "test_seen": tst, "train": t - val - tst}
-        quotas[m] = q
-        s, b, fb = split_model(by_model[m], q, m)
-        split_of.update(s)
+        s_, b, fb = split_model(by_model[m], quotas[m], m)
+        split_of.update(s_)
         block_of.update(b)
         fallback[m] = fb
     for n in sorted(split_of):
@@ -220,8 +247,8 @@ def audit(rows, by_model, quotas, fallback, missing_ids, meta_path) -> None:
             q = quotas[m]
             short = {s: q[s] - g[s][0] for s in q if g[s][0] < q[s]}
             note = f"SHORT {short}" if short else ""
-            if len(by_model[m]) < 560:
-                note += f" small model (all {len(by_model[m])} photos in play)"
+            if m in TRAIN_ONLY:
+                note += " TRAIN_ONLY"
         print(f"{m} | {len(by_model[m])} | {' | '.join(cells)} | {min_gap[m]} | {fallback.get(m, '-')} | {note}")
     if missing_ids:
         print(f"\nMissing eligible IDs (first 20): {missing_ids[:20]}")
