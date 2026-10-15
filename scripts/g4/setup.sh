@@ -47,7 +47,10 @@ case "$STEP" in
         else
             chmod 600 "$INBOX_KEY"
         fi
+        # job.sh is a small bootstrap. It runs scripts/g4/job_run.sh from the checkout,
+        # so a later repo change needs no new install. Keep a known-good copy of job_run.sh.
         install -m 755 "$REPO_DIR/scripts/g4/job.sh" "$HOME/.local/lib/cvdl-g4/job.sh"
+        install -m 755 "$REPO_DIR/scripts/g4/job_run.sh" "$HOME/.local/lib/cvdl-g4/job_run.last-good"
         service=$(mktemp)
         sed -e "s|@USER@|$(id -un)|g" -e "s|@REPO@|$REPO_DIR|g" \
             "$REPO_DIR/scripts/g4/cvdl-g4-job.service" > "$service"

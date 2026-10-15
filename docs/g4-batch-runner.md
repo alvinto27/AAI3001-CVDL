@@ -23,6 +23,46 @@ The VM disk survives a normal stop. An interrupted upload remains pending and
 is tried before the next job. A recorded job ID is **never run again**, even if
 its result is pending or failed. Use a new ID to rerun training.
 
+## Boot scripts: bootstrap and job logic
+
+Two scripts run at boot. `scripts/g4/job.sh` is a small **bootstrap**.
+`setup.sh base` installs it as `~/.local/lib/cvdl-g4/job.sh`, and the
+service starts that copy. All job logic is in `scripts/g4/job_run.sh`.
+
+In run mode the bootstrap does these steps:
+
+1. It checks that the checkout is clean, fetches `origin/yx`, and checks out the job commit (`git checkout --detach`).
+2. It runs `scripts/g4/job_run.sh` **from the checkout**, with `exec`. A repo change therefore needs no new install.
+3. If the checked-out `job_run.sh` is missing or fails `bash -n`, it runs the last-good copy `~/.local/lib/cvdl-g4/job_run.last-good`. It saves a new last-good copy each time the checked-out file passes `bash -n`.
+4. If no usable copy exists, it logs the error and shuts down (except in maintenance mode).
+
+If the bootstrap git step fails, it does not stop. `job_run.sh` repeats the
+step, records the failure, sends the error files and shuts down. The record,
+already-recorded skip, pending delivery, timeouts and shutdown trap are all in
+`job_run.sh`. The environment flag `CVDL_G4_STAGE` stops the bootstrap from
+running twice. `job_run.sh` stops if its own checkout step moves the commit
+after it started (the file could change while Bash reads it).
+
+`boot.log` shows which copy ran. The bootstrap line has `bootstrap sha256=`.
+The next line is `job_run copy: checkout|last-good path=... sha256=...`.
+The `Run` line includes `notebook=`.
+
+**One-time step.** The installed `job.sh` must be the bootstrap. The old
+installed copy holds the job logic and does not run the checkout copy. In
+the next **maintenance** boot, update the checkout and install both files:
+
+```sh
+cd ~/AAI3001-CVDL && git fetch -q origin yx && git checkout -q --detach origin/yx
+install -m 755 scripts/g4/job.sh ~/.local/lib/cvdl-g4/job.sh
+install -m 755 scripts/g4/job_run.sh ~/.local/lib/cvdl-g4/job_run.last-good
+bash -n ~/.local/lib/cvdl-g4/job.sh && grep -c CVDL_G4_STAGE ~/.local/lib/cvdl-g4/job.sh
+```
+
+The count must be 1 or more. After that, do not install `job.sh` again unless
+`job.sh` itself changes (rare). The service file does not change. A change
+to `job.sh` needs a new maintenance install. A change to `job_run.sh` needs only
+a pushed commit.
+
 ## First boot (person, maintenance mode)
 
 Get the current external IP from the Google Cloud console. Install the PC
@@ -214,7 +254,8 @@ the next boot resends the files available on disk.
 
 ## PC-only checks
 
-`job.sh --test --metadata-file FILE` reads a local text file with lines such
+`job.sh --test --metadata-file FILE` (the bootstrap, which then runs
+`job_run.sh` from `G4_REPO_ROOT`; `G4_LIB_DIR` sets the last-good folder) reads a local text file with lines such
 as `job-mode=run`, `job-id=test-id`, `job-env=/path/to/env-file` and
 `job-timeout-min=0.05`. It runs Python **inside** `aai3001` and prints the
 shutdown step; it never calls GCE metadata or shuts down the PC. Set
