@@ -2349,11 +2349,38 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - This speed-only run used StepLR step size 1, so its scores are not
   comparable with 10-epoch runs.
 
+#### New-source checks
+
+- ALASKA#2 has 80,005 images from about 50 camera models, according to
+  `ALASKAv2Base_by_DSC.txt`. Twenty sampled various-size TIFF files were
+  0.79-3.1 MB at 512 x 512 to 1024 x 1024, mean 1.69 MB. The full set is
+  estimated at about 135 GB. The 512 set files are 786,572 B each, about
+  63 GB total. ALASKA includes a Nikon D90, also present in RAISE.
+- LSDIR's CVPR 2023 workshop paper reports 84,991 train, 1,000 validation,
+  and 1,000 test images. It describes about 4,000 Flickr photos shrunk 4x
+  with Lanczos and cropped to multiples of 48. Hugging Face access needs a
+  login and accepted terms. Total size is not known.
+- Current 512 data has 53,950 train tiles: RAISE 45,674 (85%) and DIV2K
+  8,276 (15%), from 1,381 photos (701 and 680). Validation has 11,238 tiles
+  and test has 10,956.
+
 ### Decided
 
 - Pending user decision: G4 runs use `V3_PRIME_NEXT_EPOCH=on` as the
   recommendation.
 - The PC default remains priming off pending the PC test.
+- New-source plan (user, 2026-10-15):
+  - ALASKA#2 uses a roughly 10,000-image subset of various-size uncompressed
+    colour TIFF files, across cameras. Hold out about 8 camera models for
+    testing only.
+  - LSDIR uses about 3,000 train photos plus validation and test. Use the
+    official split if HR images exist; otherwise use a seeded holdout.
+  - DIV2K leaves the training plan. Its files stay on disk, and teammates
+    must be told.
+  - Download sources to the Pi first. Start with subsets; scale up only if
+    diversity helps.
+- Pending user approvals: accept the LSDIR terms on Hugging Face, read both
+  licences, and tell teammates about DIV2K.
 - Pending user decision: run full PC training headlessly with
   `scripts/run_notebook.py` at the proven 13.6 it/s, or test the VS Code
   candidates. The two-epoch run confirms the headless speed.
@@ -2364,7 +2391,10 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   numbers. This is a separate approved change.
 - Pending: VS Code slowdown cause, by extension rollback or hidden-tab test.
 - Pending: prime default decision.
-- Pending: dataset plan for ALASKA#2 and LSDIR.
+- Pending: Worker_2 writes `docs/plan-new-sources.md` with pipeline
+  integration, splits, balancing, download design, and risks.
+- Pending user: accept the LSDIR terms on Hugging Face, read both licences,
+  and tell teammates about DIV2K.
 - Pending: leave `V3_DIAG_WORKERS` at its default parallel setting for
   decode; the serial diagnostic path took 458 s here versus about 88 s with
   8 workers.
