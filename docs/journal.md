@@ -2276,6 +2276,10 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   used decode, 6 workers, compile, priming off, `V3_DIAG_WORKERS=0`, and
   `scripts/run_notebook.py`. Output was `runs-out/pc-headless-2ep/`, 14 MB,
   git-ignored.
+- The PC ALASKA subset download completed with 9,723 of 9,723 files,
+  15,311,632,398 B, 4,220 s, 2.304 files/s, 3.628 MB/s, and 0 failures.
+  The validation logs are `logs/alaska-download-v1.log` and
+  `logs/alaska-validation-v1.log`.
 
 ### Found
 
@@ -2380,6 +2384,30 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   (not used), `val1.tar.gz` at 765 MB, and no test archive. The released HR
   PNGs are already shrunk 4x by the authors and will be used unchanged
   (plan fix `ee300d0`).
+- Container Pillow decoded all 9,723 ALASKA files successfully. They are
+  TIFF, RGB, 8-bit, and both sides are at least 512. All 9,723 SHA-256SUMS
+  entries match. The 16 shapes from 512, 640, 720, and 1024 on each side
+  have 565-639 files each. Files are in the git-ignored
+  `Datasets/alaska/tiff_various_color/`; `selection_v1.csv` has SHA-256
+  `a6570d3191b074446fba77ee4e2dc62dd166a54d9cc0ae04735b02617cfbe96b`.
+- Unattended Pi services `cvdl-lsdir` and `cvdl-alaska` are in `scripts/pi/`
+  (commits `33e5f96`, `0e37f28`, `c3ca8be`, `0762cfc`) and deployed copies
+  match the repository. Linger is on; services restart after 60 s on failure,
+  guard 50 GiB free space, and write status to
+  `/srv/datasets/{lsdir,alaska}/STATUS`. Restart tests resumed LSDIR after
+  a mid-shard kill without a duplicate archive. ALASKA resumed after a kill
+  with partial files, rechecked 51 SHA-256 values, and continued.
+- The Pi moved from 2.4 GHz channel 6 to 5 GHz at 5,320 MHz. Its rate rose
+  from 1.28-1.83 MB/s to 8.5-9.9 MB/s; the revert was cancelled and the
+  setting persists. A backup is in `/srv/datasets/net-backup/`. At 13:19Z,
+  LSDIR was 3/18 verified (27,934,654,536 B); ALASKA was 300/70,282 with
+  0 failures. The morning status command reads both STATUS files over SSH.
+- For tiled map inference, chunk starts use multiples of 32, with at least
+  about 48 px margin; 64 px is used. Keep centre cells and drop duplicate
+  inference cells. GroupNorm means per-chunk statistics at 512 match
+  training, but whole-photo statistics do not. Keep a raw map for the
+  verdict and a photo-normalised median/MAD map for location. Normalisation
+  erases a photo-wide random-placement message.
 - Orchestrator analysis: 256 has 3.75 times the train images per epoch
   (405,144 versus 107,900). Older PC numbers rose from 129 to 309 images/s
   for decode and 418 to 1,326 for cache when moving 512 to 256. Per-tile
@@ -2451,8 +2479,9 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   numbers. This is a separate approved change.
 - Pending: VS Code slowdown cause, by extension rollback or hidden-tab test.
 - Pending: prime default decision.
-- Pending: demo maps from the current best checkpoint on a few full photos,
-  with contiguous versus random placement and several rates.
+- Pending: Worker_2 demos maps from `g4-prime-1` best epoch 8, with
+  contiguous versus random placement at three rates on RAISE, DIV2K, and
+  ALASKA test photos.
 - Pending: choose the tiling/crop policy and train crop size (256 or 512) for
   the map model.
 - Pending: Worker_2 sets up and proves the unattended Pi services, then
