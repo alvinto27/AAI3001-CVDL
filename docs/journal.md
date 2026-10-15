@@ -2280,6 +2280,11 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   15,311,632,398 B, 4,220 s, 2.304 files/s, 3.628 MB/s, and 0 failures.
   The validation logs are `logs/alaska-download-v1.log` and
   `logs/alaska-validation-v1.log`.
+- Worker_2 ran the suspicion-map demo from `g4-prime-1` best epoch 8 with
+  no training. It used `scripts/map_demo.py` (`0a0e623`) and
+  `scripts/map_demo_gn_check.py` (`d5ccde4`). Outputs are in the
+  git-ignored `runs-out/map-demo/` folder. The checkpoint SHA-256 is
+  `741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d`.
 
 ### Found
 
@@ -2434,6 +2439,37 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   retraining. The generator supports contiguous, stride, and random
   placement; a clear localized region appears only for localized placement.
 
+#### Suspicion-map demo
+
+- Photos were RAISE `r00679daet` (D7000) and `r0667a51ft` (D90), DIV2K
+  test `0801` and `0802`, and ALASKA `00001` (Pixel XL) and `30827`
+  (Canon EOS700D). Full-photo embedding used `lsb_engine`, clean images,
+  contiguous and random placement, and 0.05, 0.275, and 0.5 bpp. Chunked
+  inference used 512 chunks, starts on multiples of 32, a 64 px margin, and
+  kept centre cells.
+- The rebuilt model was exact: forward versus classifier(mean(features))
+  had max absolute difference 0; versus mean per-cell logits it was
+  1.19e-6.
+- Localization worked without retraining: contiguous cell AUC was 0.94-1.00
+  in all 18 cases. For D7000 at 0.05 bpp, 154 changed cells had mean +173.05,
+  15,554 unchanged cells had mean -5.13, and AUC was 0.99995.
+- The photo verdict failed. Cell means dilute small regions: D7000 contiguous
+  0.05 bpp had photo mean -3.38. Top-1% and max were positive on all 6 clean
+  photos; clean D7000 max was +156.06. The tile-trained model does not
+  calibrate single-cell scores.
+- Random placement at 0.05 bpp or more changed almost every cell; cell AUC
+  was undefined in 17 of 18 cases. Mean verdicts were about +20 on RAISE,
+  but negative for DIV2K 0801 at 0.05 and 0.275 and ALASKA Pixel XL at 0.05.
+- Chunked and whole-photo maps differed; DIV2K 0801 contiguous 0.5 had max
+  absolute difference 148.05 and correlation 0.909.
+- GroupNorm changed unchanged cells in chunks containing changed pixels by
+  mean absolute 0.63-11.70, max 140.3, while other chunks changed by exactly
+  0 in all 16 of 16 cases with such chunks. Replacing each GroupNorm layer's
+  statistics with clean-chunk statistics removed the band in 14 of 18 cases;
+  the others were cells next to the strip within the receptive field. Frozen
+  clean statistics gave cell AUC 0.934-1.000, but need the clean cover and
+  are diagnostic only.
+
 ### Decided
 
 - Pending user decision: G4 runs use `V3_PRIME_NEXT_EPOCH=on` as the
@@ -2463,6 +2499,10 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   or later. The user later moves the Pi SSD to the PC to copy subsets.
 - Wait on 256 throughput work. Do a G4 256 speed test only when 256 or
   Mode 2 step 17 enters the plan. Do not adopt PyAV now.
+- Map-model design is pending user confirmation: use test-time-independent
+  normalisation, such as BatchNorm with fixed evaluation statistics or no
+  per-sample normalisation; train with per-cell labels and use a trained
+  per-cell map for the photo verdict.
 - MIL is dropped. Mode 2 step 17 and the bag design leave the plan.
 - New direction (user, 2026-10-15): use a spatial suspicion map. Train with
   exact per-cell labels from the cover/stego difference: the share of changed
@@ -2479,11 +2519,11 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   numbers. This is a separate approved change.
 - Pending: VS Code slowdown cause, by extension rollback or hidden-tab test.
 - Pending: prime default decision.
-- Pending: Worker_2 demos maps from `g4-prime-1` best epoch 8, with
-  contiguous versus random placement at three rates on RAISE, DIV2K, and
-  ALASKA test photos.
-- Pending: choose the tiling/crop policy and train crop size (256 or 512) for
-  the map model.
+- Done: Worker_2 demoed maps from `g4-prime-1` best epoch 8.
+- Pending user: map-model design (normalisation, per-cell loss, crop policy,
+  and crop size).
+- Pending: choose the train/validation/test split and 8 held-out ALASKA
+  cameras.
 - Pending: Worker_2 sets up and proves the unattended Pi services, then
   checks the PC ALASKA subset.
 - Pending: when the Pi SSD is unplugged, shut the Pi down first; G4 results
