@@ -39,7 +39,8 @@ class NotebookData:
                                             for s,d in (("val",self.val),("test",self.test))}}
         self.pairs=pd.concat([self.fixed_train.frame,self.val.frame,self.test.frame],ignore_index=True)
 
-    def loaders(self,batch_size,workers,pin_memory,prefetch=None,*,eval_workers=4,prefetch_images=128):
+    def loaders(self,batch_size,workers,pin_memory,prefetch=None,*,eval_workers=4,prefetch_images=128,
+                eval_persistent_workers=False):
         if workers<0 or eval_workers<0:
             raise ValueError("worker counts must be nonnegative")
         paired=self.corpus.settings.paired_batches
@@ -52,7 +53,7 @@ class NotebookData:
         # Group pairs by photo in a worker, then restore their fixed table order.
         kwargs=dict(batch_size=pair_batch,num_workers=eval_workers,pin_memory=pin_memory,
                     prefetch_images=prefetch_images)
-        val=OrderedPairLoader(self.val,**kwargs)
+        val=OrderedPairLoader(self.val,persistent_workers=eval_persistent_workers,**kwargs)
         test=OrderedPairLoader(self.test,**kwargs)
         diagnostic=fixed_subset(self.fixed_train,min(1000,len(self.fixed_train)),0)
         train_eval=OrderedPairLoader(diagnostic,**kwargs)
@@ -62,7 +63,7 @@ class NotebookData:
                            eval_prefetch_factor=val.prefetch_factor,
                            eval_prefetch_by_split={"val":val.prefetch_factor,"test":test.prefetch_factor,
                                                    "train_eval":train_eval.prefetch_factor},
-                           eval_task="one_photo",eval_persistent_workers=False,
+                           eval_task="one_photo",eval_persistent_workers=val.persistent_workers,
                            in_order=True,group_images=4,batch_images=batch_size,
                            tensor_dtype=self.corpus.settings.tensor_dtype)
         return train,val,test,train_eval

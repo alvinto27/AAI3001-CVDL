@@ -60,6 +60,14 @@ def settings_file(path, overrides):
     return settings
 
 
+def normalize_stream_outputs(notebook):
+    """A library may still write to a saved stream after its cell returns."""
+    for cell in notebook['cells']:
+        for item in cell.get('outputs', ()):
+            if item.get('output_type') == 'stream' and isinstance(item.get('text'), list):
+                item['text'] = ''.join(item['text'])
+
+
 def atomic_json(path, data):
     temporary = path.with_name(path.name + ".part")
     with temporary.open("w", encoding="utf-8") as stream:
@@ -96,9 +104,13 @@ class CellStream:
             self.terminal.write(text)
             self.terminal.flush()
             if self.outputs and self.outputs[-1].get("output_type") == "stream" and self.outputs[-1]["name"] == self.name:
-                self.outputs[-1]["text"] += text
+                chunks = self.outputs[-1]["text"]
+                if isinstance(chunks, list):
+                    chunks.append(text)
+                else:
+                    self.outputs[-1]["text"] = [chunks, text]
             else:
-                self.outputs.append({"output_type": "stream", "name": self.name, "text": text})
+                self.outputs.append({"output_type": "stream", "name": self.name, "text": [text]})
         return len(text)
 
     def flush(self):
@@ -117,12 +129,20 @@ class StopRequested(BaseException):
 
 
 def cleanup_workers(namespace, log):
-    loader = namespace.get("train_loader")
-    if loader is not None and callable(getattr(loader, "shutdown", None)):
+    for name in ("train_loader", "val_loader", "test_loader", "train_eval_loader"):
+        loader = namespace.get(name)
+        if loader is None:
+            continue
         try:
-            loader.shutdown()
+            if callable(getattr(loader, "shutdown", None)):
+                loader.shutdown()
+            elif getattr(loader, "persistent_workers", False):
+                iterator = getattr(loader, "_iterator", None)
+                if iterator is not None:
+                    iterator._shutdown_workers()
+                    loader._iterator = None
         except BaseException:
-            log.write("Training loader shutdown failed:\n" + traceback.format_exc())
+            log.write(f"{name} shutdown failed:\n" + traceback.format_exc())
     children = multiprocessing.active_children()
     for child in children:
         if child.is_alive():
@@ -345,6 +365,11 @@ def run(args):
                     failure = error
                 finally:
                     shell.display_pub.publish = original_publish
+                # Join once per completed cell. Repeated string += here copied the
+                # entire fit log for every progress update (quadratic runtime).
+                for item in outputs:
+                    if item.get("output_type") == "stream" and isinstance(item.get("text"), list):
+                        item["text"] = "".join(item["text"])
                 cell["execution_count"] = count
                 seconds = time.perf_counter() - cell_start
                 record = {"cell": index, "seconds": seconds, "state": "failed" if failure else "done"}
@@ -368,6 +393,7 @@ def run(args):
                     status["cells"].append(record)
                 runtime_settings(namespace)
                 collect_files(namespace)
+                normalize_stream_outputs(notebook)
                 atomic_json(executed, notebook)
                 save_status()
                 if failure:
@@ -381,6 +407,7 @@ def run(args):
             status["traceback"] = "".join(traceback.format_exception(error))
         with (output / "run.log").open("a", encoding="utf-8") as log:
             log.write(status["traceback"] + "\n")
+        normalize_stream_outputs(notebook)
         atomic_json(executed, notebook)
     finally:
         for signum, handler in old_handlers.items():
@@ -395,6 +422,7 @@ def run(args):
         status["ended_at"] = now()
         status["current_cell"] = None
         status["elapsed_s"] = time.perf_counter() - start
+        normalize_stream_outputs(notebook)
         atomic_json(executed, notebook)
         save_status()
     return exit_code

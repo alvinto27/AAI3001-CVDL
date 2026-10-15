@@ -438,16 +438,17 @@ class PhotoPairTasks(Dataset):
 class OrderedPairLoader:
     """Restore pair order and old batch boundaries after photo-owned tasks.
 
-    Worker processes are short-lived, including when a caller drops an
-    iterator during a Lightning sanity check or interrupts an evaluation.
+    With persistent_workers=True, keep workers after a complete pass. Close
+    them after an interrupted pass, including a Lightning sanity check.
     """
-    def __init__(self,dataset,batch_size,num_workers=4,pin_memory=True,prefetch_images=128):
+    def __init__(self,dataset,batch_size,num_workers=4,pin_memory=True,prefetch_images=128,
+                 persistent_workers=False):
         if batch_size<=0 or num_workers<0:
             raise ValueError("batch size must be positive and workers nonnegative")
         tasks=PhotoPairTasks(dataset)
         prefetch=prefetch_for_images(tasks.max_images,prefetch_images)
         kwargs=dict(batch_size=None,num_workers=num_workers,pin_memory=pin_memory,
-                    persistent_workers=False,worker_init_fn=initialize_worker)
+                    persistent_workers=persistent_workers and num_workers>0,worker_init_fn=initialize_worker)
         if num_workers:
             kwargs.update(multiprocessing_context="spawn",prefetch_factor=prefetch)
         self.loader=DataLoader(tasks,**kwargs)
@@ -456,7 +457,15 @@ class OrderedPairLoader:
         self.pin_memory=pin_memory
         self.prefetch_factor=prefetch
         self.num_workers=num_workers
-        self.persistent_workers=False
+        self.persistent_workers=persistent_workers and num_workers>0
+
+    def shutdown(self):
+        iterator=getattr(self.loader,"_iterator",None)
+        if iterator is not None:
+            try:
+                iterator._shutdown_workers()
+            finally:
+                self.loader._iterator=None
 
     def __len__(self):
         return math.ceil(len(self.dataset)/self.batch_size)
@@ -485,9 +494,12 @@ class OrderedPairLoader:
             if batch:
                 yield self._batch(batch)
         finally:
-            if hasattr(iterator,"_shutdown_workers"):
+            # A completed persistent iterator resets its sampler on the next
+            # pass. An incomplete pass must release its workers and restart.
+            incomplete=next_index<len(self.dataset) or bool(pending)
+            if hasattr(iterator,"_shutdown_workers") and (incomplete or not self.persistent_workers):
                 try:
-                    if next_index<len(self.dataset) and self.num_workers:
+                    if incomplete and self.num_workers:
                         # Stop scheduling new photos, then consume only tasks
                         # already in flight before closing the result queue.
                         iterator._sampler_iter=iter(())
@@ -495,6 +507,8 @@ class OrderedPairLoader:
                             pass
                 finally:
                     iterator._shutdown_workers()
+                    if self.persistent_workers:
+                        self.loader._iterator=None
 
     @staticmethod
     def _batch(batch):

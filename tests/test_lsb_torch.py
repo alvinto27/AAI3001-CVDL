@@ -350,6 +350,32 @@ class TorchTests(unittest.TestCase):
                 list(OrderedPairLoader(subset,4,0,False))
                 self.assertEqual(loads.call_count,4)
 
+    def test_persistent_evaluation_replays_bytes_and_restarts_after_partial(self):
+        rows=[{**r,"split":"val"} for r in self.photos]
+        ds=FixedPairs(self.corpus(RunSettings(tile_size=256),rows),"val")
+        def snapshot(loader):
+            return [(c.numpy().tobytes(),s.numpy().tobytes(),i.numpy().tobytes())
+                    for c,s,i in loader]
+        old=OrderedPairLoader(ds,4,2,False,prefetch_images=16)
+        kept=OrderedPairLoader(ds,4,2,False,prefetch_images=16,persistent_workers=True)
+        before={p.pid for p in multiprocessing.active_children()}
+        try:
+            expected=snapshot(old)
+            self.assertEqual(snapshot(kept),expected)
+            alive={p.pid for p in multiprocessing.active_children()}-before
+            self.assertEqual(len(alive),2)
+            self.assertEqual(snapshot(kept),expected)
+            self.assertEqual({p.pid for p in multiprocessing.active_children()}-before,alive)
+            iterator=iter(kept)
+            next(iterator)
+            iterator.close()
+            self.assertEqual(snapshot(kept),expected)
+        finally:
+            old.shutdown()
+            kept.shutdown()
+        gc.collect()
+        self.assertEqual({p.pid for p in multiprocessing.active_children()},before)
+
     def test_preload_pairs_matches_serial_reads_in_order(self):
         from unittest.mock import patch
         rows=[{**r,"split":"val"} for r in self.photos]
