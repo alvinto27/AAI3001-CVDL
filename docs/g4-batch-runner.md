@@ -131,6 +131,27 @@ checkout failures prevent training. After checkout, the job runs
 `uv sync --locked` to match the pinned environment; failure uploads the error
 files and shuts down.
 
+The optional `V3_NOTEBOOK` env key selects only `notebooks/04_baseline_kv_xunet_v3.ipynb` (default if absent) or `notebooks/05_xunet_v4_nonorm.ipynb`; both submit and boot reject other values. It is never executed as shell code. For a v4 R1 full-data job, use a fresh env file like this (submit only after the notebook commit is available on the VM; do not reuse an older checkpoint):
+
+```text
+QUICK=False
+V3_NOTEBOOK=notebooks/05_xunet_v4_nonorm.ipynb
+V3_DATA=otf
+V3_SOURCE=decode
+V3_RUN_NAME=xunet_v4_clip3_nonorm_lr0.0003_warm1_drop10_e20_r1
+V3_EPOCHS=20
+V3_LR=3e-4
+V3_WARMUP_EPOCHS=1
+V3_GRAD_CLIP=1.0
+V3_NORM=none
+V3_WORKERS=32
+V3_EVAL_WORKERS=16
+V3_COMPILE=default
+V3_PRIME_NEXT_EPOCH=on
+```
+
+Run `bash scripts/g4/submit.sh run --env-file path/to/v4-r1.env --timeout-min 60 --dry-run` first; remove `--dry-run` only after review and approval. For the 20-epoch budget, measured full-data training has **107,900 train images / 32 = 3,372 steps per epoch** (rounded up), and `g4-prime-1` fit took 915 s over 10 epochs. Its full runner took 18:58 (1,138 s), including 87 s for diagnostic cell 29. Doubling fit and retaining the 223 s non-fit overhead estimates **2,053 s (34:13)** for 20 epochs. A 60-minute runner timeout leaves about 26 minutes above that estimate. The remaining VM time (at most 60 minutes, less boot and setup time) covers delivery and shutdown; the script's minimum reserve is 15 minutes. This is an estimate, not a guarantee: compilation, IO, or diagnostics can run longer. Do not use the incorrect 1,686-step estimate.
+
 The default runner timeout is **100 minutes**. The job refuses a timeout above
 `max-run-minutes - 15` (default maximum: 120). The reserve leaves time for
 boot, upload and shutdown. `timeout` sends SIGTERM to the runner and then

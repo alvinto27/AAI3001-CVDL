@@ -220,6 +220,13 @@ fi
 RUN_ENV="$STATE_ROOT/env/$JOB_ID.env"
 if ! metadata job-env "$RUN_ENV"; then note 'Missing job-env metadata'; exit 2; fi
 chmod 600 "$RUN_ENV"
+# Exact allowlist: the env file is data, never source shell code or an arbitrary path.
+NOTEBOOK=$(grep -m1 '^V3_NOTEBOOK=' "$RUN_ENV" | cut -d= -f2- || true)
+NOTEBOOK=${NOTEBOOK:-notebooks/04_baseline_kv_xunet_v3.ipynb}
+case "$NOTEBOOK" in
+    notebooks/04_baseline_kv_xunet_v3.ipynb|notebooks/05_xunet_v4_nonorm.ipynb) ;;
+    *) note "Invalid V3_NOTEBOOK: $NOTEBOOK"; exit 2 ;;
+esac
 if [[ $MODE == production ]]; then
     if [[ -n $(git status --porcelain) ]]; then note 'Dirty checkout; refuse git checkout'; exit 2; fi
     if ! git fetch origin yx; then note 'Git fetch failed'; exit 2; fi
@@ -228,13 +235,13 @@ if [[ $MODE == production ]]; then
 else
     note "TEST: skip checkout and uv sync for $COMMIT (keep PC ROCm container intact)"
 fi
-note "Run $JOB_ID commit=$COMMIT timeout=${TIMEOUT_MIN}m"
+note "Run $JOB_ID commit=$COMMIT timeout=${TIMEOUT_MIN}m notebook=$NOTEBOOK"
 if [[ $MODE == test ]]; then
     [[ $RUN_ENV == "$ROOT/"* ]] || { note 'Test state root must be inside the checkout'; exit 2; }
     env_in_container="/work/${RUN_ENV#"$ROOT"/}"
-    runner=(podman exec -w /work aai3001 timeout --signal=TERM --kill-after=20s "${TIMEOUT_MIN}m" python scripts/run_notebook.py --env-file "$env_in_container" --output "runs-out/$JOB_ID")
+    runner=(podman exec -w /work aai3001 timeout --signal=TERM --kill-after=20s "${TIMEOUT_MIN}m" python scripts/run_notebook.py --notebook "$NOTEBOOK" --env-file "$env_in_container" --output "runs-out/$JOB_ID")
 else
-    runner=("$ROOT/.venv/bin/python" scripts/run_notebook.py --env-file "$RUN_ENV" --output "runs-out/$JOB_ID")
+    runner=("$ROOT/.venv/bin/python" scripts/run_notebook.py --notebook "$NOTEBOOK" --env-file "$RUN_ENV" --output "runs-out/$JOB_ID")
 fi
 write_record "$JOB_ID" running "$STARTED" '' '' no
 RUN_STARTED=1

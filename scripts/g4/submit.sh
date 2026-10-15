@@ -31,6 +31,12 @@ if [[ $ACTION == run ]]; then
     [[ $RUN_NAME =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ && $RUN_NAME != *..* ]] || {
         echo 'Set a simple V3_RUN_NAME in the env file' >&2; exit 2;
     }
+    NOTEBOOK=$(grep -m1 '^V3_NOTEBOOK=' "$ENV_FILE" | cut -d= -f2- || true)
+    NOTEBOOK=${NOTEBOOK:-notebooks/04_baseline_kv_xunet_v3.ipynb}
+    case "$NOTEBOOK" in
+        notebooks/04_baseline_kv_xunet_v3.ipynb|notebooks/05_xunet_v4_nonorm.ipynb) ;;
+        *) echo "Invalid V3_NOTEBOOK: $NOTEBOOK" >&2; exit 2 ;;
+    esac
     [[ $COMMIT =~ ^[a-zA-Z0-9][a-zA-Z0-9._/-]*$ && $COMMIT != *..* ]] || exit 2
     [[ $TIMEOUT =~ ^[0-9]+$ && $MAX_RUN =~ ^[0-9]+$ ]] && \
         (( TIMEOUT > 0 && MAX_RUN >= 16 && TIMEOUT <= MAX_RUN - 15 )) || {
