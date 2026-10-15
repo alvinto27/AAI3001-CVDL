@@ -2,20 +2,23 @@
 """Demo last-layer XuNet suspicion cells on full-photo LSB modifications.
 
 Run only in the PC GPU container: podman exec -w /work aai3001 python scripts/map_demo.py
-This is inference, not training. Outputs go to ignored runs-out/map-demo/.
+Pass --fixed-settings for comparable k=1/k=4 figures in runs-out/map-demo-v2/.
+The default retains the original drawn-settings demo in runs-out/map-demo/.
+This is inference, not training.
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 import math
 import sys
-from collections import Counter
 from pathlib import Path
 
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.colors import TwoSlopeNorm
 import numpy as np
 from PIL import Image
 import torch
@@ -247,6 +250,58 @@ def normalise(scores):
     return (scores - median) / max(float(mad), 1e-6), float(median), float(mad)
 
 
+def sigmoid(scores):
+    """Stable stego probability from a stego-minus-clean logit margin."""
+    values = np.asarray(scores, dtype=np.float64)
+    small = np.exp(-np.abs(values))
+    return np.where(values >= 0, 1 / (1 + small), small / (1 + small))
+
+
+def render_v2(photo_id, group, cover, cases):
+    small = Image.fromarray(cover).copy()
+    small.thumbnail((320, 320))
+    fig, axes = plt.subplots(len(cases), 4, figsize=(17, 2.35 * len(cases)), dpi=110)
+    prob_scale = TwoSlopeNorm(vmin=0, vcenter=0.5, vmax=1)
+    norm_scale = TwoSlopeNorm(vmin=-5, vcenter=0, vmax=5)
+    prob_artist = norm_artist = None
+    for row, case in enumerate(cases):
+        score = case['map']
+        normalized, _, _ = normalise(score)
+        ax = axes[row]
+        ax[0].imshow(small)
+        ax[0].set_ylabel(case['label'], fontsize=8, rotation=0,
+                         ha='right', va='center', labelpad=8)
+        ax[1].imshow(case['changed_mask_thumb'], cmap='gray', vmin=0, vmax=1,
+                     interpolation='nearest')
+        prob_artist = ax[2].imshow(sigmoid(score), cmap='bwr', norm=prob_scale,
+                                   interpolation='nearest')
+        norm_artist = ax[3].imshow(np.clip(normalized, -5, 5), cmap='bwr',
+                                   norm=norm_scale, interpolation='nearest')
+        for axis in ax:
+            axis.set_xticks([]); axis.set_yticks([])
+    for axis, title in zip(axes[0], ('photo', 'changed-pixel mask\nwhite = pixels changed',
+                                      'per-cell P(stego)', 'photo-normalised cell score')):
+        axis.set_title(title, fontsize=10)
+    fig.suptitle(f'{photo_id} | {group}: lowest-bit k={1 if group == "A" else 4}, match, random bytes',
+                 y=0.995, fontsize=12)
+    fig.text(0.53, 0.967,
+             'Each square = 32x32 pixels. Red = model thinks a message is here.',
+             ha='center', va='center', fontsize=10)
+    fig.subplots_adjust(left=0.24, right=0.90, top=0.93, bottom=0.035,
+                        wspace=0.24, hspace=0.28)
+    # Two dedicated, full-height legends remain readable for tall 7-row figures.
+    bar = fig.colorbar(prob_artist, cax=fig.add_axes([0.725, 0.30, 0.010, 0.42]),
+                       ticks=[0, 0.25, 0.5, 0.75, 1])
+    bar.set_label('P(stego) per 32x32 cell')
+    bar = fig.colorbar(norm_artist, cax=fig.add_axes([0.902, 0.30, 0.010, 0.42]),
+                       ticks=[-5, -2.5, 0, 2.5, 5])
+    bar.set_label("cell score vs this photo's normal (MADs)")
+    dest = OUTPUT / f'figure-{photo_id}-{group}-k{1 if group == "A" else 4}.png'
+    fig.savefig(dest)
+    plt.close(fig)
+    print('FIGURE', dest.relative_to(ROOT), flush=True)
+
+
 def render(photo_id, cover, cases):
     maps = np.concatenate([case['map'].ravel() for case in cases])
     lo, hi = np.percentile(maps, [2, 98])
@@ -279,6 +334,13 @@ def render(photo_id, cover, cases):
 
 
 def main():
+    global OUTPUT
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--fixed-settings', action='store_true',
+                        help='compare classic lowest-bit k=1 and k=4 match; default preserves drawn settings')
+    args = parser.parse_args()
+    if args.fixed_settings:
+        OUTPUT = ROOT / 'runs-out/map-demo-v2'
     OUTPUT.mkdir(parents=True, exist_ok=True)
     if not torch.cuda.is_available():
         raise RuntimeError('GPU required: run in aai3001 after checking live kernels')
@@ -302,83 +364,106 @@ def main():
         cover = read_photo(source, row)
         print('PHOTO', photo_id, source, camera, cover.shape, flush=True)
         h, w = tuple((s // 32) * 32 for s in cover.shape[:2])
-        # The changed mask is computed against the *uncropped* full cover; maps
-        # cover only complete 32px cells, with any right/bottom strip recorded.
-        cases = [('clean', None, None, cover, np.zeros(cover.shape[:2], dtype=bool), None)]
-        settings_rng = np.random.default_rng(np.random.SeedSequence([0, index, 101]))
-        settings, _ = draw_otf_settings(config, cover, settings_rng)
-        base = {key: settings[key] for key in ('bit_mode', 'k', 'method', 'payload')}
-        for placement in PLACEMENTS:
-            for rate in RATES:
-                rng = np.random.default_rng(np.random.SeedSequence([0, index,
-                                              0 if placement == 'contiguous' else 1,
-                                              int(rate * 1000), 102]))
-                stego, meta, changed_units = embed_fast(
-                    cover, **base, placement=placement, start=None,
-                    rng=rng, bpp=rate, return_changed_units=True)
-                changed = np.any(cover != stego, axis=2)
-                assert int(changed.sum()) == len(np.unique(changed_units // 3))
-                label = f'{placement} bpp={rate:g}'
-                cases.append((label, placement, rate, stego, changed, meta))
-        figure_cases = []
-        for label, placement, rate, image, changed, meta in cases:
-            scores = chunk_map(model, image, device)
-            positive = cell_mask(changed, scores.shape)
-            mask_thumbnail = Image.fromarray(changed.astype(np.uint8))
-            mask_thumbnail.thumbnail((320, 320), resample=Image.Resampling.NEAREST)
-            avg, topk, highest, k = verdicts(scores)
-            norm, median, mad = normalise(scores)
-            changed_scores = scores[positive]
-            unchanged_scores = scores[~positive]
-            whole = whole_map(model, image, device) if source != 'raise' else None
-            if whole is not None:
-                assert whole.shape == scores.shape
-                delta = float(np.max(np.abs(scores - whole)))
-                correlation = float(np.corrcoef(scores.ravel(), whole.ravel())[0, 1])
+        # The changed mask uses the untrimmed full cover; maps cover complete
+        # 32px cells. Record any unscored right/bottom strip in the CSV.
+        if args.fixed_settings:
+            groups = [('A', dict(bit_mode='lowest', k=1, method='match', payload='random_bytes')),
+                      ('B', dict(bit_mode='lowest', k=4, method='match', payload='random_bytes'))]
+        else:
+            settings_rng = np.random.default_rng(np.random.SeedSequence([0, index, 101]))
+            settings, _ = draw_otf_settings(config, cover, settings_rng)
+            groups = [(None, {key: settings[key] for key in
+                              ('bit_mode', 'k', 'method', 'payload')})]
+        for group, base in groups:
+            cases = [('clean', None, None, cover, np.zeros(cover.shape[:2], dtype=bool), None)]
+            for placement in PLACEMENTS:
+                for rate in RATES:
+                    rng = np.random.default_rng(np.random.SeedSequence([0, index,
+                                                  0 if placement == 'contiguous' else 1,
+                                                  int(rate * 1000), 102]))
+                    stego, meta, changed_units = embed_fast(
+                        cover, **base, placement=placement, start=None,
+                        rng=rng, bpp=rate, return_changed_units=True)
+                    changed = np.any(cover != stego, axis=2)
+                    assert int(changed.sum()) == len(np.unique(changed_units // 3))
+                    label = f'{placement} bpp={rate:g}'
+                    cases.append((label, placement, rate, stego, changed, meta))
+            figure_cases = []
+            for label, placement, rate, image, changed, meta in cases:
+                scores = chunk_map(model, image, device)
+                positive = cell_mask(changed, scores.shape)
+                mask_thumbnail = Image.fromarray(changed.astype(np.uint8))
+                mask_thumbnail.thumbnail((320, 320), resample=Image.Resampling.NEAREST)
+                avg, topk, highest, k = verdicts(scores)
+                _, median, mad = normalise(scores)
+                changed_scores = scores[positive]
+                unchanged_scores = scores[~positive]
+                whole = whole_map(model, image, device) if source != 'raise' else None
+                if whole is not None:
+                    assert whole.shape == scores.shape
+                    delta = float(np.max(np.abs(scores - whole)))
+                    correlation = float(np.corrcoef(scores.ravel(), whole.ravel())[0, 1])
+                else:
+                    delta = correlation = None
+                result = dict(source=source, photo_id=photo_id, camera_model=camera,
+                              placement=placement or 'clean', requested_bpp=rate,
+                              effective_bpp=meta['bpp_actual'] if meta else None,
+                              bit_mode=base['bit_mode'], k=base['k'], method=base['method'],
+                              payload=base['payload'], changed_pixels=int(changed.sum()),
+                              cells=int(scores.size), changed_cells=int(positive.sum()),
+                              unchanged_cells=int((~positive).sum()), cell_auc=roc_auc(scores, positive),
+                              changed_score_mean=float(changed_scores.mean()) if len(changed_scores) else None,
+                              unchanged_score_mean=float(unchanged_scores.mean()) if len(unchanged_scores) else None,
+                              mean_margin=avg, top1pct_margin=topk, max_margin=highest, top_k_cells=k,
+                              mean_verdict='stego' if avg > 0 else 'clean',
+                              top1pct_verdict='stego' if topk > 0 else 'clean',
+                              max_verdict='stego' if highest > 0 else 'clean',
+                              photo_median=median, photo_MAD=mad,
+                              chunk_whole_max_abs=delta, chunk_whole_correlation=correlation,
+                              cropped_right_pixels=cover.shape[1] - w,
+                              cropped_bottom_pixels=cover.shape[0] - h)
+                if group is not None:
+                    result['group'] = group
+                results.append(result)
+                if args.fixed_settings:
+                    auc = 'n/a' if result['cell_auc'] is None else f"{result['cell_auc']:.3f}"
+                    photo_probability = float(sigmoid(avg))  # sigmoid(mean of cell logits)
+                    row_label = (f'{label}\n{base["bit_mode"]} k={base["k"]} {base["method"]} '
+                                 f'{base["payload"]}\nP(stego)={photo_probability:.4f}; cell AUC={auc}')
+                else:
+                    row_label = label
+                figure_cases.append({'label': row_label, 'map': scores,
+                                     'changed_mask_thumb': np.asarray(mask_thumbnail)})
+                if placement:
+                    prefix = f'{group}-' if group else ''
+                    mask_path = OUTPUT / f'mask-{prefix}{photo_id}-{placement}-{str(rate).replace(".", "p")}.npz'
+                    np.savez_compressed(mask_path, packed=np.packbits(changed.reshape(-1)),
+                                        shape=np.asarray(changed.shape, dtype=np.int32))
+                print('CASE', group, photo_id, label, 'mean', f'{avg:.5f}',
+                      'Pmean', f'{float(sigmoid(avg)):.6f}', 'top1%', f'{topk:.5f}',
+                      'max', f'{highest:.5f}', 'AUC', result['cell_auc'],
+                      'chunk/whole', delta, correlation, flush=True)
+                del image, changed
+            if args.fixed_settings:
+                render_v2(photo_id, group, cover, figure_cases)
             else:
-                delta = correlation = None
-            result = dict(source=source, photo_id=photo_id, camera_model=camera,
-                          placement=placement or 'clean', requested_bpp=rate,
-                          effective_bpp=meta['bpp_actual'] if meta else None,
-                          bit_mode=base['bit_mode'], k=base['k'], method=base['method'],
-                          payload=base['payload'], changed_pixels=int(changed.sum()),
-                          cells=int(scores.size), changed_cells=int(positive.sum()),
-                          unchanged_cells=int((~positive).sum()), cell_auc=roc_auc(scores, positive),
-                          changed_score_mean=float(changed_scores.mean()) if len(changed_scores) else None,
-                          unchanged_score_mean=float(unchanged_scores.mean()) if len(unchanged_scores) else None,
-                          mean_margin=avg, top1pct_margin=topk, max_margin=highest, top_k_cells=k,
-                          mean_verdict='stego' if avg > 0 else 'clean',
-                          top1pct_verdict='stego' if topk > 0 else 'clean',
-                          max_verdict='stego' if highest > 0 else 'clean',
-                          photo_median=median, photo_MAD=mad,
-                          chunk_whole_max_abs=delta, chunk_whole_correlation=correlation,
-                          cropped_right_pixels=cover.shape[1] - w,
-                          cropped_bottom_pixels=cover.shape[0] - h)
-            results.append(result)
-            figure_cases.append({'label': label, 'map': scores,
-                                 'changed_mask_thumb': np.asarray(mask_thumbnail)})
-            if placement:
-                mask_path = OUTPUT / f'mask-{photo_id}-{placement}-{str(rate).replace(".", "p")}.npz'
-                np.savez_compressed(mask_path, packed=np.packbits(changed.reshape(-1)),
-                                    shape=np.asarray(changed.shape, dtype=np.int32))
-            print('CASE', photo_id, label, 'mean', f'{avg:.5f}', 'top1%', f'{topk:.5f}',
-                  'max', f'{highest:.5f}', 'AUC', result['cell_auc'],
-                  'chunk/whole', delta, correlation, flush=True)
-            del image, changed
-        render(photo_id, cover, figure_cases)
-        photo_records.append(dict(photo_id=photo_id, source=source, camera=camera,
-                                  width=cover.shape[1], height=cover.shape[0],
-                                  settings=base))
+                render(photo_id, cover, figure_cases)
+            photo_records.append(dict(photo_id=photo_id, source=source, camera=camera,
+                                      width=cover.shape[1], height=cover.shape[0],
+                                      settings=base, group=group))
         del cover
         torch.cuda.empty_cache()
-    with (OUTPUT / 'metrics.csv').open('w', newline='') as stream:
+    csv_name = 'metrics-v2.csv' if args.fixed_settings else 'metrics.csv'
+    with (OUTPUT / csv_name).open('w', newline='') as stream:
         writer = csv.DictWriter(stream, fieldnames=list(results[0]))
         writer.writeheader(); writer.writerows(results)
-    (OUTPUT / 'run.json').write_text(json.dumps(dict(checkpoint=CHECKPOINT.name,
+    json_name = 'run-v2.json' if args.fixed_settings else 'run.json'
+    (OUTPUT / json_name).write_text(json.dumps(dict(checkpoint=CHECKPOINT.name,
         proof_max_abs_forward_meanpool=proof[0], proof_max_abs_forward_cellmean=proof[1],
         bpp=list(RATES), photo_records=photo_records, score='stego_minus_clean_logit',
+        photo_probability='sigmoid(mean(cell_margin))', fixed_settings=args.fixed_settings,
         chunk_size=512, chunk_margin=64, cell_size=32, cases=len(results)), indent=2) + '\n')
-    print('DONE cases', len(results), 'figures', len(photos), 'metrics', OUTPUT / 'metrics.csv', flush=True)
+    print('DONE cases', len(results), 'figures', len(photo_records), 'metrics', OUTPUT / csv_name, flush=True)
 
 
 if __name__ == '__main__':
