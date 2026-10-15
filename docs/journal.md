@@ -2273,6 +2273,11 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   `scripts/run_notebook.py`: decode, 6 workers, compile, priming off,
   `V3_DIAG_WORKERS=0`, and 20% train-photo fraction. It stopped by SIGTERM
   after epoch 2 on purpose.
+- The user ran full-data two-epoch headless PC run `pc-headless-2ep` from a
+  scratch copy of the committed notebook. Only `EPOCHS` changed to 2. It
+  used decode, 6 workers, compile, priming off, `V3_DIAG_WORKERS=0`, and
+  `scripts/run_notebook.py`. Output was `runs-out/pc-headless-2ep/`, 14 MB,
+  git-ignored.
 
 ### Found
 
@@ -2329,6 +2334,21 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   2025.9.1 did not change. This is a candidate, not proof. VS Code rendering
   on the same GPU is another candidate.
 
+#### Full-data headless PC run
+
+- The run completed with status done, exit 0, all 15 cells, and clean
+  cleanup. It ran from 02:29:09Z to 02:50:30Z (1,280.949 s).
+- Steady training from step 150 to 3,300 was 13.816 it/s in both epochs.
+  Time to step 75 was 17 s in epoch 0 and 10 s in epoch 1. Train-only
+  epochs took 259 s and 247 s. Validation took 43 s per epoch, or 49 s wall
+  time with callbacks.
+- Cell times: fit 612.928 s, test evaluation 188.401 s, serial diagnostics
+  458.332 s, and Notebook 02 2.910 s. GPU in epoch 1 was 100% busy at
+  252-254 W, 3,095-3,103 MHz, with hotspot 85-89 C. Container memory was
+  about 15.3 GB and host available memory about 13 GiB.
+- This speed-only run used StepLR step size 1, so its scores are not
+  comparable with 10-epoch runs.
+
 ### Decided
 
 - Pending user decision: G4 runs use `V3_PRIME_NEXT_EPOCH=on` as the
@@ -2336,7 +2356,7 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - The PC default remains priming off pending the PC test.
 - Pending user decision: run full PC training headlessly with
   `scripts/run_notebook.py` at the proven 13.6 it/s, or test the VS Code
-  candidates.
+  candidates. The two-epoch run confirms the headless speed.
 
 ### Next
 
@@ -2345,3 +2365,6 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Pending: VS Code slowdown cause, by extension rollback or hidden-tab test.
 - Pending: prime default decision.
 - Pending: dataset plan for ALASKA#2 and LSDIR.
+- Pending: leave `V3_DIAG_WORKERS` at its default parallel setting for
+  decode; the serial diagnostic path took 458 s here versus about 88 s with
+  8 workers.
