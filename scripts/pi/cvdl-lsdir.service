@@ -1,0 +1,19 @@
+[Unit]
+Description=CVDL LSDIR model-repo archive acquisition and SHA-256 verification
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/rpi400/cvdl-jobs
+ExecStart=/home/rpi400/hf-env/bin/python /home/rpi400/cvdl-jobs/lsdir_download.py
+Restart=on-failure
+RestartSec=60
+RestartPreventExitStatus=78
+TimeoutStopSec=15
+KillMode=control-group
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
