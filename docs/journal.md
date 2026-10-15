@@ -2534,10 +2534,23 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   or later. The user later moves the Pi SSD to the PC to copy subsets.
 - Wait on 256 throughput work. Do a G4 256 speed test only when 256 or
   Mode 2 step 17 enters the plan. Do not adopt PyAV now.
-- Map-model design is pending user confirmation: use test-time-independent
-  normalisation, such as BatchNorm with fixed evaluation statistics or no
-  per-sample normalisation; train with per-cell labels and use a trained
-  per-cell map for the photo verdict.
+- Correction to the map-model design input (user, 2026-10-15): every
+  normalisation compares against some group. Train-mode BatchNorm compares
+  with other images in the batch and leaks the batch context: all-clean
+  batches were called stego; V3a clean accuracy in all-clean train-mode
+  batches was 0.0169 / 0.0218. GroupNorm compares with the rest of the same
+  image or chunk and leaks spatial context: the map band and self-dimming
+  were found above. GroupNorm removed batch dependence in V3b/V3c; train/eval
+  maximum logit difference was 0.
+- A map model needs a fixed reference or only the cell's own position.
+  Candidate designs, not decisions, are: A) no normalisation with clip 3;
+  B) freeze statistics after an early training phase; C) per-position
+  channel normalisation across channels at each position only, which may
+  remove the local noise-strength signal.
+- Judge each candidate with the existing all-clean/all-stego batch checks
+  (V3 tests e/f), chunked-versus-whole map equality, cell AUC, and photo P_E
+  with k=1 reported. Train with per-cell labels and use a trained per-cell
+  map for the photo verdict.
 - MIL is dropped. Mode 2 step 17 and the bag design leave the plan.
 - New direction (user, 2026-10-15): use a spatial suspicion map. Train with
   exact per-cell labels from the cover/stego difference: the share of changed
