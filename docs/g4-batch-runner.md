@@ -45,7 +45,21 @@ after it started (the file could change while Bash reads it).
 
 `boot.log` shows which copy ran. The bootstrap line has `bootstrap sha256=`.
 The next line is `job_run copy: checkout|last-good path=... sha256=...`.
-The `Run` line includes `notebook=`.
+The `Run` line includes `notebook=`. A G4 notebook job writes `host.csv` into
+its job folder at 60-second intervals. The checked-out `run_notebook.py`
+starts the sampler by default on Google Compute Engine. Thus even the old
+installed one-file `job.sh` uses the sampler when it calls the new checkout.
+If the stable bootstrap is installed, `job_run.sh` also passes
+`--host-monitor on` explicitly. The old installed path **does not require a
+maintenance install for host.csv**. The one-time bootstrap install below is
+still useful for other changes to `job_run.sh`; verify the installed copy in
+`boot.log` during a future approved boot. Do not start the VM just to check it.
+The sampler needs `/proc` and Linux cgroup files and delivers `host.csv` with
+other job files. The first CPU and disk rates are blank until the next sample.
+Notebook 05 also writes `checkpoints/<run-name>/epoch_timing.csv`: one row per
+zero-based epoch with first-batch wait, train and validation spans, transition
+spans, and callback durations. See [the time-field guide](plan-epoch-overhead.md#new-read-only-timers-for-the-next-run).
+The monitor and timers do not change data streams or model selection.
 
 **One-time step.** The installed `job.sh` must be the bootstrap. The old
 installed copy holds the job logic and does not run the checkout copy. In

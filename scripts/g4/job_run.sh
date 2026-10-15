@@ -252,7 +252,7 @@ if [[ $MODE == test ]]; then
     env_in_container="/work/${RUN_ENV#"$ROOT"/}"
     runner=(podman exec -w /work aai3001 timeout --signal=TERM --kill-after=20s "${TIMEOUT_MIN}m" python scripts/run_notebook.py --notebook "$NOTEBOOK" --env-file "$env_in_container" --output "runs-out/$JOB_ID")
 else
-    runner=("$ROOT/.venv/bin/python" scripts/run_notebook.py --notebook "$NOTEBOOK" --env-file "$RUN_ENV" --output "runs-out/$JOB_ID")
+    runner=("$ROOT/.venv/bin/python" scripts/run_notebook.py --notebook "$NOTEBOOK" --env-file "$RUN_ENV" --output "runs-out/$JOB_ID" --host-monitor on)
 fi
 write_record "$JOB_ID" running "$STARTED" '' '' no
 RUN_STARTED=1

@@ -212,6 +212,15 @@ def run(args):
     if output.exists() and any(output.iterdir()):
         raise ValueError(f"use a new, empty output folder: {output}")
     output.mkdir(parents=True, exist_ok=True)
+    sys.path.insert(0, str(ROOT))
+    from scripts.host_monitor import monitor, on_gce
+    monitor_enabled = args.host_monitor == 'on' or (args.host_monitor == 'auto' and on_gce())
+    if monitor_enabled:
+        args.monitor_stop = threading.Event()
+        args.monitor_thread = threading.Thread(target=monitor,
+            args=(output / 'host.csv', args.monitor_stop),
+            kwargs={'runner_pid': os.getpid()}, name='host-monitor', daemon=True)
+        args.monitor_thread.start()
     settings["V3_OUTPUT_ROOT"] = str(output / "checkpoints")
     for key in list(os.environ):
         if key == "QUICK" or key == "PRED_PATH" or key.startswith("V3_"):
@@ -219,7 +228,6 @@ def run(args):
     os.environ.update(settings)
     OPEN_FILE_LIMIT = raise_open_file_limit()  # inherited by loader workers
     os.chdir(ROOT)
-    sys.path.insert(0, str(ROOT))
     speed_mode = settings.get('V3_SPEED_MATRIX', 'off')
     if speed_mode not in {'on', 'off'}:
         raise ValueError('V3_SPEED_MATRIX must be on or off')
@@ -399,12 +407,18 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
                         help="override one QUICK or V3_* value from the env file")
+    parser.add_argument('--host-monitor', choices=('auto', 'on', 'off'), default='auto',
+                        help='host.csv: on for GCE by default, optional on the PC')
     args = parser.parse_args()
     try:
         return run(args)
     except (OSError, ValueError) as error:
         print(f"run_notebook: {error}", file=sys.stderr)
         return 2
+    finally:
+        if hasattr(args, 'monitor_stop'):
+            args.monitor_stop.set()
+            args.monitor_thread.join(timeout=5)
 
 
 if __name__ == "__main__":
