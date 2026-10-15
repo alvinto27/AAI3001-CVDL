@@ -2225,8 +2225,6 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Pending: confirm the 4-worker PC setting in the next full PC run.
 - Done: limited compile helper processes with `TORCHINDUCTOR_COMPILE_THREADS=4`
   (`22e61a9`).
-- Pending: MIL batching and model design, when photo-level work starts; the
-  user will decide then.
 - Done: VM fix 4 and fix 5 measurements. Fix 4 has no reliable VM gain;
   fix 5 was already verified above.
 - Done: removed VM scratch `~/otf-dev/eval-yx` after the VM returned.
@@ -2387,6 +2385,27 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   for decode and 418 to 1,326 for cache when moving 512 to 256. Per-tile
   work, not decoding, limits 256. PyAV is not adopted.
 
+#### Tile overlap and spatial map findings
+
+- On 6,934 downloaded ALASKA TIFFs, with sides approximated as squares from
+  file size, `overlap_last` at 512 gave 3.81 tiles per photo and each pixel
+  appeared 2.07 times on average. A non-overlapping 512 grid gave 1.18
+  tiles per photo and used 59% of pixels.
+- At 256, overlap gave 10.92 tiles per photo (1.39 times the non-overlapping
+  count); non-overlap gave 6.03 tiles per photo and used 75% of pixels.
+  For a 573-pixel side, two 512 tiles share 88% of their pixels.
+- Overlap counts the same changed pixels more than once in Mode 2 bags,
+  makes tile tests look more certain than they are, and skews the even
+  per-camera mix.
+- Notebook 04's XuNet is fully convolutional: convolution layers, five
+  average pools of 2, `x.mean(dim=(-2, -1))`, and `Linear(128, 2)`. It accepts
+  any photo size. There is one 128-value cell per 32 x 32 pixels, and each
+  cell sees about 48 x 48 pixels.
+- Because `Linear(mean) = mean(Linear)`, the current checkpoint already
+  gives a per-cell suspicion map and averages it. Maps can be drawn without
+  retraining. The generator supports contiguous, stride, and random
+  placement; a clear localized region appears only for localized placement.
+
 ### Decided
 
 - Pending user decision: G4 runs use `V3_PRIME_NEXT_EPOCH=on` as the
@@ -2416,6 +2435,12 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   or later. The user later moves the Pi SSD to the PC to copy subsets.
 - Wait on 256 throughput work. Do a G4 256 speed test only when 256 or
   Mode 2 step 17 enters the plan. Do not adopt PyAV now.
+- MIL is dropped. Mode 2 step 17 and the bag design leave the plan.
+- New direction (user, 2026-10-15): use a spatial suspicion map. Train with
+  exact per-cell labels from the cover/stego difference: the share of changed
+  pixels in each cell. Take the photo verdict from the map with top-k cells.
+- Tiling strategy is open: non-overlapping centred grid, seeded random crops
+  per epoch, whole-photo input, or train on crops and test on whole photos.
 - Pending user decision: run full PC training headlessly with
   `scripts/run_notebook.py` at the proven 13.6 it/s, or test the VS Code
   candidates. The two-epoch run confirms the headless speed.
@@ -2426,6 +2451,10 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   numbers. This is a separate approved change.
 - Pending: VS Code slowdown cause, by extension rollback or hidden-tab test.
 - Pending: prime default decision.
+- Pending: demo maps from the current best checkpoint on a few full photos,
+  with contiguous versus random placement and several rates.
+- Pending: choose the tiling/crop policy and train crop size (256 or 512) for
+  the map model.
 - Pending: Worker_2 sets up and proves the unattended Pi services, then
   checks the PC ALASKA subset.
 - Pending: when the Pi SSD is unplugged, shut the Pi down first; G4 results
