@@ -148,8 +148,51 @@ decode disk time uses train master bytes. The report is under
 
 ## Submit a run
 
-Install and authenticate gcloud on the PC or Pi separately. Inspect commands
-without starting the VM:
+The PC has a user-local Google Cloud CLI in `~/.local/opt/google-cloud-sdk`
+with `~/.local/bin/gcloud` linked to it. The installed version is 589.0.0.
+The official unversioned Linux x86_64 archive matched Google's published
+SHA-256 `817026aec0adea0e2ee8ed3a1ba3eabfe9e5177581fbe16595a8fe495a601300`
+([Google install guide](https://docs.cloud.google.com/sdk/docs/install-sdk)).
+No login was done during installation. The user must do these steps in a
+browser session. The project `personal-compute-511601` is recorded in this
+repository's project journal; `submit.sh` sets zone `us-central1-c` on each
+command.
+
+```sh
+gcloud auth login
+gcloud config set project personal-compute-511601
+gcloud config set compute/zone us-central1-c
+```
+
+After the user says **go**, the Orchestrator checks the VM is stopped and
+runs a dry run first. It must review the job name, commit, timeout, and env
+file before it removes `--dry-run`:
+
+```sh
+bash scripts/g4/submit.sh status
+bash scripts/g4/submit.sh run --env-file scripts/g4/jobs/speed-1.env --timeout-min 50 --dry-run
+bash scripts/g4/submit.sh run --env-file scripts/g4/jobs/speed-1.env --timeout-min 50
+```
+
+The last line **starts a billable VM**; run it only after the user says go.
+`submit.sh` checks that the VM is `TERMINATED` or `STOPPED`. It makes a new job
+ID from the run name and UTC time, updates the instance keys `job-mode`,
+`job-id`, `job-commit`, `job-timeout-min`, `max-run-minutes`, and `job-env`, and
+starts the VM. It leaves other instance metadata untouched. A prior `job-env`
+or job ID is overwritten on a run, but other console keys stay. `maintenance`
+and `off` change only `job-mode`; stale run keys are then inert. The instance
+`job-env` value must be at most 256 KiB and all metadata at most 512 KiB.
+The speed env file is far below these limits. The PC command uses the user's
+own `gcloud auth login`, **not** the VM service account. To describe the VM,
+update its instance metadata, and start it, the user needs Compute Instance
+Admin (v1) (`roles/compute.instanceAdmin.v1`). If the VM uses an attached
+service account, Google's [metadata permissions guide](https://docs.cloud.google.com/compute/docs/metadata/setting-custom-metadata)
+also calls for Service Account User (`roles/iam.serviceAccountUser`) on that
+account (`iam.serviceAccounts.actAs`). The script does not attach or change a
+service account. If IAM denies a command, check the exact permission in its
+error before changing roles.
+
+Inspect other commands without starting the VM:
 
 ```sh
 bash scripts/g4/submit.sh run --env-file path/to/job.env --dry-run
