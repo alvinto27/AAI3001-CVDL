@@ -146,6 +146,58 @@ def raise_open_file_limit():
     return resource.getrlimit(resource.RLIMIT_NOFILE)
 
 
+def speed_matrix_run(output, settings, notebook_path):
+    """Allow one bounded benchmark job through the existing G4 notebook runner."""
+    if notebook_path != ROOT / 'notebooks/05_xunet_v4_nonorm.ipynb':
+        raise ValueError('V3_SPEED_MATRIX=on requires notebook 05')
+    status_path = output / 'status.json'
+    start = time.perf_counter()
+    status = {'state': 'running', 'started_at': now(), 'ended_at': None, 'heartbeat_at': now(),
+              'exit_code': None, 'effective_settings': settings, 'runtime_settings': {'speed_matrix': True},
+              'cells': [], 'executed_notebook': None, 'log': str(output / 'run.log'),
+              'run_output_dir': str(output), 'run_files': [], 'traceback': None}
+    atomic_json(status_path, status)
+    (output / 'executed.ipynb').write_text(json.dumps({'cells': [{'cell_type': 'markdown',
+        'metadata': {}, 'source': ['Speed matrix job; no notebook cells were executed.']}],
+        'metadata': {'headless_run': {'source': str(notebook_path), 'settings': settings}},
+        'nbformat': 4, 'nbformat_minor': 5}, indent=2) + '\n')
+    stop = threading.Event()
+    def heartbeat():
+        while not stop.wait(10):
+            status['heartbeat_at'] = now()
+            atomic_json(status_path, status)
+    pulse = threading.Thread(target=heartbeat, daemon=True)
+    pulse.start()
+    with (output / 'run.log').open('w', encoding='utf-8') as log:
+        log.write('SPEED MATRIX (notebook 05 bypassed): ' + json.dumps(settings, sort_keys=True) + '\n')
+        log.flush()
+        process = subprocess.Popen([sys.executable, '-u', 'scripts/speed_matrix.py', '--output', str(output)],
+                                   cwd=ROOT, env=os.environ.copy(), stdout=log, stderr=subprocess.STDOUT,
+                                   start_new_session=True)
+        handlers = {sig: signal.getsignal(sig) for sig in (signal.SIGINT, signal.SIGTERM)}
+        def forward(sig, _frame):
+            try:
+                os.killpg(process.pid, sig)
+            except ProcessLookupError:
+                pass
+        try:
+            for sig in handlers:
+                signal.signal(sig, forward)
+            code = process.wait()
+        finally:
+            for sig, handler in handlers.items():
+                signal.signal(sig, handler)
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=10)
+    stop.set(); pulse.join(timeout=2)
+    status.update(state='done' if code == 0 else 'failed', exit_code=code,
+                  ended_at=now(), elapsed_s=time.perf_counter()-start,
+                  run_files=[str(p) for p in output.rglob('*') if p.is_file()])
+    atomic_json(status_path, status)
+    return code
+
+
 def run(args):
     notebook_path = args.notebook.resolve()
     if not notebook_path.is_file():
@@ -168,6 +220,11 @@ def run(args):
     OPEN_FILE_LIMIT = raise_open_file_limit()  # inherited by loader workers
     os.chdir(ROOT)
     sys.path.insert(0, str(ROOT))
+    speed_mode = settings.get('V3_SPEED_MATRIX', 'off')
+    if speed_mode not in {'on', 'off'}:
+        raise ValueError('V3_SPEED_MATRIX must be on or off')
+    if speed_mode == 'on':
+        return speed_matrix_run(output, settings, notebook_path)
 
     executed = output / "executed.ipynb"
     status_path = output / "status.json"

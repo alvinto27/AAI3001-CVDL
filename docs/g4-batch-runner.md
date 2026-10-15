@@ -230,6 +230,64 @@ estimate is **2,762–2,782 s (46–47 min)**. A 75-minute timeout leaves about
 job script accepts it. The VM maximum also needs room for boot, upload and
 shutdown. These are estimates, not guarantees.
 
+### One-boot batch and BF16 speed matrix
+
+The installed one-file `job.sh` can start this job: it calls the checked-out
+`scripts/run_notebook.py`. Set `V3_SPEED_MATRIX=on` and select notebook 05.
+The runner then calls `scripts/speed_matrix.py` instead of notebook cells.
+This is a **speed test**, not model training for a checkpoint. It runs six
+short, independent train configurations in one VM boot and saves
+`speed-matrix.json`, one `*-nvidia.csv` per configuration, `run.log`, and
+`status.json`. It does not run validation, diagnostics or the extra test.
+Each configuration uses a fresh eager or compiled XuNet and AdamW at the
+same manually set LR. The measured interval starts after 50 warm-up steps,
+which excludes first compilation. CUDA BF16 mixed precision uses autocast
+without loss scaling. A 600-step interval does not reach the first epoch
+boundary, so `V3_PRIME_NEXT_EPOCH=on` is **set but not exercised**. Do not use
+this test to compare convergence or P_E.
+
+Use a new job ID and an env file with these lines:
+
+```text
+QUICK=False
+V3_NOTEBOOK=notebooks/05_xunet_v4_nonorm.ipynb
+V3_SPEED_MATRIX=on
+V3_RUN_NAME=g4-speed-batch-bf16
+V3_DATA=otf
+V3_SOURCE=decode
+V3_WORKERS=32
+V3_COMPILE=default
+V3_PRIME_NEXT_EPOCH=on
+V3_EXTRA_TESTS=none
+V3_LR=3e-4
+V3_SPEED_BATCHES=32,64,128
+V3_SPEED_PRECISIONS=32,bf16-mixed
+V3_SPEED_STEPS=600
+V3_SPEED_WARMUP=50
+```
+
+The script writes steps/s, images/s, loader-wait ms per step, model-and-transfer
+ms per step, peak PyTorch memory, and NVIDIA use and memory samples.
+The reported NVIDIA mean uses measure-phase samples only; each CSV marks
+warm-up and measure samples. Use
+`bash scripts/g4/submit.sh run --env-file path/to/speed-matrix.env
+--timeout-min 50 --dry-run` to check the job before the user starts the VM.
+**Estimate:** allow 20–35 minutes for six warm-up/measure cycles, compile,
+worker start, boot and upload. At about $1.63/hour this costs about
+$0.54–$0.95; a 50-minute job timeout can cost about $1.36 if it is used in
+full. The timeout is at most `120 - 15 = 105` minutes, so it is allowed.
+These times and costs are estimates, not speed results.
+
+Notebook 05 supports `V3_BATCH_SIZE` (full default 32; QUICK default 8)
+and `V3_PRECISION` (`32` by default, or `bf16-mixed` on a BF16 GPU).
+Only `V3_COMPILE=off` and `default` exist. Run names gain batch/precision
+tags only for overrides. `V3_LR` stays manual: do not scale it without an
+explicit setting. The training loader uses the selected batch; pair-based
+validation and test loaders use half that batch count, so the number of
+images per evaluation step is similar. Notebook checkpoint reload and
+`scripts/eval_checkpoint.py` use float32 model weights and float32 inference
+for the final test, even for a BF16 mixed training run.
+
 The default runner timeout is **100 minutes**. The job refuses a timeout above
 `max-run-minutes - 15` (default maximum: 120). The reserve leaves time for
 boot, upload and shutdown. `timeout` sends SIGTERM to the runner and then
