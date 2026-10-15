@@ -2299,6 +2299,40 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   design, and batch/precision speed-matrix support.
 - The user ran the no-normalisation G4 R1 job `g4-v4-r1b`; R2 was later
   launched as `g4-v4-r2` and is still Pending.
+- Worker_2 new-data code `e592cce`: a strict ALASKA uncompressed RGB8 TIFF
+  reader, the LSDIR PNG path, a per-record `trim512` grid (RAISE/DIV2K keep
+  `overlap_last`; the grid policy is recorded per photo), and
+  `scripts/build_new_source_manifests.py`. The builder writes
+  `photo_manifest.csv`, `split.csv`, `provenance.csv` and `build_record.json`,
+  checks size, SHA-256 and duplicates, and refuses to overwrite. Also added:
+  opt-in `V3_SOURCE_MIX` and `V3_TILES_PER_EPOCH` per-epoch sampling,
+  separate extra panels (ALASKA val/test_seen/test_unseen, LSDIR val/test),
+  and `docs/plan-new-data-code.md` with the LSDIR selection contract
+  (`lsdir_id, shard, path, split, width, height, tiles512, bytes, sha256`).
+- Worker_2 capped checkpoint validation `1b54858`: `V3_CHECKPOINT_VAL=capped`
+  is the default only when `V3_SOURCE_MIX` is set. It uses a fixed seeded
+  sample of up to 5,000 RAISE validation pairs (no DIV2K), all ALASKA val
+  pairs and up to 1,500 LSDIR val pairs. The ordered pair CSV and its SHA-256
+  go to the run outputs; a resume with changed pair IDs is refused.
+  Per-source validation P_E and loss are logged each epoch (CSV and
+  TensorBoard).
+- The ALASKA download finished at 23:26 +08: 70,282/70,282 files,
+  110,550,230,800 B, 0 failures, all files verified.
+- Worker_3 final ALASKA selection v2 `5ca650b`: `data/alaska/selection_v2.csv`
+  (18,200 rows, SHA-256
+  `437fcfef817689cd1af5347f08f948cfddfad6523667afd9dace37eb5ef1ff85`, the
+  same bytes on a second run), `scripts/alaska_select_v2.py` and
+  `docs/alaska-selection-v2.md`. Pi scan with `--verify`: 70,282 files
+  re-hashed equal to `SHA256SUMS`, 0 bad. PC v1 copy: 9,723 re-hashed, 0 bad.
+  All 80,005 IDs are covered; 0 eligible IDs are missing. All files are
+  uncompressed RGB 8/8/8.
+- Worker_3 commit `90425cb` (train-only list, run-based blocks) reached
+  `origin` through a later push without a separate review. The Orchestrator
+  reviewed it afterwards; it agrees with the decisions.
+- The Orchestrator wrote the session handoff `docs/handoff-2026-10-15.md`
+  (`f679b44`). Scribe stopped before it recorded the last two updates; the
+  Orchestrator recorded them here and committed the first version of
+  `docs/research-checklist.md` (written by Scribe).
 
 ### Found
 
@@ -2800,6 +2834,51 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   (about 100 GB, estimated 10-15 min), then downloads about 6,200 files
   (estimated about 40 min). Cause is unknown; router per-device limit or a
   stale Wi-Fi session is only a guess.
+- New-data checks: old RAISE/DIV2K records are unchanged; the standard test
+  hash `fdd989f7...b06837` is unchanged; with the mix unset, the train stream
+  (epochs 0/1) and the val/test frames are byte-identical to before. PC QUICK
+  with the mix on (30 LSDIR PNGs, 33 ALASKA TIFFs): 24/12/24 tiles per epoch,
+  0 repeats, 16/16 cells, 422.4 s. Capped QUICK: 12/6/12 tiles, 16 val pairs
+  (6/5/5), 116.8 s, pair-list SHA `2f1424db...0ce8a`.
+- The full 89-test suite passes on a clean worktree. In the shared tree,
+  `test_notebook_compile` and `test_notebook_diagnostics` fail only because
+  they read the user's edited notebook 04 (the Orchestrator confirmed this on
+  a clean worktree of `e592cce`).
+- Today's split by tiles: train 53,950 (71%), validation 11,238 (15%), test
+  10,956 (14%). Validation precision estimate (P_E about 0.02, binomial, two
+  images per pair): +/-0.0008 at 16,000 pairs, +/-0.0009 at 11,238,
+  +/-0.0011 at 8,000, +/-0.0016 at 4,000. Epochs are compared on the same
+  fixed set, so differences resolve better than this.
+- ALASKA v2 final splits (photos / tiles / bytes / on PC / to copy):
+
+  | Split | Photos | Tiles | Bytes | On PC | To copy |
+  | --- | ---: | ---: | ---: | ---: | ---: |
+  | train | 13,500 | 21,141 | 21,301,332,312 | 3,285 | 10,215 |
+  | val | 1,000 | 1,552 | 1,562,059,792 | 214 | 786 |
+  | test_seen | 1,700 | 2,672 | 2,686,627,688 | 342 | 1,358 |
+  | test_unseen | 2,000 | 3,153 | 3,173,550,368 | 2,000 | 0 |
+  | all | 18,200 | 28,518 | 28,723,570,160 | 5,841 | 12,359 |
+
+  Bytes to copy: 19,429,045,766. Train tiles 21,141 are above the 19,000
+  target. 3,882 v1 files on the PC are not in v2.
+- Per model: 24 mixed models have train 442-445 (Canon_EOS700D 356 because of
+  the 75% cap), val 41-42, test_seen 70-71. Train-only models (even share):
+  Canon_PowerShot-G11 333, Nikon_D90 395, Kodak_Z990 555, Pentax_K10D 556,
+  Pentax_ist-DS 556, Sigma_SD10 556. The 8 unseen models have 250 each, all
+  from v1.
+- Leakage rule: blocks of 10 consecutive IDs per model (an assumed burst
+  length, not measured); an empty block separates splits, so the minimum ID
+  gap is 11 (11-21 per mixed model); val/test blocks come in runs of up to 3;
+  a mixed model uses at most 75% of its photos; 0 fallbacks. No SHA-256 is
+  repeated in the selection. The pool's one identical pair (58794 = 59282)
+  is in the excluded RAW_wesaturate group.
+- The builder accepts all 18,200 rows (`_manifest('alaska')`). Expected capped
+  validation size: 5,000 RAISE + 1,552 ALASKA + up to 1,500 LSDIR = 8,052
+  pairs. G4 validation estimate with the capped set: about 9-15 s (XuNet) and
+  9-17 s (wide) per epoch (not measured).
+- Correction: the train-only decision used partial-download counts. Full
+  counts are G11 333, D90 395, Kodak_Z990 832, Pentax_ist-DS 1,076,
+  Sigma_SD10 2,380, Pentax_K10D 5,461. Four of the six models are not small.
 
 ### Decided
 
@@ -2904,6 +2983,17 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Pending user decision: run full PC training headlessly with
   `scripts/run_notebook.py` at the proven 13.6 it/s, or test the VS Code
   candidates. The two-epoch run confirms the headless speed.
+- User: checkpoint selection uses the capped combined validation set (about
+  8,000 pairs, about 10% of the ~81,000-tile unique training pool), not the
+  standard set only and not the full combined set (~16,000). Validation
+  photos stay set apart; only fewer tiles are scored. DIV2K and the full
+  standard set stay in the fixed tests.
+- ALASKA selection v2 (`5ca650b`) is accepted as committed. Pending user
+  decision: keep the six train-only models (as committed) or option B, with
+  only G11 and D90 train-only (0 fallbacks, minimum gap 11, val/test about
+  36/61 per model over 28 models; a one-line change). The Orchestrator
+  recommends option B.
+- User: the session ended after the ALASKA selection task.
 
 ### Next
 
@@ -2946,3 +3036,10 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Pending: copy data to G4, estimated at 35-45 GB.
 - Pending, optional: measure miss rate against tile noise, run the denoise-
   and-compare demo, test tanh saturation, and run a filter linear probe.
+- Done: new-data code, capped validation, ALASKA download and ALASKA
+  selection v2.
+- Pending user: ALASKA option B (two train-only models instead of six).
+- Pending: LSDIR subset selection to the contract (suggested 7,000 / 1,500 /
+  2,500 photos), final manifests, copy of about 19.4 GB ALASKA plus the LSDIR
+  subset to the G4 (maintenance boot), and the first new-data G4 run (it also
+  measures the post-fix timing). See `docs/handoff-2026-10-15.md`.
