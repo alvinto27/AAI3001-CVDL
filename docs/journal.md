@@ -2285,6 +2285,14 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   `scripts/map_demo_gn_check.py` (`d5ccde4`). Outputs are in the
   git-ignored `runs-out/map-demo/` folder. The checkpoint SHA-256 is
   `741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d`.
+- The first demo used random settings per photo, so its photos were not
+  comparable. Settings were lowest/plane bit mode, k 1-8, replace/match
+  method, contiguous/stride/random placement, and random_bytes/letters
+  payload. Draws were RAISE D7000 lowest k=7 match, RAISE D90 lowest k=5
+  match, DIV2K 0801 plane k=1 match, DIV2K 0802 plane k=6 match, ALASKA
+  Pixel XL lowest k=3 replace, and ALASKA Canon EOS700D plane k=4 replace.
+- Worker_2 ran map demo v2 with fixed settings in `scripts/map_demo.py`
+  (`da97765`). Outputs are in `runs-out/map-demo-v2/`.
 
 ### Found
 
@@ -2469,6 +2477,33 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   the others were cells next to the strip within the receptive field. Frozen
   clean statistics gave cell AUC 0.934-1.000, but need the clean cover and
   are diagnostic only.
+
+#### Suspicion-map demo v2
+
+- The v2 run used the same six photos, checkpoint, and chunked inference.
+  It produced 12 figures with fixed P(stego) 0-1 and -5 to +5 MAD colour
+  bars, plus `metrics-v2.csv` with 84 rows. Group A was lowest k=1,
+  match, random_bytes. Group B was lowest k=4, match, random_bytes.
+  P(stego) is sigmoid(mean cell logit), the current photo verdict.
+- Clean P(stego): RAISE 0.003268 / 0.000451, DIV2K 0.011232 / 0.011580,
+  ALASKA Pixel XL 0.009859, and ALASKA Canon EOS700D 0.554315 (false
+  positive).
+- Group A random k=1 at 0.05 bpp missed all six (P 0.003-0.07, Canon 0.55).
+  At 0.275, RAISE was 0.999995 / 0.998437, DIV2K 0.154259 / 0.266355,
+  and Pixel XL 0.032288. At 0.5, RAISE was 1.0, DIV2K 0.883698 / 0.948439,
+  and Pixel XL 0.163922.
+- Group A contiguous cell AUC was 0.80-0.996 on five photos; Canon was
+  0.152-0.205 with changed cells scoring lower. Group B random detected at
+  0.275 and 0.5 on all photos except Canon, at 0.84 / 0.97. Group B
+  contiguous cell AUC was 0.96-1.0 except Canon at 0.20 / 0.86 / 0.71.
+- Group B RAISE contiguous verdicts were lower than Group A despite higher
+  cell AUC; for r00679daet at 0.5 bpp they were 0.149816 versus 0.816317.
+  The hypothesis that louder strips shift GroupNorm statistics and dim the
+  strip is not proven.
+- The k=1 random result repeats the source weakness: RAISE is detected at
+  0.275 bpp, while DIV2K and unseen ALASKA Pixel XL are not. Clean Canon
+  EOS700D is a smooth out-of-distribution image, with a false positive and
+  inverted localization.
 
 ### Decided
 
