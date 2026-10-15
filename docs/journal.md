@@ -2784,6 +2784,23 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   24 train was 1.117 s and validation 3.917 s. The data stream is not the
   cause. Post-fix G4 timing is Pending.
 
+#### Pi network outage
+
+- At about 22:05 +08, the Pi lost Internet access while the LAN worked.
+  Gateway `192.168.18.1` replied in 3 ms, but 1.1.1.1, Google, and
+  alaska.utt.fr timed out. The PC on the same router reached alaska.utt.fr
+  with HTTP 206 in 2.7 s. Tailscale showed the Pi offline and no exit node
+  was in use.
+- ALASKA stopped at 64,097/70,282 with 16 curl 28 timeouts in retry backoff.
+  With user approval, the Orchestrator reconnected Wi-Fi using detached
+  `systemd-run` and `nmcli con down/up "netplan-wlan0-Lee Family"`.
+  Internet returned: ping 6 ms and alaska.utt.fr HTTP 206 in 0.9 s.
+  `cvdl-alaska` restarted at 22:24 +08 to skip the 1,200 s waits.
+- The service re-verifies existing files with TIFF checks and SHA-256 first
+  (about 100 GB, estimated 10-15 min), then downloads about 6,200 files
+  (estimated about 40 min). Cause is unknown; router per-device limit or a
+  stale Wi-Fi session is only a guess.
+
 ### Decided
 
 - Pending user decision: G4 runs use `V3_PRIME_NEXT_EPOCH=on` as the
@@ -2870,6 +2887,9 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   Pending.
 - Worker_2 does speed fixes first, then new-data code. Worker_3 handles Pi
   data jobs. The Orchestrator does not monitor G4 runs; a worker monitors them.
+- User decision: ALASKA v2 final selection is tomorrow's work; Worker_3 was
+  not triggered tonight. If the Pi loses Internet again, reconnect with the
+  same Wi-Fi procedure and check the router for a per-device limit.
 - Hypothesis, not tested: without normalisation, tanh inputs in layers 1-2
   are not scaled. They may saturate tanh and explain R1/R2 underfitting and
   validation spikes.
@@ -2919,8 +2939,8 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
   Pending: measure the post-fix G4 timing. The expected saving is about 14 min
   and $0.40 per 30-epoch run (estimate: about 5 min late slowdown plus 9 min
   validation start-up).
-- Pending: ALASKA selection v2 final run after the download, LSDIR subset,
-  per-source sampler, and new-data code.
+- Pending: download completion check and ALASKA v2 final run tomorrow;
+  LSDIR subset, per-source sampler, and new-data code remain Pending.
 - Pending user: choose the checkpoint-selection validation set after
   Worker_2 lists the options.
 - Pending: copy data to G4, estimated at 35-45 GB.
