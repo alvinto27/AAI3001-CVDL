@@ -1,11 +1,28 @@
 """Notebook adapters; no source transforms or embedding logic live here."""
 from __future__ import annotations
 import dataclasses
+import hashlib
 import json
 import numpy as np
 import pandas as pd
 from lsb_torch import (torch,RunSettings,Corpus,TrainingImages,FixedPairs,PairSubset,
                        training_loader,OrderedPairLoader,prefetch_for_images)
+
+
+def capped_validation(dataset,raise_cap,lsdir_cap):
+    """Seeded pair sampling; preserve the original photo/tile distribution in expectation."""
+    if any(type(cap) is not int or cap<1 for cap in (raise_cap,lsdir_cap)):
+        raise ValueError("validation caps must be positive integers")
+    source=dataset.frame["source"].to_numpy()
+    selected=[]
+    for name,cap,seed in (("raise",raise_cap,2401),("alaska",None,0),("lsdir",lsdir_cap,2402)):
+        available=np.flatnonzero(source==name)
+        if not len(available):
+            raise ValueError(f"capped validation needs {name} validation pairs")
+        chosen=(np.random.default_rng(seed).choice(available,size=cap,replace=False)
+                if cap is not None and len(available)>cap else available)
+        selected.extend(map(int,chosen))
+    return PairSubset(dataset,sorted(selected))
 
 
 def fixed_subset(dataset,count,seed=0):
@@ -20,23 +37,32 @@ def fixed_subset(dataset,count,seed=0):
         for queue in queues:
             if queue and len(indices)<count:
                 indices.append(queue.pop())
+    if isinstance(dataset,PairSubset):
+        return PairSubset(dataset.dataset,[dataset.indices[int(i)] for i in indices])
     return PairSubset(dataset,indices)
 
 
 class NotebookData:
     def __init__(self,root,settings,*,quick=False,profile="overlap_full_mix",eval_pairs=16,
-                 checkpoint_validation="standard"):
+                 checkpoint_validation="standard",val_cap_raise=5000,val_cap_lsdir=1500):
         self.corpus=Corpus(root,settings)
         self.train=TrainingImages(self.corpus)
         chosen={r["photo_id"] for r in self.corpus.selected}
         self.fixed_train=FixedPairs(self.corpus,"train",profile,photo_ids=chosen)
-        if checkpoint_validation not in {"standard","combined"}:
-            raise ValueError("checkpoint_validation must be standard or combined")
+        if checkpoint_validation not in {"standard","combined","capped"}:
+            raise ValueError("checkpoint_validation must be standard, combined, or capped")
+        if checkpoint_validation=="capped" and not {"raise","alaska","lsdir"}<=set(settings.sources):
+            raise ValueError("capped validation needs RAISE, ALASKA, and LSDIR")
         if profile!="overlap_full_mix" and set(settings.sources)&{"alaska","lsdir"}:
             raise ValueError("new-source panels require overlap_full_mix; legacy_v6 is RAISE only")
         self.checkpoint_validation=checkpoint_validation
-        self.val=FixedPairs(self.corpus,"val",profile,
-                            sources=("raise","div2k") if checkpoint_validation=="standard" else None)
+        if checkpoint_validation=="capped":
+            self.val=capped_validation(FixedPairs(self.corpus,"val",profile,
+                                                    sources=("raise","alaska","lsdir")),
+                                       val_cap_raise,val_cap_lsdir)
+        else:
+            self.val=FixedPairs(self.corpus,"val",profile,
+                                sources=("raise","div2k") if checkpoint_validation=="standard" else None)
         self.test=FixedPairs(self.corpus,"test",profile,sources=("raise","div2k"))
         self.extra_pairs={}
         for source,splits in (("alaska",("val","test_seen","test_unseen")),
@@ -54,6 +80,11 @@ class NotebookData:
                      "extra_pair_counts":{name:len(ds) for name,ds in self.extra_pairs.items()},
                      "quick_eval_pair_ids":{s:d.frame["cover_id"].tolist() if quick else None
                                             for s,d in (("val",self.val),("test",self.test))}}
+        if checkpoint_validation=="capped":
+            self.validation_pair_csv=self.val.frame[["cover_id","source"]].to_csv(index=False)
+            self.record.update(val_cap_raise=val_cap_raise,val_cap_lsdir=val_cap_lsdir,
+                               validation_pair_counts=self.val.frame["source"].value_counts().to_dict(),
+                               validation_pairs_sha256=hashlib.sha256(self.validation_pair_csv.encode()).hexdigest())
         self.pairs=pd.concat([self.fixed_train.frame,self.val.frame,self.test.frame],ignore_index=True)
 
     def loaders(self,batch_size,workers,pin_memory,prefetch=None,*,eval_workers=4,prefetch_images=128,
