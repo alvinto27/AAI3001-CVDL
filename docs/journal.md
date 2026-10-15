@@ -2255,3 +2255,55 @@ ROCm-Works v2 conv1 fix proposal (2026-10-13):
 - Done (user, 2026-10-14): told teammates that the VM is on branch `yx`,
   the `raise512-run1` images are gone on the VM, and `V3_DATA=png` there
   needs a rebuild.
+
+## 2026-10-15 — G4 priming run and PC observation
+
+### Did
+
+- The user started the Pi before G4 run `g4-prime-1`. It used decode,
+  32 train workers, 16 evaluation workers, compile default, and
+  `V3_PRIME_NEXT_EPOCH=on`. It ran commit `ad8c754` through `origin/yx`.
+  The user's live `notebooks/04` run and `checkpoints/pc-prime-test` were
+  not changed.
+
+### Found
+
+- G4 booted at 00:59:42Z. The runner ended at 01:18:40Z, Pi delivery at
+  01:19:46Z, and the VM was offline at 01:21:01Z. Status was done, exit 0,
+  all 15 cells passed, and cleanup was clean.
+- Runner time fell from 1,602.266 s in `g4-full-1` to 1,137.973 s:
+  26:42 to 18:58, a saving of 464.3 s.
+  - Cell 29 fell from 499.524 s to 87.480 s, saving 412.0 s.
+  - Fit fell from 967.311 s to 914.918 s, saving 52.4 s.
+- Epochs 1-9 reached step 75 in 1 s instead of 11-12 s. Train-only epoch
+  time fell from 60-62 s to 49-51 s. Steady speed from step 150 to 3,300
+  was 67.84 to 67.19 it/s, so steady speed did not change.
+- Validation wall time per epoch rose from 27-28 s to 32-33 s because priming
+  adds about 4-5 s. The final epoch took 27 s.
+- Service peak memory was 79,963,168,768 B (74.47 GiB) of 176 GiB. There
+  was no out-of-memory event.
+- Test accuracy was 0.9828, AUC 0.997728, and P_E 0.016475. RAISE P_E was
+  0.011410 and DIV2K P_E was 0.054560. The earlier `g4-full-1` values were
+  0.9833 / 0.997603 / 0.016247, with RAISE 0.010948 and DIV2K 0.052524.
+  The best epoch was 8, with validation P_E 0.0147 and AUC 0.9973.
+- Small metric differences are expected from non-deterministic compiled GPU
+  math. The stream exactness proof is the PC hash test.
+- In the user's live PC `pc-prime-test`, decode, 6 workers, compile, prime on:
+  epoch 0 ran at 9.86 it/s; epoch 1 at about 10.67 it/s, versus the journal
+  value of 13.54 it/s for decode, 6 workers, compiled. Workers used 40-50%
+  CPU, CPU was about 70% idle, and the GPU reached 3,176 MHz and 100% GFX
+  activity at about 235 W. Hotspot temperature was 79 C. Validation took
+  about 1 min; decode had taken about 47 s before. Priming contention is
+  expected. The cause is not known. Worker_2 will profile after the run.
+
+### Decided
+
+- Pending user decision: G4 runs use `V3_PRIME_NEXT_EPOCH=on` as the
+  recommendation.
+- The PC default remains priming off pending the PC test.
+
+### Next
+
+- Pending: PC slowdown diagnosis.
+- Pending: prime default decision.
+- Pending: dataset plan for ALASKA#2 and LSDIR.
