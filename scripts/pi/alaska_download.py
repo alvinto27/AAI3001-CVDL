@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import threading
 import time
+from collections import deque
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -102,8 +103,7 @@ def fetch(number: int) -> tuple[int, str, int, str]:
     name = f'{number:05d}.tif'
     part = IMAGES / (name + '.part')
     final = IMAGES / name
-    delay = 600
-    while not stop.is_set():
+    for attempt in range(3):
         if shutil.disk_usage(ROOT).free < MIN_FREE + WORKERS * SINGLE_MAX:
             return number, 'disk_guard', 0, ''
         part.unlink(missing_ok=True)  # restart only this interrupted object at byte zero
@@ -119,16 +119,20 @@ def fetch(number: int) -> tuple[int, str, int, str]:
             os.replace(part, final)
             return number, digest, size, ''
         part.unlink(missing_ok=True)
-        # No hard stop for HTTP 429/5xx or timeouts: hours-long unattended
-        # downloads must recover without an agent present.
+        # No hard stop for HTTP 429/5xx or timeouts: retry this file and
+        # eventually defer it so healthy files can still make progress.
         reason = f'curl={request.returncode}, http={code}, valid_tiff=no_or_unchecked'
         global failures
         with failure_lock:
             failures += 1
-        LOG.warning('retry %s %s; wait %ds', name, reason, delay)
-        stop.wait(delay)
-        delay = min(delay + 600, 1800)
-    return number, 'stopped', 0, ''
+        if attempt < 2:
+            delay = (600, 1200)[attempt]
+            LOG.warning('retry %s %s; wait %ds', name, reason, delay)
+            stop.wait(delay)
+            if stop.is_set():
+                return number, 'stopped', 0, ''
+    LOG.warning('defer %s after 3 failures', name)
+    return number, 'deferred', 0, ''
 
 
 def main() -> int:
@@ -149,17 +153,26 @@ def main() -> int:
         record('disk_guard', str(exc))
         return 78
     existing(ids)
-    todo = iter(n for n in ids if n not in verified)
+    todo = deque(n for n in ids if n not in verified)
+    deferred = deque()
     with ThreadPoolExecutor(max_workers=WORKERS) as pool:
         active = {}
-        for _ in range(WORKERS):
-            number = next(todo, None)
-            if number is not None:
+        def fill() -> None:
+            while todo and len(active) < WORKERS:
+                number = todo.popleft()
                 active[pool.submit(fetch, number)] = number
-        while active:
+        fill()
+        while active or deferred:
+            if not active:
+                record('retrying', f'{len(deferred)} deferred files; wait 30 min')
+                LOG.warning('retry %d deferred files after 30 min', len(deferred))
+                time.sleep(1800)
+                todo, deferred = deferred, deque()
+                fill()
+                continue
             finished, _ = wait(active, return_when=FIRST_COMPLETED, timeout=60)
             if not finished:
-                record('running', f'in_flight={len(active)}')
+                record('running', f'in_flight={len(active)}, deferred={len(deferred)}')
                 continue
             for future in finished:
                 number = active.pop(future)
@@ -171,6 +184,10 @@ def main() -> int:
                     # No new jobs; thread pool waits for remaining workers to end.
                     return 78
                 assert ident == number
+                if reason == 'deferred':
+                    deferred.append(number)
+                    record('retrying', f'{number:05d} deferred; others continue')
+                    continue
                 verified[number] = (digest, size)
                 with DIGESTS.open('a') as stream:
                     stream.write(f'{digest}  tiff_various_color/{number:05d}.tif\n')
@@ -179,10 +196,8 @@ def main() -> int:
                 if len(verified) % 100 == 0:
                     LOG.info('verified %d/%d bytes=%d', len(verified), TOTAL,
                              sum(value[1] for value in verified.values()))
-                    record('running', f'in_flight={len(active)}')
-                following = next(todo, None)
-                if following is not None:
-                    active[pool.submit(fetch, following)] = following
+                    record('running', f'in_flight={len(active)}, deferred={len(deferred)}')
+            fill()
     if len(verified) != TOTAL:
         raise RuntimeError(f'incomplete: {len(verified)}/{TOTAL}')
     with DIGESTS.open('w') as stream:

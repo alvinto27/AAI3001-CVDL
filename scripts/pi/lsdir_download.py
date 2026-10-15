@@ -110,6 +110,11 @@ def main() -> int:
                     LOG.error('%s', exc)
                     record('disk_guard', name)
                     return 78
+                if not ok:
+                    # The CLI has exited. Xet can leave a randomly named,
+                    # unusable incomplete file; do not accumulate duplicates.
+                    for stale in (ROOT / '.cache/huggingface/download').glob('*.incomplete'):
+                        stale.unlink()
                 if ok and inspect(name):
                     LOG.info('verified %s bytes=%d', name, verified[name][1])
                     record('running', f'verified {name}')
