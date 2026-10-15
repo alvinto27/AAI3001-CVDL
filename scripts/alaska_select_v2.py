@@ -12,11 +12,11 @@ Rules (all seeded by VERSION+SEED+model+block, independent of file order):
 * Excluded: *_FLATS, *_TEXTURES, RAW_wesaturate (as in v1) and Leica_Mono (monochrome).
 * UNSEEN models: every photo of these models can only be test_unseen. UNSEEN_CAP per model,
   v1 photos first.
-* TRAIN_ONLY models (too small to keep a gap between splits): all their photos go to train.
-* Other models ("seen"): the rest of the photo budget TOTAL is spread evenly over them
-  ("water-fill": every model gets the same number, a model with fewer photos gives all it has and
-  the remainder goes to the others). The VAL and TEST_SEEN totals are shared equally over these
-  models (largest remainder, seeded tie-break); the rest of each model's share is train.
+* The photo budget TOTAL is spread evenly over all seen models ("water-fill": every model gets
+  the same number; a model with fewer photos gives all it has, and the rest goes to the others).
+  A mixed model may use at most MAX_USE of its photos, so empty blocks keep its splits apart.
+* TRAIN_ONLY models give their whole share to train. The VAL and TEST_SEEN totals are shared
+  equally over the other ("mixed") models (seeded tie-break); the rest of each share is train.
 * Leakage rule: a model's photos, in ID order, are cut into BLOCKs of BLOCK consecutive photos.
   A whole block belongs to one split. Blocks of different splits are never next to each other
   (a block-wide gap stays empty) unless a model is too small to allow it (reported).
@@ -45,9 +45,10 @@ RUN = 3          # val/test blocks are placed in runs of up to RUN blocks (30 ph
 UNSEEN = ["Google_Pixel-XL", "Samsung_GalaxyS9plus-SM-G965F", "Huawei_P20lite-ANE-LX1",
           "Panasonic_DMC-TZ60", "Ricoh_GRDigital-III", "Canon_EOS-60D", "Sony_A7R", "Pentax_K50"]
 DROP_MODELS = {"Leica_Mono"}
-# Decision (Orchestrator, 2026-10-15): these models have only 250-395 photos, so a 10-photo block
-# split would put blocks of different splits next to each other (ID gap 1-3, near-duplicate
-# leakage risk). They give all photos to train; val and test_seen come from the other models.
+# Decision (Orchestrator, 2026-10-15): train only, no val/test_seen photos; val and test_seen come
+# from the other models. Reason: on the partial download these models had only 250-395 photos and
+# a block split put blocks of different splits next to each other (ID gap 1-3). With the full
+# download only G11 (333) and D90 (395) are small; the list is kept as decided.
 TRAIN_ONLY = ["Canon_PowerShot-G11", "Kodak_Z990", "Pentax_K10D", "Pentax_ist-DS",
               "Sigma_SD10", "Nikon_D90"]
 UNSEEN_CAP = 250
@@ -180,11 +181,13 @@ def main() -> int:
         raise ValueError("a TRAIN_ONLY model has no photos")
     split_of, block_of, fallback = dict(unseen_split), {}, {}
     quotas = {}
-    for m in TRAIN_ONLY:
-        quotas[m] = {"train": len(by_model[m]), "val": 0, "test_seen": 0}
     mixed = [m for m in seen if m not in TRAIN_ONLY]
-    share = water_fill({m: int(MAX_USE * len(by_model[m])) for m in mixed},
-                       TOTAL - sum(q["train"] for q in quotas.values()))
+    # One water-fill over all seen models: TRAIN_ONLY models may use all their photos (no gap
+    # needed), mixed models at most MAX_USE of theirs.
+    cap = {m: len(by_model[m]) if m in TRAIN_ONLY else int(MAX_USE * len(by_model[m])) for m in seen}
+    share = water_fill(cap, TOTAL)
+    for m in TRAIN_ONLY:
+        quotas[m] = {"train": share[m], "val": 0, "test_seen": 0}
     even = {}
     for name, total in (("val", VAL), ("test_seen", TEST_SEEN)):
         cap = {m: share[m] for m in mixed}
