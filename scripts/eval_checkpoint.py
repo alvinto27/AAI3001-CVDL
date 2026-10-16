@@ -24,10 +24,17 @@ import cvdl  # exposes the flat LSB library
 from lsb_torch import Corpus, FixedPairs, OrderedPairLoader, RunSettings
 from cvdl.models import model_from_hparams
 from cvdl.metrics import counts, metrics, summary_rows
+from cvdl.settings import extra_panel_limit
+from lsb_notebook import fixed_subset
+
+
+def panel_dataset(dataset, *, quick=None):
+    limit = extra_panel_limit(quick=quick)
+    return fixed_subset(dataset, limit, seed=1) if limit is not None else dataset
 
 
 def evaluate(checkpoint, eval_yaml=ROOT / 'configs/raise512-run1.yaml', *, split='test', output,
-             workers=6, source=None, manifest_root=None):
+             workers=6, source=None, manifest_root=None, quick=None):
     """Score one frozen panel and return the summary; default is the standard test."""
     if (split not in ('test','val','test_seen','test_unseen') or workers < 0
             or source not in (None,'alaska','lsdir')
@@ -59,6 +66,7 @@ def evaluate(checkpoint, eval_yaml=ROOT / 'configs/raise512-run1.yaml', *, split
     dataset = FixedPairs(Corpus(ROOT, settings), split, sources=(source,) if source else ('raise','div2k'))
     if not len(dataset):
         raise ValueError('selected evaluation panel is empty')
+    dataset = panel_dataset(dataset, quick=quick)
     loader = OrderedPairLoader(dataset, batch_size=16, num_workers=workers,
                                pin_memory=device.type == 'cuda', prefetch_images=128)
     pairs = dataset.frame
@@ -99,7 +107,8 @@ def evaluate(checkpoint, eval_yaml=ROOT / 'configs/raise512-run1.yaml', *, split
                 norm=norm, clip_t=hparams.get('clip_t', 3.0), evaluation_yaml=str(evaluation_yaml),
                 split=split, workers=workers, settings_sha256=setting_digest,
                 source=source or 'standard', manifest_root=str(manifest_root) if manifest_root else None,
-                pairs=len(dataset), elapsed_seconds=time.perf_counter() - start, overall=summary[0])
+                pairs=len(dataset), quick_pair_cap=extra_panel_limit(quick=quick),
+                elapsed_seconds=time.perf_counter() - start, overall=summary[0])
     (output / 'run.json').write_text(json.dumps(info, indent=2) + '\n')
     print(json.dumps(info, indent=2), flush=True)
     return info, pd.DataFrame(summary)
@@ -114,10 +123,12 @@ def main():
     parser.add_argument('--manifest-root', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--workers', type=int, default=6)
+    parser.add_argument('--quick', action=argparse.BooleanOptionalAction, default=None,
+                        help='cap panel at 16 pairs; default follows explicit QUICK env (otherwise full)')
     args = parser.parse_args()
     evaluate(args.checkpoint, args.eval_yaml, split=args.split,
              output=args.output, workers=args.workers, source=args.source,
-             manifest_root=args.manifest_root)
+             manifest_root=args.manifest_root, quick=args.quick)
 
 
 if __name__ == '__main__':

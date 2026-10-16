@@ -1,7 +1,7 @@
 """Run a notebook headlessly and save a restart-safe executed copy after each cell.
 
 Uses IPython and the standard library only. The tracked notebook is read only.
-Run from a fresh git-ignored output folder; QUICK must be explicit.
+Run from a fresh git-ignored output folder; notebook 05 uses an automatic machine profile.
 """
 from __future__ import annotations
 
@@ -43,17 +43,17 @@ def settings_file(path, overrides):
         if not KEY.fullmatch(key) or key in settings:
             raise ValueError(f"{path}:{number}: invalid or repeated key {key!r}")
         settings[key] = value
+    sys.path.insert(0, str(ROOT))
+    from cvdl.settings import legacy_override
     for item in overrides:
-        if "=" not in item:
-            raise ValueError(f"--set expects KEY=VALUE: {item!r}")
-        key, value = (part.strip() for part in item.split("=", 1))
-        if not KEY.fullmatch(key):
-            raise ValueError(f"invalid --set key {key!r}")
+        key, value = legacy_override(item)
         settings[key] = value
-    if settings.get("QUICK", "").lower() not in {"true", "false", "1", "0", "yes", "no"}:
-        raise ValueError("set QUICK explicitly to true or false")
+    if "QUICK" in settings and settings["QUICK"].lower() not in {"true", "false", "1", "0", "yes", "no"}:
+        raise ValueError("QUICK must be true or false")
     if "V3_OUTPUT_ROOT" in settings:
         raise ValueError("V3_OUTPUT_ROOT is set by --output, not the env file")
+    if settings.get("V3_RUN_NAME") == "":
+        settings.pop("V3_RUN_NAME")  # --set run_name= requests the derived name.
     name = settings.get("V3_RUN_NAME")
     if name and (name in {".", ".."} or Path(name).name != name or "\\" in name):
         raise ValueError("V3_RUN_NAME must be one folder name")
@@ -238,6 +238,22 @@ def run(args):
     if ignored.returncode != 0:
         raise ValueError(f"--output must be git-ignored: {output}")
     compact = notebook_path == ROOT / "notebooks/05_xunet_v4_nonorm.ipynb"
+    resolved_settings = None
+    if compact:
+        sys.path.insert(0, str(ROOT))
+        from cvdl.settings import ALIASES, load
+        resolution_env = {key: value for key, value in os.environ.items()
+                          if (key in ALIASES and key != "QUICK" and not key.startswith("V3_"))
+                          or key == "MIOPEN_GEMM_ENFORCE_BACKEND"}
+        resolved_settings = load(environ={**resolution_env, **settings},
+                                 overrides=[*args.set, f"output_root={output / 'checkpoints'}"])
+        # Bridge only profile differences into the still-independent notebook.
+        # Keep existing explicit env files/resume status unchanged.
+        for key, value in (("QUICK", str(resolved_settings.quick).lower()),
+                           ("V3_WORKERS", str(resolved_settings.workers)),
+                           ("V3_EVAL_WORKERS", str(resolved_settings.eval_workers))):
+            if key not in settings and (key == "QUICK" or resolved_settings.profile == "g4"):
+                settings[key] = value
     previous = output / "status.json"
     if output.exists() and any(output.iterdir()):
         if not args.resume or not compact or not previous.is_file():
@@ -304,11 +320,16 @@ def run(args):
             status["run_output_dir"] = str(run_dir)
             status["run_files"] = files
 
+    recorded_settings = set()
+
     def runtime_settings(namespace):
         values = {name: namespace[name] for name in ("RUN_NAME", "QUICK", "V3_DATA", "EPOCHS", "BATCH_SIZE", "COMPILE_MODE") if name in namespace}
         data = namespace.get("otf_data")
         if data is not None:
             values["data_run_settings"] = deepcopy(data.record)
+        if resolved_settings is not None and namespace.get("RUN_NAME") not in recorded_settings and namespace.get("RUN_NAME"):
+            resolved_settings.write(output / "checkpoints" / namespace["RUN_NAME"])
+            recorded_settings.add(namespace["RUN_NAME"])
         with status_lock:
             status["runtime_settings"] = values
 
@@ -458,7 +479,7 @@ def main():
     parser.add_argument("--env-file", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
-                        help="override one QUICK or V3_* value from the env file")
+                        help="one-off setting override (lr=0.0003 or legacy V3_LR=0.0003); repeatable")
     parser.add_argument('--host-monitor', choices=('auto', 'on', 'off'), default='auto',
                         help='host.csv: on for GCE by default, optional on the PC')
     args = parser.parse_args()

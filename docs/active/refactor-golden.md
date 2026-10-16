@@ -65,13 +65,24 @@ GPU tolerance fields are historical, not the current comparison rules above.
 CPU final weights SHA:
 `5525eb379fe37a74b9b1d28bc3caee453cf7835edfb548385ab1b04d28812edb`.
 
-## Known defect and later change
+## Intended difference: QUICK extra-panel cap (phase 4a)
 
-**QUICK does not cap extra panels:** the bpp-1 panel evaluates all 10,956 pairs.
-The GPU smoke [settings](../../tests/golden/quick-gpu.env) retain that behaviour;
-the CPU [settings](../../tests/golden/cpu-det.env) disable extras. Fix QUICK's
-extra-panel cap deliberately in the settings phase and review its expected
-pair-count/settings/output differences; never silently replace the before JSON.
+The phase-0 GPU QUICK record evaluated all **10,956 bpp-1 pairs**. The shared
+extra-panel evaluator now selects at most **16 pairs** when QUICK is true,
+with the existing fixed, camera/source-stratified subset and seed 1. This also
+caps source panels. Extra-panel pair counts, settings hashes and predictions
+are intended differences; extra `run.json` records `quick_pair_cap`.
+
+The standard notebook test, its full 10,956-pair identity/hash, validation and
+training are unchanged. The default comparator still returns ALL EQUAL: CPU
+extras are disabled, and settings/data checks do not evaluate extra panels.
+The historical golden JSON is unchanged. At the final GPU smoke, retain the
+standard-test file/count/identity/key checks; do not require full-size extra
+panel predictions. No GPU run was needed for phase 4a's cap test.
+
+Standalone `eval_checkpoint.py` remains full when QUICK is absent. `--quick`
+requests the cap; `--no-quick` disables an inherited QUICK value. Future thin
+notebooks must pass their resolved `settings.quick` to `evaluate()`.
 
 The package/API design is in the [cvdl plan](plan-cvdl-package.md). Keep old
 checkpoint parameter and hyperparameter names. Update capture adapters explicitly

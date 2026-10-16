@@ -98,3 +98,66 @@ optimizer/callback/epoch state, reaches step 22, and preserves prior CSV rows.
 The capped-validation sanity/source guard is tested with explicit validation
 data. Default compare is ALL EQUAL; **135 tests pass**. No GPU runs added;
 notebooks 04/05 remain unchanged until thinning.
+
+### Phase 4a: settings API and transition
+
+`cvdl/settings.py` owns the `SCHEMA` definition table. Each entry has a name,
+type parser, default (possibly dependent on QUICK/epochs), allowed values,
+one-line meaning, legacy env name and machine-ownership flag. `load()` returns
+a frozen `Settings`; nested maps and sequences are immutable. Example for the
+future notebook top cell:
+
+```python
+from cvdl.settings import load
+settings = load(model="xunet_wide", width=4, lr=3e-4, norm="none")
+# Later, after the run directory is known:
+settings.write(run_dir)
+```
+
+Resolution order is **defaults/profile < notebook < override**. Legacy env
+values remain supported: they fill unset fields; equal notebook/env values
+keep notebook provenance. Conflicting notebook/env experiment values fail with
+both values and a `--set` instruction unless that field has an explicit override.
+Machine env fields continue to override profile defaults.
+Unknown names and bad values stop before data loading; close names/enum values
+include a `did you mean` hint. `settings.provenance` maps each name to default,
+notebook, profile, env or override. `settings.sources` remains the selected data
+source tuple. `to_run_settings()` builds the existing LSB settings without
+reading photos. `legacy_globals()` is the temporary golden/runner adapter.
+
+| Machine choice | Rule |
+| --- | --- |
+| Detection | Google DMI product/vendor selects `g4`; otherwise `pc` (also the unknown-machine fallback) |
+| Train/eval workers | PC 6/4; G4 32/16 |
+| QUICK default | PC true; G4 false; legacy env and explicit overrides can change it |
+| Precision | Default 32; bf16-mixed only with GPU BF16 support |
+| Output root | PC `runs/`; G4 `runs-out/`; runner `--output` selects its checkpoint root |
+| Paths and performance flags | Machine-owned; notebook arguments cannot set them |
+
+A notebook cannot set machine fields, even to the same value. Explicit
+one-off overrides can set workers/QUICK/paths/precision, but cannot change
+read-only device, precision limits or checkout root. The runner supports
+repeatable canonical `--set extra_tests=none --set workers=4` and legacy
+`--set V3_EXTRA_TESTS=none`. Fields with no legacy env reader cannot be passed
+through the unchanged notebook yet; `load()` supports them for thinning.
+If a changed knob changes the run prefix, supply a matching run_name or use
+`--set run_name=` to request a new derived name. Existing prefix guards and
+all five golden env-file names remain unchanged.
+
+The notebook-05 headless runner records `run_settings.json` in the actual run
+folder after setup: final values, a source for every value, ordered override
+history, machine profile, git commit and dirty flag. It records this once per
+run folder, before training. The unchanged notebook gets profile worker/QUICK
+defaults through its env bridge. Existing explicit G4 env files remain valid;
+notebook 04 still uses its historical runner path. The saved runner output root
+is an override from `--output`. Compile-cache env values are also recorded.
+
+The QUICK extra-panel cap is an [intended difference](refactor-golden.md#intended-difference-quick-extra-panel-cap-phase-4a).
+Settings tests compare every captured effective global and LSB setting for
+newdata-1, wide-1, CPU and GPU QUICK, plus the speed-tool configuration/name.
+They use captured hardware profiles without GPU computation; only absolute
+checkout paths are mapped when the test checkout is not `/work`. Tests also
+cover provenance, errors, machine guards, immutable values, repeated CLI
+settings, saved git metadata, the runner-to-JSON path with a no-training shell
+stub, notebook/env conflicts, and deterministic QUICK panel selection. Default
+golden compare is ALL EQUAL; **144 tests pass**. Notebooks remain independent.
