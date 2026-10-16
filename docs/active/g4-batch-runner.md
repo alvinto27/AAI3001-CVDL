@@ -1,6 +1,6 @@
 # G4 batch job: setup, run, send results, stop
 
-> **G4 disk still uses the old layout; reorganise it before the next G4 job (commits from `76f6257` on need the new layout: `Datasets/originals/…` master paths).**
+> **G4 disk still uses the old layout; reorganise it before the next G4 job (commits from `76f6257` on need the new layout: `Datasets/originals/…` master paths). Use [the one-time layout change](#one-time-data-layout-change-maintenance-boot).**
 
 The Spot VM `rtx6000pro` is in `us-central1-c`. It has one RTX PRO 6000.
 Its external IP changes at boot. The machine costs about $1.63 per hour when
@@ -106,8 +106,10 @@ masters. The service starts on the next boot, not during setup.
 
 ## Masters, cache and short speed check (separate steps)
 
-The PC has the masters. Copy only those three folders **from the PC**, not
-from the Seoul VM. `setup.sh upload` runs `scripts/g4/upload_masters.sh`: it
+The PC has the masters. Copy them **from the PC**, not from the Seoul VM, into
+`Datasets/originals/{raise,div2k,alaska,lsdir}` (RAISE and DIV2K whole; ALASKA and
+LSDIR only the files named in `data/<source>/photo_manifest.csv`, so the 3,896 unused
+ALASKA files stay on the PC). `setup.sh upload` runs `scripts/g4/upload_masters.sh`: it
 splits all master files into disjoint lists (largest first, dealt round-robin)
 and runs **10 parallel `rsync` streams** (`--streams N` changes this, 1 to 32)
 with `--partial --append-verify`, a cheaper SSH cipher and no compression.
@@ -161,6 +163,56 @@ training time. This is a lower bound because those tasks can overlap and
 there is other work. Cache disk time uses train cache bytes (about 38 GB);
 decode disk time uses train master bytes. The report is under
 `runs-out/g4-speed-*.json`.
+
+## One-time data-layout change (maintenance boot)
+
+**Why:** the G4 disk still has `ImageSets/` and `Datasets/{alaska,lsdir}` (the old
+layout). Records from commit `76f6257` on name `Datasets/originals/…`. Run this
+once, before the next job. It needs no network copy: photos are renamed in place.
+
+**Before the boot (PC):**
+
+1. Push the branch so the VM can fetch the commit (`git push origin yx`) and note its SHA.
+2. Optional, only for `--clean-runs`: `bash scripts/g4/delivered_manifest.sh /tmp/pi.manifest`
+   (read-only on the Pi: lists the delivered files and the SHA-256 of each `.ckpt`).
+
+**Maintenance boot (user starts the VM with `job-mode=maintenance`):**
+
+```sh
+scp -i ~/.ssh/cvdl-g4 scripts/g4/reorg_data_layout.sh yangxuan@EXTERNAL_IP:   # the VM checkout is old and lacks it
+ssh -i ~/.ssh/cvdl-g4 yangxuan@EXTERNAL_IP
+bash ~/reorg_data_layout.sh --commit SHA            # dry run: inventory, plan, checks; changes nothing
+bash ~/reorg_data_layout.sh --commit SHA --apply    # act (add --keep-cache to keep a cache)
+git -C ~/AAI3001-CVDL status --porcelain            # must print nothing
+sudo shutdown -h now
+```
+
+What `--apply` does, in order: refuses (changes nothing) if the checkout is dirty, a
+target exists, a path is a symlink or on another filesystem, or the target commit
+does not have the new layout or does not ignore `runs-out/`; renames the five photo
+folders (same filesystem, instant); keeps the small `raise512-run1` files under
+`Datasets/generated/raise512-run1-records/` and deletes its `clean/ stego/ masks/`
+(only if present); deletes an `otf-cache` found at `~/otf-cache` or
+`Datasets/otf-cache` (only if it holds a `cache.json`); checks out the target commit
+(detached); then checks every `master_path`: existence for all, and size plus
+SHA-256 for ALASKA and LSDIR against `provenance.csv`. RAISE and DIV2K records hold
+no SHA, so only existence is checked (the PC proof compared their SHA before and
+after the move). The script exits non-zero and prints `Master check FAILED` on any
+problem; do not start a job then. Unknown items in `ImageSets/` and `Datasets/` are
+listed and never deleted. It never touches `runs-out/.g4-state` or
+`~/.local/lib/cvdl-g4`. Rerunning `--apply` after a stop is safe.
+
+**Time (estimate; not measured on the VM):** renames and checkout, seconds. Deleting a
+53 GB cache, under a minute. The SHA check reads about 46 GB (18,200 ALASKA + 11,000
+LSDIR files; 1,900 RAISE/DIV2K files are only looked up): about 5 to 10 minutes at
+100 to 200 MB/s. `--no-sha` checks sizes only (seconds). Use the 120-minute boot limit as the bound.
+
+**Clean old job folders (optional, separate):** the dry run already lists, per job
+folder under `runs-out/`, the size and the per-epoch checkpoints and TensorBoard logs.
+It deletes nothing by default. `--clean-runs --delivered-manifest FILE` (with
+`--apply`) removes only per-epoch `*.ckpt` (not `last*`/`best*`) and `logs/tb/` files
+of jobs whose VM record says `delivered=yes` **and** whose file size (and SHA-256 for
+`.ckpt`) match the Pi manifest. Status, logs, results and last/best checkpoints stay.
 
 ## Submit a run
 

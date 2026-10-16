@@ -13,3 +13,6 @@ logs/*
 runs/
 runs/**/*.ckpt
 runs/**/logs/tb/
+# runs-out/ is the G4 VM's own job output folder (scripts/g4/job*.sh, setup.sh speed).
+# It must stay ignored there, or the VM checkout looks dirty and job.sh refuses to update.
+runs-out/

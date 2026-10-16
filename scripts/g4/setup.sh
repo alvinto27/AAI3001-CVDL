@@ -75,7 +75,7 @@ case "$STEP" in
         ;;
     cache)
         [[ -x "$REPO_DIR/.venv/bin/python" ]] || { echo 'Run base first' >&2; exit 2; }
-        [[ -d "$REPO_DIR/ImageSets/RAISE" ]] || { echo 'Run upload first' >&2; exit 2; }
+        [[ -d "$REPO_DIR/Datasets/originals/raise" && -d "$REPO_DIR/Datasets/originals/div2k" ]] || { echo 'Run upload first' >&2; exit 2; }
         [[ $CACHE_WORKERS =~ ^[0-9]+$ ]] || { echo '--workers must be a positive integer' >&2; exit 2; }
         mkdir -p "$CACHE_ROOT"
         echo "Build cache with $CACHE_WORKERS workers (reserve about 1 GiB RAM per worker)."
