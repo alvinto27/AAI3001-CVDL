@@ -75,7 +75,7 @@ the project record for each result.
 | 3 | LSDIR subset selection v1 (7,000 / 1,500 / 2,500) and records | Worker_3 | Done (`4d6f27b`, `2659b3d`) | — | — |
 | 4 | Copy data to PC and G4; build records | Workers | Done (`daf893c`; G4 verified 29,200 files) | — | — |
 | 5 | First new-data G4 run (also measures post-fix timing) | Orchestrator + Worker_2 | Done (`ab9d3f1`) | — | — |
-| 6 | B: ALASKA false-alarm review; per-source thresholds chosen on validation | Worker_2 / Worker_3 | Pending | — | No |
+| 6 | B: ALASKA false-alarm review; per-source thresholds chosen on validation | Worker_2 | Done (`042903d`, [result](result-check-b.md)) | — | No |
 | 7 | A: per-cell (dense) training | Worker_2 | Pending | B | Design review |
 | 8 | C: more capacity / longer training / bf16 | — | Pending | A | Yes |
 

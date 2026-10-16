@@ -3119,22 +3119,51 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
 
   | Panel | AUC | FA at 0.5 | k=1 miss at 0.5 | Miss at 5% FA |
   | --- | --- | --- | --- | --- |
-  | ALASKA test_unseen | 0.7982 -> 0.9340 | 47.48% -> 13.80% | 31.30% -> 49.11% | 21.25% -> 25.31% |
-  | ALASKA test_seen | 0.7842 -> 0.9159 | 49.74% -> 15.03% | 28.32% -> 52.21% | 22.24% -> 31.53% |
+  | ALASKA test_unseen | 0.7982 -> 0.9340 | 47.48% -> 13.80% | 31.30% -> 49.11% | not reachable (see correction) -> 25.31% |
+  | ALASKA test_seen | 0.7842 -> 0.9159 | 49.74% -> 15.03% | 28.32% -> 52.21% | not reachable (see correction) -> 31.53% |
   | LSDIR test | 0.9628 -> 0.9742 | 7.91% -> 3.55% | 38.80% -> 47.48% | 11.94% -> 8.66% |
 
   "Miss at 5% FA" uses the threshold at the 95th percentile of each panel's
   clean scores (an analysis view, not a deployable threshold). ALASKA
   unseen P_E 0.23359 -> 0.13876; LSDIR test P_E 0.08151 -> 0.06635.
-- Interpretation (Orchestrator): the mixed model mostly fixed clean-photo
-  scores on new cameras (false alarms), not detection power at a strict
-  false-alarm level on ALASKA, where the old model catches more at 5% FA.
-  LSDIR improves on all measures. LSDIR is not an easy source (test P_E
+- Correction (same day, from check B): the first Orchestrator view gave the
+  old model 21.25% / 22.24% ALASKA miss "at 5% FA". That was wrong. The old
+  model scores 25.63% (unseen) and 28.25% (seen) of clean ALASKA test tiles
+  exactly 1.0, so its 95th percentile is 1.0 and the real FA at that cut is
+  25.6% / 28.3%, not 5%. No threshold gives the old model 5% FA on ALASKA
+  without flagging nothing (score saturation; 418/1,535 = 27.2% of clean
+  ALASKA val tiles at 1.0; the mixed model has 7/1,535).
+- Interpretation (Orchestrator, corrected): the mixed model is better on
+  ALASKA at both fixed and strict false-alarm levels; the old model is
+  over-confident on new cameras. LSDIR improves on all measures. LSDIR is not an easy source (test P_E
   0.066).
 - Standard test regressed: P_E 0.019533 -> 0.025370; k=1 0.046439 ->
   0.059008; DIV2K 0.052932 -> 0.059039.
 - ALASKA per camera at threshold 0.5: 21/28 seen and 5/8 unseen cameras have
   FA above 10%; Sigma_SD1Merrill seen P_E 0.384 (FA 31.4%), Sigma_SD10 0.312.
+
+- Check B (Worker_2, `042903d`, `docs/result-check-b.md`, PC only; both
+  checkpoints scored on the same standard val, 11,238 pairs, settings SHA
+  `2d24d423...`). Thresholds chosen on validation only:
+  - Mixed model, ALASKA val 5%-FA cut-off 0.815754: test FA 5.97% (seen) /
+    5.93% (unseen), drift +0.97 / +0.93 pp. Miss 29.72% / 24.20%; k=1 miss
+    68.14% / 66.16%. P_E-optimal val cut-off 0.651967: test FA 9.10% / 8.79%,
+    miss 24.74% / 19.63%.
+  - One shared mixed 5%-FA cut-off (0.408610) gives ALASKA test FA 29.53% /
+    24.36% against ~1.33% on RAISE: per-source calibration is necessary.
+  - Old wide-R2: strict 5% FA on ALASKA is not reachable (score saturation,
+    418/1,535 clean val tiles at exactly 1.0).
+  - Tile noise (std of the clipped KV input) predicts the clean score inside
+    all 36 ALASKA cameras (median Spearman 0.546 seen / 0.544 unseen). By
+    val-derived noise quartile Q1 -> Q4: seen FA at 0.5 7.6% -> 23.1%, k=1
+    miss 31.0% -> 75.0%; unseen FA 7.6% -> 21.3%, k=1 miss 34.4% -> 65.4%.
+  - Figure `docs/figures/check-b/alaska-clean-score-contrasts.png`: high-score
+    clean tiles have strong, textured KV residuals; their cell maps show many
+    hot cells spread over the textured areas.
+- Conclusion of B: two problems. Calibration (solved by per-source
+  thresholds that hold on unseen cameras) and a model problem: natural noise
+  and texture read as embedding, so noisy tiles raise both false alarms and
+  k=1 misses. A threshold cannot fix the second.
 
 ### Decided
 
@@ -3149,7 +3178,7 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
 
 ### Next
 
-- Pending: B checks (Worker_2 and Worker_3, PC only).
+- Done: B checks (`042903d`).
 - Pending: A, per-cell (dense) training design and run.
 - Pending: C, capacity / epochs / bf16.
 - Pending: start a new Scribe session (the old Scribe alias shows the
