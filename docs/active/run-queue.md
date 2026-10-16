@@ -25,6 +25,15 @@ States: `queued` (approved, waiting) · `preparing` (code or notebook not ready)
   ("must be set"; run and G4 pre-flight fail while unset). Default front end
   stays `kv`; SRM = 30 fixed filters per colour channel, same +/-3 clip.
 
+## PC task queue (free, no G4)
+
+| Task | State | Note |
+| --- | --- | --- |
+| SRM notebook build | queued: Worker_5 after the 256 notebooks | tile size, grid, batch, tiles/epoch unset |
+| Temperature scaling in `scripts/evaluate_run.py` | approved, queued (next free worker) | one T fitted on validation; report calibration, 1.0 ties and FA5 reachability before/after; add only (old outputs unchanged); also run on wide-R2, newdata-1 and the tiling models |
+| tanh saturation measurement | approved, queued (next free worker) | existing models, PC; share of tanh inputs with abs > 3 per layer, clean vs stego; a G4 run only if a fix is tested later |
+| Photo-level decision | deferred by the user | — |
+
 ## After the runs
 
 - Evaluate each delivered run on the PC with `scripts/evaluate_run.py` (plus
