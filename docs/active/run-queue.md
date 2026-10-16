@@ -20,7 +20,10 @@ States: `queued` (approved, waiting) · `preparing` (code or notebook not ready)
 
 - **SRM filter bank instead of the KV filter** (front-end test, aimed at weak
   k = 1 detection). Tiling strategy and tile size are decided after runs 1-6.
-  Design and code start only when the user picks them.
+  Notebook build (user decision): Worker_5, right after the 256 notebooks.
+  `tile_size`, `train_grid`, `batch_size` and `tiles_per_epoch` stay unset
+  ("must be set"; run and G4 pre-flight fail while unset). Default front end
+  stays `kv`; SRM = 30 fixed filters per colour channel, same +/-3 clip.
 
 ## After the runs
 
