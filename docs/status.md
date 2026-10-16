@@ -8,6 +8,8 @@
 
 - **Layout (2026-10-16):** all run outputs in git-ignored `runs/<run>/` (best + `last.ckpt` only, one `run.log`); photos in `Datasets/originals/{raise,div2k,alaska,lsdir}` on the PC and the G4; `V3_SOURCE` defaults to `decode` (the cache is deleted; rebuild it to use `cache`). See `runs/README.md` and `Datasets/README.md`.
 
+- **G4 run queue:** [`active/run-queue.md`](active/run-queue.md) lists every approved run and its state. Check it before and after each launch.
+
 - **Active experiment (user lifted the hold for this only): training tiling.** Arms: overlap-last, centre trim, centre zero-pad, each for all training sources; recipe newdata-1; tests and validation frozen. Design in progress (`active/plan-training-tiling.md`); then code, PC QUICK, 3 G4 runs (~$4) on the user's go.
 
 - **Hard test (idea, under discussion with the user; NOT approved, do not start):** a separate held-out test made mostly of hard cases (k=1, low bpp, balanced across tile-noise quarters set on validation, ~1,000 pairs per hard group) reported as its own number next to the unchanged standard test. Pick up after the refactor, only when the user continues the discussion.

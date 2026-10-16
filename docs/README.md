@@ -4,6 +4,7 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Researc
 
 ## Current references (`active/` means kept for use, not permission to run)
 - [Training tiling — rules and PC implementation gates](active/plan-training-tiling.md)
+- [G4 run queue — approved, running and finished runs](active/run-queue.md)
 - [Per-cell design — not approved, on hold](active/plan-per-cell-training.md)
 - [G4 batch-runner guide](active/g4-batch-runner.md)
 - [Pi host state](active/pi-host-changes.md)
