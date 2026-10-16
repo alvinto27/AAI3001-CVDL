@@ -165,7 +165,9 @@ class SettingsTests(unittest.TestCase):
             (root/'.gitignore').write_text('runs/\n')
             notebook=root/'notebooks/05_xunet_v4_nonorm.ipynb';notebook.parent.mkdir()
             name='xunet_v4_clip3_nonorm_lr0.001_warm1_drop1_e3_otf'
-            notebook.write_text(json.dumps({'cells':[{'cell_type':'code','source':[f'RUN_NAME = {name!r}'], 'metadata':{}}], 'metadata':{}}))
+            notebook.write_text(json.dumps({'cells':[{'cell_type':'code',
+                'source':['from cvdl.settings import load\nsettings = load()\nRUN_NAME = settings.run_name'],
+                'metadata':{}}], 'metadata':{}}))
             env=root/'job.env';env.write_text('QUICK=false\n')
             args=SimpleNamespace(notebook=notebook,env_file=env,set=['lr=.001','epochs=3'],
                                  output=root/'runs/test',resume=False,host_monitor='off')
@@ -179,6 +181,7 @@ class SettingsTests(unittest.TestCase):
                 self.assertEqual(record['values']['epochs'],3)
                 self.assertEqual(record['sources']['lr'],'override')
                 self.assertEqual(record['sources']['epochs'],'override')
+                self.assertEqual(record['values']['run_name'],name)
                 self.assertEqual(record['overrides'][:2],[{'name':'lr','value':.001},{'name':'epochs','value':3}])
             finally:
                 os.chdir(previous)

@@ -38,7 +38,7 @@ def prepare_data_and_rng():
     probe) before the real model. Replaying those allocations is necessary to
     preserve its RNG stream, not a change to the training algorithm.
     """
-    notebook = json.loads((ROOT / 'notebooks/05_xunet_v4_nonorm.ipynb').read_text())
+    notebook = json.loads((ROOT / 'notebooks/archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb').read_text())
     ns = {'__name__': '__main__'}
     with patch('lsb_notebook.NotebookData', side_effect=data.build_otf_data):
         exec(''.join(notebook['cells'][2]['source']), ns)

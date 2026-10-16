@@ -5,7 +5,9 @@ do not overwrite it during the refactor. The [checker](../../scripts/refactor_go
 records effective settings/RUN_NAMEs, train/val/test identities, decoded batches,
 four real checkpoints on 64 reproducible tiles, and a deterministic CPU run.
 Library versions, checkpoint/input hashes and tile coordinates are recorded.
-Notebook 04 is frozen; phase 1 leaves notebook 05 unchanged as a reference.
+Notebook 04 is frozen. The pre-package notebook 05 is frozen, with outputs
+cleared, in [the parity archive](../../notebooks/archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb).
+The current notebook 05 is the thin package caller.
 
 ## Run
 
@@ -37,7 +39,8 @@ The 64 model tiles are 8 clean + 8 stego from each of RAISE/DIV2K/ALASKA/LSDIR.
 RNG seed 7 selects crops and random LSB replacement (k=1…4, 50% channel values).
 These are parity fixtures, not production accuracy results. The GPU parity test
 runs these tiles against both models with identical checkpoint weights, using
-notebook 04 for prime-1 and notebook 05 for the other three.
+notebook 04 for prime-1 and the frozen pre-package notebook 05 archive for the
+other three.
 
 ## Why GPU cross-run checks are smoke checks
 
@@ -83,6 +86,31 @@ panel predictions. No GPU run was needed for phase 4a's cap test.
 Standalone `eval_checkpoint.py` remains full when QUICK is absent. `--quick`
 requests the cap; `--no-quick` disables an inherited QUICK value. Future thin
 notebooks must pass their resolved `settings.quick` to `evaluate()`.
+
+## Thin-notebook drivers and allow-list (phase 4c)
+
+The settings/data/CPU drivers still execute the **current** notebook 05's code
+cells in order. They do not execute the archive. The settings driver reads the
+resolved `Settings.legacy_globals()` view and `to_run_settings()` to compare the
+same historical fields. Data still hashes real loaders at epochs 0/1. CPU still
+records all 20 losses, final weights, metrics and checkpoint structure. The
+archive is used only by independent same-process parity tests and the model
+fallback reference. Behaviour tests use the package callbacks/Lightning module.
+
+The historical golden JSON is not changed. The comparator has an explicit,
+named allow-list; it prints every use. All other differences still fail.
+
+| Allowed name | Exact scope |
+| --- | --- |
+| `run-settings-file` | One new `run_settings.json` in the run folder; all other filenames remain checked |
+| `thin-cell-layout` | 16 completed old code cells become exactly 10 completed new code cells; failed/missing cells fail |
+| `quick-extra-panel-cap` | Only the bpp-1 extra panel uses 16 instead of 10,956 pairs; rebuild its fixed seed-1 subset, settings SHA, categories, values and every group/image/pair count independently |
+| `gpu-setting-table-scores` | Only the GPU per-setting CSV score-byte hash may change; the actual saved table is separately rebuilt from the saved standard predictions and checked byte-for-byte |
+
+The standard test's pair identity hash and checkpoint/data/CPU checks are not
+relaxed. GPU scalar/probability deltas remain informational as before. The GPU
+runner also passes `--set lr=0.0003` (the unchanged LR) and checks that the final
+`run_settings.json` records `lr` with source `override` and in override history.
 
 The package/API design is in the [cvdl plan](plan-cvdl-package.md). Keep old
 checkpoint parameter and hyperparameter names. Update capture adapters explicitly

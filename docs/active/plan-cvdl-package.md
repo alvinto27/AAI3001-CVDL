@@ -138,8 +138,8 @@ A notebook cannot set machine fields, even to the same value. Explicit
 one-off overrides can set workers/QUICK/paths/precision, but cannot change
 read-only device, precision limits or checkout root. The runner supports
 repeatable canonical `--set extra_tests=none --set workers=4` and legacy
-`--set V3_EXTRA_TESTS=none`. Fields with no legacy env reader cannot be passed
-through the unchanged notebook yet; `load()` supports them for thinning.
+`--set V3_EXTRA_TESTS=none`. Phase 4c also passes settings with no legacy env
+reader (for example `--set seed=9`) directly to the thin notebook's `load()`.
 If a changed knob changes the run prefix, supply a matching run_name or use
 `--set run_name=` to request a new derived name. Existing prefix guards and
 all five golden env-file names remain unchanged.
@@ -189,3 +189,44 @@ CSV bytes and setting tables in OTF/PNG mode, plus diagnostic numbers for
 none/group/batch normalization on both train and val. The panel scorer is
 checked with a small CPU checkpoint and full/QUICK subsets. Default golden
 compare is ALL EQUAL; **151 tests pass**. No GPU runs.
+
+### Phase 4c: thin notebook 05
+
+The [current notebook](../../notebooks/05_xunet_v4_nonorm.ipynb) contains **10 code
+cells / 4,284 code characters**, down from **16 / 81,097**. Its first code cell
+uses `settings = load()` with a commented experiment example and no explicit
+experiment values. Existing G4/golden env files therefore remain valid without
+notebook/env conflicts. It imports package helpers, builds data/loaders, runs
+the model checks, builds/fits the Trainer, predicts, evaluates extra panels,
+writes breakdowns, and runs batch diagnostics.
+
+`cvdl.runtime` supplies explicit-argument wiring and the historical count-model
+and KV-probe checks. Keeping those two allocations preserves the seeded model
+initialization sequence. It has no env readers. Run settings are written before
+fit and at completion. `cvdl.settings` also owns compiler environment setup,
+the headless/diagnostic-worker settings, and a scoped runner context. That
+context lets the literal `load()` top cell retain the ordered `--set` overrides
+and their provenance without passing runner globals into the notebook. Resume
+checks the override list as well as the bridged env settings.
+
+The [frozen reference](../../notebooks/archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb)
+retains every old source cell and has no outputs. Independent parity tests use
+it; capped-sanity and output-retention behaviour tests use package code. The
+golden settings/data/CPU drivers execute the new notebook, not the archive.
+They preserve exact comparisons except for the explicitly named new settings
+file. All [allowed differences](refactor-golden.md#thin-notebook-drivers-and-allow-list-phase-4c)
+are printed and regression-tested; unknown changes still fail.
+
+Notebook 04 is untouched. Notebook 02 remains standalone and unchanged as the
+independent saved-prediction reference; the thin notebook calls its equivalent
+package breakdown functions directly. G4 whitelist names are unchanged.
+
+Evidence: default compare is ALL EQUAL; **156 tests pass**. The single GPU
+QUICK smoke finished in **79 seconds**, all **10 code cells** passed, and the
+structural comparison is ALL EQUAL. Standard prediction max absolute delta and
+all recorded train/validation scalar deltas were **0** (informational, not a new
+GPU equality rule). The real runner's `--set lr=0.0003` appears in final values,
+override history and source `override` in `run_settings.json`. Used allow-list
+entries were only `run-settings-file`, `thin-cell-layout` and
+`quick-extra-panel-cap`. The 16-pair extra-panel settings SHA is
+`e50a63091a5a6abb82f09fca11619a3a5641f102a8f6e2c743684ed4e20061cb`.

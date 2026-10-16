@@ -81,20 +81,20 @@ class EvaluationTests(unittest.TestCase):
             namespace=dict(np=np,pd=pd,torch=torch,SteganalysisModule=SmallModel,
                            DataLoader=DataLoader,DEVICE='cpu',V3_DATA=mode,
                            complete_bpp_bins=complete_bpp_bins)
-            functions(code('05_xunet_v4_nonorm.ipynb',21),namespace)
+            functions(code('archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb',21),namespace)
             expected=namespace['predict_pairs'](model,loader)
             actual=ev.predict_pairs(model,loader,device='cpu',data_mode=mode)
             pd.testing.assert_frame_equal(actual,expected,check_exact=True)
             self.assertEqual(ev.prediction_accuracy(actual),namespace['prediction_accuracy'](expected))
             namespace['predictions']=expected
             with redirect_stdout(io.StringIO()):
-                exec(code('05_xunet_v4_nonorm.ipynb',25),namespace)
+                exec(code('archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb',25),namespace)
             table=ev.per_setting_table(actual,data_mode=mode)
             pd.testing.assert_frame_equal(table,namespace['per_setting'],check_exact=True)
             with tempfile.TemporaryDirectory() as tmp:
                 directory=Path(tmp)
                 namespace.update(checkpoint_dir=directory)
-                with redirect_stdout(io.StringIO()):exec(code('05_xunet_v4_nonorm.ipynb',27),namespace)
+                with redirect_stdout(io.StringIO()):exec(code('archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb',27),namespace)
                 path=ev.save_predictions(actual,directory/'package.csv')
                 self.assertEqual(path.read_bytes(),namespace['predictions_path'].read_bytes())
 
@@ -106,7 +106,7 @@ class EvaluationTests(unittest.TestCase):
         predictions=pd.read_csv(paths[0],float_precision='round_trip')
         namespace=dict(predictions=predictions, np=np,pd=pd,V3_DATA='otf',
             complete_bpp_bins=complete_bpp_bins, probability_error=probability_error)
-        with redirect_stdout(io.StringIO()):exec(code('05_xunet_v4_nonorm.ipynb',25),namespace)
+        with redirect_stdout(io.StringIO()):exec(code('archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb',25),namespace)
         actual=ev.per_setting_table(predictions,data_mode='otf')
         self.assertEqual(actual.to_csv(index=False),namespace['per_setting'].to_csv(index=False))
 
@@ -156,7 +156,7 @@ class EvaluationTests(unittest.TestCase):
         dataset=TinyPairs()
         namespace=dict(np=np,pd=pd,torch=torch,SteganalysisModule=SmallModel,
                        DataLoader=DataLoader,DEVICE='cpu',V3_DATA='otf')
-        functions(code('05_xunet_v4_nonorm.ipynb',21),namespace)
+        functions(code('archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb',21),namespace)
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);checkpoint=root/'model.ckpt'
             torch.save(dict(hyper_parameters={'norm':'none'},state_dict=model.state_dict()),checkpoint)
@@ -226,7 +226,7 @@ class DiagnosticsTests(unittest.TestCase):
                     os=os,PreloadedPairs=PreloadedPairs,preload_pairs=preload,
                     fixed_subset=fixed_subset,FixedPairs=lambda *a:base,EVAL_PROFILE='overlap_full_mix',
                     otf_data=data,best_model=model,checkpoint_dir=ROOT/'runs',captured=captured)
-                source=code('05_xunet_v4_nonorm.ipynb',31)
+                source=code('archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb',31)
                 # Observe full-precision intermediate numbers, not rounded printed strings.
                 source=source.replace('    print(f"CHECK {split_name} a',
                     '    captured[split_name] = {"a": dict(accuracy=correct/count, loss=total_loss/count)}\n    print(f"CHECK {split_name} a')

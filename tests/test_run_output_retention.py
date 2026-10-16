@@ -18,23 +18,20 @@ class RunOutputRetentionTests(unittest.TestCase):
     def test_notebook_05_has_one_best_and_last_callback(self):
         notebook = json.loads((ROOT / "notebooks/05_xunet_v4_nonorm.ipynb").read_text())
         code = "\n".join("".join(cell["source"]) for cell in notebook["cells"] if cell["cell_type"] == "code")
+        code += (ROOT / 'cvdl/runtime.py').read_text()
         self.assertNotIn("save_top_k=-1", code)
         self.assertIn('monitor="val_pe", mode="min", save_top_k=1, save_last=True', code)
         self.assertIn("assert trainer.checkpoint_callbacks == [checkpoint_callback]", code)
-        self.assertIn("best_checkpoint = select_best_checkpoint(checkpoint_callback.best_model_path, checkpoint_dir)", code)
-        self.assertIn("last_saved = torch.load(checkpoint_callback.last_model_path", code)
-        self.assertIn('assert not list(checkpoint_dir.glob("epoch*.ckpt"))', code)
+        self.assertIn('best = select_best_checkpoint(checkpoint.best_model_path, bundle.checkpoint_dir)', code)
+        self.assertIn("saved = torch.load(checkpoint.last_model_path", code)
+        self.assertIn("assert not list(bundle.checkpoint_dir.glob('epoch*.ckpt'))", code)
         self.assertIn("QuietHeadlessProgress()", code)
 
     def test_last_updates_even_when_validation_does_not_improve(self):
         import lightning as L
         import torch
 
-        notebook = json.loads((ROOT / "notebooks/05_xunet_v4_nonorm.ipynb").read_text())
-        code = next("".join(c["source"]) for c in notebook["cells"] if "class TimedModelCheckpoint" in "".join(c.get("source", [])))
-        node = next(n for n in ast.parse(code).body if isinstance(n, ast.ClassDef) and n.name == "TimedModelCheckpoint")
-        scope = {"L": L, "time": time, "epoch_timing_callback": SimpleNamespace(add=lambda *args: None)}
-        exec(compile(ast.Module(body=[node], type_ignores=[]), "notebook05", "exec"), scope)
+        from cvdl.callbacks import TimedModelCheckpoint
 
         class Model(L.LightningModule):
             def __init__(self):
@@ -52,7 +49,8 @@ class RunOutputRetentionTests(unittest.TestCase):
 
         loader = torch.utils.data.DataLoader(torch.zeros(2, 1), batch_size=2)
         with tempfile.TemporaryDirectory() as folder:
-            callback = scope["TimedModelCheckpoint"](
+            callback = TimedModelCheckpoint(
+                timing=SimpleNamespace(add=lambda *args:None),
                 dirpath=folder, filename="best-epoch{epoch:02d}-val_pe{val_pe:.4f}",
                 auto_insert_metric_name=False, monitor="val_pe", mode="min",
                 save_top_k=1, save_last=True, every_n_epochs=1,

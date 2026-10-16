@@ -29,7 +29,7 @@ except ImportError as error:  # pragma: no cover
     SKIP = str(error)
 
 
-def notebook_model_namespace(path="notebooks/05_xunet_v4_nonorm.ipynb"):
+def notebook_model_namespace(path="notebooks/archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb"):
     """Run the notebook's KV_ARRAY statement and its model cell, nothing else."""
     cells = json.loads((ROOT / path).read_text())["cells"]
     ns = dict(torch=torch, nn=nn, F=F, np=np, CLIP_T=3.0, NORM="group")

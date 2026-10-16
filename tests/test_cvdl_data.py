@@ -25,7 +25,7 @@ from lsb_notebook import NotebookData
 from lsb_torch import RunSettings, PrimedTrainingLoader
 from test_lsb_source import record
 
-CELLS = json.loads((ROOT / 'notebooks/05_xunet_v4_nonorm.ipynb').read_text())['cells']
+CELLS = json.loads((ROOT / 'notebooks/archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb').read_text())['cells']
 
 
 def source(index):

@@ -234,9 +234,15 @@ def drive(mode: str, env_file: Path | None, sets: list[str], out: Path) -> None:
         L.Trainer.fit = original_fit
     if mode == "settings":
         data = namespace["otf_data"]
-        result["globals"] = {name: jsonable(value) for name, value in sorted(namespace.items())
-                             if name.isupper() and not name.startswith("_") and not callable(value)
-                             and name not in {"ROOT", "F", "L"}}
+        # The thin notebook exposes only runner globals. Compare the same complete
+        # historical effective-settings view through the typed adapter, not the archive.
+        from cvdl.settings import Settings
+        if isinstance(namespace['settings'], Settings):
+            result['globals'] = namespace['settings'].legacy_globals()
+        else:
+            result["globals"] = {name: jsonable(value) for name, value in sorted(namespace.items())
+                                 if name.isupper() and not name.startswith("_") and not callable(value)
+                                 and name not in {"ROOT", "F", "L"}}
         result["run_name"] = namespace["RUN_NAME"]
         result["run_settings"] = jsonable(settings_dict(namespace["settings"]))
         result["data_record"] = shrink(jsonable({k: v for k, v in data.record.items() if not is_noise(k)}))
@@ -268,6 +274,8 @@ def drive(mode: str, env_file: Path | None, sets: list[str], out: Path) -> None:
 
 def settings_dict(settings):
     from dataclasses import asdict
+    if hasattr(settings, 'to_run_settings'):
+        settings = settings.to_run_settings()
     return asdict(settings)
 
 
@@ -440,7 +448,7 @@ def part_gpu():
     out = SCRATCH / f"golden-gpu-{os.getpid()}"
     command = [sys.executable, "scripts/run_notebook.py", "--notebook", str(NOTEBOOK.relative_to(ROOT)),
                "--env-file", str(ENV_FILES["quick-gpu"].relative_to(ROOT)), "--output", str(out.relative_to(ROOT)),
-               "--host-monitor", "off"]
+               "--host-monitor", "off", "--set", "lr=0.0003"]
     start = time.perf_counter()
     try:
         done = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=3 * 3600)
@@ -461,7 +469,19 @@ def part_gpu():
         result["run_folder_relative"] = str(folders[0].parent.relative_to(out))
         result["runtime_settings"] = shrink(jsonable({k: v for k, v in status.get("runtime_settings", {}).items()
                                                if not is_noise(k)}))
-        result["folder"] = collect_run_folder(folders[0].parent)
+        folder = folders[0].parent
+        saved_settings = json.loads((folder / 'run_settings.json').read_text())
+        assert saved_settings['values']['lr'] == 0.0003
+        assert saved_settings['sources']['lr'] == 'override'
+        assert {'name':'lr', 'value':0.0003} in saved_settings['overrides']
+        print('[override proof] run_notebook.py --set lr=0.0003: run_settings.json lr=0.0003 source=override', flush=True)
+        # A score-byte hash can vary on GPU, but a malformed/missing setting table cannot.
+        from cvdl.evaluation import load_breakdown, breakdown_tables
+        from cvdl.metrics import global_summary
+        frame, otf = load_breakdown(folder / 'test_predictions.csv')
+        table, _, _ = breakdown_tables(frame, otf_metadata=otf, global_threshold=global_summary(frame)['threshold'])
+        assert (folder / 'test_predictions_per_setting.csv').read_text() == table.to_csv(index=False)
+        result["folder"] = collect_run_folder(folder)
         result["extra_panels"] = {}
         for summary in sorted(out.rglob("summary.csv")):
             entry = {"summary": read_csv_rows(summary)}
@@ -470,6 +490,7 @@ def part_gpu():
                 r = json.loads(record.read_text())
                 entry["pairs"] = r["pairs"]
                 entry["settings_sha256"] = r["settings_sha256"]
+                assert r['quick_pair_cap'] == 16, 'GPU QUICK extra panels must record the phase-4a cap'
             result["extra_panels"][str(summary.parent.relative_to(out))] = entry
         return result
     finally:
@@ -543,7 +564,7 @@ def part_models():
             sys.path.insert(0, str(ROOT / "tests"))
             from test_model_copy_parity import notebook_model_namespace, notebook_outputs
             notebook_path = ("notebooks/04_baseline_kv_xunet_v3.ipynb" if name == "g4-prime-1"
-                             else "notebooks/05_xunet_v4_nonorm.ipynb")
+                             else "notebooks/archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb")
             ns = notebook_model_namespace(notebook_path)
             kw = dict(clip_t=hp.get("clip_t", 3.0), norm=hp.get("norm", "group"))
             notebook_model = (ns["XuNetWide"](width=int(hp.get("width", 4)), **kw)
@@ -647,6 +668,71 @@ def diff(old, new, path="", rel=0.0, found=None, floats_tolerant=False, limit=40
     return found
 
 
+# Named, narrowly scoped transition allow-list. Every use is printed. The golden
+# JSON stays unchanged; anything not handled here still reaches the exact diff.
+EXPECTED_DIFFERENCES = {
+    'run-settings-file': 'one new run_settings.json in the run folder',
+    'thin-cell-layout': '16 old code cells become 10 completed thin-notebook cells',
+    'quick-extra-panel-cap': 'bpp-1 extra panel: 10956 full pairs become the fixed 16-pair subset',
+    'gpu-setting-table-scores': 'GPU setting-table CSV score bytes may vary; saved table is independently verified',
+}
+
+
+def allowed_difference(name, detail):
+    assert name in EXPECTED_DIFFERENCES
+    print(f'[allowed {name}] {EXPECTED_DIFFERENCES[name]}: {detail}', flush=True)
+
+
+def allow_run_settings_file(old, new):
+    a, b = old.get('folder', {}).get('files', []), new.get('folder', {}).get('files', [])
+    if 'run_settings.json' not in a and b.count('run_settings.json') == 1:
+        allowed_difference('run-settings-file', 'added run_settings.json')
+        b.remove('run_settings.json')  # Every other filename is still compared exactly.
+
+
+def allow_quick_panel_cap(old, new):
+    """Validate the named intended cap against independently rebuilt pair metadata."""
+    if not any(name.endswith('/extra-test-bpp1') and before.get('pairs') != new.get('extra_panels', {}).get(name, {}).get('pairs')
+               for name, before in old.get('extra_panels', {}).items()):
+        return set()
+    allowed = set()
+    from lsb_torch import Corpus, FixedPairs, RunSettings
+    from lsb_notebook import fixed_subset
+    import pandas as pd
+    full = FixedPairs(Corpus(ROOT, RunSettings(evaluation_yaml=str(ROOT/'configs/test-bpp1.yaml'),
+                     sources=('raise','div2k'))), 'test', sources=('raise','div2k'))
+    selected = fixed_subset(full, 16, seed=1)
+    pairs = selected.frame
+    setting_sha = frame_sha(pairs, SETTING_FIELDS)
+    # Metrics are GPU information, but category order, values and all counts are exact.
+    frame = pd.concat([pairs.assign(label=0,prob_stego=0.), pairs.assign(label=1,prob_stego=0.)])
+    frame['bpp_bin'] = pd.cut(frame['requested_bpp'], bins=[0.,.05,.15,.3,.5,.75,1.],
+        labels=['<=0.05','0.05-0.15','0.15-0.30','0.30-0.50','0.50-0.75','0.75-1.0'], include_lowest=True, right=True)
+    from cvdl.metrics import summary_rows
+    expected = summary_rows(frame)
+    columns = ['category','value','images','pairs','P_E','AUC','accuracy','false_alarm_rate','miss_rate']
+    for name, before in old.get('extra_panels', {}).items():
+        after = new.get('extra_panels', {}).get(name)
+        if not name.endswith('/extra-test-bpp1') or after is None or before.get('pairs') == after.get('pairs'):
+            continue
+        table = after.get('summary', {})
+        valid = (set(after) == {'summary','pairs','settings_sha256'} and before['pairs'] == len(full)
+                 and after['pairs'] == 16 and after['settings_sha256'] == setting_sha
+                 and table.get('columns') == columns and table.get('kept_columns') == columns
+                 and len(table.get('rows', [])) == len(expected))
+        if valid:
+            for actual, wanted in zip(table['rows'], expected):
+                if actual[:4] != [wanted[key] for key in columns[:4]]:
+                    valid = False; break
+                if any(not isinstance(v,(int,float)) or not math.isfinite(v) or not 0 <= v <= 1 for v in actual[4:]):
+                    valid = False; break
+        if valid:
+            allowed_difference('quick-extra-panel-cap', f'{name}: {before["pairs"]} -> 16; settings SHA {setting_sha}; all group counts/schema checked')
+            old['extra_panels'][name] = after
+            allowed.add(name)
+    return allowed
+
+
 def compare_part(part, old, new):
     from copy import deepcopy
     old, new = deepcopy(old), deepcopy(new)
@@ -658,15 +744,28 @@ def compare_part(part, old, new):
                 entry.pop("class_source", None)
                 entry.pop("cuda", None)
         return diff(old, new, "/models")
+    if part in {'cpu','gpu'}:
+        allow_run_settings_file(old, new)
     if part != "gpu":
         return diff(old, new, f"/{part}")
+
+    if (old.get('cells_run') == 16 and old.get('cell_states') == ['done']*16
+            and new.get('cells_run') == 10 and new.get('cell_states') == ['done']*10):
+        allowed_difference('thin-cell-layout', '16 -> 10; every code cell completed')
+        old['cells_run'], old['cell_states'] = new['cells_run'], new['cell_states']
+    capped_panels = allow_quick_panel_cap(old, new)
+    a = old.get('folder', {}).get('test_predictions_per_setting.csv', {})
+    b = new.get('folder', {}).get('test_predictions_per_setting.csv', {})
+    if set(a) == set(b) == {'sha256'} and a != b:
+        allowed_difference('gpu-setting-table-scores', f'{a["sha256"]} -> {b["sha256"]}')
+        a['sha256'] = b['sha256']
 
     # GPU QUICK is a smoke check: exact completion, file list, counts and keys;
     # numerical results are information only, not a cross-run equality proof.
     for section in ("metrics_csv",):
         a = old.get("folder", {}).get(section, {})
         b = new.get("folder", {}).get(section, {})
-        if a.get("kept_columns") == b.get("kept_columns") and len(a.get("rows", [])) == len(b.get("rows", [])):
+        if a.get("kept_columns") is not None and a.get("kept_columns") == b.get("kept_columns") and len(a.get("rows", [])) == len(b.get("rows", [])):
             for i, (ar, br) in enumerate(zip(a["rows"], b["rows"])):
                 for j, column in enumerate(a["kept_columns"]):
                     if column not in {"epoch", "step"}:
@@ -684,6 +783,8 @@ def compare_part(part, old, new):
         print(f"[GPU info] test probability max abs delta={maximum:.8g}")
         b["prob_stego"] = a["prob_stego"]
     for name, panel in old.get("extra_panels", {}).items():
+        if name in capped_panels:
+            continue  # Different subsets: do not print artificial zero numeric deltas.
         other = new.get("extra_panels", {}).get(name, {})
         a, b = panel["summary"], other.get("summary", {})
         if a.get("kept_columns") != b.get("kept_columns") or len(a.get("rows", [])) != len(b.get("rows", [])):

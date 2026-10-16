@@ -30,7 +30,7 @@ class SharedMetricsTests(unittest.TestCase):
                    (np.zeros(5, dtype=int), np.linspace(0, 1, 5)),
                    (np.ones(5, dtype=int), np.linspace(0, 1, 5)),
                    (rng.integers(0, 2, 500), np.round(rng.random(500), 2))]
-        for notebook, cell in (("notebooks/05_xunet_v4_nonorm.ipynb", 19),
+        for notebook, cell in (("notebooks/archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb", 19),
                                ("notebooks/02_eval_breakdown.ipynb", 4)):
             ns = frozen_metrics(notebook, cell)
             for labels, scores in samples:

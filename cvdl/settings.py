@@ -5,6 +5,8 @@ fills unset fields; conflicting notebook/env values need an explicit override.
 Machine-owned fields cannot be supplied by a notebook. No data is loaded here.
 """
 from dataclasses import dataclass
+from contextlib import contextmanager
+from contextvars import ContextVar
 from difflib import get_close_matches
 import json
 import math
@@ -15,6 +17,17 @@ import subprocess
 from types import MappingProxyType
 
 ROOT = Path(__file__).resolve().parents[1]
+_RUNNER_CONTEXT = ContextVar('cvdl_runner_settings', default=None)
+
+
+@contextmanager
+def runner_context(environ, overrides):
+    """Keep explicit runner overrides/provenance when a top cell calls load()."""
+    token = _RUNNER_CONTEXT.set((dict(environ), tuple(overrides)))
+    try:
+        yield
+    finally:
+        _RUNNER_CONTEXT.reset(token)
 
 
 def boolean(x):
@@ -116,6 +129,8 @@ SCHEMA = MappingProxyType({
     'quick': Definition('bool', boolean, True, 'bool', 'Small trial mode.', env='QUICK', legacy_global='QUICK', machine=True),
     'workers': Definition('int', integer, 6, '>=0', 'Training workers.', lambda v:v>=0, 'V3_WORKERS', 'OTF_WORKERS', True),
     'eval_workers': Definition('int', integer, 4, '>=0', 'Evaluation workers.', lambda v:v>=0, 'V3_EVAL_WORKERS', 'EVAL_WORKERS', True),
+    'diag_workers': Definition('int', integer, lambda c:c['eval_workers'], '>=0', 'Diagnostic photo workers.', lambda v:v>=0, 'V3_DIAG_WORKERS', machine=True),
+    'headless': Definition('bool', boolean, False, 'bool', 'Compact headless progress.', env='CVDL_HEADLESS_LOG', machine=True),
     'main_threads': Definition('int', integer, 1, '>0', 'Main PyTorch threads.', lambda v:v>0, 'V3_MAIN_THREADS', 'MAIN_THREADS', True),
     'precision': Definition('str', str, '32', '32/bf16-mixed within profile limits', 'Training precision.', lambda v:v in {'32','bf16-mixed'}, 'V3_PRECISION', 'PRECISION', True),
     'persistent_workers': Definition('bool', boolean, True, 'bool', 'Persistent validation workers.', env='V3_PERSISTENT_WORKERS', machine=True),
@@ -286,6 +301,14 @@ class Settings:
             PIL_VERSION=version('Pillow'))
         return out
 
+    def apply_runtime_environment(self):
+        """Set the supported compiler controls before lazy compiler imports."""
+        if self.compile == 'default':
+            os.environ['TORCHINDUCTOR_COMPILE_THREADS'] = str(self.compile_threads)
+        for name, variable in (('inductor_cache','TORCHINDUCTOR_CACHE_DIR'), ('triton_cache','TRITON_CACHE_DIR')):
+            if self.values[name] is not None:
+                os.environ[variable] = self.values[name]
+
     def write(self, folder):
         folder = Path(folder); folder.mkdir(parents=True, exist_ok=True)
         commit = subprocess.check_output(['git','rev-parse','HEAD'],cwd=self.root,text=True).strip()
@@ -327,6 +350,11 @@ def _run_name(c, explicit):
 
 def load(*, overrides=(), environ=None, _profile=None, **notebook_values):
     """Resolve settings without side effects. _profile is a test seam, not a notebook setting."""
+    override_pairs = override_values(overrides)
+    context = _RUNNER_CONTEXT.get() if environ is None else None
+    if context is not None:
+        environ, inherited_overrides = context
+        override_pairs = [*override_values(inherited_overrides), *override_pairs]
     env = os.environ if environ is None else environ
     profile = automatic_profile() if _profile is None else _profile
     supplied, origins, history = {}, {}, []
@@ -343,7 +371,7 @@ def load(*, overrides=(), environ=None, _profile=None, **notebook_values):
         if SCHEMA[resolved].machine:
             raise ValueError(f'setting {name!r} is machine-owned; use the automatic profile or a one-off override, not the notebook')
         put(name,value,'notebook')
-    explicit_overrides = [(canonical(name), value) for name,value in override_values(overrides)]
+    explicit_overrides = [(canonical(name), value) for name,value in override_pairs]
     override_names = {name for name,_ in explicit_overrides}
     for name,value in env.items():
         if name in ALIASES or name.startswith('V3_'):
@@ -398,15 +426,17 @@ def load(*, overrides=(), environ=None, _profile=None, **notebook_values):
     return result
 
 
-def legacy_override(item):
-    """Translate a CLI override for the unchanged notebook's env reader."""
+def legacy_override(item, *, allow_native=False):
+    """Translate legacy overrides, or validate a native thin-notebook setting."""
     if '=' not in item:
         raise ValueError('--set expects key=value')
     key, raw = (part.strip() for part in item.split('=',1))
     name = canonical(key)
     spec = SCHEMA[name]
     if not spec.env:
-        raise ValueError(f'{name} has no legacy notebook bridge yet; use load() until notebook thinning')
+        if allow_native:
+            return None, parse(name, raw)
+        raise ValueError(f'{name} has no legacy notebook bridge; use the thin notebook')
     value = parse(name, raw)
     if isinstance(value, bool):
         value = ('on' if value else 'off') if name in {'persistent_workers','speed_matrix'} else str(value).lower()

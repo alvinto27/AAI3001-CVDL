@@ -1,13 +1,13 @@
 """Run a notebook headlessly and save a restart-safe executed copy after each cell.
 
-Uses IPython and the standard library only. The tracked notebook is read only.
+Executes through IPython. The tracked notebook is read only.
 Run from a fresh git-ignored output folder; notebook 05 uses an automatic machine profile.
 """
 from __future__ import annotations
 
 import argparse
 import base64
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import nullcontext, redirect_stderr, redirect_stdout
 from copy import deepcopy
 from datetime import datetime, timezone
 import json
@@ -31,7 +31,7 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def settings_file(path, overrides):
+def settings_file(path, overrides, *, allow_native=False):
     settings = {}
     for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         line = raw.strip()
@@ -46,8 +46,9 @@ def settings_file(path, overrides):
     sys.path.insert(0, str(ROOT))
     from cvdl.settings import legacy_override
     for item in overrides:
-        key, value = legacy_override(item)
-        settings[key] = value
+        key, value = legacy_override(item, allow_native=allow_native)
+        if key is not None:
+            settings[key] = value
     if "QUICK" in settings and settings["QUICK"].lower() not in {"true", "false", "1", "0", "yes", "no"}:
         raise ValueError("QUICK must be true or false")
     if "V3_OUTPUT_ROOT" in settings:
@@ -230,25 +231,27 @@ def run(args):
     notebook_path = args.notebook.resolve()
     if not notebook_path.is_file():
         raise ValueError(f"notebook not found: {notebook_path}")
-    settings = settings_file(args.env_file.resolve(), args.set)
+    compact = notebook_path == ROOT / "notebooks/05_xunet_v4_nonorm.ipynb"
+    settings = settings_file(args.env_file.resolve(), args.set, allow_native=compact)
     output = args.output.resolve()
     if output == ROOT or ROOT not in output.parents:
         raise ValueError("--output must be inside this repository")
     ignored = subprocess.run(["git", "check-ignore", "-q", str(output)], cwd=ROOT, check=False)
     if ignored.returncode != 0:
         raise ValueError(f"--output must be git-ignored: {output}")
-    compact = notebook_path == ROOT / "notebooks/05_xunet_v4_nonorm.ipynb"
     resolved_settings = None
+    resolution_env = None
+    runner_overrides = [*args.set, f"output_root={output / 'checkpoints'}"]
     if compact:
         sys.path.insert(0, str(ROOT))
-        from cvdl.settings import ALIASES, load
+        from cvdl.settings import ALIASES, load, runner_context
         resolution_env = {key: value for key, value in os.environ.items()
                           if (key in ALIASES and key != "QUICK" and not key.startswith("V3_"))
                           or key == "MIOPEN_GEMM_ENFORCE_BACKEND"}
-        resolved_settings = load(environ={**resolution_env, **settings},
-                                 overrides=[*args.set, f"output_root={output / 'checkpoints'}"])
-        # Bridge only profile differences into the still-independent notebook.
-        # Keep existing explicit env files/resume status unchanged.
+        resolution_env = {**resolution_env, **settings, 'CVDL_HEADLESS_LOG': '1'}
+        resolved_settings = load(environ=resolution_env, overrides=runner_overrides)
+        # Keep legacy env/status and resume records stable. The scoped load()
+        # context retains the original profile provenance instead of this bridge.
         for key, value in (("QUICK", str(resolved_settings.quick).lower()),
                            ("V3_WORKERS", str(resolved_settings.workers)),
                            ("V3_EVAL_WORKERS", str(resolved_settings.eval_workers))):
@@ -261,7 +264,8 @@ def run(args):
         prior = json.loads(previous.read_text(encoding="utf-8"))
         if prior.get("state") == "done" or prior.get("executed_notebook") != str(output / "executed.ipynb"):
             raise ValueError("only an interrupted notebook 05 run can resume")
-        if prior.get("effective_settings") != {**settings, "V3_OUTPUT_ROOT": str(output / "checkpoints")}:
+        if (prior.get("effective_settings") != {**settings, "V3_OUTPUT_ROOT": str(output / "checkpoints")}
+                or prior.get('setting_overrides', []) != args.set):
             raise ValueError("resume settings differ from the saved run")
         if not settings.get("V3_RUN_NAME") or not (output / "checkpoints" / settings["V3_RUN_NAME"] / "last.ckpt").is_file():
             raise ValueError("resume needs the existing last.ckpt")
@@ -300,7 +304,8 @@ def run(args):
     notebook.setdefault("metadata", {})["headless_run"] = {"source": str(notebook_path), "settings": settings}
     status = {"state": "running", "current_cell": None, "last_completed_cell": None,
               "started_at": now(), "ended_at": None, "heartbeat_at": now(), "exit_code": None,
-              "effective_settings": settings.copy(), "runtime_settings": {}, "cells": [],
+              "effective_settings": settings.copy(), "setting_overrides": list(args.set),
+              "runtime_settings": {}, "cells": [],
               "executed_notebook": str(executed), "log": str(output / "run.log"),
               "run_output_dir": None, "run_files": [], "traceback": None}
     status_lock = threading.RLock()
@@ -328,7 +333,11 @@ def run(args):
         if data is not None:
             values["data_run_settings"] = deepcopy(data.record)
         if resolved_settings is not None and namespace.get("RUN_NAME") not in recorded_settings and namespace.get("RUN_NAME"):
-            resolved_settings.write(output / "checkpoints" / namespace["RUN_NAME"])
+            from cvdl.settings import Settings
+            active_settings = namespace.get('settings')
+            if not isinstance(active_settings, Settings):
+                active_settings = resolved_settings
+            active_settings.write(output / "checkpoints" / namespace["RUN_NAME"])
             recorded_settings.add(namespace["RUN_NAME"])
         with status_lock:
             status["runtime_settings"] = values
@@ -397,7 +406,8 @@ def run(args):
                 cell_start = time.perf_counter()
                 failure = None
                 try:
-                    with redirect_stdout(stdout), redirect_stderr(stderr):
+                    context = runner_context(resolution_env, runner_overrides) if compact else nullcontext()
+                    with context, redirect_stdout(stdout), redirect_stderr(stderr):
                         result = shell.run_cell("".join(cell["source"]), store_history=True)
                     failure = result.error_before_exec or result.error_in_exec
                     if interrupted["signum"] is not None:
