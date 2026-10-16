@@ -1,0 +1,14 @@
+{
+  "source": "lsdir",
+  "selection_sha256": "c7e1b3209e96f1eda6ba59c4896ddbd639fffb7797e63048b5c4d674d65c9dbf",
+  "photos": 11000,
+  "tiles512": 22884,
+  "splits": {
+    "train": 7000,
+    "val": 1500,
+    "test": 2500
+  },
+  "verified_masters": true,
+  "decoder_policy": "stored RGB8, no ICC conversion, no resize",
+  "grid_policy": "trim512"
+}
