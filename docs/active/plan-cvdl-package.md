@@ -84,3 +84,17 @@ filter (CHW and batched BCHW supported). Same-process tests execute notebook
 and three OTF settings (256 px, paired 512 px, mixed/capped 512 px), workers 0,
 train epochs 0/1 and fixed evaluation. Frames and batch tensors match exactly.
 Default golden compare is ALL EQUAL; **132 tests pass**. No new GPU checks.
+
+Phase 3 adds `cvdl.lit` and `cvdl.callbacks`, preserving the notebook's class
+names and checkpoint parameter names. Timing callbacks, validation data,
+priming loader and optional conv1 conversion are explicit runtime arguments;
+validation data and the conversion factory are excluded from saved hparams.
+The package-built CPU run (data/models/lit/callbacks) matches all 20 golden
+losses, final weights SHA `5525eb37…`, metrics.csv and checkpoint structure
+exactly. The test replays only the still-unmoved setup and throwaway model
+probe to preserve the original RNG stream. All four old real checkpoints load
+strictly with identical state tensors. Resuming the fresh last.ckpt restores
+optimizer/callback/epoch state, reaches step 22, and preserves prior CSV rows.
+The capped-validation sanity/source guard is tested with explicit validation
+data. Default compare is ALL EQUAL; **135 tests pass**. No GPU runs added;
+notebooks 04/05 remain unchanged until thinning.
