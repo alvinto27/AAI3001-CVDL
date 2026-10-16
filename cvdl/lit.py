@@ -22,13 +22,14 @@ def v4_lr_factor(step: int, steps_per_epoch: int, max_epochs: int, warmup_epochs
 class SteganalysisModule(L.LightningModule):
     """Lightning wrapper for paired or unpaired image batches."""
 
-    def __init__(self, lr: float = 3e-4, max_epochs: int = 20, weight_decay: float = 1e-4, paired_batches: bool = False, clip_t=3.0, norm="none", steps_per_epoch: int = 1, warmup_epochs: int = 1, grad_clip: float = 1.0, lr_drops=None, batch_size: int = 32, precision: str = "32", model: str = "xunet", width: int = 4, *, validation_data=None, conv1_factory=None):
+    def __init__(self, lr: float = 3e-4, max_epochs: int = 20, weight_decay: float = 1e-4, paired_batches: bool = False, clip_t=3.0, norm="none", steps_per_epoch: int = 1, warmup_epochs: int = 1, grad_clip: float = 1.0, lr_drops=None, batch_size: int = 32, precision: str = "32", model: str = "xunet", width: int = 4, front_end: str = "kv", *, validation_data=None, conv1_factory=None):
         super().__init__()
         if lr_drops is None:
             lr_drops = ((max_epochs // 2 + 1, 0.1),)
         self.save_hyperparameters(ignore=["validation_data", "conv1_factory"])
         self.validation_data = validation_data
-        self.net = XuNetWide(clip_t=clip_t, norm=norm, width=width) if model == "xunet_wide" else XuNet(clip_t=clip_t, norm=norm)
+        self.net = (XuNetWide(clip_t=clip_t, norm=norm, width=width, front_end=front_end) if model == "xunet_wide"
+                    else XuNet(clip_t=clip_t, norm=norm, front_end=front_end))
         if conv1_factory is not None:
             self.net.conv1 = conv1_factory(self.net.conv1)
         self.validation_scores = []

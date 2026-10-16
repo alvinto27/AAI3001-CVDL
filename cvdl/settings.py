@@ -164,6 +164,7 @@ SCHEMA = MappingProxyType({
     'post_fit_eval': Definition('str', str, 'full', 'full/none', 'Run post-fit evaluation.', lambda v:v in {'full','none'}),
     'name': Definition('str?', optional_string, None, 'notebook stem or None', 'Short experiment notebook name.'),
     'extra_tests': Definition('str', str, 'test-bpp1', 'none/test-bpp1/source-panels or both panels', 'Extra evaluation panels.', lambda v:set(v.split(','))<={'none','test-bpp1','source-panels'} and ('none' not in v or v=='none'), 'V3_EXTRA_TESTS', 'EXTRA_TESTS'),
+    'front_end': Definition('str', str, 'kv', 'kv/srm', 'Fixed first-layer residual filters: KV or the 30 SRM filters.', lambda v:v in {'kv','srm'}),
     'model': Definition('str', str, 'xunet', 'xunet/xunet_wide', 'Network architecture.', lambda v:v in {'xunet','xunet_wide'}, 'V3_MODEL', 'MODEL'),
     'width': Definition('int', integer, 4, '1..8', 'Wide network multiplier.', lambda v:1<=v<=8, 'V3_WIDTH', 'WIDTH'),
     'batch_size': Definition('int', integer, lambda c:8 if c['quick'] else 32, 'positive multiple of 4', 'Training images per batch.', lambda v:v>0 and v%4==0, 'V3_BATCH_SIZE', 'BATCH_SIZE'),
@@ -384,6 +385,7 @@ def _run_name(c, explicit):
         tag = f'k{k[0]}to{k[-1]}' if k==tuple(range(k[0],k[-1]+1)) else 'k'+'-'.join(map(str,k))
         prefix += '_'+tag
     prefix += f"_e{c['epochs']}"
+    if c['front_end']!='kv': prefix += '_'+c['front_end']
     if c['model']=='xunet_wide': prefix += f"_wide-w{c['width']}"
     if c['batch_size'] != (8 if c['quick'] else 32): prefix += f"_b{c['batch_size']}"
     if c['precision']!='32': prefix += f"_prec-{c['precision']}"
@@ -395,7 +397,7 @@ def _run_name(c, explicit):
     return name
 
 
-def load(*, overrides=(), environ=None, _profile=None, **notebook_values):
+def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_values):
     """Resolve settings without side effects. _profile is a test seam, not a notebook setting."""
     override_pairs = override_values(overrides)
     context = _RUNNER_CONTEXT.get() if environ is None else None
@@ -419,6 +421,8 @@ def load(*, overrides=(), environ=None, _profile=None, **notebook_values):
             raise ValueError(f'setting {name!r} is machine-owned; use the automatic profile or a one-off override, not the notebook')
         put(name,value,'notebook')
     explicit_overrides = [(canonical(name), value) for name,value in override_pairs]
+    unknown = [n for n in must_set if n not in SCHEMA and n not in ALIASES]
+    if unknown: raise ValueError(f'must_set names unknown settings: {", ".join(unknown)}')
     override_names = {name for name,_ in explicit_overrides}
     for name,value in env.items():
         if name in ALIASES or name.startswith('V3_'):
@@ -432,6 +436,10 @@ def load(*, overrides=(), environ=None, _profile=None, **notebook_values):
             put(name,value,'env')
     for name,value in explicit_overrides:
         put(name,value,'override')
+    missing = [n for n in map(canonical, must_set) if origins.get(n) not in ('notebook','env','override')]
+    if missing:
+        raise ValueError('these settings must be set and have no default: ' + ', '.join(missing)
+                         + '. Put them in the notebook top cell, or give a one-off value with run_notebook.py --set key=value.')
     c, origins_all = {}, {}
     for name in SCHEMA:
         spec = SCHEMA[name]

@@ -22,6 +22,68 @@ class KVFilter(nn.Module):
         return self.conv(x)
 
 
+# Fixed 30-filter spatial rich model (SRM) high-pass bank: Fridrich & Kodovsky,
+# IEEE TIFS 7(3) 2012, as used by Ye-Net (Ye, Ni, Yi, IEEE TIFS 12(11) 2017).
+# Each row is (divisor, integer 5x5 kernel). The kernel is integer/divisor, so
+# its largest coefficient has magnitude 1. Order: 8 first-order, 4 second-order,
+# 8 third-order, SQUARE3x3, 4 EDGE3x3, SQUARE5x5, 4 EDGE5x5.
+SRM_KERNEL_TABLE = (
+    (1, [[0, 0, 0, 0, 0], [0, 0, 1, 0, 0], [0, 0, -1, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]),
+    (1, [[0, 0, 0, 0, 0], [0, 0, 0, 1, 0], [0, 0, -1, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]),
+    (1, [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, -1, 1, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]),
+    (1, [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, -1, 0, 0], [0, 0, 0, 1, 0], [0, 0, 0, 0, 0]]),
+    (1, [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, -1, 0, 0], [0, 0, 1, 0, 0], [0, 0, 0, 0, 0]]),
+    (1, [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, -1, 0, 0], [0, 1, 0, 0, 0], [0, 0, 0, 0, 0]]),
+    (1, [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 1, -1, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]),
+    (1, [[0, 0, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, -1, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]),
+    (2, [[0, 0, 0, 0, 0], [0, 0, 1, 0, 0], [0, 0, -2, 0, 0], [0, 0, 1, 0, 0], [0, 0, 0, 0, 0]]),
+    (2, [[0, 0, 0, 0, 0], [0, 0, 0, 1, 0], [0, 0, -2, 0, 0], [0, 1, 0, 0, 0], [0, 0, 0, 0, 0]]),
+    (2, [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 1, -2, 1, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]),
+    (2, [[0, 0, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, -2, 0, 0], [0, 0, 0, 1, 0], [0, 0, 0, 0, 0]]),
+    (3, [[0, 0, -1, 0, 0], [0, 0, 3, 0, 0], [0, 0, -3, 0, 0], [0, 0, 1, 0, 0], [0, 0, 0, 0, 0]]),
+    (3, [[0, 0, 0, 0, -1], [0, 0, 0, 3, 0], [0, 0, -3, 0, 0], [0, 1, 0, 0, 0], [0, 0, 0, 0, 0]]),
+    (3, [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 1, -3, 3, -1], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]),
+    (3, [[0, 0, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, -3, 0, 0], [0, 0, 0, 3, 0], [0, 0, 0, 0, -1]]),
+    (3, [[0, 0, 0, 0, 0], [0, 0, 1, 0, 0], [0, 0, -3, 0, 0], [0, 0, 3, 0, 0], [0, 0, -1, 0, 0]]),
+    (3, [[0, 0, 0, 0, 0], [0, 0, 0, 1, 0], [0, 0, -3, 0, 0], [0, 3, 0, 0, 0], [-1, 0, 0, 0, 0]]),
+    (3, [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [-1, 3, -3, 1, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]),
+    (3, [[-1, 0, 0, 0, 0], [0, 3, 0, 0, 0], [0, 0, -3, 0, 0], [0, 0, 0, 1, 0], [0, 0, 0, 0, 0]]),
+    (4, [[0, 0, 0, 0, 0], [0, -1, 2, -1, 0], [0, 2, -4, 2, 0], [0, -1, 2, -1, 0], [0, 0, 0, 0, 0]]),
+    (4, [[0, 0, 0, 0, 0], [0, -1, 2, -1, 0], [0, 2, -4, 2, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]),
+    (4, [[0, 0, 0, 0, 0], [0, 0, 2, -1, 0], [0, 0, -4, 2, 0], [0, 0, 2, -1, 0], [0, 0, 0, 0, 0]]),
+    (4, [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 2, -4, 2, 0], [0, -1, 2, -1, 0], [0, 0, 0, 0, 0]]),
+    (4, [[0, 0, 0, 0, 0], [0, -1, 2, 0, 0], [0, 2, -4, 0, 0], [0, -1, 2, 0, 0], [0, 0, 0, 0, 0]]),
+    (12, [[-1, 2, -2, 2, -1], [2, -6, 8, -6, 2], [-2, 8, -12, 8, -2], [2, -6, 8, -6, 2], [-1, 2, -2, 2, -1]]),
+    (12, [[-1, 2, -2, 2, -1], [2, -6, 8, -6, 2], [-2, 8, -12, 8, -2], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]),
+    (12, [[0, 0, -2, 2, -1], [0, 0, 8, -6, 2], [0, 0, -12, 8, -2], [0, 0, 8, -6, 2], [0, 0, -2, 2, -1]]),
+    (12, [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [-2, 8, -12, 8, -2], [2, -6, 8, -6, 2], [-1, 2, -2, 2, -1]]),
+    (12, [[-1, 2, -2, 0, 0], [2, -6, 8, 0, 0], [-2, 8, -12, 0, 0], [2, -6, 8, 0, 0], [-1, 2, -2, 0, 0]]),
+)
+SRM_ARRAY = np.stack([np.array(m, dtype=np.float64)/d for d, m in SRM_KERNEL_TABLE]).astype(np.float32)
+
+
+class SRMFilter(nn.Module):
+    """Frozen depthwise SRM bank: 30 filters per colour channel -> 90 channels.
+
+    Output channel 30*c + f is filter f applied to colour channel c.
+    The attribute is named ``conv`` like KVFilter; weights stay out of training.
+    """
+    channels = 90
+
+    def __init__(self):
+        super().__init__()
+        self.conv = nn.Conv2d(3, 90, kernel_size=5, padding=2, groups=3, bias=False)
+        with torch.no_grad():
+            self.conv.weight.copy_(torch.tensor(SRM_ARRAY).repeat(3, 1, 1).unsqueeze(1))
+        self.conv.weight.requires_grad_(False)
+
+    def forward(self, x):
+        return self.conv(x)
+
+
+FRONT_ENDS = {'kv': (KVFilter, 3), 'srm': (SRMFilter, 90)}
+
+
 def make_norm(channels, norm):
     if norm == 'none':
         return nn.Identity()
@@ -34,11 +96,15 @@ def make_norm(channels, norm):
 
 class XuNet(nn.Module):
     """Same layers and forward order as notebook 04 cell 14; expose pre-mean features."""
-    def __init__(self, clip_t=3.0, norm='group'):
+    def __init__(self, clip_t=3.0, norm='group', front_end='kv'):
         super().__init__()
+        if front_end not in FRONT_ENDS:
+            raise ValueError(f'unsupported front end: {front_end}')
         self.clip_t = clip_t
-        self.kv = KVFilter()
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=5, padding=2)
+        self.front_end = front_end
+        front, channels = FRONT_ENDS[front_end]
+        self.kv = front()  # historical attribute name; kept for checkpoint keys
+        self.conv1 = nn.Conv2d(channels, 16, kernel_size=5, padding=2)
         self.bn1 = make_norm(16, norm)
         self.conv2 = nn.Conv2d(16, 16, kernel_size=5, padding=2)
         self.bn2 = make_norm(16, norm)
@@ -74,10 +140,10 @@ class XuNet(nn.Module):
 
 class XuNetWide(XuNet):
     """Notebook 05 wide model; same 32 px output cells and linear cell logits."""
-    def __init__(self, clip_t=3.0, norm='group', width=4):
-        super().__init__(clip_t=clip_t, norm=norm)
+    def __init__(self, clip_t=3.0, norm='group', width=4, front_end='kv'):
+        super().__init__(clip_t=clip_t, norm=norm, front_end=front_end)
         a, b, c, d, e = (16, 16*width, 32*width, 64*width, 128*width)
-        for name, ni, no, kernel in ((1,3,a,5),(2,a,b,5),(3,b,c,1),
+        for name, ni, no, kernel in ((1,FRONT_ENDS[front_end][1],a,5),(2,a,b,5),(3,b,c,1),
                                      (4,c,d,1),(5,d,e,1),(6,e,e,1),(7,e,d,1)):
             setattr(self, f'conv{name}', nn.Conv2d(ni, no, kernel, padding=kernel//2))
             setattr(self, f'bn{name}', make_norm(no, norm))
@@ -99,10 +165,11 @@ class XuNetWide(XuNet):
 def model_from_hparams(hparams):
     model = hparams.get('model', 'xunet')
     clip_t, norm = hparams.get('clip_t', 3.0), hparams.get('norm', 'group')
+    front_end = hparams.get('front_end', 'kv')
     if model == 'xunet':
-        return XuNet(clip_t=clip_t, norm=norm)
+        return XuNet(clip_t=clip_t, norm=norm, front_end=front_end)
     if model == 'xunet_wide':
-        return XuNetWide(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)))
+        return XuNetWide(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
     raise ValueError(f'unsupported checkpoint model: {model}')
 
 

@@ -113,6 +113,7 @@ class TrainingGridTests(unittest.TestCase):
         for path in (ROOT/'notebooks/experiments').glob('*.ipynb'):
             nb=json.loads(path.read_text());values=top_values(nb)
             validate_notebook_name(path,values)
+            if path.stem=='srm':continue  # own recipe checks: tests/test_srm_front_end.py
             self.assertEqual(values['name'],path.stem);self.assertEqual(values['post_fit_eval'],'none')
             self.assertEqual(values['train_yaml'],'configs/train-k1to4.yaml')
             recipe=top_values(base);recipe.pop('run_name')

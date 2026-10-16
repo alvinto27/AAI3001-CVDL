@@ -76,8 +76,8 @@ def create_loaders(s, otf, tables):
 def model_checks(s, clean_batch, stego_batch):
     """Count parameters and check frozen KV weights, preserving both allocations."""
     def model():
-        return (models.XuNetWide(clip_t=s.clip_t, norm=s.norm, width=s.width)
-                if s.model == 'xunet_wide' else models.XuNet(clip_t=s.clip_t, norm=s.norm))
+        return (models.XuNetWide(clip_t=s.clip_t, norm=s.norm, width=s.width, front_end=s.front_end)
+                if s.model == 'xunet_wide' else models.XuNet(clip_t=s.clip_t, norm=s.norm, front_end=s.front_end))
     counted = model()
     print(f'Total parameters: {sum(p.numel() for p in counted.parameters()):,}')
     print(f'Output shape for one batch: {tuple(counted(clean_batch[:1]).shape)}')
@@ -196,7 +196,7 @@ def create_training(s, otf_data, loaders):
     )
     training_started = time.perf_counter()
     assert trainer.checkpoint_callbacks == [checkpoint_callback], "only one best-and-last checkpoint callback is allowed"
-    lightning_model = SteganalysisModule(clip_t=s.clip_t, norm=s.norm, validation_data=otf_data, conv1_factory=conv1_factory(s), lr=s.lr, max_epochs=s.epochs, paired_batches=s.paired_batches, steps_per_epoch=len(train_loader), warmup_epochs=s.warmup_epochs, grad_clip=s.grad_clip, lr_drops=s.lr_drops, batch_size=s.batch_size, precision=s.precision, model=s.model, width=s.width)
+    lightning_model = SteganalysisModule(clip_t=s.clip_t, norm=s.norm, validation_data=otf_data, conv1_factory=conv1_factory(s), lr=s.lr, max_epochs=s.epochs, paired_batches=s.paired_batches, steps_per_epoch=len(train_loader), warmup_epochs=s.warmup_epochs, grad_clip=s.grad_clip, lr_drops=s.lr_drops, batch_size=s.batch_size, precision=s.precision, model=s.model, width=s.width, front_end=s.front_end)
     if s.name:
         import hashlib
         digest=hashlib.sha256()
