@@ -9,8 +9,8 @@ States: `queued` (approved, waiting) · `preparing` (code or notebook not ready)
 
 | # | Run (notebook) | Purpose | Commit | State | Job ID | Result |
 | ---: | --- | --- | --- | --- | --- | --- |
-| 1 | `experiments/tiling-overlap.ipynb` | Tiling arm 1: overlap-last, 512 | `8fff50d` | running (start 14:00Z, 2026-10-16) | `tiling-overlap-20261016T135926Z-8501` | — |
-| 2 | `experiments/tiling-trim.ipynb` | Tiling arm 2: centre trim, 512 | `8fff50d` | queued | — | — |
+| 1 | `experiments/tiling-overlap.ipynb` | Tiling arm 1: overlap-last, 512 | `8fff50d` | delivered (14:00-14:40Z; 39m49s; best epoch 29, val P_E .0586) | `tiling-overlap-20261016T135926Z-8501` | evaluating |
+| 2 | `experiments/tiling-trim.ipynb` | Tiling arm 2: centre trim, 512 | `8fff50d` | running (start 14:41Z) | `tiling-trim-20261016T144117Z-3222` | — |
 | 3 | `experiments/tiling-pad.ipynb` | Tiling arm 3: centre zero-pad, 512 | `8fff50d` | queued | — | — |
 | 4 | `experiments/tiling-overlap-256.ipynb` | Tiling arm 1 at 256: overlap-last (batch 128, 180,000 tiles/epoch, LR 3e-4) | — | preparing (Worker_5) | — | — |
 | 5 | `experiments/tiling-trim-256.ipynb` | Tiling arm 2 at 256: centre trim (same 256 budget) | — | preparing (Worker_5) | — | — |
