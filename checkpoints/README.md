@@ -1,5 +1,7 @@
 # Checkpoints and run outputs
 
+Use `checkpoints/<run>/` only as the notebook's working folder while a run is active. Put all finished PC and G4 run results under `runs-out/<run>/`. Notebook 05 headless runs already write their working checkpoints inside that result folder; keep only `last.ckpt` for resume and the single best validation-P_E checkpoint for evaluation. Do not move tracked files or the user's `baseline_kv_xunet_v3_clip3_group_otf/` folder.
+
 Small outputs from these three runs are tracked in git:
 
 | Run folder | Version |
@@ -26,7 +28,7 @@ files. Fetch a best checkpoint from the repository root with:
 
 ```sh
 scp 'aai-team@gcp-aai3001:/srv/aai3001/AAI3001-CVDL/checkpoints/baseline_kv_xunet_v3_clip3_group/best-*.ckpt' \
-  checkpoints/baseline_kv_xunet_v3_clip3_group/
+  runs-out/early-pc/baseline_kv_xunet_v3_clip3_group/
 ```
 
 Use `last.ckpt` to resume training. Use `best-*.ckpt` for evaluation. Keep
@@ -35,8 +37,8 @@ local model copies out of git.
 ## Not tracked
 
 Git ignores `.ckpt` files, per-run `logs/tb/` TensorBoard events, old
-`lightning_logs/`, and `_quick` run folders. V1/v2 folders and the old local
-executed v3b notebook are also ignored. Do not stage other run folders.
+`lightning_logs/`, and `_quick` run folders. Local-only V1/V2 files and the old
+executed V3b notebook were moved to `runs-out/early-pc/`, with the same folder names. Tracked records remain here. Do not stage other run folders.
 
 ## Watch TensorBoard
 
@@ -44,13 +46,13 @@ From the ROCm container:
 
 ```sh
 podman exec aai3001 tensorboard \
-  --logdir /work/checkpoints --bind_all --port 6006
+  --logdir /work/runs-out --bind_all --port 6006
 ```
 
 From the VM repository root:
 
 ```sh
-uv run tensorboard --logdir checkpoints --port 6006
+uv run tensorboard --logdir runs-out --port 6006
 ```
 
 Open `http://localhost:6006`. Notebook 04 gives the optional SSH tunnel for

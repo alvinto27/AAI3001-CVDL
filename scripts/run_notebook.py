@@ -91,9 +91,9 @@ def mime_data(data):
 
 
 class CellStream:
-    def __init__(self, name, log, terminal, outputs, lock):
+    def __init__(self, name, log, terminal, outputs, lock, compact=False):
         self.name, self.log, self.terminal = name, log, terminal
-        self.outputs, self.lock = outputs, lock
+        self.outputs, self.lock, self.compact = outputs, lock, compact
 
     def write(self, text):
         if not text:
@@ -101,6 +101,13 @@ class CellStream:
         with self.lock:
             self.log.write(text)
             self.log.flush()
+            if self.compact:
+                # The job watcher gets only short step/rate reports, not the
+                # complete notebook stream or thousands of progress redraws.
+                if text.startswith(("TRAIN progress ", "TRAIN epoch-end ")):
+                    self.terminal.write(text.rstrip("\n") + "\n")
+                    self.terminal.flush()
+                return len(text)  # Notebook 05 keeps full cell text only in run.log.
             self.terminal.write(text)
             self.terminal.flush()
             if self.outputs and self.outputs[-1].get("output_type") == "stream" and self.outputs[-1]["name"] == self.name:
@@ -116,7 +123,8 @@ class CellStream:
     def flush(self):
         with self.lock:
             self.log.flush()
-            self.terminal.flush()
+            if not self.compact:
+                self.terminal.flush()
 
     def isatty(self):
         return False
@@ -229,9 +237,21 @@ def run(args):
     ignored = subprocess.run(["git", "check-ignore", "-q", str(output)], cwd=ROOT, check=False)
     if ignored.returncode != 0:
         raise ValueError(f"--output must be git-ignored: {output}")
+    compact = notebook_path == ROOT / "notebooks/05_xunet_v4_nonorm.ipynb"
+    previous = output / "status.json"
     if output.exists() and any(output.iterdir()):
-        raise ValueError(f"use a new, empty output folder: {output}")
+        if not args.resume or not compact or not previous.is_file():
+            raise ValueError(f"use a new, empty output folder: {output} (or --resume for interrupted notebook 05)")
+        prior = json.loads(previous.read_text(encoding="utf-8"))
+        if prior.get("state") == "done" or prior.get("executed_notebook") != str(output / "executed.ipynb"):
+            raise ValueError("only an interrupted notebook 05 run can resume")
+        if prior.get("effective_settings") != {**settings, "V3_OUTPUT_ROOT": str(output / "checkpoints")}:
+            raise ValueError("resume settings differ from the saved run")
+        if not settings.get("V3_RUN_NAME") or not (output / "checkpoints" / settings["V3_RUN_NAME"] / "last.ckpt").is_file():
+            raise ValueError("resume needs the existing last.ckpt")
     output.mkdir(parents=True, exist_ok=True)
+    if compact:
+        os.environ["CVDL_HEADLESS_LOG"] = "1"
     sys.path.insert(0, str(ROOT))
     from scripts.host_monitor import monitor, on_gce
     monitor_enabled = args.host_monitor == 'on' or (args.host_monitor == 'auto' and on_gce())
@@ -341,8 +361,8 @@ def run(args):
                 emit(f"CELL START {index}")
                 outputs = cell["outputs"]
                 cell_lock = threading.RLock()
-                stdout = CellStream("stdout", log, sys.stdout, outputs, cell_lock)
-                stderr = CellStream("stderr", log, sys.stderr, outputs, cell_lock)
+                stdout = CellStream("stdout", log, sys.stdout, outputs, cell_lock, compact=compact)
+                stderr = CellStream("stderr", log, sys.stderr, outputs, cell_lock, compact=compact)
                 original_publish = shell.display_pub.publish
 
                 def publish(data, metadata=None, **_kwargs):
@@ -365,6 +385,9 @@ def run(args):
                     failure = error
                 finally:
                     shell.display_pub.publish = original_publish
+                if compact:
+                    outputs.append({"output_type": "stream", "name": "stdout",
+                                    "text": f"Cell {index}: full stdout/stderr in run.log.\n"})
                 # Join once per completed cell. Repeated string += here copied the
                 # entire fit log for every progress update (quadratic runtime).
                 for item in outputs:
@@ -431,6 +454,7 @@ def run(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--notebook", type=Path, default=ROOT / "notebooks/04_baseline_kv_xunet_v3.ipynb")
+    parser.add_argument("--resume", action="store_true", help="resume an interrupted notebook 05 output with identical settings")
     parser.add_argument("--env-file", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",

@@ -405,6 +405,10 @@ the next boot resends the files available on disk.
    missing `job-mode` now **sends pending folders and shuts down**, not idle
    maintenance. For maintenance later, set the mode explicitly each time.
 
+## Result folders and headless output
+
+Keep finished PC and G4 results together in `runs-out/<run>/`. Use `checkpoints/<run>/` only as the notebook's working folder during a run. A notebook 05 headless job writes its working checkpoints in `runs-out/<run>/checkpoints/<model-run>/`: one overwritten `last.ckpt` to resume, plus one best validation-P_E checkpoint for evaluation. It does not save every epoch. `run.log` is the only full text copy of notebook output. `executed.ipynb` keeps figures and pointers to that log. The G4 service console retains short job and step/rate reports, not another copy of the notebook output. On a PC, use the explicit notebook 05 runner `--resume` option only for an interrupted run with matching settings and `last.ckpt`. On G4, a Spot preemption requires a new job ID and a fresh run; the service refuses an existing job ID and never resumes its folder. Notebook 04 behavior is unchanged.
+
 ## PC-only checks
 
 `job.sh --test --metadata-file FILE` (the bootstrap, which then runs

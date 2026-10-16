@@ -181,7 +181,11 @@ cleanup() {
     if [[ -n $JOB_ID ]] && valid_id "$JOB_ID" && [[ -f "$STATE_ROOT/jobs/$JOB_ID.record" ]]; then
         local out="$ROOT/runs-out/$JOB_ID" finished
         mkdir -p "$out"
-        [[ -f "$STATE_ROOT/logs/$JOB_ID-run.log" ]] && cp "$STATE_ROOT/logs/$JOB_ID-run.log" "$out/job-console.log"
+        # Notebook 05 keeps the full cell output only in run.log. Preserve a
+        # small console record only if the runner failed before run.log existed.
+        if [[ $NOTEBOOK != notebooks/05_xunet_v4_nonorm.ipynb || ! -f $out/run.log ]]; then
+            [[ -f "$STATE_ROOT/logs/$JOB_ID-run.log" ]] && cp "$STATE_ROOT/logs/$JOB_ID-run.log" "$out/job-console.log"
+        fi
         [[ -n $RUN_ENV && -f $RUN_ENV ]] && cp "$RUN_ENV" "$out/job.env"
         finished=$(stamp)
         if deliver "$JOB_ID"; then

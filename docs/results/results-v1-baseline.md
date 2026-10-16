@@ -271,10 +271,10 @@ epoch. Full tables and the v3 plan are in the
 - Each stride value has only about 150 pairs. Stride comparisons are therefore
   uncertain.
 - Local-only PC records (ignored by git; these paths do not work on GitHub)
-  are `../checkpoints/baseline_kv_xunet/test_predictions.csv`,
-  `../checkpoints/baseline_kv_xunet/test_predictions_per_setting.csv`, and
-  `../checkpoints/baseline_kv_xunet/baseline_pc_9070xt.ipynb`. The checkpoint
-  folder is not part of the report commit.
+  are `runs-out/early-pc/baseline_kv_xunet/test_predictions.csv`,
+  `runs-out/early-pc/baseline_kv_xunet/test_predictions_per_setting.csv`, and
+  `runs-out/early-pc/baseline_kv_xunet/baseline_pc_9070xt.ipynb`. These
+  local files are not part of the report commit.
 
 Related files:
 
