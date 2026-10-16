@@ -266,11 +266,26 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
   Checker ALL EQUAL (re-run by the Orchestrator); 130 tests; a saved bpp-1
   panel re-scores exactly. Design: `active/plan-cvdl-package.md`.
 
+- Did: refactor phases 2-4c. `cvdl/data.py` (`ebcea7a`), `lit.py` +
+  `callbacks.py` (`4d0a063`; package-built 20-step CPU run equals the golden
+  losses and weights; the 4 real checkpoints load strict; resume works),
+  `settings.py` (`4554aa1`; typed settings, machine profiles, provenance,
+  `run_notebook.py --set`, QUICK now caps extra panels; Worker_4 added: a
+  notebook/env conflict stops the run), `evaluation.py` + `diagnostics.py`
+  (`aa24401`; real g4-v4-r2 tables, CSVs and 4 heatmaps byte-identical),
+  thin notebook 05 (`b715a12`): 16 -> 10 code cells, 81,097 -> 4,284 code
+  characters; old copy in `notebooks/archive/` as parity reference.
+- Found: golden compare ALL EQUAL after every phase (Orchestrator re-runs);
+  156 tests; the one GPU QUICK smoke passed (79 s); `--set lr=0.0003` is
+  recorded as an override in `run_settings.json`.
+- Note: Worker_3 session died during phase 4a; Worker_4 reviewed and
+  finished its uncommitted draft.
+
 ### Next
 
 - Done: B checks (`042903d`).
 - Done: bookkeeping tidy-up of docs, runs, data (PC and G4) and code.
-- In progress: notebook refactor; phases 0-1 done, next phase 2 (data).
+- In progress: notebook refactor; phases 0-4c done, next phase 5 (G4 jobs by notebook + commit, docs).
 - On hold: A, per-cell training (design written, not approved).
 - On hold: C, capacity / epochs / bf16.
 - Pending: start a new Scribe session (the old Scribe alias shows the
