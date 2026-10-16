@@ -116,7 +116,18 @@ class TrainingGridTests(unittest.TestCase):
             self.assertEqual(values['name'],path.stem);self.assertEqual(values['post_fit_eval'],'none')
             self.assertEqual(values['train_yaml'],'configs/train-k1to4.yaml')
             recipe=top_values(base);recipe.pop('run_name')
-            self.assertEqual({k:v for k,v in values.items() if k not in {'name','train_grid','post_fit_eval'}},recipe)
+            ignored={'name','train_grid','post_fit_eval'}
+            if path.stem=='tiling-overlap-256':
+                self.assertEqual((values['train_tile_size'],values['batch_size'],values['tiles_per_epoch']),(256,128,180000))
+                # Same pixels per epoch and per optimiser step as the 512 arm.
+                self.assertEqual(values['tiles_per_epoch']*256**2,45000*512**2)
+                self.assertEqual(values['batch_size']*256**2,32*512**2)
+                ignored|={'train_tile_size','batch_size','tiles_per_epoch'}
+                recipe={k:v for k,v in recipe.items() if k not in ignored}
+            else:
+                self.assertNotIn('train_tile_size',values)
+                self.assertEqual((values['batch_size'],values['tiles_per_epoch']),(32,45000))
+            self.assertEqual({k:v for k,v in values.items() if k not in ignored},recipe)
             self.assertEqual(nb['cells'][2:],base['cells'][2:])
             resolved=load(environ={},_profile=profile(),**values)
             self.assertEqual(resolved.run_name,path.stem)
@@ -129,6 +140,53 @@ class TrainingGridTests(unittest.TestCase):
             self.assertEqual(len(tree.body),1)
         default=load(environ={},_profile=profile())
         self.assertEqual((default.train_grid,default.post_fit_eval),('recorded','full'))
+
+    def test_tile256_summary_pools_and_digests(self):
+        records=[]
+        for source in ('raise','alaska','lsdir'):
+            with (ROOT/f'data/{source}/photo_manifest.csv').open() as f:records.extend(csv.DictReader(f))
+        expected=json.loads((ROOT/'data/train-grids/v1/summary-256.json').read_text())
+        self.assertEqual(expected['inputs'],json.loads((ROOT/'data/train-grids/v1/summary.json').read_text())['inputs'])
+        for policy in POLICIES:
+            self.assertEqual(summary(ROOT,records,256,policy),expected['plans'][policy])
+        self.assertEqual(expected['plans']['overlap_last']['pool_counts'],{'raise':170356,'alaska':121704,'lsdir':140863})
+        damaged=[dict(r) for r in records];next(r for r in damaged if r['split']=='train')['source_width']='2000'
+        with self.assertRaisesRegex(ValueError,'digest/count'):summary(ROOT,damaged,256,'overlap_last')
+
+    def test_train_tile_256_is_training_only(self):
+        from lsb_torch import FixedPairs
+        records=[{**record(649,777,kind='nef'),'photo_index':str(i),'photo_id':f'{source}-{split}','source':source,
+                  'split':split,'camera_model':'test','grid_policy':'overlap_last'}
+                 for i,(source,split) in enumerate((s,p) for s in ('raise','lsdir','alaska') for p in ('train','val','test'))]
+        settings=RunSettings(sources=('raise','lsdir','alaska'),source_mix={'raise':.4,'lsdir':.2,'alaska':.4},
+                             tiles_per_epoch=10,settings_yaml=str(ROOT/'configs/train-k1to4.yaml'))
+        base=Corpus(ROOT,settings,records=records)
+        corpus=Corpus(ROOT,settings,records=records,train_grid='overlap_last',train_tile=256)
+        self.assertEqual(settings.tile_size,512);self.assertEqual(corpus.grid_record['tile_size'],256)
+        self.assertEqual(corpus.run_record['train_tile_size'],256)
+        self.assertNotIn('train_tile_size',base.run_record)
+        train=next(r for r in records if r['split']=='train')
+        self.assertEqual(corpus.training_axes(train),axes(train,256,'overlap_last'))
+        self.assertEqual(len(corpus.training_axes(train)[0])*len(corpus.training_axes(train)[1]),3*4)
+        groups,_=corpus.train_tile_schedule(0)
+        self.assertEqual(sum(len(t) for _,t in groups),10)
+        photo=np.random.default_rng(1).integers(0,256,(649,777,3),dtype=np.uint8)
+        for r in records[:1]:
+            clean,meta=make_sample(photo,r,TileSpec('train_overlap_v1',256,2,3),corpus.config,OTFSeed(0,'train',0),'stego')
+            self.assertEqual(clean.shape,(256,256,3));self.assertEqual(meta['tile_size'],256)
+        for split in ('val','test'):
+            one,two=FixedPairs(base,split),FixedPairs(corpus,split)
+            self.assertEqual(one.frame.to_csv(index=False),two.frame.to_csv(index=False))
+            self.assertTrue((two.frame.tile_size==512).all())
+        with self.assertRaisesRegex(ValueError,'explicit train_grid'):Corpus(ROOT,settings,records=records,train_tile=256)
+        with self.assertRaisesRegex(ValueError,'invalid train tile'):Corpus(ROOT,settings,records=records,train_grid='overlap_last',train_tile=128)
+        with self.assertRaises(ValueError):RunSettings(sources=('raise','lsdir'),tile_size=256)  # eval guard unchanged
+
+    def test_train_tile_size_setting(self):
+        self.assertIsNone(load(environ={},_profile=profile()).train_tile_size)
+        self.assertEqual(load(environ={},_profile=profile(),train_grid='overlap_last',train_tile_size=256).train_tile_size,256)
+        for bad in (dict(train_tile_size=256),dict(train_grid='overlap_last',train_tile_size=128)):
+            with self.assertRaises(ValueError):load(environ={},_profile=profile(),**bad)
 
     def test_named_notebook_still_validates_yaml_before_launch(self):
         with self.assertRaisesRegex(ValueError,'invalid train_yaml'):

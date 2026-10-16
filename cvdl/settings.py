@@ -160,6 +160,7 @@ SCHEMA = MappingProxyType({
     'lr_drops': Definition('tuple?', drops, lambda c:((c['epochs']//2+1,.1),), 'None=automatic; increasing epoch:factor; factor (0,1]', 'LR drop plan.', env='V3_LR_DROPS', legacy_global='LR_DROPS'),
     'train_yaml': Definition('path?', optional_string, None, 'path or None; OTF only', 'Train embedding settings.', env='V3_TRAIN_YAML', legacy_global='TRAIN_YAML'),
     'train_grid': Definition('str', str, 'recorded', 'recorded/overlap_last/centre_trim/centre_pad', 'Training-only tiling rule.', lambda v:v in {'recorded','overlap_last','centre_trim','centre_pad'}),
+    'train_tile_size': Definition('int?', lambda x:None if x is None else integer(x), None, 'None (=tile_size) or 256/512; needs explicit train_grid', 'Training tile size; evaluation keeps tile_size.', lambda v:v is None or v in {256,512}),
     'post_fit_eval': Definition('str', str, 'full', 'full/none', 'Run post-fit evaluation.', lambda v:v in {'full','none'}),
     'name': Definition('str?', optional_string, None, 'notebook stem or None', 'Short experiment notebook name.'),
     'extra_tests': Definition('str', str, 'test-bpp1', 'none/test-bpp1/source-panels or both panels', 'Extra evaluation panels.', lambda v:set(v.split(','))<={'none','test-bpp1','source-panels'} and ('none' not in v or v=='none'), 'V3_EXTRA_TESTS', 'EXTRA_TESTS'),
@@ -475,6 +476,8 @@ def load(*, overrides=(), environ=None, _profile=None, **notebook_values):
         origins_all['job_id']='interactive'
     if c['name'] and c['job_id'] and not c['job_id'].startswith(c['name']+'-'):
         raise ValueError('job_id must start with experiment name')
+    if c['train_tile_size'] not in (None,c['tile_size']) and c['train_grid']=='recorded':
+        raise ValueError('train_tile_size differs from tile_size only with an explicit train_grid')
     if c['train_grid']!='recorded' and c['data']!='otf':
         raise ValueError('train_grid requires OTF data')
     result = Settings(freeze(c),freeze(origins_all),profile.name,freeze(history))

@@ -63,8 +63,8 @@ def fixed_subset(dataset,count,seed=0):
 
 class NotebookData:
     def __init__(self,root,settings,*,quick=False,profile="overlap_full_mix",eval_pairs=16,
-                 checkpoint_validation="standard",val_cap_raise=5000,val_cap_lsdir=1500,train_grid='recorded'):
-        self.corpus=Corpus(root,settings,train_grid=train_grid)
+                 checkpoint_validation="standard",val_cap_raise=5000,val_cap_lsdir=1500,train_grid='recorded',train_tile=None):
+        self.corpus=Corpus(root,settings,train_grid=train_grid,train_tile=train_tile)
         self.train=TrainingImages(self.corpus)
         chosen={r["photo_id"] for r in self.corpus.selected}
         self.fixed_train=FixedPairs(self.corpus,"train",profile,photo_ids=chosen)
@@ -147,7 +147,7 @@ class NotebookData:
         from lsb_mode1 import TileSpec,OTFSeed,make_sample
         record=self.corpus.selected[0]
         photo=self.corpus.photo(record)
-        spec=TileSpec(self.corpus.settings.grid if self.corpus.train_grid=='recorded' else self.corpus.training_grid(record),self.corpus.settings.tile_size,0,0)
+        spec=TileSpec(self.corpus.settings.grid if self.corpus.train_grid=='recorded' else self.corpus.training_grid(record),self.corpus.train_tile,0,0)
         a,_=make_sample(photo,record,spec,self.corpus.config,OTFSeed(self.corpus.settings.run_seed,"train",0),"stego")
         b,_=make_sample(photo,record,spec,self.corpus.config,OTFSeed(self.corpus.settings.run_seed,"train",1),"stego")
         assert not np.array_equal(a,b)

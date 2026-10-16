@@ -131,7 +131,7 @@ class Corpus:
     Evaluation always includes both frozen sources; training source selection,
     fraction, weights, and custom YAML cannot change overlap_full_mix.
     """
-    def __init__(self, repo_root, settings: RunSettings, *, records=None, train_grid='recorded'):
+    def __init__(self, repo_root, settings: RunSettings, *, records=None, train_grid='recorded', train_tile=None):
         self.root=Path(repo_root)
         self.settings=settings
         manifests=Path(settings.manifest_root) if settings.manifest_root else self.root
@@ -142,8 +142,12 @@ class Corpus:
         from lsb_train_grid import POLICIES, summary
         if train_grid not in {'recorded',*POLICIES}:raise ValueError('invalid train_grid')
         self.train_grid=train_grid
+        self.train_tile=settings.tile_size if train_tile is None else train_tile
+        if type(self.train_tile) is not int or self.train_tile not in (256,512):raise ValueError('invalid train tile size')
+        if self.train_tile!=settings.tile_size and train_grid=='recorded':
+            raise ValueError('train tile size differs from tile_size only with an explicit train_grid')
         self._grid_photos=[r for r in self.photos if r['source'] in settings.sources]
-        self.grid_record=(summary(self.root,self._grid_photos,settings.tile_size,train_grid,verify=records is None)
+        self.grid_record=(summary(self.root,self._grid_photos,self.train_tile,train_grid,verify=records is None)
                           if train_grid!='recorded' else None)
         self.by_id={r["photo_id"]:r for r in self.photos}
         if len(self.by_id)!=len(self.photos):
@@ -208,7 +212,7 @@ class Corpus:
         if self.train_grid=='recorded':
             return grid_axes(record,self.effective_grid(record),self.settings.tile_size)
         from lsb_train_grid import axes
-        return axes(record,self.settings.tile_size,self.train_grid)
+        return axes(record,self.train_tile,self.train_grid)
 
     def training_pairs(self, record):
         if self.train_grid=='recorded':return self.pairs_in_photo(record,self.settings.grid)
@@ -219,7 +223,7 @@ class Corpus:
         if self.grid_record is None:return
         from lsb_train_grid import plan
         with (Path(folder)/'train_grid_plan.jsonl').open('w') as out:
-            out.writelines(plan(self._grid_photos,self.settings.tile_size,self.train_grid))
+            out.writelines(plan(self._grid_photos,self.train_tile,self.train_grid))
         (Path(folder)/'train_grid_summary.json').write_text(json.dumps(self.grid_record,indent=2)+'\n')
 
     def train_tile_schedule(self,epoch):
@@ -279,12 +283,13 @@ class Corpus:
     @property
     def run_record(self):
         extra={} if self.grid_record is None else {'train_grid':self.grid_record}
+        if self.train_tile!=self.settings.tile_size:extra['train_tile_size']=self.train_tile
         return dict(**extra,settings=asdict(self.settings),source=self.settings.source,grid=self.settings.grid,tile_size=self.settings.tile_size,
                     run_seed=self.settings.run_seed,train_photo_fraction=self.settings.train_photo_fraction,
                     train_photo_selection=self.selection_record,source_weights=self.settings.source_weights,
                     variants_per_tile=self.settings.variants_per_tile,fixed_variants=self.settings.fixed_variants,
                     buffer_images=self.settings.buffer_size,
-                    buffer_payload_bytes=self.settings.buffer_size*self.settings.tile_size**2*3)
+                    buffer_payload_bytes=self.settings.buffer_size*self.train_tile**2*3)
 
 
 class TrainingImages(IterableDataset):
@@ -329,7 +334,7 @@ class TrainingImages(IterableDataset):
             for row in range(len(ys)):
                 for col in range(len(xs)):
                     for variant in range(1,settings.variants_per_tile+1):
-                        spec=TileSpec(settings.grid if self.corpus.train_grid=='recorded' else self.corpus.training_grid(record),settings.tile_size,row,col)
+                        spec=TileSpec(settings.grid if self.corpus.train_grid=='recorded' else self.corpus.training_grid(record),self.corpus.train_tile,row,col)
                         seed=OTFSeed(settings.run_seed,"train",epoch,variant,settings.fixed_variants)
                         clean,_=make_sample(photo,record,spec,self.corpus.config,seed,"clean")
                         stego,meta=make_sample(photo,record,spec,self.corpus.config,seed,"stego")
@@ -349,7 +354,7 @@ class TrainingImages(IterableDataset):
             photo=self.corpus.photo(record)
             ys,xs=self.corpus.training_axes(record)
             for row,col,variant in tiles:
-                spec=TileSpec(self.corpus.training_grid(record),settings.tile_size,row,col)
+                spec=TileSpec(self.corpus.training_grid(record),self.corpus.train_tile,row,col)
                 seed=OTFSeed(settings.run_seed,"train",epoch,variant,settings.fixed_variants)
                 clean,_=make_sample(photo,record,spec,self.corpus.config,seed,"clean")
                 stego,meta=make_sample(photo,record,spec,self.corpus.config,seed,"stego")

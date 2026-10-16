@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 
 VERSION = 'train-grid-v1'
+SUMMARIES = {512: 'summary.json', 256: 'summary-256.json'}
 POLICIES = {'overlap_last': 'train_overlap_v1', 'centre_trim': 'centre_trim', 'centre_pad': 'centre_pad'}
 
 def starts(length, size, policy):
@@ -59,11 +60,12 @@ def summary(root, records, size, policy, *, verify=True):
         counts[value['source']]=counts.get(value['source'],0)+len(value['y'])*len(value['x'])
     result=dict(version=VERSION,tile_size=size,policy=policy,sha256=digest.hexdigest(),pool_counts=counts)
     if verify:
-        expected=json.loads((Path(root)/'data/train-grids/v1/summary.json').read_text())
+        if size not in SUMMARIES:raise ValueError('no approved training grid summary for this tile size')
+        expected=json.loads((Path(root)/'data/train-grids/v1'/SUMMARIES[size]).read_text())
         sources=sorted({r['source'] for r in records if r['split']=='train'})
         # Approved summary covers the full three-source population, not QUICK subsets.
-        if sources!=['alaska','lsdir','raise'] or size!=512:
-            raise ValueError('approved training grid requires all three sources at 512')
+        if sources!=['alaska','lsdir','raise']:
+            raise ValueError(f'approved training grid requires all three sources at {size}')
         for source in sources:
             actual=hashlib.sha256((Path(root)/f'data/{source}/photo_manifest.csv').read_bytes()).hexdigest()
             if actual!=expected['inputs'][source]:raise ValueError(f'{source} frozen manifest changed')
