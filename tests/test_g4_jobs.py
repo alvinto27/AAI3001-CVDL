@@ -153,6 +153,14 @@ raise SystemExit(subprocess.call(a,cwd=root))
         self.assertIn('gcloud compute instances start',done.stdout)
         self.assertNotIn('UNEXPECTED_CLOUD_CALL',done.stderr)
 
+    def test_job_id_has_single_separator_and_exactly_four_random_digits(self):
+        done=self.submit('--notebook','notebooks/newdata-1.ipynb')
+        self.assertEqual(done.returncode,0,done.stdout+done.stderr)
+        job_id=next(line.split('=',1)[1] for line in done.stdout.splitlines() if line.startswith('job-id='))
+        self.assertRegex(job_id,r'^newdata-1-[0-9]{8}T[0-9]{6}Z-[0-9]{4}$')
+        self.assertNotIn('--',job_id)
+        self.assertIn(f'  CVDL_JOB_ID={job_id}\n',done.stdout)
+
     def test_bad_archive_untracked_and_typo_fail_before_cloud(self):
         for path in ('../bad.ipynb','notebooks/archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb',
                      'notebooks/missing.ipynb','notebooks/typo.ipynb','notebooks/link.ipynb'):

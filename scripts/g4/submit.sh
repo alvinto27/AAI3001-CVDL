@@ -56,10 +56,11 @@ if [[ $ACTION == run ]]; then
         [[ -n $NOTEBOOK ]] || { echo 'run needs --notebook PATH' >&2; exit 2; }
         # Python, including validation in --dry-run, runs only in the ROCm container.
         podman exec -w /work aai3001 python scripts/g4/preflight.py --commit "$COMMIT" --notebook "$NOTEBOOK"
-        label=$(basename "$NOTEBOOK" .ipynb | tr -cs 'A-Za-z0-9_-' '-' | cut -c1-50)
+        label=$(basename "$NOTEBOOK" .ipynb)
+        label=$(printf '%s' "$label" | tr -cs 'A-Za-z0-9_-' '-' | cut -c1-50)
         [[ $label =~ ^[A-Za-z0-9] ]] || label="nb-$label"
     fi
-    JOB_ID="${label}-$(date -u +%Y%m%dT%H%M%SZ)-$(printf '%04d' "$RANDOM")"
+    JOB_ID="${label}-$(date -u +%Y%m%dT%H%M%SZ)-$(printf '%04d' "$((RANDOM % 10000))")"
     if [[ -z $ENV_FILE ]]; then
         TEMP_ENV=$(mktemp)
         printf 'V3_NOTEBOOK=%s\nCVDL_JOB_ID=%s\n' "$NOTEBOOK" "$JOB_ID" > "$TEMP_ENV"
