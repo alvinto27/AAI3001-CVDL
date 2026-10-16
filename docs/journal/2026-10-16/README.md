@@ -297,6 +297,20 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
 - Pending: the first real G4 job after phase 5 is the G4 smoke test of the
   refactor.
 
+- Found: tile-grid losses from the photo records. Dropping partial tiles
+  leaves these pixels unseen at 512: RAISE 13.4%, DIV2K 40.4%, ALASKA 21.9%,
+  LSDIR 49.5% (at 256: 7.7 / 17.7 / 21.9 / 24.9%). Training overlap today
+  (RAISE/DIV2K overlap-last): RAISE train 45,674 tiles, 13.5% overlap a
+  neighbour by >=50% (3280 x 4948 photos: bottom row overlaps by 304 px),
+  11.8% duplicate pixels.
+- Decided (user): research hold lifted for ONE experiment: training tiling.
+  Three arms, each applied to every training source (RAISE/ALASKA/LSDIR):
+  overlap-last, centre trim, centre pad (zero padding, added after the stego
+  image exists; payload only in real pixels). Recipe newdata-1; tests and
+  validation unchanged; 3 fresh G4 runs (~$1.3 each) after PC QUICK checks.
+  Deployment must cover the full image; tests may overlap freely.
+- Did: Worker_4 writes the design (`active/plan-training-tiling.md`).
+
 ### Next
 
 - Done: B checks (`042903d`).

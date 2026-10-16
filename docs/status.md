@@ -8,6 +8,8 @@
 
 - **Layout (2026-10-16):** all run outputs in git-ignored `runs/<run>/` (best + `last.ckpt` only, one `run.log`); photos in `Datasets/originals/{raise,div2k,alaska,lsdir}` on the PC and the G4; `V3_SOURCE` defaults to `decode` (the cache is deleted; rebuild it to use `cache`). See `runs/README.md` and `Datasets/README.md`.
 
+- **Active experiment (user lifted the hold for this only): training tiling.** Arms: overlap-last, centre trim, centre zero-pad, each for all training sources; recipe newdata-1; tests and validation frozen. Design in progress (`active/plan-training-tiling.md`); then code, PC QUICK, 3 G4 runs (~$4) on the user's go.
+
 - **Hard test (idea, under discussion with the user; NOT approved, do not start):** a separate held-out test made mostly of hard cases (k=1, low bpp, balanced across tile-noise quarters set on validation, ~1,000 pairs per hard group) reported as its own number next to the unchanged standard test. Pick up after the refactor, only when the user continues the discussion.
 
 - **Notebook refactor (done):** shared code moves into the `cvdl/` package (`active/plan-cvdl-package.md`). Notebook 04 is frozen as the v3 baseline; new work starts from 05. Phases 0-5 done (`bc7eba2`..`8c1c0dc`): models, metrics, data, training, settings, evaluation; notebook 05 is 10 short cells with experiment settings in its top cell (`settings = load(...)`). New experiment = copy notebook 05, fill the top cell. G4: `scripts/g4/submit.sh run --notebook PATH --timeout-min N [--dry-run]` (pre-flight on the PC; see `active/g4-batch-runner.md`). Pending: G4 smoke at the next real job. Check after each phase: `python scripts/refactor_golden.py compare` (CPU, exact; `active/refactor-golden.md`).
