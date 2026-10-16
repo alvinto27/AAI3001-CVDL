@@ -10,7 +10,7 @@
 
 - **Hard test (idea, under discussion with the user; NOT approved, do not start):** a separate held-out test made mostly of hard cases (k=1, low bpp, balanced across tile-noise quarters set on validation, ~1,000 pairs per hard group) reported as its own number next to the unchanged standard test. Pick up after the refactor, only when the user continues the discussion.
 
-- **Notebook refactor (in design):** shared notebook code to move into one importable package; survey first, proof rules before any change. Pending user decision: convert notebook 04 or freeze it.
+- **Notebook refactor (in progress):** shared code moves into the `cvdl/` package (`active/plan-cvdl-package.md`). Notebook 04 is frozen as the v3 baseline; new work starts from 05. Phases 0-1 done (`bc7eba2`, `a8f1a7d`: models + metrics). Check after each phase: `python scripts/refactor_golden.py compare` (CPU, exact; `active/refactor-golden.md`).
 
 - **Code tidy-up (2026-10-16):** one-off checks moved to `scripts/archive/`, Mode 2 (full-photo/MIL) dropped and archived in `LSB-Dataset-Generator/archive/`, notebooks 01 and 03 in `notebooks/archive/`, all tests in `tests/`. See `scripts/archive/README.md`.
 

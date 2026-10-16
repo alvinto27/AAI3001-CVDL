@@ -250,11 +250,27 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
   panel, e.g. 10,956 bpp-1 pairs). Recorded in the refactor golden as a known
   defect, to be fixed on purpose in the settings phase.
 
+- Did: refactor phase 0 (`bc7eba2`): before-values and a re-runnable
+  checker `scripts/refactor_golden.py`. CPU 20-step reference run 28 s
+  (first try took 22+ min on 1 thread in the full bpp-1 panel; fixed to 8
+  threads, no extra panels). Notebook 04 got only its frozen banner.
+- Found: the GPU is not bit-exact across processes, also with unchanged
+  code (5 repeats: 2 exact, others flip; score shifts up to 2.9e-4, logit
+  929 changes by 6e-5). A module audit showed identical code ran.
+- Decided (user): slim checks. Exact and mandatory: settings, data, CPU
+  20-step run, 4-checkpoint CPU outputs; GPU package-vs-notebook in one
+  process (exact 0). GPU QUICK is a smoke test only (files, counts, keys),
+  run once at the end of the refactor.
+- Did: refactor phase 1 (`a8f1a7d`): `cvdl/models.py`, `cvdl/metrics.py`;
+  `map_demo`, `eval_checkpoint`, `speed_matrix`, `check_b_*` import them.
+  Checker ALL EQUAL (re-run by the Orchestrator); 130 tests; a saved bpp-1
+  panel re-scores exactly. Design: `active/plan-cvdl-package.md`.
+
 ### Next
 
 - Done: B checks (`042903d`).
 - Done: bookkeeping tidy-up of docs, runs, data (PC and G4) and code.
-- In progress: notebook refactor (survey and design).
+- In progress: notebook refactor; phases 0-1 done, next phase 2 (data).
 - On hold: A, per-cell training (design written, not approved).
 - On hold: C, capacity / epochs / bf16.
 - Pending: start a new Scribe session (the old Scribe alias shows the
