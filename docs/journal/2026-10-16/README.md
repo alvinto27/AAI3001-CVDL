@@ -196,7 +196,21 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
   checkout detached at `9798b56`, clean. `.g4-state` and the bootstrap install
   unchanged (39 files, same SHA-256; `job.sh` `89cc83e9...`). G4 free disk 66
   -> 116 GB.
-- Pending: PR for `main` with the data-folder change.
+- Decided: `main` stays as it is until `yx` goes into `main` as a whole.
+- Did: code survey (Worker_3). Found: the model classes in
+  `scripts/map_demo.py` (used by `eval_checkpoint.py` and check B) are a
+  rewritten copy of the notebook 05 cell. Parity check on 4 real checkpoints
+  x 64 real tiles (RAISE, DIV2K, ALASKA, LSDIR), CPU and GPU: logits and cell
+  maps differ by exactly 0; strict state_dict loads. Past results are not
+  affected. Permanent test `tests/test_model_copy_parity.py` (`ac8810a`).
+- Found: the 34 tests in `LSB-Dataset-Generator/tests` ran only from inside
+  that folder and were never part of the suite; they pass.
+- Did: code tidy-up (`d6a3875`): 8 one-off check / selection scripts to
+  `scripts/archive/` (they need the deleted PNG dataset), `check_notebook_quick.py`
+  deleted, generator tests moved into `tests/`, Mode 2 code and its 12 tests
+  archived (dropped with MIL), notebooks 01 and 03 to `notebooks/archive/`.
+  Active scripts, `scripts/g4/` and `scripts/pi/` unchanged. Suite: 122
+  tests pass from the repo root (100 + 34 - 12 archived).
 
 ### Next
 
