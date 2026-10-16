@@ -18,6 +18,7 @@
 - [Wide XuNet model-size comparison plan](plan-wide-xunet.md)
 - [Wide XuNet G4 result against R2](result-wide-xunet.md)
 - [Mixed ALASKA/LSDIR wide XuNet G4 result](result-newdata-1.md)
+- [PC check B: validation thresholds and ALASKA tile errors](result-check-b.md)
 - [Frozen RAISE and DIV2K source records](frozen-source-records.md)
 - [Full-photo source API and verification](source-verification.md)
 - [Shared settings draws and seed keys](settings-and-seeds.md)
