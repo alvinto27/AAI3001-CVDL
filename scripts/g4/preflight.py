@@ -79,7 +79,7 @@ if getattr(settings,'train_grid','recorded')!='recorded':
     records=[]
     for source in settings.sources:
         records.extend(csv.DictReader((Path(settings.root)/f'data/{source}/photo_manifest.csv').open()))
-    summary(settings.root,records,settings.train_tile_size or settings.tile_size,settings.train_grid)
+    summary(settings.root,records,getattr(settings,'train_tile_size',None) or settings.tile_size,settings.train_grid)
 print(json.dumps(dict(values=plain(settings.values), sources=plain(settings.provenance),
     profile=settings.profile, run_name=settings.run_name, globals=settings.legacy_globals(),
     run_settings=asdict(settings.to_run_settings()))))
