@@ -36,5 +36,6 @@ The old checkpoint-selection validation decision is **done**: the mixed run used
 | `465de12` | Latest dated journal update before this documentation reorganization. |
 | `45ec074` | Documentation reorganization (status, findings, journal by day). |
 | `99ca3a1` | Keep only last + best checkpoints and one run log; old per-epoch checkpoints removed. |
+| `5881bbd`..`7d56dbe` | One `runs/` folder for all runs. PR #2 brings the same move to `main` (pending user merge). |
 
 The [documentation index](README.md) lists each current, result, and historical record. The [run guide](active/g4-batch-runner.md) is reference material only while work is on hold.

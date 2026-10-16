@@ -156,6 +156,18 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
   695 MB.
 - Decided: G4 preemption keeps the fresh-ID restart. G4 resume across boots
   is postponed until C (longer runs).
+- Did: Worker_3 merged `runs-out/`, `checkpoints/` and `notebooks/runs/` into
+  one git-ignored `runs/` folder (`5881bbd`, `7463ce1`, `7d56dbe`; tracked
+  result files stay tracked). Notebooks 01, 03, 04 and 05 and the scripts
+  write to `runs/`. The G4 keeps its internal `runs-out/` paths (installed
+  `job.sh`, job-ID records); the PC copy lands in `runs/<job-id>/`. Removed
+  20 early per-epoch checkpoints, one duplicate checkpoint and the old
+  `pc-headless-2ep` test run (~19 MB). 97/97 tests pass.
+- Decided: the user discarded the private notebook 04 edits (test settings
+  only). The Orchestrator dropped all 4 notebook 04 stashes.
+- Did: PR #2 to `main` (branch `runs-folder-main`) with only the same folder
+  move for main's files: https://github.com/alvinto27/AAI3001-CVDL/pull/2.
+  Pending: user merge.
 
 ### Next
 
