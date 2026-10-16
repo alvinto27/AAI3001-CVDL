@@ -45,12 +45,10 @@ RUN = 3          # val/test blocks are placed in runs of up to RUN blocks (30 ph
 UNSEEN = ["Google_Pixel-XL", "Samsung_GalaxyS9plus-SM-G965F", "Huawei_P20lite-ANE-LX1",
           "Panasonic_DMC-TZ60", "Ricoh_GRDigital-III", "Canon_EOS-60D", "Sony_A7R", "Pentax_K50"]
 DROP_MODELS = {"Leica_Mono"}
-# Decision (Orchestrator, 2026-10-15): train only, no val/test_seen photos; val and test_seen come
-# from the other models. Reason: on the partial download these models had only 250-395 photos and
-# a block split put blocks of different splits next to each other (ID gap 1-3). With the full
-# download only G11 (333) and D90 (395) are small; the list is kept as decided.
-TRAIN_ONLY = ["Canon_PowerShot-G11", "Kodak_Z990", "Pentax_K10D", "Pentax_ist-DS",
-              "Sigma_SD10", "Nikon_D90"]
+# Decision (user, 2026-10-16, from full-download counts): train only, no val/test_seen photos;
+# val and test_seen come from the other models. Reason: Canon_PowerShot-G11 has only 333 photos
+# and Nikon_D90 only 395, too few for a block split with gaps. Nikon_D90 also occurs in RAISE.
+TRAIN_ONLY = ["Canon_PowerShot-G11", "Nikon_D90"]
 UNSEEN_CAP = 250
 MAX_USE = 0.75   # at most this share of a mixed model's photos is used, so empty blocks keep splits apart
 TRAIN, VAL, TEST_SEEN = 13500, 1000, 1700
