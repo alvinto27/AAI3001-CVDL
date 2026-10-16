@@ -30,6 +30,7 @@ States: `queued` (approved, waiting) · `preparing` (code or notebook not ready)
 | Task | State | Note |
 | --- | --- | --- |
 | SRM notebook build | Worker_5 (started) | tile size, grid, batch, tiles/epoch unset |
+| **Fix the padding check first (blocks all padding checks)** | approved, first task on 2026-10-17 | the 2026-10-16 check ran in one process (~74% of one core, no data workers; 65,736 cases for one model). Fix: multi-worker loader for decode/embed (like the main evaluation) and a cap of 2,000 pairs per shape and level, the same seeded pairs for every model. Do not resume or rerun any padding check until this is fixed and reviewed. |
 | Temperature scaling in `scripts/evaluate_run.py` | approved, queued (next free worker) | one T fitted on validation; report calibration, 1.0 ties and FA5 reachability before/after; add only (old outputs unchanged); also run on wide-R2, newdata-1 and the tiling models |
 | tanh saturation measurement | approved, queued (next free worker) | existing models, PC; share of tanh inputs with abs > 3 per layer, clean vs stego; a G4 run only if a fix is tested later |
 | Photo-level decision | deferred by the user | — |
