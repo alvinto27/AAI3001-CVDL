@@ -19,7 +19,7 @@
 - **Code tidy-up (2026-10-16):** one-off checks moved to `scripts/archive/`, Mode 2 (full-photo/MIL) dropped and archived in `LSB-Dataset-Generator/archive/`, notebooks 01 and 03 in `notebooks/archive/`, all tests in `tests/`. See `scripts/archive/README.md`.
 
 - **Completed:** ALASKA/LSDIR source records and mixed sampler; final verified masters; G4 mixed run and [result](results/result-newdata-1.md); PC threshold/noise check B and [result](results/result-check-b.md). The frozen standard test and RAISE/DIV2K records remain in use.
-- **On hold:** A, per-cell training (design only, no code or model run); C, capacity/longer training/BF16; fair R0 control, seed repeats, front-end changes, and other free checks. No follow-up is authorized by the plans.
+- **On hold:** A, per-cell training (design only, no code or model run); C, capacity/longer training/BF16; seed repeats, front-end changes, and other free checks. No follow-up is authorized by the plans.
 - **Deferred records:** prebuilt writer, OTF plan step 17: [historical design](archive/plan-otf-generator.md), OTF implemented but writer deferred. Noisy covers: [parked by the user](archive/plan-noisy-covers.md). G4 GPU LSB generator: [shelved design](archive/plan-gpu-generator.md), not built. G4 resume after Spot preemption: postponed until C (longer training); today a preempted G4 run restarts with a fresh job ID (see [run guide](active/g4-batch-runner.md)). Long runs need resume across boots because one boot is limited to 105 min.
 - **Hardware and delivery:** the G4 is **stopped** (last boot: data-layout maintenance, 06:00:55-06:10:43Z on 2026-10-16). It keeps its internal `runs-out/` folder name until the next real G4 job. `main` stays at PR #2 until `yx` is merged as a whole (expect add/add conflicts from PR #1). The Pi is online. Its USB-SSD swap file was removed; **2 GiB zram only** remains. See the [Pi record](active/pi-host-changes.md) and [2026-10-16 journal](journal/2026-10-16/README.md). Do not start the VM to resend a result.
 
@@ -31,7 +31,7 @@ These rows carry the pending decisions from the archived [research checklist](ar
 | --- | --- | --- |
 | ALASKA train-only models: six or two (option B) | User | Checklist marked Pending; Orchestrator recommended option B. Final selection used option B; do not reopen it without a new decision. |
 | BF16 for G4 | User | Pending; speed matrix complete, batch 32 retained. |
-| Fair control R0 | User / Orchestrator | Pending before a causal source/model gain claim. |
+| Fair control R0 | User | **Dropped** (2026-10-16): no normalisation is kept for detection and maps; the GroupNorm cost is not needed. |
 | Seed repeats | User / Orchestrator | Pending; one seed is not enough for small differences. |
 | Front-end upgrade | User / Orchestrator | Pending after the wide and new-source results. |
 

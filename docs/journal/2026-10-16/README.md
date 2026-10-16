@@ -311,6 +311,14 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
   Deployment must cover the full image; tests may overlap freely.
 - Did: Worker_4 writes the design (`active/plan-training-tiling.md`).
 
+- Decided (user): R0 control dropped (no normalisation stays for detection
+  and maps). No seed repeats yet. Augmentation stays on. After the 6 tiling
+  runs: SRM filter bank instead of KV (Worker_5 builds the notebook with tile
+  size, grid, batch and tiles/epoch unset). G4 run queue in
+  `active/run-queue.md`.
+- Did: tiling arm 1 launched 14:00Z (`tiling-overlap-20261016T135926Z-8501`,
+  commit `8fff50d`); about 71 s per epoch.
+
 ### Next
 
 - Done: B checks (`042903d`).
