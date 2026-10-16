@@ -1,6 +1,0 @@
-clip_t: null
-lr: 0.001
-max_epochs: 10
-norm: group
-paired_batches: false
-weight_decay: 0.0001
