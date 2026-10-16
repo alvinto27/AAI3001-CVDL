@@ -294,8 +294,8 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
   files are archived. speed-1 keeps its env file.
 - Found: 167 tests; the dry run of newdata-1 gives job ID
   `newdata-1-<UTC>-<4 digits>` (double-dash bug fixed).
-- Pending: the first real G4 job after phase 5 is the G4 smoke test of the
-  refactor.
+- Done: the first real G4 job after phase 5 (arm 1) passed as the G4 smoke
+  test of the refactor.
 
 - Found: tile-grid losses from the photo records. Dropping partial tiles
   leaves these pixels unseen at 512: RAISE 13.4%, DIV2K 40.4%, ALASKA 21.9%,
@@ -318,6 +318,24 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
   `active/run-queue.md`.
 - Did: tiling arm 1 launched 14:00Z (`tiling-overlap-20261016T135926Z-8501`,
   commit `8fff50d`); about 71 s per epoch.
+
+- Did: tiling arms 1 (overlap) and 2 (trim) on the G4, 39m49s and 39m53s
+  notebook time each (about 71 s per epoch; ~$1.1 each). Arm 3 and the 256
+  arms are paused until 2026-10-17 (user). 256 arms built and dry-run
+  (`30bac1f`; `train_tile_size=256`, batch 128, 180,000 tiles/epoch, 2,813
+  steps/epoch). SRM notebook built (`632dd22`, `97487b8`; 30 fixed filters
+  per channel, 90 channels; tile size, grid, batch and tiles/epoch unset).
+- Found: arm 1 vs newdata-1 on the PC (same backend): standard P_E 2.54 ->
+  2.80%, ALASKA unseen 13.88 -> 13.78%, LSDIR 6.64 -> 7.02%; no overall win,
+  one seed each. Padding check on arm 1 (trained without padding): padding
+  moves scores towards clean; at 50% padding FA 2.8 -> 0.3% and misses 4.2 ->
+  10.0% (strip). The model does not read zeros as stego; zeros dilute the
+  evidence.
+- Found: the padding check ran in one process (65,736 cases, ~20 min).
+  Decided: add data workers and a cap of 2,000 pairs per shape and level
+  before any further padding check.
+- Decided (user): temperature scaling (in `evaluate_run.py`) and a tanh
+  saturation measurement approved (PC); photo-level decision deferred.
 
 ### Next
 
