@@ -224,8 +224,18 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
   evaluation, plots) into one importable package, so each notebook holds
   only its experiment. Worker_3 is doing a survey and design first; nothing
   changes until the proof rules (same hashes, batches, model outputs,
-  checkpoint keys, and training losses) are agreed. Pending: user decision
-  on notebook 04 (convert, or freeze as the v3 baseline).
+  checkpoint keys, and training losses) are agreed.
+- Decided (user): notebook 04 is frozen as the v3 baseline; the refactor
+  starts from notebook 05; package name `cvdl`; each run records its git
+  commit. Phase 0 (capture of the "before" values) started.
+- Decided (user): experiment settings live in the notebook's top cell (in
+  git), not in G4 env files. Machine settings (data workers PC 6/4 vs G4
+  32/16, QUICK, precision limits) come from an automatic per-machine
+  profile. One-off PC overrides via `run_notebook.py --set`, recorded in the
+  run. Settings have one definition each (type, default, range); unknown
+  names or bad values stop the run; each run saves the final settings, the
+  source of each value, and the commit. A G4 job then names a notebook and
+  a commit instead of an env file.
 
 ### Next
 
