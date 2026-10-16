@@ -19,53 +19,11 @@ import pandas as pd
 import torch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'LSB-Dataset-Generator'))
+sys.path.insert(0, str(ROOT))
+import cvdl  # exposes the flat LSB library
 from lsb_torch import Corpus, FixedPairs, OrderedPairLoader, RunSettings
-from map_demo import model_from_hparams
-
-
-def counts(labels, scores):
-    labels = np.asarray(labels, dtype=np.int64)
-    scores = np.asarray(scores, dtype=np.float64)
-    order = np.argsort(-scores, kind='mergesort')
-    ordered = scores[order]
-    ends = np.r_[np.flatnonzero(ordered[1:] != ordered[:-1]) + 1, len(scores)]
-    pos = np.cumsum(labels[order] == 1, dtype=np.int64)[ends - 1]
-    neg = np.cumsum(labels[order] == 0, dtype=np.int64)[ends - 1]
-    return pos, neg, int((labels == 1).sum()), int((labels == 0).sum())
-
-
-def metrics(frame):
-    if frame.empty:
-        return dict(images=0, pairs=0, P_E=None, AUC=None, accuracy=None, false_alarm_rate=None, miss_rate=None)
-    labels = frame['label'].to_numpy(dtype=np.int64)
-    scores = frame['prob_stego'].to_numpy(dtype=np.float64)
-    pos, neg, positives, negatives = counts(labels, scores)
-    false_alarm = np.r_[0., neg / negatives, 1.] if negatives else np.zeros(len(pos) + 2)
-    miss = np.r_[1., (positives - pos) / positives, 0.] if positives else np.zeros(len(pos) + 2)
-    auc = float(np.trapezoid(np.r_[0., pos / positives, 1.], np.r_[0., neg / negatives, 1.])) if positives and negatives else 0.
-    return dict(images=len(frame), pairs=positives, P_E=float(np.min((false_alarm + miss) / 2)), AUC=auc,
-                accuracy=float(((scores >= .5) == labels).mean()),
-                false_alarm_rate=float((scores[labels == 0] >= .5).mean()) if negatives else None,
-                miss_rate=float((scores[labels == 1] < .5).mean()) if positives else None)
-
-
-def summary_rows(frame):
-    rows = []
-    def add(category, value, subset):
-        rows.append(dict(category=category, value=str(value), **metrics(subset)))
-    add('overall', 'all', frame)
-    for name in ('k', 'bit_mode/k', 'method', 'placement', 'source', 'bpp_bin'):
-        if name == 'bit_mode/k':
-            group = frame['bit_mode'] + '/' + frame['k'].astype(str)
-        else:
-            group = frame[name]
-        for value in sorted(group.dropna().unique(), key=str):
-            add(name, value, frame.loc[group == value])
-    one = frame.loc[frame['k'] == 1]
-    for (placement, bpp_bin), subset in one.groupby(['placement', 'bpp_bin'], observed=True, sort=True):
-        add('k1/placement/bpp_bin', f'{placement}/{bpp_bin}', subset)
-    return rows
+from cvdl.models import model_from_hparams
+from cvdl.metrics import counts, metrics, summary_rows
 
 
 def evaluate(checkpoint, eval_yaml=ROOT / 'configs/raise512-run1.yaml', *, split='test', output,

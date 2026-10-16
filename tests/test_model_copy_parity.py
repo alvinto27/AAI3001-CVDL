@@ -1,7 +1,7 @@
-"""The XuNet classes in scripts/map_demo.py must equal those in notebook 05.
+"""Shared cvdl models must equal the frozen notebook 04/05 model cells.
 
 eval_checkpoint.py, check_b_tiles.py and speed_matrix.py build models from the
-map_demo copy. The notebook defines the model that was trained. This test runs
+shared package. The frozen notebook cells define the models that were trained. This test runs
 the notebook model cell and compares both copies: same state_dict keys, same
 logits, same 32 px cell map. Weights are random (seeded). A real checkpoint is
 used when present (runs/ is git-ignored, so that part skips on a fresh clone).
@@ -9,6 +9,7 @@ used when present (runs/ is git-ignored, so that part skips on a fresh clone).
 import contextlib
 import glob
 import json
+import os
 import re
 import sys
 import unittest
@@ -17,12 +18,12 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT))
 try:
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
-    import map_demo
+    from cvdl import models as map_demo  # alias keeps this before-reference test stable
 except ImportError as error:  # pragma: no cover
     torch = None
     SKIP = str(error)
@@ -80,12 +81,13 @@ class ModelCopyParity(unittest.TestCase):
     def setUpClass(cls):
         cls.ns = notebook_model_namespace()
 
-    def pair(self, hparams, state=None):
+    def pair(self, hparams, state=None, namespace=None):
+        ns = self.ns if namespace is None else namespace
         kw = dict(clip_t=hparams.get("clip_t", 3.0), norm=hparams.get("norm", "group"))
         if hparams.get("model") == "xunet_wide":
-            nb = self.ns["XuNetWide"](width=hparams.get("width", 4), **kw)
+            nb = ns["XuNetWide"](width=hparams.get("width", 4), **kw)
         else:
-            nb = self.ns["XuNet"](**kw)
+            nb = ns["XuNet"](**kw)
         md = map_demo.model_from_hparams(hparams)
         if state is None:
             torch.manual_seed(0)
@@ -104,12 +106,16 @@ class ModelCopyParity(unittest.TestCase):
         self.assertEqual(list(nb.state_dict()), list(md.state_dict()))
         return nb, md
 
-    def assert_same(self, nb, md, size=128):
-        gen = torch.Generator().manual_seed(1)
-        x = torch.randint(0, 256, (2, 3, size, size), generator=gen).float()
+    def assert_same(self, nb, md, size=128, x=None):
+        device = os.environ.get("CVDL_PARITY_DEVICE", "cpu")
+        nb, md = nb.to(device), md.to(device)
+        if x is None:
+            gen = torch.Generator().manual_seed(1)
+            x = torch.randint(0, 256, (2, 3, size, size), generator=gen).float()
+        x = x.to(device)
         nb_logits, nb_cells = notebook_outputs(nb, x)
         md_logits, md_cells = copy_outputs(md, x)
-        self.assertEqual(tuple(nb_cells.shape), (2, size // 32, size // 32))
+        self.assertEqual(tuple(nb_cells.shape), (len(x), size // 32, size // 32))
         self.assertEqual(float((nb_logits - md_logits).abs().max()), 0.0)
         self.assertEqual(float((nb_cells - md_cells).abs().max()), 0.0)
 
@@ -124,17 +130,38 @@ class ModelCopyParity(unittest.TestCase):
                         hp = dict(model=model, norm=norm, clip_t=clip, width=2)
                         self.assert_same(*self.pair(hp))
 
+    def test_frozen_notebook_04(self):
+        ns = notebook_model_namespace("notebooks/04_baseline_kv_xunet_v3.ipynb")
+        self.assertTrue(np.array_equal(ns["KV_ARRAY"], map_demo.KV_ARRAY))
+        for norm in ("group", "batch"):
+            with self.subTest(norm=norm):
+                self.assert_same(*self.pair(dict(model="xunet", norm=norm, clip_t=3.0), namespace=ns))
+
     def test_real_checkpoints_if_present(self):
         patterns = ["runs/g4-v4-r2/checkpoints/*/best*.ckpt",
+                    "runs/g4-prime-1/checkpoints/*/best*.ckpt",
+                    "runs/xunet*wide-w4_mixr2-*/checkpoints/*/best*.ckpt",
                     "runs/xunet*wide-w4_r2-*/checkpoints/*/best*.ckpt"]
         found = [p for pattern in patterns for p in glob.glob(str(ROOT / pattern))]
         if not found:
             self.skipTest("no real checkpoint in runs/")
+        tiles = None
+        if os.environ.get("CVDL_PARITY_DEVICE") == "cuda":
+            from scripts.refactor_golden import load_tiles
+            images, _ = load_tiles()
+            tiles = torch.from_numpy(images).permute(0, 3, 1, 2).float()
         for path in found:
             with self.subTest(path=Path(path).name):
                 ckpt = torch.load(path, map_location="cpu", weights_only=False)
                 state = {k.removeprefix("net."): v for k, v in ckpt["state_dict"].items()}
-                self.assert_same(*self.pair(ckpt["hyper_parameters"], state), size=256)
+                ns = (notebook_model_namespace("notebooks/04_baseline_kv_xunet_v3.ipynb")
+                      if "/g4-prime-1/" in path else self.ns)
+                pair = self.pair(ckpt["hyper_parameters"], state, namespace=ns)
+                if tiles is None:
+                    self.assert_same(*pair, size=256)
+                else:
+                    for start in range(0, len(tiles), 16):
+                        self.assert_same(*pair, size=512, x=tiles[start:start + 16])
 
 
 if __name__ == "__main__":

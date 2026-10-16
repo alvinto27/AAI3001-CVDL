@@ -24,9 +24,11 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'LSB-Dataset-Generator'))
+sys.path.insert(0, str(ROOT))
+import cvdl  # exposes the flat LSB library
 from lsb_source import load_photo
-from map_demo import KV_ARRAY, model_from_hparams, sigmoid
+from cvdl.models import KV_ARRAY, model_from_hparams
+from cvdl.metrics import sigmoid
 
 
 class Covers(Dataset):

@@ -12,54 +12,13 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from cvdl.metrics import threshold, rates
 import numpy as np
 import pandas as pd
 
 SOURCES = ('raise', 'div2k', 'alaska', 'lsdir')
-
-
-def threshold(frame: pd.DataFrame, kind: str, target: float = .05) -> tuple[float, float]:
-    """Return (validation-derived cutoff, validation FA), with score >= cutoff positive.
-
-    For a 5% target, choose the highest empirical FA not exceeding target.
-    Tied scores move together; a zero-FA cutoff above the max is allowed.
-    At equal minimum P_E, prefer the more conservative threshold.
-    """
-    y = frame.label.to_numpy(dtype=np.int8)
-    s = frame.prob_stego.to_numpy(dtype=np.float64)
-    if len(y) == 0 or set(np.unique(y)) != {0, 1} or not np.isfinite(s).all():
-        raise ValueError('expected finite scores with both labels')
-    values, inv = np.unique(s, return_inverse=True)
-    clean = np.bincount(inv[y == 0], minlength=len(values))
-    stego = np.bincount(inv[y == 1], minlength=len(values))
-    # For each score value, positive means >= that value; the final cutoff
-    # is immediately above the largest score and predicts no positives.
-    fa = np.r_[np.cumsum(clean[::-1])[::-1] / clean.sum(), 0.]
-    miss = np.r_[np.cumsum(stego) - stego, stego.sum()] / stego.sum()
-    cutoffs = np.r_[values, np.nextafter(values[-1], np.inf)]
-    if kind == 'fa5':
-        candidates = np.flatnonzero(fa <= target + 1e-12)
-        best = candidates[np.argmax(fa[candidates])]
-    elif kind == 'pe':
-        error = (fa + miss) / 2
-        candidates = np.flatnonzero(np.isclose(error, error.min(), rtol=0, atol=1e-12))
-        best = candidates[np.argmin(fa[candidates])]
-    else:
-        raise ValueError(f'unknown threshold kind {kind}')
-    return float(cutoffs[best]), float(fa[best])
-
-
-def rates(frame: pd.DataFrame, cutoff: float) -> dict:
-    clean = frame.loc[frame.label == 0, 'prob_stego']
-    stego = frame.loc[frame.label == 1, 'prob_stego']
-    k1 = frame.loc[(frame.label == 1) & (frame.k == 1), 'prob_stego']
-    if not len(clean) or not len(stego):
-        raise ValueError('test requires clean and stego rows')
-    fa = float((clean >= cutoff).mean())
-    miss = float((stego < cutoff).mean())
-    return dict(pairs=len(stego), k1_pairs=len(k1), fa=fa, miss=miss,
-                k1_miss=float((k1 < cutoff).mean()) if len(k1) else None,
-                pe_at_cutoff=(fa + miss) / 2)
 
 
 def keyed(spec: str) -> tuple[str, str]:

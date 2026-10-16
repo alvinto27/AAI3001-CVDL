@@ -21,9 +21,10 @@ import torch
 import torch.nn.functional as F
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / 'LSB-Dataset-Generator'), str(ROOT / 'notebooks')]
+sys.path[:0] = [str(ROOT), str(ROOT / 'notebooks')]
+import cvdl  # exposes the flat LSB library
 from lsb_torch import Corpus, RunSettings, TrainingImages, training_loader
-from map_demo import XuNet
+from cvdl.models import XuNet
 
 
 def telemetry(stop, rows, phase):

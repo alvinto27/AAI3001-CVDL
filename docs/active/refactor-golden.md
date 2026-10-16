@@ -1,105 +1,78 @@
-# Notebook 05 refactor: golden before-values
+# Notebook refactor: before-values and checks
 
-Phase 0 only. No training or model code has been moved. Notebook 04 is the frozen
-v3 baseline; its only change is a short banner in the first markdown cell.
+The [golden JSON](../../tests/golden/refactor-golden.json) is the phase-0 record;
+do not overwrite it during the refactor. The [checker](../../scripts/refactor_golden.py)
+records effective settings/RUN_NAMEs, train/val/test identities, decoded batches,
+four real checkpoints on 64 reproducible tiles, and a deterministic CPU run.
+Library versions, checkpoint/input hashes and tile coordinates are recorded.
+Notebook 04 is frozen; phase 1 leaves notebook 05 unchanged as a reference.
 
-## Files and commands
-
-- [Capture/check script](../../scripts/refactor_golden.py)
-- [Golden JSON](../../tests/golden/refactor-golden.json)
-- [CPU settings](../../tests/golden/cpu-det.env)
-- [GPU QUICK settings](../../tests/golden/quick-gpu.env)
-
-Run Python in the ROCm container. The original photos and the four local
-checkpoints are required. Check that no notebook or other GPU job is active
-before the GPU checks (`pgrep -af ipykernel_launcher`; `podman exec aai3001 amd-smi process`).
+## Run
 
 ```sh
-podman exec -w /work aai3001 python scripts/refactor_golden.py capture
+# Default: settings, data, four-checkpoint CPU outputs, CPU 20-step run (~3 minutes).
 podman exec -w /work aai3001 python scripts/refactor_golden.py compare
-# A shorter check during a phase:
-podman exec -w /work aai3001 python scripts/refactor_golden.py compare --only settings,data,models,cpu
+# Same-process GPU package-vs-notebook proof (check GPU availability first).
+podman exec -w /work -e CVDL_PARITY_DEVICE=cuda aai3001 python -m unittest discover -s tests -p test_model_copy_parity.py
+# GPU QUICK smoke only: run once at the end of the refactor, not every phase.
+podman exec -w /work aai3001 python scripts/refactor_golden.py compare --only gpu
 ```
 
-`capture` writes the before-values. Do not overwrite the tracked JSON during the
-refactor. `compare` only reads that file; it reports differences and returns a
-nonzero exit code if a check fails. Temporary outputs are under `runs/.scratch/`
-and are removed after each check. Use `capture --out runs/.scratch/second.json`
-for an independent second capture. `--only` selects parts.
+Check `pgrep -af ipykernel_launcher` and `podman exec aai3001 amd-smi process`
+before GPU work. Photos and the four local checkpoints are required. The test
+suite skips real-checkpoint tests when checkpoints are absent. Capture/compare
+uses `runs/.scratch/` and removes its temporary run outputs.
 
-The JSON is specific to this PC/container: library versions, device and resolved
-`/work` paths are recorded. A version or machine change needs review, not a new
-baseline made silently.
-
-## Coverage
-
-| Part | Recorded | Compare rule |
-| --- | --- | --- |
-| settings | Actual notebook setup cell, uppercase settings, RUN_NAME, RunSettings, train/val/test frame hashes, epoch 0/1 schedule hashes; G4 newdata-1/wide-1 and CPU/GPU QUICK env files | Exact |
-| speed-1 settings | `run_notebook.settings_file` and `speed_matrix.settings()`; this job bypasses the notebook | Exact; no speed test is started |
-| standard test | 10,956 pairs; the same settings-field CSV/hash as `eval_checkpoint.py` | `fdd989f7bdab0ec6f9fd6f4c57bdde981d16b54aa8c37e5da8fd3dfcc8b06837` |
-| capped validation | Full newdata-1 validation pair CSV, 8,035 pairs (5,000 RAISE / 1,535 ALASKA / 1,500 LSDIR) | `6bb3c8efadad06af50ba014a95c98b4fc57008119bdd55b794ec2a1729e4d5ca` |
-| data | Newdata-1 with 1% train photos, batch 8, decode, priming off, nonpersistent eval; 6 train batches in epochs 0 and 1, first 2 val/test batches, full frame hashes, workers 0 and 4 | Exact **within each worker count**; training interleave differs between worker counts, so their hashes are not expected to equal each other |
-| models | Four best checkpoints: wide-w4 r2, wide-w4 mixr2, g4-v4-r2, g4-prime-1; strict state load; 64 real tiles (8 clean + 8 stego per source); logits and 16×16 margin maps; CPU and ROCm GPU | CPU and GPU hashes each repeat exactly and are mandatory. CPU vs GPU rounding deltas are recorded, not expected to be zero. Tile list, seed and input-pixel hash recorded |
-| CPU | Notebook 05: fixed seed, plain XuNet/no norm, eager, decode, batch 8, 8 fixed threads, workers 0, 20 train steps and one end-of-epoch validation pass (QUICK: 16 pairs); sanity validation also runs as usual | Per-step losses, final weight hash, metrics.csv values and checkpoint key lists exact |
-| GPU | Notebook 05 via unmodified `scripts/run_notebook.py`: mixed sources, wide model, eager, 2 epochs, train/eval workers 6/4, QUICK 16-pair validation/test, full extra bpp-1 panel | Counts, file list, checkpoint keys, epoch AUC/P_E/accuracy and identities exact. Losses/scores: absolute tolerance 1e-4. Panel P_E/AUC: report-only, warn above 0.01. Timings and TensorBoard event names excluded |
-
-For the model input tiles, the script uses one photo from each source, crops
-512×512 windows with RNG seed 7, and makes a stego counterpart by random LSB
-replacement (k=1…4, 50% of channel values). These are parity fixtures, not a
-production benchmark. The JSON stores the photo path, crop coordinates, kind,
-k, input-pixel hash and checkpoint file SHA. In phase 0, both the trained
-notebook class (04 for g4-prime-1, 05 otherwise) and `map_demo` are evaluated
-with the same state dict; any output difference stops capture.
-
-The CPU driver executes notebook cells in their original order and wraps
-`Trainer.fit` to record losses and final weights, then stops after fit. It does
-not run the later test, extra-panel or diagnostic cells. No notebook-only
-settings or alternate model implementation are introduced. Hyperparameter
-names/values, state-dict keys/shapes/dtypes, callback-state keys and optimizer
-state key lists come from this fresh run's `last.ckpt`.
-
-## Known defect: QUICK extra panels are not capped
-
-**QUICK does not cap extra panels.** The bpp-1 panel still evaluates all
-10,956 pairs; source panels would also run at full size. The GPU reference
-keeps this behaviour and runs only `V3_EXTRA_TESTS=test-bpp1`. The CPU reference
-sets extras to `none` (the full CPU panel previously took more than 23 minutes
-and was stopped after training and standard test had finished).
-
-Fixing QUICK to cap extra panels is an **intentional settings-phase change**.
-Its smaller pair count, settings hash, metrics and output list must be reviewed
-as expected differences then. Do not silently update the golden to conceal it.
-
-## Refactor use
-
-Keep the before JSON unchanged. After a code move, adapt the capture entry point
-only when required (for example, `cvdl.models.model_from_hparams` replaces the
-current model copy automatically). Never weaken the comparison to obtain a
-pass. Module source names can change; model class names, parameter keys, input
-bytes and outputs cannot. The current notebook setup/loader globals form the
-capture interface; replace the adapter explicitly if a phase removes them.
-
-## Self-reproduction result
-
-Two independent captures passed `compare --candidate runs/.scratch/second.json`.
-The [self-reproduction summary](../../tests/golden/self-reproduction.json) records the observed deltas.
-
-| Check | Before versus before |
+| Check | Rule |
 | --- | --- |
-| Settings, data, four-checkpoint outputs (CPU and GPU) | Exact |
-| CPU: 20 per-step losses, metrics and weights | Exact; final weights SHA `5525eb379fe37a74b9b1d28bc3caee453cf7835edfb548385ab1b04d28812edb` |
-| GPU QUICK loss maximum absolute difference | 4.6492e-6 (enforced limit: 1e-4) |
-| GPU standard-test probability maximum difference | 3.0190e-5 (enforced limit: 1e-4); raw score CSV hashes differ as expected |
-| GPU epoch AUC/P_E/accuracy, checkpoint keys, counts and file list | Exact |
-| Full bpp-1 P_E: overall / worst bin difference | 0.00018255 / 0.00335570 (report-only) |
-| Full bpp-1 AUC: overall / worst bin difference | 0.00009053 / 0.00043403 (report-only) |
-| Runtime per complete capture | About 4.8 minutes: settings 23 s, data 56 s, models 58 s, CPU 26 s, GPU 122 s |
+| Settings: G4 newdata-1/wide-1, speed-1 tool settings, CPU/GPU QUICK | Exact. Actual setup/parser outputs, effective settings and run names |
+| Standard test: 10,956 pairs | Exact settings SHA `fdd989f7bdab0ec6f9fd6f4c57bdde981d16b54aa8c37e5da8fd3dfcc8b06837` |
+| Capped validation: 8,035 pairs (5,000 RAISE / 1,535 ALASKA / 1,500 LSDIR) | Exact pair SHA `6bb3c8efadad06af50ba014a95c98b4fc57008119bdd55b794ec2a1729e4d5ca` |
+| Data: decode, first 6 train batches at epochs 0/1; first 2 val/test batches; full frames; workers 0 and 4 | Exact within each worker count (train interleaves differ across counts). Uses newdata-1, batch 8, 1% train photos, priming off |
+| Four checkpoints: wide r2, wide mixr2, g4-v4-r2, g4-prime-1 | CPU logits/maps hashes exact across runs. GPU package vs frozen notebook models exact within one process; no historical GPU byte-hash check |
+| CPU: 20 train steps + one end-of-epoch validation; fixed seed, 8 threads, workers 0, no norm | Exact losses, final weights, metrics and checkpoint keys. Ordinary sanity validation unchanged; downstream test/panel cells not run |
+| GPU QUICK: 6/4 workers, wide/mixed model, two epochs | Smoke only: finishes with same files, counts, identities and key lists. Loss/score/metric deltas printed but never fail |
 
-The QUICK model is near chance, so the full panel's small-bin rank/tie metrics
-are noisy. They are printed but not enforced; a delta above 0.01 prints a
-warning. Counts, panel identities and schemas still fail on a change. The exact
-CPU and four-checkpoint checks carry the refactor-equivalence proof; the GPU
-QUICK run checks the live training/output path. Five comparator tests ensure
-that exact fields cannot accidentally enter the tolerance/report-only paths.
-The full repository suite passes **127 tests** (122 existing + 5 comparator tests).
+The 64 model tiles are 8 clean + 8 stego from each of RAISE/DIV2K/ALASKA/LSDIR.
+RNG seed 7 selects crops and random LSB replacement (k=1…4, 50% channel values).
+These are parity fixtures, not production accuracy results. The GPU parity test
+runs these tiles against both models with identical checkpoint weights, using
+notebook 04 for prime-1 and notebook 05 for the other three.
+
+## Why GPU cross-run checks are smoke checks
+
+GPU kernels are not bit-exact across processes, including on unchanged code.
+Five additional QUICK runs below showed discrete mode flips; both the phase-0
+control and phase-1 code produced the same AUC flip (.625 → .62890625). A
+one-off module-file/backend audit at standard prediction save found identical
+loaded code and flags, and no `cvdl` import before that point. Later the wide
+fixed-checkpoint GPU hashes also flipped (about 6e-5 on a 929 logit). Therefore
+CPU historical hashes remain the cross-run proof, and exact same-process GPU
+notebook/package comparisons prove the GPU implementation. The audit hook and
+control worktree are not retained; there are no extra GPU array fixtures.
+
+| Run vs phase-0 golden | Max score delta | Max loss delta | Epoch 1 validation AUC |
+| --- | --- | --- | --- |
+| Phase-0 control 1 | 0 | 0 | .625 |
+| Phase-0 control 2 | 0 | 0 | .625 |
+| Phase-0 control 3 | 2.7061e-5 | 1.1086e-5 | .62890625 |
+| Phase-1 repeat 1 | 1.8865e-5 | 1.0014e-5 | .625 |
+| Phase-1 repeat 2 | 2.9173e-4 | 1.8716e-5 | .62890625 |
+
+Initial phase-0 self-reproduction is recorded in
+[self-reproduction.json](../../tests/golden/self-reproduction.json). Its original
+GPU tolerance fields are historical, not the current comparison rules above.
+CPU final weights SHA:
+`5525eb379fe37a74b9b1d28bc3caee453cf7835edfb548385ab1b04d28812edb`.
+
+## Known defect and later change
+
+**QUICK does not cap extra panels:** the bpp-1 panel evaluates all 10,956 pairs.
+The GPU smoke [settings](../../tests/golden/quick-gpu.env) retain that behaviour;
+the CPU [settings](../../tests/golden/cpu-det.env) disable extras. Fix QUICK's
+extra-panel cap deliberately in the settings phase and review its expected
+pair-count/settings/output differences; never silently replace the before JSON.
+
+The package/API design is in the [cvdl plan](plan-cvdl-package.md). Keep old
+checkpoint parameter and hyperparameter names. Update capture adapters explicitly
+when later phases remove notebook globals; do not weaken exact CPU/data checks.

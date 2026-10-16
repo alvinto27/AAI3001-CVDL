@@ -26,7 +26,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'LSB-Dataset-Generator'))
+sys.path.insert(0, str(ROOT))
+import cvdl  # exposes the flat LSB library
 from lsb_batch import read_config
 from lsb_engine import embed_fast
 from lsb_source import load_photo, grid_axes
@@ -37,106 +38,8 @@ OUTPUT = ROOT / 'runs/map-demo'
 CHECKPOINT = ROOT / 'runs/g4-prime-1/checkpoints/g4-prime-1/best-epoch08-val_pe0.0147-val_auc0.9973.ckpt'
 RATES = (0.05, 0.275, 0.5)  # low, midpoint, high of the training [0.05, 0.5] bpp range
 PLACEMENTS = ('contiguous', 'random')
-KV_ARRAY = np.array([[-1, 2, -2, 2, -1], [2, -6, 8, -6, 2],
-                     [-2, 8, -12, 8, -2], [2, -6, 8, -6, 2],
-                     [-1, 2, -2, 2, -1]], dtype=np.float32) / 12.0
-
-
-class KVFilter(nn.Module):
-    """Frozen depthwise KV residual filter from notebook 04 cell 14."""
-    def __init__(self):
-        super().__init__()
-        self.conv = nn.Conv2d(3, 3, kernel_size=5, padding=2, groups=3, bias=False)
-        with torch.no_grad():
-            self.conv.weight.copy_(torch.tensor(KV_ARRAY).view(1, 1, 5, 5).repeat(3, 1, 1, 1))
-        self.conv.weight.requires_grad_(False)
-
-    def forward(self, x):
-        return self.conv(x)
-
-
-def make_norm(channels, norm):
-    if norm == 'none':
-        return nn.Identity()
-    if norm == 'batch':
-        return nn.BatchNorm2d(channels)
-    if norm == 'group':
-        return nn.GroupNorm(8, channels)
-    raise ValueError(f'unsupported checkpoint norm: {norm}')
-
-
-class XuNet(nn.Module):
-    """Same layers and forward order as notebook 04 cell 14; expose pre-mean features."""
-    def __init__(self, clip_t=3.0, norm='group'):
-        super().__init__()
-        self.clip_t = clip_t
-        self.kv = KVFilter()
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=5, padding=2)
-        self.bn1 = make_norm(16, norm)
-        self.conv2 = nn.Conv2d(16, 16, kernel_size=5, padding=2)
-        self.bn2 = make_norm(16, norm)
-        self.conv3 = nn.Conv2d(16, 32, kernel_size=1)
-        self.bn3 = make_norm(32, norm)
-        self.conv4 = nn.Conv2d(32, 64, kernel_size=1)
-        self.bn4 = make_norm(64, norm)
-        self.conv5 = nn.Conv2d(64, 128, kernel_size=1)
-        self.bn5 = make_norm(128, norm)
-        self.pool = nn.AvgPool2d(kernel_size=2, stride=2)
-        self.classifier = nn.Linear(128, 2)
-
-    def features(self, x):
-        x = self.kv(x)
-        if self.clip_t is not None:
-            x = torch.clamp(x, -self.clip_t, self.clip_t)
-        x = self.pool(torch.tanh(self.bn1(torch.abs(self.conv1(x)))))
-        x = self.pool(torch.tanh(self.bn2(self.conv2(x))))
-        x = self.pool(F.relu(self.bn3(self.conv3(x))))
-        x = self.pool(F.relu(self.bn4(self.conv4(x))))
-        x = self.pool(F.relu(self.bn5(self.conv5(x))))
-        return x
-
-    def forward(self, x):
-        x = self.features(x)
-        x = x.mean(dim=(-2, -1))
-        return self.classifier(x)
-
-    def cell_logits(self, x):
-        return F.conv2d(self.features(x), self.classifier.weight[:, :, None, None],
-                        self.classifier.bias)
-
-
-class XuNetWide(XuNet):
-    """Notebook 05 wide model; same 32 px output cells and linear cell logits."""
-    def __init__(self, clip_t=3.0, norm='group', width=4):
-        super().__init__(clip_t=clip_t, norm=norm)
-        a, b, c, d, e = (16, 16*width, 32*width, 64*width, 128*width)
-        for name, ni, no, kernel in ((1,3,a,5),(2,a,b,5),(3,b,c,1),
-                                     (4,c,d,1),(5,d,e,1),(6,e,e,1),(7,e,d,1)):
-            setattr(self, f'conv{name}', nn.Conv2d(ni, no, kernel, padding=kernel//2))
-            setattr(self, f'bn{name}', make_norm(no, norm))
-        self.classifier = nn.Linear(d, 2)
-
-    def features(self, x):
-        x = self.kv(x)
-        if self.clip_t is not None:
-            x = torch.clamp(x, -self.clip_t, self.clip_t)
-        x = self.pool(torch.tanh(self.bn1(torch.abs(self.conv1(x)))))
-        x = self.pool(torch.tanh(self.bn2(self.conv2(x))))
-        for name in (3, 4, 5):
-            x = self.pool(F.relu(getattr(self, f'bn{name}')(getattr(self, f'conv{name}')(x))))
-        for name in (6, 7):
-            x = F.relu(getattr(self, f'bn{name}')(getattr(self, f'conv{name}')(x)))
-        return x
-
-
-def model_from_hparams(hparams):
-    model = hparams.get('model', 'xunet')
-    clip_t, norm = hparams.get('clip_t', 3.0), hparams.get('norm', 'group')
-    if model == 'xunet':
-        return XuNet(clip_t=clip_t, norm=norm)
-    if model == 'xunet_wide':
-        return XuNetWide(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)))
-    raise ValueError(f'unsupported checkpoint model: {model}')
+from cvdl.models import KV_ARRAY, KVFilter, make_norm, XuNet, XuNetWide, model_from_hparams
+from cvdl.metrics import roc_auc, sigmoid
 
 
 def as_tensor(image, device):
@@ -198,20 +101,6 @@ def cell_mask(changed, shape):
     return changed[:h * 32, :w * 32].reshape(h, 32, w, 32).any(axis=(1, 3))
 
 
-def roc_auc(scores, positive):
-    a = scores.ravel().astype(np.float64)
-    b = positive.ravel()
-    n1 = int(b.sum())
-    n0 = len(b) - n1
-    if not n0 or not n1:
-        return None
-    order = np.argsort(a, kind='mergesort')
-    sorted_scores = a[order]
-    ranks = np.empty(len(a), dtype=np.float64)
-    ends = np.r_[0, np.flatnonzero(np.diff(sorted_scores)) + 1, len(a)]
-    for lo, hi in zip(ends[:-1], ends[1:]):
-        ranks[order[lo:hi]] = (lo + 1 + hi) / 2
-    return float((ranks[b].sum() - n1 * (n1 + 1) / 2) / (n1 * n0))
 
 
 def input_photos():
@@ -291,11 +180,6 @@ def normalise(scores):
     return (scores - median) / max(float(mad), 1e-6), float(median), float(mad)
 
 
-def sigmoid(scores):
-    """Stable stego probability from a stego-minus-clean logit margin."""
-    values = np.asarray(scores, dtype=np.float64)
-    small = np.exp(-np.abs(values))
-    return np.where(values >= 0, 1 / (1 + small), small / (1 + small))
 
 
 def render_v2(photo_id, group, cover, cases):
