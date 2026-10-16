@@ -74,3 +74,13 @@ parity is exactly zero for all four real checkpoints and the same 64 tiles;
 130 tests pass. Re-scoring the saved g4-v4-r2 bpp-1 prediction CSV reproduces
 its complete saved summary exactly (round-trip float parsing). Notebook 04/05
 and G4/Pi job scripts are unchanged.
+
+Phase 2 adds `cvdl.data`: reader/filter helpers, explicit-root PNG datasets,
+label/pair/split helpers and explicit-argument PNG/OTF builders. The OTF builders
+delegate decoding, seeds and sampling to the existing LSB library. Notebook 05
+keeps its definitions until thinning. `check_b_tiles.py` uses the shared KV
+filter (CHW and batched BCHW supported). Same-process tests execute notebook
+05 cells 6/8/12 against synthetic decoded fixtures: paired/unpaired PNG loaders
+and three OTF settings (256 px, paired 512 px, mixed/capped 512 px), workers 0,
+train epochs 0/1 and fixed evaluation. Frames and batch tensors match exactly.
+Default golden compare is ALL EQUAL; **132 tests pass**. No new GPU checks.

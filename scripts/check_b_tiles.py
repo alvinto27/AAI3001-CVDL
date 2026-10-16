@@ -27,7 +27,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import cvdl  # exposes the flat LSB library
 from lsb_source import load_photo
-from cvdl.models import KV_ARRAY, model_from_hparams
+from cvdl.models import model_from_hparams
+from cvdl.data import kv_residual
 from cvdl.metrics import sigmoid
 
 
@@ -130,14 +131,13 @@ def main():
         frames[split] = f
         p['split'] = split
         all_preds.append(p)
-    weights = torch.tensor(KV_ARRAY, device=device).reshape(1, 1, 5, 5).repeat(3, 1, 1, 1)
     features = []
     loader = DataLoader(Covers(frames, manifest), batch_size=16, num_workers=4,
                         pin_memory=(device.type == 'cuda'), prefetch_factor=2)
     for i, (image, cover_ids) in enumerate(loader):
         x = image.permute(0, 3, 1, 2).to(device, dtype=torch.float32, non_blocking=True)
         with torch.inference_mode():
-            kv = F.conv2d(x, weights, padding=2, groups=3)
+            kv = kv_residual(x)
             raw_std = kv[:, :, 2:-2, 2:-2].flatten(1).std(dim=1, unbiased=False)
             kv_std = kv[:, :, 2:-2, 2:-2].clamp(-clip_t, clip_t).flatten(1).std(dim=1, unbiased=False)
             clipped = ((x == 0) | (x == 255)).float().mean(dim=(1, 2, 3))
