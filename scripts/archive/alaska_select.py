@@ -12,7 +12,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 INDEX = ROOT / "data/alaska/ALASKAv2Base_by_DSC.txt"
 OUTPUT = ROOT / "data/alaska/selection_v1.csv"
 INDEX_SHA256 = "cd4bf8b9a82c8422f86c94d82966c6a423ba2e4748667aa970777fc7b0e91a54"

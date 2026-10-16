@@ -35,7 +35,7 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "archive"))  # alaska_select.py (v1 constants)
 from alaska_select import INDEX, INDEX_SHA256, LINE, ROOT, model_name  # noqa: E402
 
 VERSION = "ALASKA_v2_TIFF_VariousSize_COLOR/selection_v2"

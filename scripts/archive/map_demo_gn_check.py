@@ -16,6 +16,9 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # scripts/ (map_demo, build_cache)
 from map_demo import (CHECKPOINT, OUTPUT, PLACEMENTS, RATES, ROOT, XuNet, as_tensor,
                       cell_mask, chunk_map, input_photos, read_photo, roc_auc, starts)
 from lsb_batch import read_config

@@ -8,7 +8,7 @@ writer and MIL model are not connected. No training was run.
 
 ## Library contract
 
-[`lsb_mode2.py`](../../LSB-Dataset-Generator/lsb_mode2.py) has three functions:
+[`lsb_mode2.py`](../../LSB-Dataset-Generator/archive/lsb_mode2.py) has three functions:
 
 - `embed_photo(photo, record, config, OTFSeed(...))` returns an owned stego
   RGB8 photo, a photo record, and sorted, read-only changed RGB-value indices.
@@ -222,8 +222,8 @@ Run Python inside the configured container, not on the PC host:
 ```sh
 podman exec -w /work aai3001 python -m unittest discover -s tests
 podman exec -w /work/LSB-Dataset-Generator aai3001 python -m unittest discover -s tests
-podman exec -w /work aai3001 python scripts/check_mode1.py --repo-root /work --gate sample
-podman exec -w /work aai3001 python scripts/check_mode1.py --repo-root /work --gate otf
+podman exec -w /work aai3001 python scripts/archive/check_mode1.py --repo-root /work --gate sample
+podman exec -w /work aai3001 python scripts/archive/check_mode1.py --repo-root /work --gate otf
 ```
 
 Documentation links/anchors and `git diff --check` passed for steps 15–16.
@@ -233,7 +233,7 @@ backend. Step 17 remains deferred; steps 18–19 follow below. See the
 
 ## On-the-fly loader and photo bags (steps 18–19)
 
-[`lsb_mode2_torch.py`](../../LSB-Dataset-Generator/lsb_mode2_torch.py)
+[`lsb_mode2_torch.py`](../../LSB-Dataset-Generator/archive/lsb_mode2_torch.py)
 reuses the Mode 1 `Corpus` inventory, selected train schedule, source/cache
 readers, configuration, and worker setup. Its map-style `Mode2Photos` dataset
 assigns **one whole photo to one worker task**. Each task reads its source

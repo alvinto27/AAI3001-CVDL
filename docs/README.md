@@ -31,7 +31,7 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **All res
 - [Settings/source cache verification](archive/cache-verification.md)
 - [Embedding-core verification](archive/embed-core-verification.md)
 - [Mode 1 verification](archive/mode1-verification.md)
-- [Mode 2 verification](archive/mode2-verification.md)
+- [Mode 2 verification](archive/mode2-verification.md) (Mode 2 code archived)
 - [PyTorch loader verification](archive/torch-loader-verification.md)
 - [Notebook OTF verification](archive/notebook-otf-verification.md)
 - [Notebook diagnostics verification](archive/notebook-diagnostics-verification.md)

@@ -446,11 +446,14 @@ A non-zero failure count returns exit code 2.
 
 ## Tests
 
-Run the full v6 suite:
+All tests live in the repository's `tests/` folder. Run them from the repository root:
 
 ```sh
-python -m unittest tests.test_prepare tests.test_engine tests.test_batch -v
+python -m unittest discover -s tests            # whole project, includes the v6 generator tests
+python -m unittest discover -s tests -p "test_lsb_[bep]*.py" -v   # v6 generator only: batch, engine, prepare
 ```
+
+The retired Mode 2 modules are in `archive/`; their tests are in `tests/archive/` and are not run by default.
 
 The suite uses synthetic photos.
 It does not require a downloaded RAW file.

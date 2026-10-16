@@ -9,7 +9,9 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"LSB-Dataset-Generator"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "LSB-Dataset-Generator"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "LSB-Dataset-Generator" / "archive"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # tests/ (test_lsb_source helpers)
 from lsb_batch import Config
 from lsb_mode1 import OTFSeed
 from lsb_mode2 import embed_photo, tile_change_counts, iter_photo_tiles

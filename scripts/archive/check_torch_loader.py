@@ -13,11 +13,12 @@ from pathlib import Path
 from subprocess import check_output
 
 os.environ["OMP_NUM_THREADS"]="1"
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"LSB-Dataset-Generator"))
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/"LSB-Dataset-Generator"))
 import numpy as np
 import psutil
 from PIL import Image
 from lsb_torch import (torch,Corpus,RunSettings,TrainingImages,FixedPairs,training_loader)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # scripts/ (map_demo, build_cache)
 from build_cache import inventory
 
 

@@ -227,7 +227,7 @@ cached joint model rate. Notebook integration/default choice remains next work.
 ## Re-run
 
 Copy code, YAML and the unchanged notebook to VM scratch. Use the existing VM
-Python and `scripts/check_torch_loader.py --repo-root ... --cache-root ...` with
+Python and `scripts/archive/check_torch_loader.py --repo-root ... --cache-root ...` with
 `--gate counts`, `parity`, `legacy`, `speed`, or (only if idle) `gpu`. Speed gate
 requires `--source`, `--tile-size`, `--workers`, `--seconds 120`; GPU gate requires
 an unchanged scratch `--notebook` path. Do not run from a writable VM checkout.

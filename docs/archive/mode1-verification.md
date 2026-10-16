@@ -53,13 +53,13 @@ Variant defaults to 1. No source or dataset files are read by the sample API.
 
 ## Verification workflow
 
-Use `scripts/check_mode1.py` from VM scratch with the existing VM Python.
+Use `scripts/archive/check_mode1.py` from VM scratch with the existing VM Python.
 The repository root is a read-only source of manifests, masters, YAML, and
 stored PNG pixels. No generated dataset is written.
 
 ```sh
 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
-  /srv/aai3001/AAI3001-CVDL/.venv/bin/python scripts/check_mode1.py \
+  /srv/aai3001/AAI3001-CVDL/.venv/bin/python scripts/archive/check_mode1.py \
   --repo-root /srv/aai3001/AAI3001-CVDL --gate sample
 # Run full only after sample passes; stop/report any mismatch.
 # Repeat command with --gate full, then --gate otf.

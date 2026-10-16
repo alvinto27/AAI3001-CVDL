@@ -12,6 +12,10 @@ import numpy as np
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "LSB-Dataset-Generator"))
 from lsb_batch import Config, generate, read_config, replay, verify_output
 
 

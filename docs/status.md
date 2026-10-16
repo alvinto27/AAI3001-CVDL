@@ -6,6 +6,8 @@
 
 - **G4 disk uses the new data layout since 2026-10-16 06:04Z** (checkout `9798b56`, free disk 116 GB). Commits before `76f6257` no longer match the G4 disk.
 
+- **Code tidy-up (2026-10-16):** one-off checks moved to `scripts/archive/`, Mode 2 (full-photo/MIL) dropped and archived in `LSB-Dataset-Generator/archive/`, notebooks 01 and 03 in `notebooks/archive/`, all tests in `tests/`. See `scripts/archive/README.md`.
+
 - **Completed:** ALASKA/LSDIR source records and mixed sampler; final verified masters; G4 mixed run and [result](results/result-newdata-1.md); PC threshold/noise check B and [result](results/result-check-b.md). The frozen standard test and RAISE/DIV2K records remain in use.
 - **On hold:** A, per-cell training (design only, no code or model run); C, capacity/longer training/BF16; fair R0 control, seed repeats, front-end changes, and other free checks. No follow-up is authorized by the plans.
 - **Deferred records:** prebuilt writer, OTF plan step 17: [historical design](archive/plan-otf-generator.md), OTF implemented but writer deferred. Noisy covers: [parked by the user](archive/plan-noisy-covers.md). G4 GPU LSB generator: [shelved design](archive/plan-gpu-generator.md), not built. G4 resume after Spot preemption: postponed until C (longer training); today a preempted G4 run restarts with a fresh job ID (see [run guide](active/g4-batch-runner.md)). Long runs need resume across boots because one boot is limited to 105 min.

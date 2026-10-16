@@ -9,7 +9,8 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"LSB-Dataset-Generator"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "LSB-Dataset-Generator"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "LSB-Dataset-Generator" / "archive"))
 from lsb_cache import build_entry
 from lsb_mode1 import OTFSeed
 from lsb_mode2 import embed_photo,iter_photo_tiles
@@ -28,7 +29,7 @@ class Mode2LoaderTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory()
         self.root=Path(self.temp.name)
         (self.root/"configs").mkdir()
-        shutil.copyfile(Path(__file__).resolve().parents[1]/"configs/raise512-run1.yaml",
+        shutil.copyfile(Path(__file__).resolve().parents[2]/"configs/raise512-run1.yaml",
                         self.root/"configs/raise512-run1.yaml")
         self.rows=[]
         for i,purpose in enumerate(["train"]*4+["val"]*2+["test"]*2):

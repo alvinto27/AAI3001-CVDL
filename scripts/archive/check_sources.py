@@ -14,7 +14,7 @@ from pathlib import Path
 
 # Set before importing rawpy, directly or through source/preparation modules.
 os.environ["OMP_NUM_THREADS"] = "1"
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "LSB-Dataset-Generator"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "LSB-Dataset-Generator"))
 import numpy as np
 import PIL
 from PIL import Image

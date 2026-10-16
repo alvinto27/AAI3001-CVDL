@@ -13,7 +13,7 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 os.environ["OMP_NUM_THREADS"] = "1"
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "LSB-Dataset-Generator"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "LSB-Dataset-Generator"))
 import numpy as np
 from PIL import Image
 import lsb_engine as engine

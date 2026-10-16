@@ -163,5 +163,5 @@ Done: full source decode and grid cutting in
 The [Mode 1 sample API](../archive/mode1-verification.md) composes these helpers.
 The [Mode 1 torch loader](../archive/torch-loader-verification.md) uses the frozen splits
 and identities. [Notebook integration](../archive/notebook-otf-verification.md) is also
-verified. Pending: Mode 2 tile labels and user-run full OTF training.
+verified. Mode 2 (full-photo/MIL) was dropped and its code is archived in `LSB-Dataset-Generator/archive/`. Pending: user-run full OTF training.
 Source terms and citations remain in the [Datasets guide](../../Datasets/README.md#citations-and-terms).

@@ -9,6 +9,10 @@ from unittest.mock import patch
 
 import numpy as np
 from PIL import Image
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "LSB-Dataset-Generator"))
 import lsb_batch
 from lsb_prepare import PrepareConfig, _raw_camera_info, prepare
 

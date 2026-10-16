@@ -77,7 +77,7 @@ OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
   -m unittest discover -s tests -p test_lsb_source.py -v
 
 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
-  /srv/aai3001/AAI3001-CVDL/.venv/bin/python scripts/check_sources.py \
+  /srv/aai3001/AAI3001-CVDL/.venv/bin/python scripts/archive/check_sources.py \
   --repo-root /srv/aai3001/AAI3001-CVDL --workers 8
 ```
 

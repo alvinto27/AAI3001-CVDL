@@ -129,7 +129,7 @@ Re-run from a scratch code copy with the existing VM Python:
 
 ```sh
 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
-  /srv/aai3001/AAI3001-CVDL/.venv/bin/python scripts/check_settings.py \
+  /srv/aai3001/AAI3001-CVDL/.venv/bin/python scripts/archive/check_settings.py \
   --repo-root /srv/aai3001/AAI3001-CVDL \
   --scratch-root "$PWD/check-output-new"
 ```

@@ -25,7 +25,7 @@ See [the RAISE 512 rebuild guide](docs/archive/rebuild-raise512-run1.md) for the
 | [`04_v3c_clip3_group.ipynb`](runs/baseline_kv_xunet_v3_clip3_group/04_v3c_clip3_group.ipynb) | executed v3c run with outputs |
 | [`04_v3c_otf_2026-10-13.ipynb`](runs/baseline_kv_xunet_v3_clip3_group_otf/04_v3c_otf_2026-10-13.ipynb) | executed first OTF v3c run (VM, L4) with outputs |
 | [`02_eval_breakdown.ipynb`](notebooks/02_eval_breakdown.ipynb) | Per-setting evaluation of a `test_predictions.csv` file. |
-| [`01_baseline_kv_xunet.ipynb`](notebooks/01_baseline_kv_xunet.ipynb) and [`03_baseline_kv_xunet_v2.ipynb`](notebooks/03_baseline_kv_xunet_v2.ipynb) | V1 and v2 history. They stay because the reports link them. |
+| [`01_baseline_kv_xunet.ipynb`](notebooks/archive/01_baseline_kv_xunet.ipynb) and [`03_baseline_kv_xunet_v2.ipynb`](notebooks/archive/03_baseline_kv_xunet_v2.ipynb) | V1 and v2 history, archived in `notebooks/archive/`. They need the deleted PNG dataset and are not run. The reports link them. |
 | [`rocm_conv1_wgrad.py`](notebooks/rocm_conv1_wgrad.py) | ROCm-only conv1 speed fix used by notebook 04. |
 
 Current results: [V3 comparison report](docs/results/results-v3.md).

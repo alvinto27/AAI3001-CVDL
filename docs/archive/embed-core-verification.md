@@ -118,7 +118,7 @@ the existing VM Python; do not write into the VM checkout. For example:
 
 ```sh
 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
-  /srv/aai3001/AAI3001-CVDL/.venv/bin/python scripts/check_embed_fast.py \
+  /srv/aai3001/AAI3001-CVDL/.venv/bin/python scripts/archive/check_embed_fast.py \
   --repo-root /srv/aai3001/AAI3001-CVDL \
   --old-engine "$PWD/old_engine.py" --cases 20000 --workers 4
 ```

@@ -279,5 +279,5 @@ epoch. Full tables and the v3 plan are in the
 Related files:
 
 - [Project journal](../journal/README.md)
-- [Baseline notebook](../../notebooks/01_baseline_kv_xunet.ipynb)
+- [Baseline notebook](../../notebooks/archive/01_baseline_kv_xunet.ipynb)
 - [Dataset rebuild guide](../archive/rebuild-raise512-run1.md)
