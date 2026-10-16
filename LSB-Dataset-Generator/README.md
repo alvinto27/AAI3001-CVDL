@@ -26,38 +26,38 @@ The tool does not resize a tile.
 The shared full-photo source API is in `lsb_source.py`. It reads frozen RAISE
 and DIV2K records and cuts manifest-backed overlap or legacy tile views.
 It does not yet embed or load training batches. See the
-[source API and verification record](../docs/source-verification.md).
+[source API and verification record](../docs/archive/source-verification.md).
 The existing `prepare.py` workflow below is unchanged.
 
 `lsb_settings.py` now owns shared settings draws and generation seed keys.
 The existing batch route keeps its legacy draws and four-integer seeds.
-See the [settings and seed record](../docs/settings-and-seeds.md) for the
+See the [settings and seed record](../docs/active/settings-and-seeds.md) for the
 separate versioned OTF route and its lower-to-fit size policy.
 
 `lsb_engine.embed_fast()` uses the same numerical core as `embed()` but skips
 the pixel mask and selection cache. It returns public metadata and optional
-actual changed-unit indices. See the [embed-core verification](../docs/embed-core-verification.md)
+actual changed-unit indices. See the [embed-core verification](../docs/archive/embed-core-verification.md)
 for its API and measured CPU timings.
 
 `lsb_mode1.make_sample()` composes full-photo tile access, shared settings/seeds,
 and mask-free embedding. `replay_legacy()` accepts a frozen legacy tile row.
 Both return owned RGB8 pixels and provenance metadata. See
-[Mode 1 verification](../docs/mode1-verification.md) for the API and replay checks.
+[Mode 1 verification](../docs/archive/mode1-verification.md) for the API and replay checks.
 No loader or torch Dataset is included in Mode 1.
 
 `lsb_cache.build_entry()` and `scripts/build_cache.py` build/resume the separate
 full-photo RGB8 NPY cache. `load_cached()` strictly rejects stale or missing
 entries without decoding in their place. See
-[session cache verification](../docs/cache-verification.md) for format, commands,
+[session cache verification](../docs/archive/cache-verification.md) for format, commands,
 validation, read timings, and the approved VM cache location.
 
 `lsb_torch.RunSettings`, `Corpus`, `TrainingImages`, and `FixedPairs` provide
 the Mode 1 PyTorch boundary. Masters are decoded by default; the verified session
 cache is optional. Training uses a bounded uint8 shuffle buffer and stable
 sample keys; evaluation exposes fixed pairs and a metadata frame. See
-[loader verification](../docs/torch-loader-verification.md) for the notebook
+[loader verification](../docs/archive/torch-loader-verification.md) for the notebook
 contract, epoch controls, source selection, counts, and throughput checks.
-Notebook 04 now connects these helpers in [step 8](../docs/notebook-otf-verification.md).
+Notebook 04 now connects these helpers in [step 8](../docs/archive/notebook-otf-verification.md).
 The loader transfers uint8 groups across workers; the notebook converts to
 float32 on the device. `tensor_dtype="float32"` and `group_images=0` retain
 reference paths for checks.

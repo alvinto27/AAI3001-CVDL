@@ -15,7 +15,7 @@ To add a package, run `uv add <package>`. Commit the changed `pyproject.toml` an
 `LSB-Dataset-Generator/README.md` documents the v6 image pipeline.
 Run `prepare.py` to create RGB PNG tiles, then `generate.py` to create clean/stego pairs.
 Use `generate.py --verify` to check deterministic replay.
-See [the RAISE 512 rebuild guide](docs/rebuild-raise512-run1.md) for the complete dataset command sequence.
+See [the RAISE 512 rebuild guide](docs/archive/rebuild-raise512-run1.md) for the complete dataset command sequence.
 
 ## Notebooks
 
@@ -28,7 +28,7 @@ See [the RAISE 512 rebuild guide](docs/rebuild-raise512-run1.md) for the complet
 | [`01_baseline_kv_xunet.ipynb`](notebooks/01_baseline_kv_xunet.ipynb) and [`03_baseline_kv_xunet_v2.ipynb`](notebooks/03_baseline_kv_xunet_v2.ipynb) | V1 and v2 history. They stay because the reports link them. |
 | [`rocm_conv1_wgrad.py`](notebooks/rocm_conv1_wgrad.py) | ROCm-only conv1 speed fix used by notebook 04. |
 
-Current results: [V3 comparison report](docs/results-v3.md).
+Current results: [V3 comparison report](docs/results/results-v3.md).
 
 Notebook 04 loader controls:
 
@@ -45,7 +45,7 @@ Notebook 04 loader controls:
 | `V3_SOURCE`, `V3_CACHE_ROOT` | Decode unless a cache root is supplied. |
 | `V3_COMPILE` | `off` by default; `default` compiles the training network in place. Other modes are rejected. TF32 flags stay at their native values. |
 
-Ordered delivery remains enabled. See [all controls and saved run settings](docs/notebook-otf-verification.md#controls) and [compile verification and safety checks](docs/notebook-compile-verification.md).
+Ordered delivery remains enabled. See [all controls and saved run settings](docs/archive/notebook-otf-verification.md#controls) and [compile verification and safety checks](docs/archive/notebook-compile-verification.md).
 
 ### Run notebook 04 without Jupyter
 
@@ -79,7 +79,7 @@ ignores `runs-out/`. The runner refuses a nonempty output folder.
 
 The `raise512-run1` source is RAISE. Cite it as [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](ImageSets/README.md#citations-and-terms) RAISE is for **non-commercial research and educational purposes**.
 
-DIV2K has [frozen source records](docs/frozen-source-records.md); the builder reads its PNG headers. Notebook 04 now uses the [OTF loader by default](docs/notebook-otf-verification.md), with a PNG fallback. Full OTF training is a user action. Cite it as [E. Agustsson and R. Timofte, “NTIRE 2017 Challenge on Single Image Super-Resolution: Dataset and Study,” IEEE Conference on Computer Vision and Pattern Recognition (CVPR) Workshops, July 2017.](ImageSets/README.md#citations-and-terms) The official page says DIV2K is for **academic research purposes only** and that copyright belongs to the original owners.
+DIV2K has [frozen source records](docs/active/frozen-source-records.md); the builder reads its PNG headers. Notebook 04 now uses the [OTF loader by default](docs/archive/notebook-otf-verification.md), with a PNG fallback. Full OTF training is a user action. Cite it as [E. Agustsson and R. Timofte, “NTIRE 2017 Challenge on Single Image Super-Resolution: Dataset and Study,” IEEE Conference on Computer Vision and Pattern Recognition (CVPR) Workshops, July 2017.](ImageSets/README.md#citations-and-terms) The official page says DIV2K is for **academic research purposes only** and that copyright belongs to the original owners.
 
 See the [ImageSets README](ImageSets/README.md) for source details, terms, and download links.
 
@@ -89,7 +89,7 @@ See the [ImageSets README](ImageSets/README.md) for source details, terms, and d
 - `photo_manifest.csv` and `legacy_tile_manifest.csv`: source identities and tile grids.
 - `run1_labels.csv.gz` and `run1_metadata.csv.gz`: deterministic gzip copies of
   `Datasets/raise512-run1/labels.csv` and `metadata.csv`. See
-  [hashes and decompression instructions](docs/frozen-source-records.md#preserved-run1-labels-and-metadata).
+  [hashes and decompression instructions](docs/active/frozen-source-records.md#preserved-run1-labels-and-metadata).
 
 Dataset `masks/` and `records/` are not kept in git. Masks can be regenerated.
 Dataset files remain local; this record preservation does not delete them.

@@ -1,44 +1,43 @@
-# Documentation
+# Documentation — start here
 
-- [Project journal](journal.md)
-- [Research checklist](research-checklist.md)
-- [Session handoff 2026-10-15](handoff-2026-10-15.md)
-- [V1 baseline results](results-v1-baseline.md)
-- [V3b baseline results](results-v3b.md)
-- [V3 comparison results](results-v3.md)
-- [Noisy-cover dataset plan](plan-noisy-covers.md)
-- [ALASKA#2 and LSDIR source integration plan](plan-new-sources.md)
-- [ALASKA/LSDIR source code, manifest contract, and verification](plan-new-data-code.md)
-- [ALASKA selection v2 (splits, leakage rule, counts)](alaska-selection-v2.md)
-- [LSDIR selection v1 (splits, leakage rule, counts)](lsdir-selection-v1.md)
-- [Pi host changes (swap, journal)](pi-host-changes.md)
-- [On-the-fly generator design plan](plan-otf-generator.md)
-- [Optional G4 GPU LSB generator plan](plan-gpu-generator.md)
-- [G4 epoch overhead analysis and options](plan-epoch-overhead.md)
-- [Wide XuNet model-size comparison plan](plan-wide-xunet.md)
-- [Wide XuNet G4 result against R2](result-wide-xunet.md)
-- [Mixed ALASKA/LSDIR wide XuNet G4 result](result-newdata-1.md)
-- [PC check B: validation thresholds and ALASKA tile errors](result-check-b.md)
-- [Per-cell XuNet training design (not implemented)](plan-per-cell-training.md)
-- [Frozen RAISE and DIV2K source records](frozen-source-records.md)
-- [Full-photo source API and verification](source-verification.md)
-- [Shared settings draws and seed keys](settings-and-seeds.md)
-- [Shared embed core and mask-free verification](embed-core-verification.md)
-- [Mode 1 sample API and legacy replay](mode1-verification.md)
-- [Mode 2 full-photo embedding and actual-change labels](mode2-verification.md)
-- [Full-photo session cache and read checks](cache-verification.md)
-- [Mode 1 PyTorch loader and contract checks](torch-loader-verification.md)
-- [Notebook OTF integration and QUICK checks](notebook-otf-verification.md)
-- [Notebook diagnostic speed and parity checks](notebook-diagnostics-verification.md)
-- [Notebook optional compile switch and verification](notebook-compile-verification.md)
-- [G4 batch runner and first-boot steps](g4-batch-runner.md)
-- [Rebuild the RAISE 512 dataset](rebuild-raise512-run1.md)
+This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **All research is on hold.** Read [status](status.md) before acting, [findings](findings.md) for run comparisons, and the [dated journal](journal/README.md) for the original records.
 
-## Local data folders
+## Current references (`active/` means kept for use, not permission to run)
+- [Per-cell design — not approved, on hold](active/plan-per-cell-training.md)
+- [G4 batch-runner guide](active/g4-batch-runner.md)
+- [Pi host state](active/pi-host-changes.md)
+- [Settings and seed rules](active/settings-and-seeds.md)
+- [Frozen RAISE/DIV2K records](active/frozen-source-records.md)
+- [ALASKA selection v2](active/alaska-selection-v2.md)
+- [LSDIR selection v1](active/lsdir-selection-v1.md)
 
-| Folder | Guide |
-| --- | --- |
-| [`ImageSets/`](../ImageSets/README.md) | Source images and intermediate image records |
-| [`Datasets/`](../Datasets/README.md) | Generated training and test datasets |
-| [`checkpoints/`](../checkpoints/README.md) | Local checkpoints and run outputs |
-| [`logs/`](../logs/README.md) | Detached-run console logs |
+## Completed results (`results/`)
+- [V1 baseline](results/results-v1-baseline.md)
+- [V3 comparison](results/results-v3.md)
+- [V3b baseline](results/results-v3b.md)
+- [Wide XuNet versus R2](results/result-wide-xunet.md)
+- [Mixed-source wide XuNet](results/result-newdata-1.md)
+- [PC check B: thresholds and ALASKA tiles](results/result-check-b.md)
+
+## Historical records (`archive/`)
+- [OTF generator design; prebuilt writer deferred](archive/plan-otf-generator.md)
+- [GPU LSB generator; shelved](archive/plan-gpu-generator.md)
+- [G4 epoch-overhead analysis](archive/plan-epoch-overhead.md)
+- [Wide XuNet plan](archive/plan-wide-xunet.md)
+- [New-source proposal](archive/plan-new-sources.md)
+- [New-source code plan](archive/plan-new-data-code.md)
+- [Noisy-cover idea; parked](archive/plan-noisy-covers.md)
+- [Source API verification](archive/source-verification.md)
+- [Settings/source cache verification](archive/cache-verification.md)
+- [Embedding-core verification](archive/embed-core-verification.md)
+- [Mode 1 verification](archive/mode1-verification.md)
+- [Mode 2 verification](archive/mode2-verification.md)
+- [PyTorch loader verification](archive/torch-loader-verification.md)
+- [Notebook OTF verification](archive/notebook-otf-verification.md)
+- [Notebook diagnostics verification](archive/notebook-diagnostics-verification.md)
+- [Notebook compile verification](archive/notebook-compile-verification.md)
+- [RAISE 512 rebuild record](archive/rebuild-raise512-run1.md)
+- [2026-10-15 session handoff](archive/handoff-2026-10-15.md)
+- [Superseded research checklist](archive/research-checklist.md)
+
+Local data guides: [ImageSets](../ImageSets/README.md), [Datasets](../Datasets/README.md), [checkpoints](../checkpoints/README.md), and [logs](../logs/README.md).

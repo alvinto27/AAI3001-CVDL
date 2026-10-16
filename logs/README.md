@@ -23,5 +23,5 @@ Never commit console logs, TensorBoard server logs, temporary logs, or other
 run output. Delete them after the results are recorded. Keep only this README
 in git.
 
-See the [project journal](../docs/journal.md), [V3b report](../docs/results-v3b.md),
-and [V3 report](../docs/results-v3.md) for recorded results.
+See the [project journal](../docs/journal/README.md), [V3b report](../docs/results/results-v3b.md),
+and [V3 report](../docs/results/results-v3.md) for recorded results.

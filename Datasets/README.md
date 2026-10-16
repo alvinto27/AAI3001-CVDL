@@ -38,11 +38,11 @@ podman exec -w /work aai3001 python scripts/check_cache.py \
 ```
 
 An in-checkout cache is accepted only when `git check-ignore` confirms that
-Git ignores its path. See the [cache verification record](../docs/cache-verification.md).
+Git ignores its path. See the [cache verification record](../docs/archive/cache-verification.md).
 
 ## Rebuild
 
-Run the [RAISE 512 rebuild guide](../docs/rebuild-raise512-run1.md) from the
+Run the [RAISE 512 rebuild guide](../docs/archive/rebuild-raise512-run1.md) from the
 repository root. The unattended command is:
 
 ```sh

@@ -1,0 +1,139 @@
+## 2026-10-16 — New-source data, Pi freeze, first mixed-source G4 run
+
+Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
+
+### Did
+
+- User decisions at the start: ALASKA option B (only Canon_PowerShot-G11 and
+  Nikon_D90 train-only) and the LSDIR subset 7,000 / 1,500 / 2,500 photos.
+- Worker_3 regenerated ALASKA selection v2 with option B (`ac098cf`):
+  `data/alaska/selection_v2.csv` SHA-256
+  `d3f122d637b09d9c65e7cafd8592f211c8b8381a3b3fa80303363bde5255206d`
+  (supersedes `437fcfef...ff85`), 18,200 rows, 28 models in val/test.
+- Worker_3 made LSDIR selection v1 (`4d6f27b`): `data/lsdir/selection_v1.csv`
+  SHA-256 `c7e1b3209e96f1eda6ba59c4896ddbd639fffb7797e63048b5c4d674d65c9dbf`,
+  11,000 rows, input `inventory.csv` SHA-256 `31371bb2...b0dc` (not
+  committed). Splits stratified by shard (each shard train 411-412, val
+  88-89, test 147-148) and assigned by blocks of 10 consecutive IDs with a
+  minimum cross-split ID gap of 11 (Orchestrator confirmed globally).
+- Pi -> PC copies started in parallel at ~09:00 +08 (ALASKA ~7.6 MiB/s,
+  LSDIR ~3.7 MB/s). The Pi froze at ~09:07-09:10: no LAN ping, no SSH, sudo
+  did not run on its console. The user powered it off and connected the USB
+  SSD (ext4, label `datafs`) to the PC at `/run/media/yangxuan/datafs`.
+  Both copies resumed from the SSD (read-only use): LSDIR ~228-240 MB/s,
+  ALASKA ~192 MiB/s.
+- Records built with full master verification: LSDIR `2659b3d`, ALASKA
+  `daf893c` (builder `verified_masters=true` for both).
+- Upload PC -> G4 in a maintenance boot (start 01:28Z): the Pi internet
+  upload measured 0.10-0.25 MB/s (while busy) against the PC 12.7-14 MB/s, so
+  the upload went from the PC. One or two rsync streams gave ~4.6 MB/s
+  (long round trip to us-central1); 12 parallel rsync streams gave ~15 MB/s.
+  Upload 01:36-02:27Z, 0 errors; all 29,200 files verified on the G4 (size +
+  SHA-256); 66 GB free after. In the same boot the bootstrap `job.sh` was
+  installed (SHA-256 `89cc83e9...b1f2af`; `job_run.last-good`
+  `a49f0300...0034`; `CVDL_G4_STAGE` count 3). VM stop took 02:27:49 ->
+  02:33:55Z. Maintenance boot cost ~$1.8 (estimate).
+- Worker_2 updated `docs/archive/plan-new-data-code.md` and prepared
+  `scripts/g4/jobs/newdata-1.env` (`717dcf8`): R2-wide recipe plus
+  `V3_SOURCE_MIX=raise:0.4,lsdir:0.2,alaska:0.4`, `V3_TILES_PER_EPOCH=45000`,
+  capped validation (5,000 RAISE + 1,535 ALASKA + 1,500 LSDIR = 8,035 pairs,
+  pair-list SHA `6bb3c8ef...e4d5ca`), persistent workers, extra panels
+  (ALASKA val/test_seen/test_unseen, LSDIR val/test, bpp-1).
+- First launch 02:34:44Z failed at 02:36:14Z in the 2-batch sanity
+  validation: `ValueError: capped validation has no alaska examples` (the
+  sanity pass sees only RAISE). VM shut down by itself at 02:41:14Z after the
+  5-minute delivery retry (Pi offline); ~$0.20. Fix `1a6a6bf`: per-source
+  metrics are skipped only while `trainer.sanity_checking`; opt-in
+  `V3_LIMIT_TRAIN_BATCHES` for a PC pre-flight; new unit test. PC pre-flight
+  with the exact full 8,035-pair list passed (2,009 validation batches).
+- Worker_3 Pi fixes (`3a6b1fd`, `docs/active/pi-host-changes.md`): `/srv/swapfile`
+  (8 GiB on the USB SSD) removed, fstab line commented; zram 2 GiB kept.
+  Persistent journal (`/etc/systemd/journald.conf.d/90-cvdl-persistent.conf`,
+  SystemMaxUse=200M); the old journal was volatile by an RPi default, so the
+  log of the frozen boot is lost.
+- Relaunch 02:50:18Z, job
+  `...wide-w4_mixr2-20261016T024859Z-9032`, commit `3a6b1fd`. Exit 0 at
+  03:36:23Z, delivered 03:37:26Z, VM stopped by itself. ~47 VM min, ~$1.28
+  (estimate). Worker_2 result `docs/results/result-newdata-1.md` (`ab9d3f1`).
+
+### Found
+
+- Run timing: epoch 0 cold (first train wait 83.9 s, train 109.4 s, I/O wait
+  41.9%, reads 275.7 MiB/s; 7.4 it/s at first). Warm epochs: 54.5 steps/s,
+  train 51.6 s for 2,813 steps, validation first-batch wait ~1.4 s (was
+  18.8 s), validation 18-19 s for 8,035 pairs, GPU util 100%, ~414-427 W of
+  600 W. No late slowdown in epochs 24-29 (train 51.5-51.8 s; the wide-R2 run
+  had 84-111 s). Both speed fixes are confirmed on the G4. The sampler groups
+  tiles by photo (one decode per photo group).
+- Best epoch 25 (zero-based), capped val P_E 0.0574 (RAISE 0.0207, ALASKA
+  0.1564, LSDIR 0.0757). Spikes at epochs 8, 10, 12, 14. Final train loss
+  0.2736 above combined val loss 0.1746: still underfitting.
+- New panels, old wide-R2 checkpoint -> mixed checkpoint (same pair IDs;
+  Orchestrator re-computed from prediction files):
+
+  | Panel | AUC | FA at 0.5 | k=1 miss at 0.5 | Miss at 5% FA |
+  | --- | --- | --- | --- | --- |
+  | ALASKA test_unseen | 0.7982 -> 0.9340 | 47.48% -> 13.80% | 31.30% -> 49.11% | not reachable (see correction) -> 25.31% |
+  | ALASKA test_seen | 0.7842 -> 0.9159 | 49.74% -> 15.03% | 28.32% -> 52.21% | not reachable (see correction) -> 31.53% |
+  | LSDIR test | 0.9628 -> 0.9742 | 7.91% -> 3.55% | 38.80% -> 47.48% | 11.94% -> 8.66% |
+
+  "Miss at 5% FA" uses the threshold at the 95th percentile of each panel's
+  clean scores (an analysis view, not a deployable threshold). ALASKA
+  unseen P_E 0.23359 -> 0.13876; LSDIR test P_E 0.08151 -> 0.06635.
+- Correction (same day, from check B): the first Orchestrator view gave the
+  old model 21.25% / 22.24% ALASKA miss "at 5% FA". That was wrong. The old
+  model scores 25.63% (unseen) and 28.25% (seen) of clean ALASKA test tiles
+  exactly 1.0, so its 95th percentile is 1.0 and the real FA at that cut is
+  25.6% / 28.3%, not 5%. No threshold gives the old model 5% FA on ALASKA
+  without flagging nothing (score saturation; 418/1,535 = 27.2% of clean
+  ALASKA val tiles at 1.0; the mixed model has 7/1,535).
+- Interpretation (Orchestrator, corrected): the mixed model is better on
+  ALASKA at both fixed and strict false-alarm levels; the old model is
+  over-confident on new cameras. LSDIR improves on all measures. LSDIR is not an easy source (test P_E
+  0.066).
+- Standard test regressed: P_E 0.019533 -> 0.025370; k=1 0.046439 ->
+  0.059008; DIV2K 0.052932 -> 0.059039.
+- ALASKA per camera at threshold 0.5: 21/28 seen and 5/8 unseen cameras have
+  FA above 10%; Sigma_SD1Merrill seen P_E 0.384 (FA 31.4%), Sigma_SD10 0.312.
+
+- Check B (Worker_2, `042903d`, `docs/results/result-check-b.md`, PC only; both
+  checkpoints scored on the same standard val, 11,238 pairs, settings SHA
+  `2d24d423...`). Thresholds chosen on validation only:
+  - Mixed model, ALASKA val 5%-FA cut-off 0.815754: test FA 5.97% (seen) /
+    5.93% (unseen), drift +0.97 / +0.93 pp. Miss 29.72% / 24.20%; k=1 miss
+    68.14% / 66.16%. P_E-optimal val cut-off 0.651967: test FA 9.10% / 8.79%,
+    miss 24.74% / 19.63%.
+  - One shared mixed 5%-FA cut-off (0.408610) gives ALASKA test FA 29.53% /
+    24.36% against ~1.33% on RAISE: per-source calibration is necessary.
+  - Old wide-R2: strict 5% FA on ALASKA is not reachable (score saturation,
+    418/1,535 clean val tiles at exactly 1.0).
+  - Tile noise (std of the clipped KV input) predicts the clean score inside
+    all 36 ALASKA cameras (median Spearman 0.546 seen / 0.544 unseen). By
+    val-derived noise quartile Q1 -> Q4: seen FA at 0.5 7.6% -> 23.1%, k=1
+    miss 31.0% -> 75.0%; unseen FA 7.6% -> 21.3%, k=1 miss 34.4% -> 65.4%.
+  - Figure `docs/figures/check-b/alaska-clean-score-contrasts.png`: high-score
+    clean tiles have strong, textured KV residuals; their cell maps show many
+    hot cells spread over the textured areas.
+- Conclusion of B: two problems. Calibration (solved by per-source
+  thresholds that hold on unseen cameras) and a model problem: natural noise
+  and texture read as embedding, so noisy tiles raise both false alarms and
+  k=1 misses. A threshold cannot fix the second.
+
+### Decided
+
+- Upload to the US VM with many parallel streams (12 gave ~15 MB/s).
+- One heavy job at a time on the Pi; no swap on the USB SSD.
+- Keep wide-R2 as the reference for the unchanged standard test; keep the
+  mixed checkpoint for new-source research. Do not tune thresholds on test
+  panels.
+- User order for next work: B (free checks: ALASKA false-alarm review and
+  per-source thresholds chosen on validation) -> A (per-cell training) -> C
+  (more capacity / longer training, bf16).
+
+### Next
+
+- Done: B checks (`042903d`).
+- Pending: A, per-cell (dense) training design and run.
+- Pending: C, capacity / epochs / bf16.
+- Pending: start a new Scribe session (the old Scribe alias shows the
+  Orchestrator session ID).
