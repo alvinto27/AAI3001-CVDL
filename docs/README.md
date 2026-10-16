@@ -12,5 +12,5 @@ Full working history (journal, v1/v2 notebooks, v1 report, ROCm fix, ideas): [br
 | --- | --- |
 | [`ImageSets/`](../ImageSets/README.md) | Source images and intermediate image records |
 | [`Datasets/`](../Datasets/README.md) | Generated training and test datasets |
-| [`checkpoints/`](../checkpoints/README.md) | Local checkpoints and run outputs |
+| [`runs/`](../runs/README.md) | Local checkpoints and run outputs |
 | [`logs/`](../logs/README.md) | Detached-run console logs |

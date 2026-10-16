@@ -62,7 +62,7 @@ The V3a metrics came from the VM file
 `/srv/aai3001/AAI3001-CVDL/checkpoints/lightning_logs/version_5/metrics.csv`.
 The V3b metrics came from
 `checkpoints/lightning_logs/version_2/metrics.csv`. The V3c metrics came from
-`checkpoints/baseline_kv_xunet_v3_clip3_group/logs/csv/run/metrics.csv`.
+`runs/baseline_kv_xunet_v3_clip3_group/logs/csv/run/metrics.csv`.
 
 ## 4. Test results
 
