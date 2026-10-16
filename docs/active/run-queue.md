@@ -16,6 +16,12 @@ States: `queued` (approved, waiting) · `preparing` (code or notebook not ready)
 | 5 | `experiments/tiling-trim-256.ipynb` | Tiling arm 2 at 256: centre trim (same 256 budget) | — | preparing (Worker_5) | — | — |
 | 6 | `experiments/tiling-pad-256.ipynb` | Tiling arm 3 at 256: centre zero-pad (same 256 budget) | — | preparing (Worker_5) | — | — |
 
+## Next (approved in principle, not queued)
+
+- **SRM filter bank instead of the KV filter** (front-end test, aimed at weak
+  k = 1 detection). Tiling strategy and tile size are decided after runs 1-6.
+  Design and code start only when the user picks them.
+
 ## After the runs
 
 - Evaluate each delivered run on the PC with `scripts/evaluate_run.py` (plus
