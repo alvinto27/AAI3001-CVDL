@@ -11,6 +11,7 @@
 - [ALASKA/LSDIR source code, manifest contract, and verification](plan-new-data-code.md)
 - [ALASKA selection v2 (splits, leakage rule, counts)](alaska-selection-v2.md)
 - [LSDIR selection v1 (splits, leakage rule, counts)](lsdir-selection-v1.md)
+- [Pi host changes (swap, journal)](pi-host-changes.md)
 - [On-the-fly generator design plan](plan-otf-generator.md)
 - [Optional G4 GPU LSB generator plan](plan-gpu-generator.md)
 - [G4 epoch overhead analysis and options](plan-epoch-overhead.md)
