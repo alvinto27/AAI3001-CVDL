@@ -145,6 +145,17 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
   resolve; 93/93 tests pass.
 - Decided: from now on, `docs/status.md` replaces the research checklist as
   the record that changes in the same commit as the journal.
+- Did: Worker_2 changed run storage (`99ca3a1`). Notebook 05 keeps only
+  `last.ckpt` (overwritten each epoch) and one best checkpoint; headless runs
+  keep one full `run.log` and print progress at most every 45 s. PC-only
+  `run_notebook.py --resume`: a QUICK run stopped after epoch 0 and resumed to
+  epoch 1 with the same settings SHA (`e8a8aeb3...248d`). 97/97 tests pass.
+- Did: removed 122 per-epoch checkpoints (445,284,516 B) after a check that
+  the Pi holds full copies of the 5 G4 runs; moved early PC checkpoints to
+  `runs-out/early-pc/`; deleted 9 scratch task logs. `runs-out` 1.1 GB ->
+  695 MB.
+- Decided: G4 preemption keeps the fresh-ID restart. G4 resume across boots
+  is postponed until C (longer runs).
 
 ### Next
 

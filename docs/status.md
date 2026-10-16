@@ -6,7 +6,7 @@
 
 - **Completed:** ALASKA/LSDIR source records and mixed sampler; final verified masters; G4 mixed run and [result](results/result-newdata-1.md); PC threshold/noise check B and [result](results/result-check-b.md). The frozen standard test and RAISE/DIV2K records remain in use.
 - **On hold:** A, per-cell training (design only, no code or model run); C, capacity/longer training/BF16; fair R0 control, seed repeats, front-end changes, and other free checks. No follow-up is authorized by the plans.
-- **Deferred records:** prebuilt writer, OTF plan step 17: [historical design](archive/plan-otf-generator.md), OTF implemented but writer deferred. Noisy covers: [parked by the user](archive/plan-noisy-covers.md). G4 GPU LSB generator: [shelved design](archive/plan-gpu-generator.md), not built.
+- **Deferred records:** prebuilt writer, OTF plan step 17: [historical design](archive/plan-otf-generator.md), OTF implemented but writer deferred. Noisy covers: [parked by the user](archive/plan-noisy-covers.md). G4 GPU LSB generator: [shelved design](archive/plan-gpu-generator.md), not built. G4 resume after Spot preemption: postponed until C (longer training); today a preempted G4 run restarts with a fresh job ID (see [run guide](active/g4-batch-runner.md)). Long runs need resume across boots because one boot is limited to 105 min.
 - **Hardware and delivery:** the G4 finished the mixed job and shut itself down; it is **stopped**. The Pi is online. Its USB-SSD swap file was removed; **2 GiB zram only** remains. See the [Pi record](active/pi-host-changes.md) and [2026-10-16 journal](journal/2026-10-16/README.md). Do not start the VM to resend a result.
 
 ## User decisions still pending
@@ -35,5 +35,6 @@ The old checkpoint-selection validation decision is **done**: the mixed run used
 | `a6170ed` | Per-cell [design only](active/plan-per-cell-training.md). |
 | `465de12` | Latest dated journal update before this documentation reorganization. |
 | `45ec074` | Documentation reorganization (status, findings, journal by day). |
+| `99ca3a1` | Keep only last + best checkpoints and one run log; old per-epoch checkpoints removed. |
 
 The [documentation index](README.md) lists each current, result, and historical record. The [run guide](active/g4-batch-runner.md) is reference material only while work is on hold.
