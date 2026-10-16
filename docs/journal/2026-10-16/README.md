@@ -281,11 +281,27 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
 - Note: Worker_3 session died during phase 4a; Worker_4 reviewed and
   finished its uncommitted draft.
 
+- Did: refactor phase 5 (`7ce30ef`, fix `8c1c0dc`): G4 jobs by notebook.
+  `submit.sh run --notebook PATH [--commit SHA] [--timeout-min N]
+  [--dry-run]`. A PC pre-flight reads the notebook top cell at the job
+  commit with the G4 profile and prints the final settings and RUN_NAME
+  before any gcloud call. The job env has 2 lines (`V3_NOTEBOOK`,
+  `CVDL_JOB_ID`). A dirty or unpushed commit and commits before phase 5 are
+  refused. The installed `job.sh` (`89cc83e9…`) already hands over to the
+  checked-out `job_run.sh`, so no reinstall or boot. G4 profile detection:
+  Google DMI + RTX PRO 6000, no fallback. `notebooks/newdata-1.ipynb` and
+  `wide-1.ipynb` give exactly the golden settings and run names; their env
+  files are archived. speed-1 keeps its env file.
+- Found: 167 tests; the dry run of newdata-1 gives job ID
+  `newdata-1-<UTC>-<4 digits>` (double-dash bug fixed).
+- Pending: the first real G4 job after phase 5 is the G4 smoke test of the
+  refactor.
+
 ### Next
 
 - Done: B checks (`042903d`).
 - Done: bookkeeping tidy-up of docs, runs, data (PC and G4) and code.
-- In progress: notebook refactor; phases 0-4c done, next phase 5 (G4 jobs by notebook + commit, docs).
+- Done: notebook refactor (phases 0-5). Pending: G4 smoke at the next real job.
 - On hold: A, per-cell training (design written, not approved).
 - On hold: C, capacity / epochs / bf16.
 - Pending: start a new Scribe session (the old Scribe alias shows the
