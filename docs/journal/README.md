@@ -15,3 +15,6 @@ The dated entries were moved from the former single journal file without deletin
 - [2026-10-16](2026-10-16/README.md) — Recorded final source data, the mixed G4 run, and Pi swap changes.
   The corrected old-model ALASKA 5%-FA finding is in the [check B result](../results/result-check-b.md).
   Afternoon: per-cell design written (not approved), all research on hold, docs reorganised.
+  Then bookkeeping: one `runs/` folder (best + latest checkpoints only), `Datasets/originals` +
+  `generated` on PC and G4 (137 GB freed), code tidy-up (122 tests), model-copy parity proven,
+  notebook refactor started.

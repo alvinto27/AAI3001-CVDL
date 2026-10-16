@@ -212,9 +212,26 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
   Active scripts, `scripts/g4/` and `scripts/pi/` unchanged. Suite: 122
   tests pass from the repo root (100 + 34 - 12 archived).
 
+- Found: a test merge of `yx` into `main` conflicts in about a dozen files
+  (add/add). Cause: PR #1 copied files into `main` without their `yx`
+  history. Not caused by PR #2. The later `yx` -> `main` merge needs one
+  careful PR.
+- Decided: the G4 keeps its internal `runs-out/` name for now (installed
+  `job.sh`, job-ID records). Rename it to match the PC `runs/` with the next
+  real G4 job, not in a separate boot.
+- Did: started the notebook refactor (user request). Goal: move the code
+  that notebooks 04 and 05 share (data, models, Lightning module, callbacks,
+  evaluation, plots) into one importable package, so each notebook holds
+  only its experiment. Worker_3 is doing a survey and design first; nothing
+  changes until the proof rules (same hashes, batches, model outputs,
+  checkpoint keys, and training losses) are agreed. Pending: user decision
+  on notebook 04 (convert, or freeze as the v3 baseline).
+
 ### Next
 
 - Done: B checks (`042903d`).
+- Done: bookkeeping tidy-up of docs, runs, data (PC and G4) and code.
+- In progress: notebook refactor (survey and design).
 - On hold: A, per-cell training (design written, not approved).
 - On hold: C, capacity / epochs / bf16.
 - Pending: start a new Scribe session (the old Scribe alias shows the

@@ -1,17 +1,21 @@
 # Project status — 2026-10-16
 
-**Start here:** All research and training work is **on hold at the user's request**. Do not start a new PC experiment, G4 run, or work from a plan without a new user decision. The last mixed-source wide XuNet run completed, and the PC validation-threshold and ALASKA false-alarm check B completed. The [per-cell design](active/plan-per-cell-training.md) is written, **not approved**, and not implemented. Use [findings](findings.md) for the run table and [journal days](journal/README.md) for dated records.
+**Start here:** All research and training work is **on hold at the user's request**; a bookkeeping tidy-up is in progress (docs, runs, data and code done; notebook refactor in design). Do not start a new PC experiment, G4 run, or work from a plan without a new user decision. The last mixed-source wide XuNet run completed, and the PC validation-threshold and ALASKA false-alarm check B completed. The [per-cell design](active/plan-per-cell-training.md) is written, **not approved**, and not implemented. Use [findings](findings.md) for the run table and [journal days](journal/README.md) for dated records.
 
 ## Current state and items
 
 - **G4 disk uses the new data layout since 2026-10-16 06:04Z** (checkout `9798b56`, free disk 116 GB). Commits before `76f6257` no longer match the G4 disk.
+
+- **Layout (2026-10-16):** all run outputs in git-ignored `runs/<run>/` (best + `last.ckpt` only, one `run.log`); photos in `Datasets/originals/{raise,div2k,alaska,lsdir}` on the PC and the G4; `V3_SOURCE` defaults to `decode` (the cache is deleted; rebuild it to use `cache`). See `runs/README.md` and `Datasets/README.md`.
+
+- **Notebook refactor (in design):** shared notebook code to move into one importable package; survey first, proof rules before any change. Pending user decision: convert notebook 04 or freeze it.
 
 - **Code tidy-up (2026-10-16):** one-off checks moved to `scripts/archive/`, Mode 2 (full-photo/MIL) dropped and archived in `LSB-Dataset-Generator/archive/`, notebooks 01 and 03 in `notebooks/archive/`, all tests in `tests/`. See `scripts/archive/README.md`.
 
 - **Completed:** ALASKA/LSDIR source records and mixed sampler; final verified masters; G4 mixed run and [result](results/result-newdata-1.md); PC threshold/noise check B and [result](results/result-check-b.md). The frozen standard test and RAISE/DIV2K records remain in use.
 - **On hold:** A, per-cell training (design only, no code or model run); C, capacity/longer training/BF16; fair R0 control, seed repeats, front-end changes, and other free checks. No follow-up is authorized by the plans.
 - **Deferred records:** prebuilt writer, OTF plan step 17: [historical design](archive/plan-otf-generator.md), OTF implemented but writer deferred. Noisy covers: [parked by the user](archive/plan-noisy-covers.md). G4 GPU LSB generator: [shelved design](archive/plan-gpu-generator.md), not built. G4 resume after Spot preemption: postponed until C (longer training); today a preempted G4 run restarts with a fresh job ID (see [run guide](active/g4-batch-runner.md)). Long runs need resume across boots because one boot is limited to 105 min.
-- **Hardware and delivery:** the G4 finished the mixed job and shut itself down; it is **stopped**. The Pi is online. Its USB-SSD swap file was removed; **2 GiB zram only** remains. See the [Pi record](active/pi-host-changes.md) and [2026-10-16 journal](journal/2026-10-16/README.md). Do not start the VM to resend a result.
+- **Hardware and delivery:** the G4 is **stopped** (last boot: data-layout maintenance, 06:00:55-06:10:43Z on 2026-10-16). It keeps its internal `runs-out/` folder name until the next real G4 job. `main` stays at PR #2 until `yx` is merged as a whole (expect add/add conflicts from PR #1). The Pi is online. Its USB-SSD swap file was removed; **2 GiB zram only** remains. See the [Pi record](active/pi-host-changes.md) and [2026-10-16 journal](journal/2026-10-16/README.md). Do not start the VM to resend a result.
 
 ## User decisions still pending
 
@@ -40,6 +44,8 @@ The old checkpoint-selection validation decision is **done**: the mixed run used
 | `465de12` | Latest dated journal update before this documentation reorganization. |
 | `45ec074` | Documentation reorganization (status, findings, journal by day). |
 | `99ca3a1` | Keep only last + best checkpoints and one run log; old per-epoch checkpoints removed. |
-| `5881bbd`..`7d56dbe` | One `runs/` folder for all runs. PR #2 brings the same move to `main` (pending user merge). |
+| `5881bbd`..`7d56dbe` | One `runs/` folder for all runs. PR #2 (merged, `0981ce7`) brought the same move to `main`. |
+| `76f6257`, `9798b56` | Data layout `Datasets/originals` + `generated` (PC), G4 scripts and one-time G4 reorganisation. |
+| `ac8810a`, `d6a3875` | Model-copy parity test; code tidy-up (122 tests). |
 
 The [documentation index](README.md) lists each current, result, and historical record. The [run guide](active/g4-batch-runner.md) is reference material only while work is on hold.
