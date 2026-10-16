@@ -26,7 +26,8 @@ class SteganalysisModule(L.LightningModule):
         super().__init__()
         if lr_drops is None:
             lr_drops = ((max_epochs // 2 + 1, 0.1),)
-        self.save_hyperparameters(ignore=["validation_data", "conv1_factory"])
+        # front_end is saved only when it is not the default, so KV checkpoints keep their old hyper_parameters.
+        self.save_hyperparameters(ignore=["validation_data", "conv1_factory", *(["front_end"] if front_end == "kv" else [])])
         self.validation_data = validation_data
         self.net = (XuNetWide(clip_t=clip_t, norm=norm, width=width, front_end=front_end) if model == "xunet_wide"
                     else XuNet(clip_t=clip_t, norm=norm, front_end=front_end))
