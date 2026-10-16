@@ -11,7 +11,7 @@ States: `queued` (approved, waiting) · `preparing` (code or notebook not ready)
 | ---: | --- | --- | --- | --- | --- | --- |
 | 1 | `experiments/tiling-overlap.ipynb` | Tiling arm 1: overlap-last, 512 | `8fff50d` | delivered (14:00-14:40Z; 39m49s; best epoch 29, val P_E .0586) | `tiling-overlap-20261016T135926Z-8501` | evaluating |
 | 2 | `experiments/tiling-trim.ipynb` | Tiling arm 2: centre trim, 512 | `8fff50d` | running (start 14:41Z) | `tiling-trim-20261016T144117Z-3222` | — |
-| 3 | `experiments/tiling-pad.ipynb` | Tiling arm 3: centre zero-pad, 512 | `8fff50d` | queued | — | — |
+| 3 | `experiments/tiling-pad.ipynb` | Tiling arm 3: centre zero-pad, 512 | `8fff50d` | queued: paused until 2026-10-17 (user) | — | — |
 | 4 | `experiments/tiling-overlap-256.ipynb` | Tiling arm 1 at 256: overlap-last (batch 128, 180,000 tiles/epoch, LR 3e-4) | `30bac1f` | queued (dry run OK) | — | — |
 | 5 | `experiments/tiling-trim-256.ipynb` | Tiling arm 2 at 256: centre trim (same 256 budget) | `30bac1f` | queued (dry run OK) | — | — |
 | 6 | `experiments/tiling-pad-256.ipynb` | Tiling arm 3 at 256: centre zero-pad (same 256 budget) | `30bac1f` | queued (dry run OK) | — | — |
