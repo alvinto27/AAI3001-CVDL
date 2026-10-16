@@ -117,7 +117,7 @@ class TrainingGridTests(unittest.TestCase):
             self.assertEqual(values['train_yaml'],'configs/train-k1to4.yaml')
             recipe=top_values(base);recipe.pop('run_name')
             ignored={'name','train_grid','post_fit_eval'}
-            if path.stem=='tiling-overlap-256':
+            if path.stem.endswith('-256'):
                 self.assertEqual((values['train_tile_size'],values['batch_size'],values['tiles_per_epoch']),(256,128,180000))
                 # Same pixels per epoch and per optimiser step as the 512 arm.
                 self.assertEqual(values['tiles_per_epoch']*256**2,45000*512**2)
