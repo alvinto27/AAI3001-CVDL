@@ -1,6 +1,6 @@
 # Research checklist
 
-Status date: 2026-10-15 (end of session)
+Status date: 2026-10-16
 
 This file records what the project tried, checked, and still needs. It uses
 `P_E` for the best-threshold error probability unless it says **at threshold
@@ -30,6 +30,7 @@ the project record for each result.
 | XuNet v4 R1 / `g4-v4-r1b` | New notebook 05, no normalisation, clip 3, LR `3e-4`, 20 epochs, k=1–8 training | Best validation `P_E` / AUC 0.0202 / 0.9949. Test `P_E` / AUC 0.022864 / 0.989898. At threshold 0.5, clean false alarm was 0.0172 and lowest k=1 miss was 0.1804. RAISE / DIV2K `P_E` was 0.0179 / 0.0615. | Dropped as the base candidate. The run underfit and had a validation spike. | [Journal](journal.md#2026-10-15--g4-priming-run-and-pc-observation); commit `ad8c754` |
 | XuNet v4 R2 / `g4-v4-r2` | No normalisation; 30 epochs; train k=1–4; LR drops at epochs 5 and 20 | Best validation `P_E` / AUC 0.0227 / 0.9939. Test `P_E` 0.0250; bpp-1 `P_E` 0.0199. At threshold 0.5, clean false alarm was 0.0233 and lowest k=1 miss was 0.1041. | Superseded as the base candidate by wide XuNet. The LR and k-range changes were confounded. | [Journal](journal.md#2026-10-15--g4-priming-run-and-pc-observation); commit `563ae3c` |
 | Wide XuNet / `wide-w4_r2` | Wider layers after the same front end; R2 recipe | Test `P_E` / AUC 0.019533 / 0.996092. Bpp-1 `P_E` / AUC 0.014878 / 0.997560. At threshold 0.5, clean false alarm was 1.396%, lowest k=1 miss was 10.264%, and k=1–4 `P_E` was 0.02373. | Pass. Base-model candidate. V3c still has lower test `P_E` (0.0165), so seed repeats are needed. | [Wide result](result-wide-xunet.md); [Journal](journal.md#2026-10-15--g4-priming-run-and-pc-observation); commit `5720c87` |
+| Mixed-source wide / `wide-w4_mixr2` (`...024859Z-9032`) | Wide XuNet, R2 recipe; data RAISE 40% / LSDIR 20% / ALASKA 40%, 45,000 tiles per epoch; capped validation 8,035 pairs | ALASKA unseen AUC 0.798 -> 0.934, FA at 0.5 47.5% -> 13.8%, but miss at 5% FA 21.3% -> 25.3%; LSDIR test P_E 0.0815 -> 0.0664; standard test P_E 0.0195 -> 0.0254. Best val epoch 25 (RAISE 0.021, ALASKA 0.156, LSDIR 0.076). | Kept for new-source research; wide-R2 kept for the standard test. Still underfits; ALASKA FA high on 21/28 seen cameras. | [Result](result-newdata-1.md); [Journal](journal.md#2026-10-16--new-source-data-pi-freeze-first-mixed-source-g4-run); commit `ab9d3f1` |
 | G4 speed matrix | Batch 32/64/128; fp32 and BF16; 600 timed steps after 50 warm-up steps | Images/s: 2,615.72 / 2,710.68 / 2,573.36 / 2,542.93 / 2,671.68 / 2,696.26 for 32-fp32, 32-BF16, 64-fp32, 64-BF16, 128-fp32, 128-BF16. | Keep batch 32. BF16 and validation/data-supply work are Pending. | [Journal](journal.md#2026-10-15--g4-priming-run-and-pc-observation); commit `ad33aa8` |
 | GPU LSB generator design | Proposed train-only GPU embedding path | PC probe found decode 83% of CPU work and embedding about 8%. Estimated gain was 0–25%; no G4 generator run exists. | Shelved. | [GPU plan](plan-gpu-generator.md); [Journal](journal.md#2026-10-15--g4-priming-run-and-pc-observation); commit `a30748d` |
 | DIV2K training plan | Earlier RAISE + DIV2K training mix | No new metric for removal. DIV2K files remain on disk and are kept for separate evaluation. | Dropped from the training plan. The team must keep the source records and report DIV2K separately. | [Journal](journal.md#2026-10-15--g4-priming-run-and-pc-observation) |
@@ -61,9 +62,9 @@ the project record for each result.
 | The model ignores periodic stride structure and payload structure. | Supported | At equal bpp, stride misses were similar to or worse than random; contiguous k=1 letters / random bytes misses were 1.2% / 1.9%. | Use matched effective-bpp, equal-photo tests with more samples per stride and payload type. | Medium. |
 | `map(raw) - map(denoised)` cancels clean hot spots. | Untested | The calibration idea may remove clean scene responses, but denoising may also remove natural noise and costs about 2x compute. | Run the denoise-and-compare demo on clean/stego pairs and measure clean false alarm, cell AUC, and k=1 P_E. | Medium to high. |
 | Per-cell training fixes clean hot spots and the tile-label/map objective mismatch. | Untested | The current tile model produces clean hot spots; the generator can provide changed-pixel masks. | Train with dense or soft per-cell labels and compare clean hot spots, chunk/whole equality, cell AUC, and k=1 P_E. | High; new data code and training. |
-| LSDIR, already shrunk 4x, is easier and may teach an easy-data shortcut. | Untested | LSDIR HR is already shrunk 4x and is smoother than camera output. The source mix was changed to RAISE 40%, LSDIR 20%, ALASKA 40% to reduce this risk. | Train with and without LSDIR; report per-source and unseen-camera results at matched source weights. | High; multiple runs. |
+| LSDIR, already shrunk 4x, is easier and may teach an easy-data shortcut. | Weakened | LSDIR HR is already shrunk 4x and is smoother than camera output. The source mix was changed to RAISE 40%, LSDIR 20%, ALASKA 40% to reduce this risk. | Train with and without LSDIR; report per-source and unseen-camera results at matched source weights. | High; multiple runs. |
 | The R2 k=1–4 improvement is caused by the k-range change rather than the LR plan. | Untested | R2 changed both the k range and LR drops. Wide and R2 comparisons do not isolate either change. | Run a factorial control: old k range with new LR, and new k range with old LR, with the same seed and data. | High; at least two full runs. |
-| Source diversity improves generalisation to unseen cameras. | Untested | ALASKA and LSDIR add cameras and source types, but no new-source model result exists. | Use held-out ALASKA camera models and separate LSDIR test data; compare to the RAISE/DIV2K control across seed repeats. | High; new-source runs and repeats. |
+| Source diversity improves generalisation to unseen cameras. | Partly supported | Mixed run: unseen ALASKA AUC 0.798 -> 0.934 and FA at 0.5 47.5% -> 13.8%, but miss at 5% FA got worse (21.3% -> 25.3%). Gains are mostly in clean-photo scores. One seed. | Use held-out ALASKA camera models and separate LSDIR test data; compare to the RAISE/DIV2K control across seed repeats. | High; new-source runs and repeats. |
 
 ## 4. To do — ordered work
 
@@ -71,10 +72,12 @@ the project record for each result.
 | ---: | --- | --- | --- | --- | --- |
 | 1 | Finish ALASKA/LSDIR readers, records, per-source sampler, extra validation/test sets, capped checkpoint validation. | Worker_2 | Done (`e592cce`, `1b54858`) | — | No |
 | 2 | Run the final ALASKA selection v2 after the download. Keep the 8 unseen models and the 11-ID gap rule. | Worker_3 | Done (`5ca650b`); option B open | — | Yes: option B (only G11 and D90 train-only) |
-| 3 | Choose the LSDIR train/validation/test subset from train shards to the contract in `plan-new-data-code.md` (suggested 7,000 / 1,500 / 2,500 photos). Do not use val1. Drop one of the identical pair. | Worker_3 | Pending | User confirms numbers | Yes |
-| 4 | Build final manifests; copy the selected source data to G4 (~19.4 GB ALASKA to the PC first, then ALASKA + LSDIR to G4). | Worker_2 + user (maintenance boot) | Pending | Steps 2–3 | No |
-| 5 | Run the first new-data training job. Use it to measure post-fix G4 timing. | Orchestrator + Worker_2 | Pending | Data copy, sampler, manifests | No |
-| 6 | Train the dense per-cell map model on the better base. | Worker_2 | Pending | New-data run; per-cell loss and crop policy | No |
+| 3 | LSDIR subset selection v1 (7,000 / 1,500 / 2,500) and records | Worker_3 | Done (`4d6f27b`, `2659b3d`) | — | — |
+| 4 | Copy data to PC and G4; build records | Workers | Done (`daf893c`; G4 verified 29,200 files) | — | — |
+| 5 | First new-data G4 run (also measures post-fix timing) | Orchestrator + Worker_2 | Done (`ab9d3f1`) | — | — |
+| 6 | B: ALASKA false-alarm review; per-source thresholds chosen on validation | Worker_2 / Worker_3 | Pending | — | No |
+| 7 | A: per-cell (dense) training | Worker_2 | Pending | B | Design review |
+| 8 | C: more capacity / longer training / bf16 | — | Pending | A | Yes |
 
 ### Decisions still pending
 
