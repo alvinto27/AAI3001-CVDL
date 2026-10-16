@@ -159,6 +159,9 @@ SCHEMA = MappingProxyType({
     'grad_clip': Definition('float', number, 1., '>=0; 0=off', 'Gradient norm clipping.', lambda v:v>=0, 'V3_GRAD_CLIP', 'GRAD_CLIP'),
     'lr_drops': Definition('tuple?', drops, lambda c:((c['epochs']//2+1,.1),), 'None=automatic; increasing epoch:factor; factor (0,1]', 'LR drop plan.', env='V3_LR_DROPS', legacy_global='LR_DROPS'),
     'train_yaml': Definition('path?', optional_string, None, 'path or None; OTF only', 'Train embedding settings.', env='V3_TRAIN_YAML', legacy_global='TRAIN_YAML'),
+    'train_grid': Definition('str', str, 'recorded', 'recorded/overlap_last/centre_trim/centre_pad', 'Training-only tiling rule.', lambda v:v in {'recorded','overlap_last','centre_trim','centre_pad'}),
+    'post_fit_eval': Definition('str', str, 'full', 'full/none', 'Run post-fit evaluation.', lambda v:v in {'full','none'}),
+    'name': Definition('str?', optional_string, None, 'notebook stem or None', 'Short experiment notebook name.'),
     'extra_tests': Definition('str', str, 'test-bpp1', 'none/test-bpp1/source-panels or both panels', 'Extra evaluation panels.', lambda v:set(v.split(','))<={'none','test-bpp1','source-panels'} and ('none' not in v or v=='none'), 'V3_EXTRA_TESTS', 'EXTRA_TESTS'),
     'model': Definition('str', str, 'xunet', 'xunet/xunet_wide', 'Network architecture.', lambda v:v in {'xunet','xunet_wide'}, 'V3_MODEL', 'MODEL'),
     'width': Definition('int', integer, 4, '1..8', 'Wide network multiplier.', lambda v:1<=v<=8, 'V3_WIDTH', 'WIDTH'),
@@ -298,6 +301,10 @@ class Settings:
         except KeyError as error:
             raise AttributeError(name) from error
 
+    @property
+    def run_directory_name(self):
+        return (self.job_id or self.run_name) if self.name else self.run_name
+
     def to_run_settings(self):
         from lsb_torch import RunSettings
         return RunSettings(source=self.source, cache_root=self.cache_root,
@@ -343,7 +350,22 @@ class Settings:
         return record
 
 
+def validate_notebook_name(path, values):
+    """New experiment cells state a name; paths, not optional prose, enforce it."""
+    path=Path(path)
+    if path.parent.name=='experiments' or values.get('name') is not None:
+        if path.parent.name!='experiments' or values.get('name')!=path.stem:
+            raise ValueError('experiment name must equal its notebooks/experiments file stem')
+
+
 def _run_name(c, explicit):
+    if c['name'] is not None:
+        name=c['name']
+        if not name or not name.isascii() or not name[0].isalnum() or not all(ch.isalnum() or ch in '_-' for ch in name):
+            raise ValueError('name must be a simple ASCII notebook stem')
+        if c['run_name'] is not None and c['run_name']!=name:
+            raise ValueError('name and run_name must agree')
+        return name
     if c['run_name'] is not None and (c['run_name'] in {'.','..'} or not c['run_name'].isascii()
             or not all(ch.isalnum() or ch in '._-' for ch in c['run_name'])):
         raise ValueError('run_name must be a simple ASCII path component')
@@ -426,6 +448,10 @@ def load(*, overrides=(), environ=None, _profile=None, **notebook_values):
     if c['train_yaml']:
         if c['data']!='otf': raise ValueError('train_yaml requires data=otf')
         c['train_yaml']=str((Path(c['root'])/c['train_yaml']).resolve())
+        from lsb_batch import read_config
+        try:read_config(c['train_yaml'])
+        except (OSError,ValueError) as error:
+            raise ValueError(f"invalid train_yaml {c['train_yaml']!r}: {error}") from error
     c['persistent_workers'] = c['persistent_workers'] and c['eval_workers'] > 0
     if c['compile'] == 'default':
         if 'MIOPEN_GEMM_ENFORCE_BACKEND' in env:
@@ -443,6 +469,14 @@ def load(*, overrides=(), environ=None, _profile=None, **notebook_values):
     if c['source']!='cache': c['cache_root']=None
     if c['source_mix'] and tuple(c['source_mix'])!=c['sources']: raise ValueError('sources conflicts with source_mix order')
     c['run_name']=_run_name(c, {name for name,value in supplied.items() if name!='lr_drops' or value is not None})
+    if c['name'] and c['job_id'] is None and _profile is None:
+        from datetime import datetime, timezone
+        c['job_id']=f"{c['name']}-interactive-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}"
+        origins_all['job_id']='interactive'
+    if c['name'] and c['job_id'] and not c['job_id'].startswith(c['name']+'-'):
+        raise ValueError('job_id must start with experiment name')
+    if c['train_grid']!='recorded' and c['data']!='otf':
+        raise ValueError('train_grid requires OTF data')
     result = Settings(freeze(c),freeze(origins_all),profile.name,freeze(history))
     result.to_run_settings()  # shared source/mix/cache constraints; no photo reads
     if result.speed_matrix:

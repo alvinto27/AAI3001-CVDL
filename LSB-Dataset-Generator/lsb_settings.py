@@ -138,7 +138,7 @@ draw_legacy_settings = _draw_settings
 OTF_KEY_VERSION = 1
 FIXED_EVALUATION_SEED = 1
 PURPOSE_CODES = MappingProxyType({"train": 1, "val": 2, "test": 3, "test_seen": 4, "test_unseen": 5})
-GRID_CODES = MappingProxyType({"none": 0, "topleft_crop": 1, "overlap_last": 2, "trim512": 3})
+GRID_CODES = MappingProxyType({"none": 0, "topleft_crop": 1, "overlap_last": 2, "trim512": 3, "train_overlap_v1": 2, "centre_trim": 4, "centre_pad": 5})
 CARRIER_CODES = MappingProxyType({"tile": 1, "photo": 2})
 STREAM_CODES = MappingProxyType({"settings": 0, "embedding": 1})
 

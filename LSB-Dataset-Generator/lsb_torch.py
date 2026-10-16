@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from concurrent.futures import ThreadPoolExecutor
 import math
 import os
@@ -130,7 +131,7 @@ class Corpus:
     Evaluation always includes both frozen sources; training source selection,
     fraction, weights, and custom YAML cannot change overlap_full_mix.
     """
-    def __init__(self, repo_root, settings: RunSettings, *, records=None):
+    def __init__(self, repo_root, settings: RunSettings, *, records=None, train_grid='recorded'):
         self.root=Path(repo_root)
         self.settings=settings
         manifests=Path(settings.manifest_root) if settings.manifest_root else self.root
@@ -138,6 +139,12 @@ class Corpus:
                      _rows(self.root/"data/raise/photo_manifest.csv")+_rows(self.root/"data/div2k/photo_manifest.csv")+
                      sum((_rows(manifests/f"data/{source}/photo_manifest.csv") for source in ("alaska","lsdir")
                           if source in settings.sources),[]))
+        from lsb_train_grid import POLICIES, summary
+        if train_grid not in {'recorded',*POLICIES}:raise ValueError('invalid train_grid')
+        self.train_grid=train_grid
+        self._grid_photos=[r for r in self.photos if r['source'] in settings.sources]
+        self.grid_record=(summary(self.root,self._grid_photos,settings.tile_size,train_grid,verify=records is None)
+                          if train_grid!='recorded' else None)
         self.by_id={r["photo_id"]:r for r in self.photos}
         if len(self.by_id)!=len(self.photos):
             raise ValueError("duplicate photo identity")
@@ -162,10 +169,12 @@ class Corpus:
         self.offsets={}
         offset=0
         for record in self.photos:
+            if train_grid!='recorded' and (record['split']!='train' or record['source'] not in settings.sources):
+                continue
             if settings.grid=="topleft_crop" and record["source"]!="raise":
                 continue
             self.offsets[record["photo_id"]]=offset
-            offset+=self.pairs_in_photo(record,settings.grid)
+            offset+=self.training_pairs(record)
         self._legacy=None
         if settings.source=="cache":
             key=(str(self.root.resolve()),str(Path(settings.cache_root).resolve()),
@@ -191,6 +200,28 @@ class Corpus:
         ys,xs=grid_axes(record,effective,self.settings.tile_size)
         return len(ys)*len(xs)*self.settings.variants_per_tile
 
+    def training_grid(self, record):
+        from lsb_train_grid import POLICIES
+        return self.effective_grid(record) if self.train_grid=='recorded' else POLICIES[self.train_grid]
+
+    def training_axes(self, record):
+        if self.train_grid=='recorded':
+            return grid_axes(record,self.effective_grid(record),self.settings.tile_size)
+        from lsb_train_grid import axes
+        return axes(record,self.settings.tile_size,self.train_grid)
+
+    def training_pairs(self, record):
+        if self.train_grid=='recorded':return self.pairs_in_photo(record,self.settings.grid)
+        ys,xs=self.training_axes(record)
+        return len(ys)*len(xs)*self.settings.variants_per_tile
+
+    def save_training_plan(self, folder):
+        if self.grid_record is None:return
+        from lsb_train_grid import plan
+        with (Path(folder)/'train_grid_plan.jsonl').open('w') as out:
+            out.writelines(plan(self._grid_photos,self.settings.tile_size,self.train_grid))
+        (Path(folder)/'train_grid_summary.json').write_text(json.dumps(self.grid_record,indent=2)+'\n')
+
     def train_tile_schedule(self,epoch):
         """Photo-grouped sampled tile tuples, with a new keyed draw each epoch."""
         if self.settings.source_mix is None:
@@ -204,7 +235,7 @@ class Corpus:
             candidates=[]
             for record in self.selected:
                 if record["source"]!=source:continue
-                ys,xs=grid_axes(record,self.effective_grid(record),self.settings.tile_size)
+                ys,xs=self.training_axes(record)
                 candidates.extend((record,row,col,variant)
                                   for row in range(len(ys)) for col in range(len(xs))
                                   for variant in range(1,self.settings.variants_per_tile+1))
@@ -247,7 +278,8 @@ class Corpus:
 
     @property
     def run_record(self):
-        return dict(settings=asdict(self.settings),source=self.settings.source,grid=self.settings.grid,tile_size=self.settings.tile_size,
+        extra={} if self.grid_record is None else {'train_grid':self.grid_record}
+        return dict(**extra,settings=asdict(self.settings),source=self.settings.source,grid=self.settings.grid,tile_size=self.settings.tile_size,
                     run_seed=self.settings.run_seed,train_photo_fraction=self.settings.train_photo_fraction,
                     train_photo_selection=self.selection_record,source_weights=self.settings.source_weights,
                     variants_per_tile=self.settings.variants_per_tile,fixed_variants=self.settings.fixed_variants,
@@ -271,7 +303,7 @@ class TrainingImages(IterableDataset):
         if self.corpus.settings.source_mix is not None:
             count=self.corpus.settings.tiles_per_epoch
         else:
-            count=sum(self.corpus.pairs_in_photo(r,self.corpus.settings.grid)
+            count=sum(self.corpus.training_pairs(r)
                       for r in self.corpus.train_schedule(int(self._epoch.item())))
         return count if self.corpus.settings.paired_batches else count*2
 
@@ -285,18 +317,19 @@ class TrainingImages(IterableDataset):
         schedule=self.corpus.train_schedule(int(self._epoch.item()))
         n=max(1,workers)
         factor=1 if self.corpus.settings.paired_batches else 2
-        return sum(math.ceil(sum(self.corpus.pairs_in_photo(r,self.corpus.settings.grid)*factor
+        return sum(math.ceil(sum(self.corpus.training_pairs(r)*factor
                                  for r in schedule[w::n])/batch_size) for w in range(n))
 
     def _items(self,schedule,epoch):
         settings=self.corpus.settings
         for record in schedule:
             photo=self.corpus.photo(record)
-            ys,xs=grid_axes(record,settings.grid,settings.tile_size)
+            ys,xs=(grid_axes(record,settings.grid,settings.tile_size) if self.corpus.train_grid=='recorded'
+                   else self.corpus.training_axes(record))
             for row in range(len(ys)):
                 for col in range(len(xs)):
                     for variant in range(1,settings.variants_per_tile+1):
-                        spec=TileSpec(settings.grid,settings.tile_size,row,col)
+                        spec=TileSpec(settings.grid if self.corpus.train_grid=='recorded' else self.corpus.training_grid(record),settings.tile_size,row,col)
                         seed=OTFSeed(settings.run_seed,"train",epoch,variant,settings.fixed_variants)
                         clean,_=make_sample(photo,record,spec,self.corpus.config,seed,"clean")
                         stego,meta=make_sample(photo,record,spec,self.corpus.config,seed,"stego")
@@ -314,9 +347,9 @@ class TrainingImages(IterableDataset):
         settings=self.corpus.settings
         for record,tiles in groups:
             photo=self.corpus.photo(record)
-            ys,xs=grid_axes(record,self.corpus.effective_grid(record),settings.tile_size)
+            ys,xs=self.corpus.training_axes(record)
             for row,col,variant in tiles:
-                spec=TileSpec(self.corpus.effective_grid(record),settings.tile_size,row,col)
+                spec=TileSpec(self.corpus.training_grid(record),settings.tile_size,row,col)
                 seed=OTFSeed(settings.run_seed,"train",epoch,variant,settings.fixed_variants)
                 clean,_=make_sample(photo,record,spec,self.corpus.config,seed,"clean")
                 stego,meta=make_sample(photo,record,spec,self.corpus.config,seed,"stego")

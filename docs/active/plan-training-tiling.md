@@ -1,9 +1,9 @@
 # Training tiling: three-arm design
 
-**Design only.** The user lifted the research hold only for this experiment.
-No implementation, image generation or training is authorised by this document.
-The counts below are a read-only calculation from tracked photo dimensions;
-no originals were decoded. Other research remains on hold.
+**Approved design and PC implementation.** The user lifted the research hold
+only for this experiment. This task does not launch G4 jobs. Pool statistics
+below came from tracked dimensions without decoding originals; later PC
+training/evaluation checks are listed at the end. Other research stays on hold.
 
 ## Fixed recipe and evaluation
 
@@ -58,7 +58,7 @@ The formulas also work at 256; this experiment is **512 only**. Existing
 
 Today's default is **mixed**: RAISE uses recorded overlap-last, whereas ALASKA
 and LSDIR use recorded **top-left** `trim512`. It is not any one of these arms.
-Add one experiment setting, `train_grid`, allowed values `recorded` (default),
+The training setting `train_grid` has values `recorded` (default),
 `overlap_last`, `centre_trim`, `centre_pad`. `recorded` must take today's exact
 code path, identities, RNG consumption and outputs. Do not rename its grids.
 
@@ -69,8 +69,8 @@ sampling, extraction and training pair offsets. Evaluation and legacy replay
 must continue through their existing resolver. Do not mutate source CSVs,
 splits, photo indices, recorded axes or their hashes.
 
-Version the new geometry as `train-grid-v1`. At implementation, produce an
-approved, tracked `data/train-grids/v1/summary.json` with input CSV SHA-256s,
+The geometry version is `train-grid-v1`. The tracked
+[summary](../../data/train-grids/v1/summary.json) holds input CSV SHA-256s,
 rule version, T, source/train selection, pool counts and expected plan digests.
 The canonical plan is one UTF-8 JSON line per training photo, sorted by frozen
 photo_index: source, photo_id/index, H/W, rule/version/T and signed y/x starts;
@@ -81,7 +81,7 @@ from the tracked CSV, not a new runtime scan. Assert decoded sizes agree.
 Track only the compact summary, not new photo records or image tiles.
 
 Keep OTF seed version and old grid codes intact. Overlap retains code 2;
-reserve new codes 4/5 for centre trim/pad (3 remains frozen top-left trim512).
+use new codes 4/5 for centre trim/pad (3 remains frozen top-left trim512).
 Record geometry version separately. Keep purpose, epoch, photo_index, tile
 row/column, variant and settings/embedding streams keyed as today. Same seed
 does not mean identical payloads across changed grids. Never change eval keys.
@@ -185,37 +185,46 @@ split=train only. They require no photo decode, embedding or new upload.
 
 ## 5. Notebook identity and execution
 
-Create copies of newdata-1, changing **only their first code cell**:
+The three copies of newdata-1 differ **only in their first code cell**.
+The common post-fit cells are now guarded by post_fit_eval; full remains the
+unchanged default for old notebooks.
 
-| Notebook (under `notebooks/experiments/`) | train_grid | Automatic run_name |
+| Notebook (under `notebooks/experiments/`) | train_grid | name = run_name |
 | --- | --- | --- |
 | `tiling-overlap.ipynb` | `overlap_last` | `tiling-overlap` |
 | `tiling-trim.ipynb` | `centre_trim` | `tiling-trim` |
 | `tiling-pad.ipynb` | `centre_pad` | `tiling-pad` |
 
-Remove the copied explicit long run_name. Keep other literal recipe keywords
-identical, add only train_grid. In this **new namespace only**, shared settings
-must derive run_name from the verified current notebook path's stem, and reject
-an explicit conflicting run_name. Preflight/CLI already know the selected path;
-supply it through internal execution context, not another experiment setting.
-For interactive use, a shared notebook-identity helper must resolve the actual
-kernel's notebook path (frontend-provided path or notebook-server session),
-and fail clearly if absent/ambiguous. Do not guess from cwd or hard-code the
-stem in a cell: that would drift on rename. In these cells, explicit non-default
-train_grid must require notebook identity even when context is missing; never
-fall back to the old generated name. Interactive integration is a gate
-before creating usable notebooks, not an assumed existing API.
+Approved simplification: each top cell states literal `name="tiling-pad"`
+(or its own stem), train_grid and `post_fit_eval="none"`, replacing the copied
+long run_name. All other recipe values stay identical. Preflight, runner and
+a test over experiments notebooks reject name/stem mismatch; conflicting
+run_name or name overrides also fail. No interactive path-discovery machinery.
+Old notebook names and golden RUN_NAMEs remain unchanged.
 
-Leave all existing notebooks, RUN_NAME rules and golden names unchanged.
-For new notebooks, one launch allocates `<stem>-<UTC YYYYMMDDTHHMMSSZ>-<4 digits>`
-once. G4 uses its submitted CVDL_JOB_ID; PC/interactive launches allocate the
-same form once in shared execution context. Use this ID for the run folder,
-logs and Pi display, but keep run_name equal to stem. Persist both in
-run_settings.json; never allocate an ID during preflight or each load() call.
-Checkpoint paths for this namespace must use the instance ID, not just the
-stem, to avoid resume/collision with an earlier launch. Check collisions before
-training. Keep model/grid/LR/k details in the top cell and run_settings.json,
-not names. No timestamp or experiment setting should be typed by the user.
+One headless launch allocates `<name>-<UTC YYYYMMDDTHHMMSSZ>-<4 digits>` once:
+G4 supplies CVDL_JOB_ID; PC run_notebook.py allocates it. Interactive load uses
+`<name>-interactive-<UTC>` instead. Use the ID for checkpoint/run folders,
+logs and Pi display, while run_name equals name. Save both in run_settings.json.
+Preflight allocates no ID. Hyperparameters remain in cells/settings, not names.
+
+`post_fit_eval` is `full` (default) or `none`. The three arms use none: G4 fits
+with per-epoch capped validation, writes best/last checkpoints and settings,
+then stops without post-fit predictions, panels, breakdown or diagnostics.
+Default full preserves old behaviour. After download, evaluate on the PC:
+
+```sh
+podman exec -w /work aai3001 python scripts/evaluate_run.py runs/<downloaded-run>
+podman exec -w /work aai3001 python scripts/evaluate_run.py runs/<downloaded-run> --padding-check
+```
+
+The evaluator accepts the outer job folder or checkpoint folder, selects its
+best checkpoint, reuses saved experiment/QUICK values and PC evaluation workers,
+and runs the notebook's standard/bpp-1/source panels, breakdown and diagnostics.
+It rebases saved config paths, checks validation identity, preserves training
+settings/checkpoints and writes separate evaluation provenance/results. Old
+pre-package runs are reconstructed explicitly from model/data settings. Do not
+run multiple models concurrently. Padding controls are optional and separate.
 
 ## 6. G4 schedule and comparison
 
@@ -225,12 +234,13 @@ After all PC gates pass, run fresh **overlap → trim → pad**, sequentially, a
 one reviewed/pushed commit. Use the [notebook submission workflow](g4-batch-runner.md#submit-a-run)
 with `--timeout-min 105`, existing 120-minute safety stop, and a dry run first.
 Expected budget is about **$1.30/arm, $3.90 total**, an estimate, not measured
-new timing or a spending cap. The timeout is a safety bound, not expected duration. Stop on wrong validation hash, missing sources or timeout; do not
+new timing or a spending cap. The timeout is a safety bound, not expected
+duration. Stop on wrong validation hash, missing sources or timeout; do not
 silently shorten epochs, change settings or resume a different arm.
 
 Select each best checkpoint by the identical capped-validation metric/rule.
 Report checkpoint SHA/epoch, seeds, grid/input/validation/test digests, pool and
-sampling statistics, elapsed time/cost, train/validation curves, standard-test
+sampling statistics, elapsed time/cost, train/validation curves, PC standard-test
 and separate extra-panel AUC/P_E, FA/miss at 0.5 and a validation-calibrated
 threshold, by source/camera/k/bpp. Test-optimized P_E is diagnostic, not a way
 to select a checkpoint or tune the deployed threshold. Compare all three fresh
@@ -302,12 +312,55 @@ Before any G4 boot:
    size unpadded controls without hidden batch padding. Remove QUICK artefacts;
    inspect three G4 dry runs before submission.
 
-Pending implementation: training-only resolver/real-crop interface, versioned
-summary/digest generation, new setting/provenance and automatic notebook/run
-identity (especially interactive path discovery), three notebooks, tests and
-report tool. Confirm live G4 inputs match tracked inventories before boot.
+Implementation and PC checks are complete; no G4 launch is authorised by
+this task. Confirm live G4 inputs match tracked inventories before boot.
 No statistical winner rule or further seeds are approved; report trade-offs,
 then ask before extending the experiment. Estimate **2–3 working days** for
 implementation, audit/review and PC checks, then three sequential G4 jobs
 (each bounded at 105 minutes) plus report preparation. This is a planning
-estimate; no training or QUICK result has been produced in this design task.
+estimate.
+
+## 8. PC gate evidence (2026-10-16)
+
+- Default golden compare: **ALL EQUAL**. Full suite: **179 tests pass**.
+  The 12 new tests cover rules/rounding, full pool/digest checks, real-only
+  embedding and pad zeros, source-independent sampling, frozen evaluation
+  frames, name checks, post-fit skipping and offline/padding controls.
+- Full-size metadata for all three arms retains validation `6bb3c8ef…` and
+  standard test `fdd989f7…`, plus identical five ALASKA/LSDIR settings hashes.
+  Bpp-1 settings also retain `606bd680…` in the full backend comparison.
+- One successful QUICK fit per arm through run_notebook.py: 2 epochs,
+  2 train batches/epoch, batch 8, 30 scheduled pairs/epoch, QUICK eval cap 16.
+  These are recorded overrides, not G4 recipe edits. Fit/runner time was about
+  **43.4 s/arm**. All stopped with post_fit_eval=none, one best plus last
+  checkpoint, no predictions until the separate evaluator was invoked.
+- Initial weight SHA-256 was identical in all arms:
+  `b5c85aac1e76b89903fb1f334c4b0bf5e45c6a0ab46eae906981477280110966`.
+  Each QUICK folder then completed the PC evaluator, including standard,
+  bpp-1, five source panels, breakdown/heatmaps and batch diagnostics.
+  Pad QUICK additionally completed both geometries at 10/25/50%, padded and
+  unpadded controls on 16 parent pairs, plus the frozen p=0 reference. These
+  are smoke checks, not research results or an arm ranking.
+
+Full backend check used a scratch copy of the existing mixed-run folder
+`runs/xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_mixr2-20261016T024859Z-9032`.
+The original was not written; both checkpoint files remained byte-identical.
+PC profile used 4 eval workers, Torch `2.14.0+rocm10.1.0`, NumPy 2.5.3,
+Pillow 12.3.0. Compare identical ordered cover IDs/labels to saved G4 CSVs:
+
+| Panel | Pairs | Absolute AUC difference | Absolute P_E difference |
+| --- | ---: | ---: | ---: |
+| Standard | 10,956 | 5.04024e-7 | 0 |
+| Bpp-1 | 10,956 | 2.62426e-7 | 4.56371e-5 |
+| ALASKA val | 1,535 | 3.60747e-6 | 0 |
+| ALASKA seen | 2,648 | 9.26995e-7 | 0 |
+| ALASKA unseen | 3,153 | 8.55010e-7 | 0 |
+| LSDIR val | 3,164 | 2.14766e-6 | 0 |
+| LSDIR test | 5,245 | 2.61723e-6 | 9.53289e-5 |
+
+Maximum differences: **AUC 3.607465331345594e-6**,
+**P_E 9.532888465203782e-5**, both below the 1e-3 gate.
+All six extra-panel settings hashes match the original G4 files.
+GPU process checks before PC work found no GPU owner; notebook 02 was never
+changed or staged by this task. G4 dry runs at the pushed final commit are
+Pending orchestration; no VM boot occurred in these checks.

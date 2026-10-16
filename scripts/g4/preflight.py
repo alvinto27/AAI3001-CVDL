@@ -59,7 +59,8 @@ def preflight(notebook_path, commit, *, root=ROOT, speed_env=None):
     """Use settings code/configs FROM the selected commit in an isolated snapshot."""
     notebook = validate_notebook(notebook_path,commit=commit,root=root)
     values = top_values(notebook) if speed_env is None else {}
-    from cvdl.settings import machine_profile, plain
+    from cvdl.settings import machine_profile, plain, validate_notebook_name
+    if speed_env is None:validate_notebook_name(notebook_path,values)
     archive = subprocess.check_output(['git','archive',commit],cwd=root)
     with tempfile.TemporaryDirectory(prefix='cvdl-preflight-') as temp:
         snapshot = Path(temp)
@@ -71,6 +72,14 @@ from dataclasses import asdict
 from cvdl.settings import load, MachineProfile, plain
 values, profile, env = (json.loads(arg) for arg in sys.argv[1:4])
 settings = load(environ=env, _profile=MachineProfile('g4',profile), **values)
+if getattr(settings,'train_grid','recorded')!='recorded':
+    import csv
+    from pathlib import Path
+    from lsb_train_grid import summary
+    records=[]
+    for source in settings.sources:
+        records.extend(csv.DictReader((Path(settings.root)/f'data/{source}/photo_manifest.csv').open()))
+    summary(settings.root,records,settings.tile_size,settings.train_grid)
 print(json.dumps(dict(values=plain(settings.values), sources=plain(settings.provenance),
     profile=settings.profile, run_name=settings.run_name, globals=settings.legacy_globals(),
     run_settings=asdict(settings.to_run_settings()))))
@@ -103,7 +112,8 @@ def validate_job_env(path, job_id, *, root=ROOT, commit='HEAD'):
         raise ValueError('notebook job-env must contain only V3_NOTEBOOK and matching CVDL_JOB_ID')
     document = validate_notebook(notebook,commit=commit,root=root)
     if env.get('V3_SPEED_MATRIX') != 'on':
-        top_values(document)
+        from cvdl.settings import validate_notebook_name
+        validate_notebook_name(notebook,top_values(document))
     return notebook
 
 

@@ -1,0 +1,43 @@
+{
+  "version": "train-grid-v1",
+  "inputs": {
+    "raise": "fedab1b67cda8e90013ad8fde0cc9b03f62afca3df36d6af1b7a1b069645e7b8",
+    "lsdir": "0f0969b713916fe2ae61bac76796ee40d07ec7a825d0cfb951a29e8d52afe53f",
+    "alaska": "daa16066debe1f918ef70a889889d5c69094725142d76b9da57795477b23a1bf"
+  },
+  "plans": {
+    "overlap_last": {
+      "version": "train-grid-v1",
+      "tile_size": 512,
+      "policy": "overlap_last",
+      "sha256": "7a65dd8cc35c7ea304966b2a9a1eba0bb77f87d01e69ef22ab9216cf9ab9e64e",
+      "pool_counts": {
+        "raise": 45674,
+        "alaska": 41391,
+        "lsdir": 41520
+      }
+    },
+    "centre_trim": {
+      "version": "train-grid-v1",
+      "tile_size": 512,
+      "policy": "centre_trim",
+      "sha256": "033f8d843f4caad12e024d71f11f5772f7d206c0169cd98302a7c8e9573e6117",
+      "pool_counts": {
+        "raise": 34890,
+        "alaska": 21139,
+        "lsdir": 14475
+      }
+    },
+    "centre_pad": {
+      "version": "train-grid-v1",
+      "tile_size": 512,
+      "policy": "centre_pad",
+      "sha256": "90781bba6a29d5cdf76f70ff967e3ca92b98684c5468f6ea9e35025d6c0a7a03",
+      "pool_counts": {
+        "raise": 45674,
+        "alaska": 41391,
+        "lsdir": 41520
+      }
+    }
+  }
+}

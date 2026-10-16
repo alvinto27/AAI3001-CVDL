@@ -242,7 +242,21 @@ def run(args):
             pass
     compact = package_notebook or notebook_path == ROOT / "notebooks/05_xunet_v4_nonorm.ipynb"
     settings = settings_file(args.env_file.resolve(), args.set, allow_native=compact)
-    if settings.get('CVDL_JOB_ID'):
+    provided_job_id = bool(settings.get('CVDL_JOB_ID'))
+    declared = {}
+    if compact:
+        from scripts.g4.preflight import top_values
+        from cvdl.settings import validate_notebook_name
+        declared = top_values(document)
+        validate_notebook_name(notebook_path,declared)
+    if declared.get('name') and not settings.get('CVDL_JOB_ID'):
+        import secrets
+        prior_path=args.output.resolve()/'status.json'
+        prior=json.loads(prior_path.read_text()) if args.resume and prior_path.exists() else {}
+        settings['CVDL_JOB_ID']=prior.get('effective_settings',{}).get('CVDL_JOB_ID') or (
+            f"{declared['name']}-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{secrets.randbelow(10000):04d}")
+        settings['V3_NOTEBOOK']=notebook_path.relative_to(ROOT).as_posix()
+    if provided_job_id:
         from scripts.g4.preflight import validate_notebook
         relative = notebook_path.relative_to(ROOT).as_posix()
         if settings.get('V3_NOTEBOOK') != relative:
@@ -264,7 +278,10 @@ def run(args):
                           if (key in ALIASES and key != "QUICK" and not key.startswith("V3_"))
                           or key == "MIOPEN_GEMM_ENFORCE_BACKEND"}
         resolution_env = {**resolution_env, **settings, 'CVDL_HEADLESS_LOG': '1'}
-        resolved_settings = load(environ=resolution_env, overrides=runner_overrides)
+        resolved_settings = load(environ=resolution_env, overrides=runner_overrides,
+                                 **(declared if declared.get('name') else {}))
+        if declared.get('name'):
+            validate_notebook_name(notebook_path,dict(resolved_settings.values))
         # Keep legacy env/status and resume records stable. The scoped load()
         # context retains the original profile provenance instead of this bridge.
         for key, value in (("QUICK", str(resolved_settings.quick).lower()),
@@ -282,7 +299,8 @@ def run(args):
         if (prior.get("effective_settings") != {**settings, "V3_OUTPUT_ROOT": str(output / "checkpoints")}
                 or prior.get('setting_overrides', []) != args.set):
             raise ValueError("resume settings differ from the saved run")
-        if not settings.get("V3_RUN_NAME") or not (output / "checkpoints" / settings["V3_RUN_NAME"] / "last.ckpt").is_file():
+        resume_name=resolved_settings.run_directory_name if declared.get('name') else settings.get('V3_RUN_NAME')
+        if not resume_name or not (output / "checkpoints" / resume_name / "last.ckpt").is_file():
             raise ValueError("resume needs the existing last.ckpt")
     output.mkdir(parents=True, exist_ok=True)
     if compact:
@@ -334,7 +352,8 @@ def run(args):
         name = namespace.get("RUN_NAME")
         if not isinstance(name, str):
             return
-        run_dir = output / "checkpoints" / name
+        active=namespace.get('settings')
+        run_dir = output / "checkpoints" / (active.run_directory_name if getattr(active,'name',None) else name)
         files = [str(path) for path in sorted(run_dir.rglob("*")) if path.is_file()] if run_dir.exists() else []
         with status_lock:
             status["run_output_dir"] = str(run_dir)
@@ -352,7 +371,7 @@ def run(args):
             active_settings = namespace.get('settings')
             if not isinstance(active_settings, Settings):
                 active_settings = resolved_settings
-            active_settings.write(output / "checkpoints" / namespace["RUN_NAME"])
+            active_settings.write(output / "checkpoints" / active_settings.run_directory_name)
             recorded_settings.add(namespace["RUN_NAME"])
         with status_lock:
             status["runtime_settings"] = values

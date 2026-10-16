@@ -42,7 +42,7 @@ def create_data(s):
         otf = data.build_otf_data(s.root, s.to_run_settings(), quick=s.quick,
             profile=s.eval_profile, eval_pairs=s.quick_eval_pairs,
             checkpoint_validation=s.checkpoint_validation,
-            val_cap_raise=s.val_cap_raise, val_cap_lsdir=s.val_cap_lsdir)
+            val_cap_raise=s.val_cap_raise, val_cap_lsdir=s.val_cap_lsdir, train_grid=s.train_grid)
         otf.record.update(compile_mode=s.compile, prime_next_epoch=s.prime_next_epoch)
         return otf, data.otf_pair_tables(otf)
     labels = data.load_labels(labels_path=s.labels_path)
@@ -61,7 +61,8 @@ def create_loaders(s, otf, tables):
         byte_images, _, _ = next(iter(loaders.val))
         assert byte_images.dtype == torch.uint8
         assert torch.equal(byte_images.to(s.device).float(), byte_images.float().to(s.device))
-        otf.check_epochs()
+        if s.post_fit_eval == 'full':
+            otf.check_epochs()
         otf.print_record()
     else:
         loaders = data.build_png_loaders(tables.run_pairs, s.data_root, **kwargs,
@@ -121,7 +122,7 @@ def finish_training(s, bundle, loaders):
 def create_training(s, otf_data, loaders):
     """Wire checkpoint-compatible callbacks, loggers, Trainer and module."""
     train_loader, val_loader = loaders.train, loaders.val
-    checkpoint_dir = Path(s.output_root) / s.run_name
+    checkpoint_dir = Path(s.output_root) / s.run_directory_name
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     model_run_settings = {"compile_mode": s.compile,
                           "compile_target": "net" if s.compile == "default" else None,
@@ -140,6 +141,7 @@ def create_training(s, otf_data, loaders):
     print("Model run settings:", json.dumps(model_run_settings, indent=2))
     if s.data == "otf":
         otf_data.save_record(checkpoint_dir / "data_run_settings.json")
+        otf_data.corpus.save_training_plan(checkpoint_dir)
         if otf_data.checkpoint_validation == "capped":
             validation_file = checkpoint_dir / "validation_pairs.csv"
             if validation_file.exists() and validation_file.read_text() != otf_data.validation_pair_csv:
@@ -194,6 +196,13 @@ def create_training(s, otf_data, loaders):
     training_started = time.perf_counter()
     assert trainer.checkpoint_callbacks == [checkpoint_callback], "only one best-and-last checkpoint callback is allowed"
     lightning_model = SteganalysisModule(clip_t=s.clip_t, norm=s.norm, validation_data=otf_data, conv1_factory=conv1_factory(s), lr=s.lr, max_epochs=s.epochs, paired_batches=s.paired_batches, steps_per_epoch=len(train_loader), warmup_epochs=s.warmup_epochs, grad_clip=s.grad_clip, lr_drops=s.lr_drops, batch_size=s.batch_size, precision=s.precision, model=s.model, width=s.width)
+    if s.name:
+        import hashlib
+        digest=hashlib.sha256()
+        for name,tensor in lightning_model.net.state_dict().items():
+            digest.update(name.encode());digest.update(tensor.detach().cpu().contiguous().numpy().tobytes())
+        model_run_settings['initial_weights_sha256']=digest.hexdigest()
+        (checkpoint_dir/'model_run_settings.json').write_text(json.dumps(model_run_settings,indent=2)+'\n')
     if s.compile == "default":
         # In place, not torch.compile(net): no _orig_mod prefix in checkpoints.
         # Do not compile in __init__: checkpoint reload and deepcopy diagnostics stay eager.

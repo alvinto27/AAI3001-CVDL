@@ -47,7 +47,17 @@ def make_sample(photo: np.ndarray, record: Mapping, tile: TileSpec,
     """
     if kind not in ("clean", "stego"):
         raise ValueError("kind must be clean or stego")
-    view = tile_at(photo, record, tile.grid_policy, tile.tile_size, tile.row, tile.col)
+    from lsb_train_grid import POLICIES, crop, pad_crop
+    training_policy = next((k for k,v in POLICIES.items() if v == tile.grid_policy), None)
+    pad = None
+    if training_policy is not None:
+        if not isinstance(seed, OTFSeed) or seed.purpose != 'train':
+            raise ValueError('new grids are training-only')
+        from lsb_source import SourceTile
+        pixels, (y,x), pad = crop(photo, record, tile.tile_size, tile.row, tile.col, training_policy)
+        view = SourceTile(pixels, record['photo_id'], tile.grid_policy, tile.tile_size, tile.row, tile.col, y, x)
+    else:
+        view = tile_at(photo, record, tile.grid_policy, tile.tile_size, tile.row, tile.col)
     if isinstance(seed, LegacySeed):
         if tile.grid_policy != "topleft_crop" or tile.tile_size != 512:
             raise ValueError("legacy keys require topleft_crop 512")
@@ -72,14 +82,17 @@ def make_sample(photo: np.ndarray, record: Mapping, tile: TileSpec,
                     y=view.y, x=view.x, kind=kind, label=int(kind == "stego"),
                     seed_version=version, settings_seed_key=list(sequences[0].entropy),
                     embedding_seed_key=list(sequences[1].entropy), settings=None, embedding=None)
+    if pad is not None:
+        metadata.update(real_shape=list(view.pixels.shape[:2]), real_pixels=int(view.pixels.shape[0]*view.pixels.shape[1]), pad=list(pad))
     if kind == "clean":
-        return view.pixels.copy(), metadata
+        pixels = view.pixels.copy()
+        return (pad_crop(pixels,pad) if pad is not None else pixels), metadata
     kwargs, drawn = draw(config, view.pixels, np.random.default_rng(sequences[0]))
     metadata["settings"] = {**{k: v for k, v in kwargs.items() if k != "rng"}, **drawn}
     kwargs["rng"] = np.random.default_rng(sequences[1])
     pixels, embedded, _ = embed_fast(view.pixels, **kwargs)
     metadata["embedding"] = embedded
-    return pixels, metadata
+    return (pad_crop(pixels,pad) if pad is not None else pixels), metadata
 
 
 def replay_legacy(photo: np.ndarray, record: Mapping, legacy_row: Mapping,

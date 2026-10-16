@@ -132,7 +132,7 @@ def panel_dataset(dataset, *, quick=False, quick_pairs=SCHEMA['quick_eval_pairs'
 
 def evaluate(checkpoint, eval_yaml, *, root, device='cpu', split='test', output,
              workers=6, source=None, manifest_root=None, quick=False,
-             quick_pairs=SCHEMA['quick_eval_pairs'].default):
+             quick_pairs=SCHEMA['quick_eval_pairs'].default, overwrite=False):
     """Score one frozen panel and return the summary; default is the standard test."""
     if (split not in ('test','val','test_seen','test_unseen') or workers < 0
             or source not in (None,'alaska','lsdir')
@@ -144,7 +144,7 @@ def evaluate(checkpoint, eval_yaml, *, root, device='cpu', split='test', output,
     checkpoint = Path(checkpoint).resolve()
     evaluation_yaml = Path(eval_yaml).resolve()
     output = Path(output).resolve()
-    if output.exists() and any(output.iterdir()):
+    if not overwrite and output.exists() and any(output.iterdir()):
         raise ValueError(f'output must be empty: {output}')
     output.mkdir(parents=True, exist_ok=True)
     ckpt = torch.load(checkpoint, map_location='cpu', weights_only=False)
@@ -441,7 +441,7 @@ def breakdown(predictions_path, *, labels_path=None, show=False):
 
 
 def extra_panels(checkpoint, *, root, output, panels, workers, device, quick,
-                 data_mode, manifest_root=None, source_panels=()):
+                 data_mode, manifest_root=None, source_panels=(), overwrite=False):
     """Run requested bpp-1 and source panels using the shared checkpoint scorer."""
     root, output = Path(root), Path(output)
     selected = tuple(panels.split(',')) if isinstance(panels, str) else tuple(panels)
@@ -450,7 +450,8 @@ def extra_panels(checkpoint, *, root, output, panels, workers, device, quick,
     results = {}
     if 'test-bpp1' in selected:
         results['test-bpp1'] = evaluate(checkpoint, root/'configs/test-bpp1.yaml',
-            root=root, device=device, output=output/'extra-test-bpp1', workers=workers, quick=quick)
+            root=root, device=device, output=output/'extra-test-bpp1', workers=workers, quick=quick,
+            **({'overwrite':True} if overwrite else {}))
     if 'source-panels' in selected:
         if data_mode != 'otf' or not source_panels:
             raise ValueError('source-panels requires OTF and selected new-source manifests')
@@ -458,5 +459,6 @@ def extra_panels(checkpoint, *, root, output, panels, workers, device, quick,
             source, split = name.split('-', 1)
             results[name] = evaluate(checkpoint, root/'configs/raise512-run1.yaml',
                 root=root, device=device, split=split, source=source, manifest_root=manifest_root,
-                output=output/('extra-'+name), workers=workers, quick=quick)
+                output=output/('extra-'+name), workers=workers, quick=quick,
+                **({'overwrite':True} if overwrite else {}))
     return results

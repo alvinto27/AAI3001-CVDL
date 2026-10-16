@@ -204,11 +204,11 @@ def otf_pair_tables(data):
 
 
 def build_otf_data(root, settings, *, quick=False, profile='overlap_full_mix', eval_pairs=16,
-                   checkpoint_validation='standard', val_cap_raise=5000, val_cap_lsdir=1500):
+                   checkpoint_validation='standard', val_cap_raise=5000, val_cap_lsdir=1500, train_grid='recorded'):
     """Construct the existing LSB NotebookData adapter with explicit settings."""
     return NotebookData(root, settings, quick=quick, profile=profile, eval_pairs=eval_pairs,
                         checkpoint_validation=checkpoint_validation, val_cap_raise=val_cap_raise,
-                        val_cap_lsdir=val_cap_lsdir)
+                        val_cap_lsdir=val_cap_lsdir, train_grid=train_grid)
 
 
 @dataclass
