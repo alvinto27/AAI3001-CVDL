@@ -4,7 +4,7 @@
 
 ## Current state and items
 
-- **G4 disk still uses the old layout; reorganise it before the next G4 job (commits from `76f6257` on need the new layout: `Datasets/originals/…` master paths).**
+- **G4 disk uses the new data layout since 2026-10-16 06:04Z** (checkout `9798b56`, free disk 116 GB). Commits before `76f6257` no longer match the G4 disk.
 
 - **Completed:** ALASKA/LSDIR source records and mixed sampler; final verified masters; G4 mixed run and [result](results/result-newdata-1.md); PC threshold/noise check B and [result](results/result-check-b.md). The frozen standard test and RAISE/DIV2K records remain in use.
 - **On hold:** A, per-cell training (design only, no code or model run); C, capacity/longer training/BF16; fair R0 control, seed repeats, front-end changes, and other free checks. No follow-up is authorized by the plans.

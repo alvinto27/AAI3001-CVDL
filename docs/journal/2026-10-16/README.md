@@ -182,6 +182,21 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
 - Pending: the G4 disk and `scripts/g4/{setup.sh,upload_masters.sh}` still
   use the old layout. Reorganise the G4 before the next G4 job (code from
   `76f6257` on needs the new layout). Then a PR for `main`.
+- Found: the `runs/` change had removed `runs-out/` from `.gitignore`; on the
+  G4 this would make the checkout dirty and the next job would refuse to
+  start. Worker_3 restored it (`9798b56`).
+- Did: G4 data reorganisation (`9798b56`: `scripts/g4/reorg_data_layout.sh`,
+  `delivered_manifest.sh`, updated `setup.sh` and `upload_masters.sh`).
+  Maintenance boot 06:00:55Z -> stopped 06:10:43Z (~10 min, ~$0.27
+  estimate). Dry run, then apply 06:03-06:04Z: 5 renames into
+  `Datasets/originals/`, `~/otf-cache` deleted (50 GB), per-epoch
+  checkpoints and tb logs of 8 delivered job folders deleted (427.3 MB, each
+  file matched the Pi by size and SHA-256). Master check pass (RAISE 1,000
+  and DIV2K 900 present; ALASKA 18,200 and LSDIR 11,000 size + SHA OK). G4
+  checkout detached at `9798b56`, clean. `.g4-state` and the bootstrap install
+  unchanged (39 files, same SHA-256; `job.sh` `89cc83e9...`). G4 free disk 66
+  -> 116 GB.
+- Pending: PR for `main` with the data-folder change.
 
 ### Next
 

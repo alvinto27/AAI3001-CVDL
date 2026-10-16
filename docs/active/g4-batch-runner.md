@@ -1,6 +1,6 @@
 # G4 batch job: setup, run, send results, stop
 
-> **G4 disk still uses the old layout; reorganise it before the next G4 job (commits from `76f6257` on need the new layout: `Datasets/originals/…` master paths). Use [the one-time layout change](#one-time-data-layout-change-maintenance-boot).**
+> **The G4 disk uses the new data layout (`Datasets/originals/…`) since 2026-10-16 (checkout `9798b56`). Commits before `76f6257` no longer match it. The one-time change is recorded in the runbook section below.**
 
 The Spot VM `rtx6000pro` is in `us-central1-c`. It has one RTX PRO 6000.
 Its external IP changes at boot. The machine costs about $1.63 per hour when
