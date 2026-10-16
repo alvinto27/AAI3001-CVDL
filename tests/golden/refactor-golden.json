@@ -1,0 +1,5184 @@
+{
+ "_meta": {
+  "env_file_sha256": {
+   "cpu-det": "4a4a5ae158590b168175f8e3eb5b61b83df42419690c6afe1aadb15ac7b16f0e",
+   "newdata-1": "da753f9841db015f9a5e6d44d923211edee28dbd6ec536cbdc36ed7a8cb507e9",
+   "quick-gpu": "854e265c3eaf48fdb48d0d71d14b14775eacd33629618390cf54d8c9d15e48ed",
+   "speed-1": "1f0b2568982ccb191a2a01a25c2b6c967af3936cd107928d7044d2583d2fcaf3",
+   "wide-1": "5498cddd46d2e55ff7a3c8285660f9720bd1c3b0fdae6a3aa506e67b58af0558"
+  },
+  "notebook": "notebooks/05_xunet_v4_nonorm.ipynb",
+  "notebook_sha256": "26a37aacc26f6cc3b29f09438637e1bdfe59978b4832eb431adbdc9e6fd8d9ed",
+  "parts_present": [
+   "cpu",
+   "data",
+   "gpu",
+   "models",
+   "settings"
+  ],
+  "source_revision": "bc8b2a0aa4fe37d2d15f6254c992a450ef120381",
+  "standard_test_sha_documented": "fdd989f7bdab0ec6f9fd6f4c57bdde981d16b54aa8c37e5da8fd3dfcc8b06837",
+  "versions": {
+   "lightning": "2.6.6",
+   "numpy": "2.5.3",
+   "pandas": "3.0.6",
+   "python": "3.12.3",
+   "torch": "2.14.0+rocm10.1.0"
+  }
+ },
+ "cpu": {
+  "folder": {
+   "best_ckpt_names": [
+    "best-epoch00-val_pe0.3750-val_auc0.6328.ckpt"
+   ],
+   "best_ckpt_structure_equal_last": true,
+   "data_run_settings.json": {
+    "batch_images": 8,
+    "buffer_images": 1024,
+    "buffer_payload_bytes": 805306368,
+    "checkpoint_validation": "standard",
+    "compile_mode": "off",
+    "data": "otf",
+    "eval_persistent_workers": false,
+    "eval_prefetch_by_split": {
+     "test": 16,
+     "train_eval": 1,
+     "val": 16
+    },
+    "eval_prefetch_factor": 16,
+    "eval_profile": "overlap_full_mix",
+    "eval_task": "one_photo",
+    "eval_workers": 0,
+    "extra_pair_counts": {},
+    "fixed_variants": false,
+    "grid": "overlap_last",
+    "group_images": 4,
+    "in_order": true,
+    "main_threads": 8,
+    "prefetch_factor": 32,
+    "prefetch_images": 128,
+    "prefetch_override": null,
+    "prime_next_epoch": false,
+    "quick": true,
+    "quick_eval_pair_ids": {
+     "test": [
+      "div2k_0809:overlap_last:512:1:2:v1",
+      "rf26241d5t:overlap_last:512:1:0:v1",
+      "rce28e1c2t:overlap_last:512:4:1:v1",
+      "rf1dafb88t:overlap_last:512:1:1:v1",
+      "div2k_0818:overlap_last:512:0:1:v1",
+      "rf26241d5t:overlap_last:512:2:3:v1",
+      "r5f7dff30t:overlap_last:512:4:2:v1",
+      "rdde9a595t:overlap_last:512:2:8:v1",
+      "div2k_0815:overlap_last:512:1:2:v1",
+      "rf26241d5t:overlap_last:512:0:0:v1",
+      "r5f4cf23et:overlap_last:512:4:6:v1",
+      "r0667a51ft:overlap_last:512:5:7:v1",
+      "div2k_0856:overlap_last:512:2:1:v1",
+      "rf26241d5t:overlap_last:512:2:2:v1",
+      "r91403508t:overlap_last:512:2:1:v1",
+      "r0667a51ft:overlap_last:512:2:7:v1"
+     ],
+     "val": [
+      "div2k_0318:overlap_last:512:2:3:v1",
+      "r26d5bcc0t:overlap_last:512:3:0:v1",
+      "rbce66e7dt:overlap_last:512:4:5:v1",
+      "r21c5b1fet:overlap_last:512:5:5:v1",
+      "div2k_0547:overlap_last:512:1:3:v1",
+      "r26d5bcc0t:overlap_last:512:2:0:v1",
+      "r52f2bb08t:overlap_last:512:0:4:v1",
+      "re9a83ac0t:overlap_last:512:2:1:v1",
+      "div2k_0105:overlap_last:512:1:0:v1",
+      "r26d5bcc0t:overlap_last:512:0:1:v1",
+      "rbce66e7dt:overlap_last:512:0:0:v1",
+      "rd286f8e2t:overlap_last:512:1:1:v1",
+      "div2k_0798:overlap_last:512:1:1:v1",
+      "r26d5bcc0t:overlap_last:512:0:5:v1",
+      "ree078dcbt:overlap_last:512:4:5:v1",
+      "r3d67144et:overlap_last:512:3:6:v1"
+     ]
+    },
+    "run_seed": 0,
+    "settings": {
+     "augment": true,
+     "buffer_size": 1024,
+     "cache_root": null,
+     "evaluation_yaml": null,
+     "fixed_variants": false,
+     "grid": "overlap_last",
+     "manifest_root": null,
+     "paired_batches": false,
+     "run_seed": 0,
+     "settings_yaml": null,
+     "source": "decode",
+     "source_mix": null,
+     "source_weights": null,
+     "sources": [
+      "raise",
+      "div2k"
+     ],
+     "tensor_dtype": "uint8",
+     "tile_size": 512,
+     "tiles_per_epoch": null,
+     "train_photo_fraction": 0.005,
+     "variants_per_tile": 1
+    },
+    "source": "decode",
+    "source_weights": null,
+    "tensor_dtype": "uint8",
+    "tile_size": 512,
+    "train_photo_fraction": 0.005,
+    "train_photo_selection": [
+     {
+      "available": 680,
+      "camera_model": "",
+      "photo_ids": [
+       "div2k_0032",
+       "div2k_0133",
+       "div2k_0282"
+      ],
+      "selected": 3,
+      "source": "div2k"
+     },
+     {
+      "available": 6,
+      "camera_model": "NIKON D40",
+      "photo_ids": [
+       "r684e92a7t"
+      ],
+      "selected": 1,
+      "source": "raise"
+     },
+     {
+      "available": 500,
+      "camera_model": "NIKON D7000",
+      "photo_ids": [
+       "r4cb981b2t",
+       "rc8713000t"
+      ],
+      "selected": 2,
+      "source": "raise"
+     },
+     {
+      "available": 195,
+      "camera_model": "NIKON D90",
+      "photo_ids": [
+       "r006b0e4bt"
+      ],
+      "selected": 1,
+      "source": "raise"
+     }
+    ],
+    "train_prefetch_images": 128,
+    "variants_per_tile": 1,
+    "workers": 0
+   },
+   "epoch_timing_columns": [
+    "epoch",
+    "train_first_wait_s",
+    "train_steps_s",
+    "train_end_to_val_start_s",
+    "val_loader_setup_s",
+    "val_first_wait_s",
+    "val_compute_s",
+    "val_last_to_end_s",
+    "val_end_to_next_first_s",
+    "curves_s",
+    "scalars_s",
+    "lr_trace_s",
+    "prime_s",
+    "checkpoint_s"
+   ],
+   "files": [
+    "best-epoch00-val_pe0.3750-val_auc0.6328.ckpt",
+    "data_run_settings.json",
+    "epoch_timing.csv",
+    "last.ckpt",
+    "logs/csv/run/hparams.yaml",
+    "logs/csv/run/metrics.csv",
+    "logs/tb/run/custom_scalars_layout.json",
+    "logs/tb/run/hparams.yaml",
+    "lr_trace.csv",
+    "model_run_settings.json",
+    "training_curves.png"
+   ],
+   "last_ckpt": {
+    "callback_state_keys": [
+     "PerEpochScalars",
+     "TimedModelCheckpoint{'monitor': 'val_pe', 'mode': 'min', 'every_n_train_steps': 0, 'every_n_epochs': 1, 'train_time_interval': None}",
+     "TrainingCurves"
+    ],
+    "epoch": 0,
+    "global_step": 20,
+    "hyper_parameters": {
+     "batch_size": 8,
+     "clip_t": 3.0,
+     "grad_clip": 1.0,
+     "lr": 0.0003,
+     "lr_drops": [
+      [
+       1,
+       0.1
+      ]
+     ],
+     "max_epochs": 1,
+     "model": "xunet",
+     "norm": "none",
+     "paired_batches": false,
+     "precision": "32",
+     "steps_per_epoch": 64,
+     "warmup_epochs": 1,
+     "weight_decay": 0.0001,
+     "width": 4
+    },
+    "loops_keys": [
+     "fit_loop",
+     "predict_loop",
+     "test_loop",
+     "validate_loop"
+    ],
+    "lr_scheduler_count": 1,
+    "optimizer_param_group_keys": [
+     [
+      "amsgrad",
+      "betas",
+      "capturable",
+      "decoupled_weight_decay",
+      "differentiable",
+      "eps",
+      "foreach",
+      "fused",
+      "initial_lr",
+      "lr",
+      "maximize",
+      "params",
+      "weight_decay"
+     ]
+    ],
+    "optimizer_state_keys": [
+     [
+      "param_groups",
+      "state"
+     ]
+    ],
+    "pytorch_lightning_version_present": true,
+    "state_dict_keys": [
+     [
+      "net.kv.conv.weight",
+      [
+       3,
+       1,
+       5,
+       5
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv1.weight",
+      [
+       16,
+       3,
+       5,
+       5
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv1.bias",
+      [
+       16
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv2.weight",
+      [
+       16,
+       16,
+       5,
+       5
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv2.bias",
+      [
+       16
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv3.weight",
+      [
+       32,
+       16,
+       1,
+       1
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv3.bias",
+      [
+       32
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv4.weight",
+      [
+       64,
+       32,
+       1,
+       1
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv4.bias",
+      [
+       64
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv5.weight",
+      [
+       128,
+       64,
+       1,
+       1
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv5.bias",
+      [
+       128
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.classifier.weight",
+      [
+       2,
+       128
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.classifier.bias",
+      [
+       2
+      ],
+      "torch.float32"
+     ]
+    ],
+    "top_level_keys": [
+     "callbacks",
+     "epoch",
+     "global_step",
+     "hparams_name",
+     "hyper_parameters",
+     "loops",
+     "lr_schedulers",
+     "optimizer_states",
+     "pytorch-lightning_version",
+     "state_dict"
+    ]
+   },
+   "lr_trace.csv": {
+    "rows": [
+     [
+      0,
+      0,
+      3e-07
+     ],
+     [
+      1,
+      0,
+      7.640625e-07
+     ]
+    ],
+    "sha256": "4ca5ef28e151f4f907c5bd7dd0e437c8dcdcee62b26fa92758680e61edb97f8f"
+   },
+   "metrics_csv": {
+    "columns": [
+     "epoch",
+     "step",
+     "train_acc",
+     "train_loss",
+     "val_acc",
+     "val_auc",
+     "val_fa",
+     "val_loss",
+     "val_md",
+     "val_pe"
+    ],
+    "kept_columns": [
+     "epoch",
+     "step",
+     "train_acc",
+     "train_loss",
+     "val_acc",
+     "val_auc",
+     "val_fa",
+     "val_loss",
+     "val_md",
+     "val_pe"
+    ],
+    "rows": [
+     [
+      0,
+      19,
+      null,
+      null,
+      0.5,
+      0.6328125,
+      0.0,
+      0.6932406425476074,
+      1.0,
+      0.375
+     ],
+     [
+      0,
+      19,
+      0.4749999940395355,
+      0.694324254989624,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    ]
+   },
+   "model_run_settings.json": {
+    "batch_size": 8,
+    "clip_t": 3.0,
+    "compile_dynamic": null,
+    "compile_fullgraph": null,
+    "compile_mode": "off",
+    "compile_target": null,
+    "extra_tests": "none",
+    "grad_clip_norm": 1.0,
+    "lr": 0.0003,
+    "lr_drops": [
+     [
+      1,
+      0.1
+     ]
+    ],
+    "max_epochs": 1,
+    "model": "xunet",
+    "norm": "none",
+    "persistent_validation_workers": false,
+    "precision": "32",
+    "steps_per_epoch": 64,
+    "tf32_cudnn": true,
+    "tf32_matmul": false,
+    "torch_version": "2.14.0+rocm10.1.0",
+    "train_yaml": null,
+    "warmup_epochs": 1,
+    "weight_decay": 0.0001,
+    "width": 4
+   },
+   "tensorboard_event_files": 3
+  },
+  "losses": [
+   0.6928786635398865,
+   0.6930962800979614,
+   0.6865001916885376,
+   0.6931224465370178,
+   0.7069887518882751,
+   0.6995158195495605,
+   0.6933630108833313,
+   0.6728522777557373,
+   0.6784974336624146,
+   0.7001399397850037,
+   0.6929994821548462,
+   0.6936454772949219,
+   0.6986222267150879,
+   0.7127557396888733,
+   0.6926440000534058,
+   0.7063519358634949,
+   0.6869248747825623,
+   0.6929386854171753,
+   0.6993998289108276,
+   0.6932465434074402
+  ],
+  "mode": "run",
+  "note": "deterministic CPU run, fixed 8 threads, 20 train steps + one validation pass",
+  "run_name": "xunet_v4_clip3_nonorm_lr0.0003_warm1_drop0_e1_quick_otf",
+  "steps": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19,
+   20
+  ],
+  "stopped_early": true,
+  "val_metrics": [
+   {
+    "val_acc": 0.5,
+    "val_auc": 0.6328125,
+    "val_fa": 0.0,
+    "val_loss": 0.6932406425476074,
+    "val_md": 1.0,
+    "val_pe": 0.375
+   }
+  ],
+  "weights_sha": "5525eb379fe37a74b9b1d28bc3caee453cf7835edfb548385ab1b04d28812edb"
+ },
+ "data": {
+  "workers0": {
+   "fixed_train_frame_sha": "58d6ad07d6ed69d23b4a95df6de495f07637fca9c817476a6506a5e17b9d849e",
+   "mode": "data",
+   "note": "newdata-1 env, batch 8, 1% train photos, decode path; workers 0",
+   "stopped_early": true,
+   "test_first_batches_sha": [
+    "89a63fa5ee7df9c0f5e1569d507eef028156e854e62cc91492fb1cc12c4084c0",
+    "eaf5953773b14927231cc019fe33fd11240bf21f0796a4605a0f4dcbd6d86a0a"
+   ],
+   "test_frame_sha": "f993069f94b35134e2520a27c7bf2531cecccd75d1b8572e096ee1ef246084f5",
+   "test_len": 10956,
+   "train_batch_sha": {
+    "epoch0": [
+     "6a9eb9f6626fff83fd4f065a4d4a3a55fe00e41935d7095626808ef2cdebfb1d",
+     "3017e2d5caef2fbdba92fca5d9dd54529470629d51f9e20c7c15f3f3308e1cdb",
+     "c4f44ee0f93ff0cc3cad32cf6a01e00409dbed751a61dd4ea0e0ad7001fd268a",
+     "731440f7d6c93edbce198cdd93ceddeab86443ad46c52af1bf088bdc39a77f58",
+     "12997aef0013d66bae932cd1f9ae6684f865d015414837573f947a8061dab026",
+     "82c3e2bc7d0d55b522b1443b7d6fe03bd02d61b25fd0ee3595a6b602231c659c"
+    ],
+    "epoch1": [
+     "18110e160a57ea5077ba683e776190c5ef177ab4d0e15fc4fa9e833dde7d968f",
+     "0a3aeffa1b58203117254e384e99e1e9a6048314f4b1a37737d3313212cf5e36",
+     "8f8e1bd3a5b4b6e280c7fa8fe952f8d239fa2a001fdbf19fb4b77983e67e51e7",
+     "e0c5aa1f21760cbda782bd77833f1a7260a48aa37fe72fde8e3b5d30c00d2156",
+     "db96084d2d49f9677424d70031668c93e5385426a46ea3b7a59b35077f958589",
+     "861de9d69ea23c5c6f90af5adffd7e6343e8684ff2bdb48cd127d35d6f6040e7"
+    ]
+   },
+   "train_len": 90000,
+   "val_first_batches_sha": [
+    "9ffa1f9a31b49d252159bca3699bf336a8b14044c75ba78600bd54721b0d3cad",
+    "7865a07b8f14faa4576da0b9e03a727226154a27a355c8eccfd9aa527f3609da"
+   ],
+   "val_frame_sha": "b589915dc757c268840b6c0d4b721e9f3e155c8b4b78ec18d10f79a4cc661739",
+   "val_len": 8035
+  },
+  "workers4": {
+   "fixed_train_frame_sha": "58d6ad07d6ed69d23b4a95df6de495f07637fca9c817476a6506a5e17b9d849e",
+   "mode": "data",
+   "note": "newdata-1 env, batch 8, 1% train photos, decode path; workers 4",
+   "stopped_early": true,
+   "test_first_batches_sha": [
+    "89a63fa5ee7df9c0f5e1569d507eef028156e854e62cc91492fb1cc12c4084c0",
+    "eaf5953773b14927231cc019fe33fd11240bf21f0796a4605a0f4dcbd6d86a0a"
+   ],
+   "test_frame_sha": "f993069f94b35134e2520a27c7bf2531cecccd75d1b8572e096ee1ef246084f5",
+   "test_len": 10956,
+   "train_batch_sha": {
+    "epoch0": [
+     "dba59247310785d77ea7078fdb68730a27a229c7199b05faffbe2e5f73d29980",
+     "898b791a38fa9cec0743b0d6dacadcda3c17de7d1612febb281c2db339c7c5bf",
+     "6423a6db63bb372eeb97115386f37e5f69d4fe05fe6432eba6009316754dc0bf",
+     "7064b12c1505b6239467f91bbe51305823a057ac7060841c879573a1ba8aac8d",
+     "9103114439c1d3fdf5d828c91d4c46fffd2ff7355a9a5c795e2d581ed7e49f30",
+     "1eee786c56bb0f51800d31a7f2ec1ce6555036fbda5db90585d90cf8254c3f1d"
+    ],
+    "epoch1": [
+     "0ce28d410105458d35760f5e600a9146854b984fa10f8bdd6962d80dd0fe9c92",
+     "ed538f37cc97b2e4678be987f2f944dbd9bccaebdf27f8a3946313526a9895ff",
+     "73b96af46abab4dfd0315b2ee46f7da4421de076bc1ff9467b1ba4f0e4cebe28",
+     "7983779ac092e0bd7f11c729fc7dd417f83cbc2f9d6afb971b51936759f52137",
+     "10228a817ae534f4963e22410d69780c5550c958a6553c7ff267f24b5bacb4b2",
+     "7fb3aef69c16baddf106259a7a79f94e5ee2471484ff93e04415a35ad75925c4"
+    ]
+   },
+   "train_len": 90000,
+   "val_first_batches_sha": [
+    "9ffa1f9a31b49d252159bca3699bf336a8b14044c75ba78600bd54721b0d3cad",
+    "7865a07b8f14faa4576da0b9e03a727226154a27a355c8eccfd9aa527f3609da"
+   ],
+   "val_frame_sha": "b589915dc757c268840b6c0d4b721e9f3e155c8b4b78ec18d10f79a4cc661739",
+   "val_len": 8035
+  }
+ },
+ "gpu": {
+  "cell_states": [
+   "done",
+   "done",
+   "done",
+   "done",
+   "done",
+   "done",
+   "done",
+   "done",
+   "done",
+   "done",
+   "done",
+   "done",
+   "done",
+   "done",
+   "done",
+   "done"
+  ],
+  "cells_run": 16,
+  "extra_panels": {
+   "checkpoints/xunet_v4_clip3_nonorm_lr0.0003_warm1_drops2x0.3_k1to4_e2_wide-w4_quick_otf/extra-test-bpp1": {
+    "pairs": 10956,
+    "settings_sha256": "606bd680694032d8f21e9a8fa47d3ec5324566bd8533cad8f020c50828e7d74e",
+    "summary": {
+     "columns": [
+      "category",
+      "value",
+      "images",
+      "pairs",
+      "P_E",
+      "AUC",
+      "accuracy",
+      "false_alarm_rate",
+      "miss_rate"
+     ],
+     "kept_columns": [
+      "category",
+      "value",
+      "images",
+      "pairs",
+      "P_E",
+      "AUC",
+      "accuracy",
+      "false_alarm_rate",
+      "miss_rate"
+     ],
+     "rows": [
+      [
+       "overall",
+       "all",
+       21912,
+       10956,
+       0.314850310332238,
+       0.754103014667452,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k",
+       "1",
+       2864,
+       1432,
+       0.4217877094972067,
+       0.5870600851253082,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k",
+       "2",
+       2762,
+       1381,
+       0.3544532947139753,
+       0.6821401024874146,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k",
+       "3",
+       2700,
+       1350,
+       0.2985185185185185,
+       0.7757467764060357,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k",
+       "4",
+       2718,
+       1359,
+       0.264532744665195,
+       0.7969365649438162,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k",
+       "5",
+       2820,
+       1410,
+       0.2641843971631206,
+       0.8008100699160001,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k",
+       "6",
+       2616,
+       1308,
+       0.2557339449541284,
+       0.807306133041551,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k",
+       "7",
+       2698,
+       1349,
+       0.2583395107487027,
+       0.8027416184516878,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k",
+       "8",
+       2734,
+       1367,
+       0.269568397951719,
+       0.7932216115148106,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "lowest/1",
+       1364,
+       682,
+       0.4142228739002932,
+       0.5912520102166303,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "lowest/2",
+       1344,
+       672,
+       0.3601190476190476,
+       0.6584611057964852,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "lowest/3",
+       1382,
+       691,
+       0.3256150506512301,
+       0.7352826604618823,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "lowest/4",
+       1354,
+       677,
+       0.3168389955686854,
+       0.7378226121410603,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "lowest/5",
+       1410,
+       705,
+       0.3177304964539006,
+       0.7377234545545999,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "lowest/6",
+       1272,
+       636,
+       0.3113207547169812,
+       0.7354287805071001,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "lowest/7",
+       1426,
+       713,
+       0.3155680224403927,
+       0.7339019491747136,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "lowest/8",
+       1426,
+       713,
+       0.332398316970547,
+       0.7171759096247017,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "plane/1",
+       1500,
+       750,
+       0.426,
+       0.5836542222222222,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "plane/2",
+       1418,
+       709,
+       0.3441466854724965,
+       0.7049192231256005,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "plane/3",
+       1318,
+       659,
+       0.2602427921092564,
+       0.8187786248995466,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "plane/4",
+       1364,
+       682,
+       0.2038123167155425,
+       0.8587656194907165,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "plane/5",
+       1410,
+       705,
+       0.2085106382978723,
+       0.8658920577435743,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "plane/6",
+       1344,
+       672,
+       0.1875,
+       0.8735484428146258,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "plane/7",
+       1272,
+       636,
+       0.1894654088050314,
+       0.8799332997112456,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bit_mode/k",
+       "plane/8",
+       1308,
+       654,
+       0.1896024464831804,
+       0.8779283449765731,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "method",
+       "match",
+       11020,
+       5510,
+       0.3125226860254083,
+       0.7541882437804882,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "method",
+       "replace",
+       10892,
+       5446,
+       0.3141755416819684,
+       0.7541614299052601,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "placement",
+       "contiguous",
+       7422,
+       3711,
+       0.4168687685260038,
+       0.6068841996465024,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "placement",
+       "random",
+       7228,
+       3614,
+       0.1739070282235749,
+       0.8956668771661824,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "placement",
+       "stride",
+       7262,
+       3631,
+       0.3069402368493528,
+       0.7651916189433671,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "source",
+       "div2k",
+       2456,
+       1228,
+       0.3448697068403908,
+       0.7080154696601555,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "source",
+       "raise",
+       19456,
+       9728,
+       0.3068462171052631,
+       0.7631231767649136,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bpp_bin",
+       "0.05-0.15",
+       2320,
+       1160,
+       0.4012931034482758,
+       0.6325754310344828,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bpp_bin",
+       "0.15-0.30",
+       3430,
+       1715,
+       0.3676384839650146,
+       0.6829863407253781,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bpp_bin",
+       "0.30-0.50",
+       4654,
+       2327,
+       0.3240223463687151,
+       0.7385741345823741,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bpp_bin",
+       "0.50-0.75",
+       5782,
+       2891,
+       0.2796610169491526,
+       0.790159611030595,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "bpp_bin",
+       "0.75-1.0",
+       5726,
+       2863,
+       0.2551519385260217,
+       0.8214107900320236,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k1/placement/bpp_bin",
+       "contiguous/0.05-0.15",
+       94,
+       47,
+       0.4574468085106383,
+       0.526935264825713,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k1/placement/bpp_bin",
+       "contiguous/0.15-0.30",
+       170,
+       85,
+       0.4588235294117647,
+       0.533356401384083,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k1/placement/bpp_bin",
+       "contiguous/0.30-0.50",
+       210,
+       105,
+       0.4285714285714286,
+       0.5508843537414966,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k1/placement/bpp_bin",
+       "contiguous/0.50-0.75",
+       264,
+       132,
+       0.4015151515151515,
+       0.5891586317722681,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k1/placement/bpp_bin",
+       "contiguous/0.75-1.0",
+       298,
+       149,
+       0.348993288590604,
+       0.6471555335345254,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k1/placement/bpp_bin",
+       "random/0.05-0.15",
+       96,
+       48,
+       0.4375,
+       0.5442708333333334,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k1/placement/bpp_bin",
+       "random/0.15-0.30",
+       144,
+       72,
+       0.4027777777777778,
+       0.576195987654321,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k1/placement/bpp_bin",
+       "random/0.30-0.50",
+       188,
+       94,
+       0.3882978723404255,
+       0.5909913988229969,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k1/placement/bpp_bin",
+       "random/0.50-0.75",
+       188,
+       94,
+       0.3829787234042553,
+       0.6263014938886374,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k1/placement/bpp_bin",
+       "random/0.75-1.0",
+       234,
+       117,
+       0.2991452991452991,
+       0.707648476879246,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k1/placement/bpp_bin",
+       "stride/0.05-0.15",
+       118,
+       59,
+       0.4576271186440678,
+       0.5284401034185578,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k1/placement/bpp_bin",
+       "stride/0.15-0.30",
+       148,
+       74,
+       0.4121621621621621,
+       0.5609934258582907,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k1/placement/bpp_bin",
+       "stride/0.30-0.50",
+       220,
+       110,
+       0.4045454545454545,
+       0.5889256198347108,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k1/placement/bpp_bin",
+       "stride/0.50-0.75",
+       264,
+       132,
+       0.4090909090909091,
+       0.5772497704315886,
+       0.5,
+       0.0,
+       1.0
+      ],
+      [
+       "k1/placement/bpp_bin",
+       "stride/0.75-1.0",
+       228,
+       114,
+       0.4122807017543859,
+       0.5825638658048631,
+       0.5,
+       0.0,
+       1.0
+      ]
+     ]
+    }
+   }
+  },
+  "folder": {
+   "best_ckpt_names": [
+    "best-epoch00-val_pe0.3438-val_auc0.6211.ckpt"
+   ],
+   "best_ckpt_structure_equal_last": false,
+   "data_run_settings.json": {
+    "batch_images": 8,
+    "buffer_images": 1024,
+    "buffer_payload_bytes": 805306368,
+    "checkpoint_validation": "capped",
+    "compile_mode": "off",
+    "data": "otf",
+    "diagnostic_pair_ids": {
+     "train": [
+      "alaska_13271:trim512:512:1:0:v1",
+      "alaska_15360:trim512:512:0:0:v1",
+      "alaska_43239:trim512:512:0:0:v1",
+      "alaska_28460:trim512:512:1:0:v1",
+      "alaska_65143:trim512:512:0:0:v1",
+      "alaska_31000:trim512:512:0:0:v1",
+      "alaska_66937:trim512:512:0:1:v1",
+      "alaska_02376:trim512:512:1:1:v1",
+      "alaska_03227:trim512:512:0:0:v1",
+      "alaska_04647:trim512:512:0:0:v1",
+      "alaska_79793:trim512:512:0:0:v1",
+      "alaska_06547:trim512:512:0:1:v1",
+      "alaska_08389:trim512:512:1:0:v1",
+      "alaska_31861:trim512:512:0:0:v1",
+      "alaska_34284:trim512:512:0:0:v1",
+      "alaska_22436:trim512:512:0:0:v1",
+      "alaska_45163:trim512:512:0:0:v1",
+      "alaska_22764:trim512:512:0:0:v1",
+      "alaska_49701:trim512:512:0:0:v1",
+      "alaska_48601:trim512:512:0:0:v1",
+      "alaska_16964:trim512:512:0:0:v1",
+      "alaska_16507:trim512:512:0:0:v1",
+      "alaska_52616:trim512:512:0:0:v1",
+      "alaska_53602:trim512:512:0:0:v1",
+      "alaska_76876:trim512:512:1:0:v1",
+      "alaska_69616:trim512:512:0:0:v1",
+      "alaska_10601:trim512:512:0:0:v1",
+      "alaska_69280:trim512:512:0:0:v1",
+      "alaska_62178:trim512:512:0:0:v1",
+      "alaska_35308:trim512:512:1:0:v1",
+      "lsdir_0031000_0030138:trim512:512:0:1:v1",
+      "r684e92a7t:overlap_last:512:0:3:v1"
+     ],
+     "val": [
+      "alaska_14646:trim512:512:0:0:v1",
+      "alaska_14933:trim512:512:0:0:v1",
+      "alaska_42805:trim512:512:1:0:v1",
+      "alaska_29936:trim512:512:0:0:v1",
+      "alaska_65102:trim512:512:1:1:v1",
+      "alaska_30922:trim512:512:1:0:v1",
+      "alaska_02271:trim512:512:0:0:v1",
+      "alaska_03826:trim512:512:1:0:v1",
+      "alaska_04557:trim512:512:0:0:v1",
+      "alaska_79321:trim512:512:0:1:v1",
+      "alaska_06399:trim512:512:0:0:v1",
+      "alaska_08265:trim512:512:0:0:v1",
+      "alaska_32935:trim512:512:0:0:v1",
+      "alaska_33698:trim512:512:0:0:v1",
+      "alaska_20206:trim512:512:0:0:v1",
+      "alaska_45770:trim512:512:0:0:v1",
+      "alaska_23795:trim512:512:0:1:v1",
+      "alaska_50509:trim512:512:0:1:v1",
+      "alaska_48162:trim512:512:0:0:v1",
+      "alaska_19473:trim512:512:0:0:v1",
+      "alaska_52833:trim512:512:0:0:v1",
+      "alaska_54673:trim512:512:0:1:v1",
+      "alaska_78021:trim512:512:0:1:v1",
+      "alaska_69558:trim512:512:0:0:v1",
+      "alaska_12235:trim512:512:0:0:v1",
+      "alaska_68668:trim512:512:0:0:v1",
+      "alaska_62900:trim512:512:0:0:v1",
+      "alaska_35843:trim512:512:0:0:v1",
+      "div2k_0114:overlap_last:512:2:0:v1",
+      "lsdir_0072000_0071415:trim512:512:0:1:v1",
+      "r26d5bcc0t:overlap_last:512:3:4:v1",
+      "r041c02cat:overlap_last:512:3:0:v1"
+     ]
+    },
+    "eval_persistent_workers": true,
+    "eval_prefetch_by_split": {
+     "test": 16,
+     "train_eval": 1,
+     "val": 64
+    },
+    "eval_prefetch_factor": 64,
+    "eval_profile": "overlap_full_mix",
+    "eval_task": "one_photo",
+    "eval_workers": 4,
+    "extra_pair_counts": {
+     "alaska-test_seen": 16,
+     "alaska-test_unseen": 16,
+     "alaska-val": 16,
+     "lsdir-test": 16,
+     "lsdir-val": 16
+    },
+    "fixed_variants": false,
+    "grid": "overlap_last",
+    "group_images": 4,
+    "in_order": true,
+    "main_threads": 1,
+    "prefetch_factor": 32,
+    "prefetch_images": 128,
+    "prefetch_override": null,
+    "prime_next_epoch": true,
+    "quick": true,
+    "quick_eval_pair_ids": {
+     "test": [
+      "div2k_0809:overlap_last:512:1:2:v1",
+      "rf26241d5t:overlap_last:512:1:0:v1",
+      "rce28e1c2t:overlap_last:512:4:1:v1",
+      "rf1dafb88t:overlap_last:512:1:1:v1",
+      "div2k_0818:overlap_last:512:0:1:v1",
+      "rf26241d5t:overlap_last:512:2:3:v1",
+      "r5f7dff30t:overlap_last:512:4:2:v1",
+      "rdde9a595t:overlap_last:512:2:8:v1",
+      "div2k_0815:overlap_last:512:1:2:v1",
+      "rf26241d5t:overlap_last:512:0:0:v1",
+      "r5f4cf23et:overlap_last:512:4:6:v1",
+      "r0667a51ft:overlap_last:512:5:7:v1",
+      "div2k_0856:overlap_last:512:2:1:v1",
+      "rf26241d5t:overlap_last:512:2:2:v1",
+      "r91403508t:overlap_last:512:2:1:v1",
+      "r0667a51ft:overlap_last:512:2:7:v1"
+     ],
+     "val": [
+      "alaska_24752:trim512:512:0:0:v1",
+      "lsdir_0070000_0069773:trim512:512:0:0:v1",
+      "r1ced1907t:overlap_last:512:0:2:v1",
+      "alaska_46286:trim512:512:0:1:v1",
+      "lsdir_0057000_0056222:trim512:512:1:0:v1",
+      "r1344c943t:overlap_last:512:1:6:v1",
+      "alaska_79629:trim512:512:0:0:v1",
+      "lsdir_0052000_0051588:trim512:512:0:0:v1",
+      "red4874ebt:overlap_last:512:2:1:v1",
+      "alaska_06390:trim512:512:0:0:v1",
+      "lsdir_0016000_0015354:trim512:512:0:0:v1",
+      "rc47bb311t:overlap_last:512:5:4:v1",
+      "alaska_75708:trim512:512:0:0:v1",
+      "lsdir_0006000_0005456:trim512:512:0:1:v1",
+      "r3c53386ct:overlap_last:512:6:7:v1",
+      "alaska_02655:trim512:512:1:0:v1"
+     ]
+    },
+    "run_seed": 0,
+    "settings": {
+     "augment": true,
+     "buffer_size": 1024,
+     "cache_root": null,
+     "evaluation_yaml": null,
+     "fixed_variants": false,
+     "grid": "overlap_last",
+     "manifest_root": null,
+     "paired_batches": false,
+     "run_seed": 0,
+     "settings_yaml": "/work/configs/train-k1to4.yaml",
+     "source": "decode",
+     "source_mix": {
+      "alaska": 0.4,
+      "lsdir": 0.2,
+      "raise": 0.4
+     },
+     "source_weights": null,
+     "sources": [
+      "raise",
+      "lsdir",
+      "alaska"
+     ],
+     "tensor_dtype": "uint8",
+     "tile_size": 512,
+     "tiles_per_epoch": 225,
+     "train_photo_fraction": 0.005,
+     "variants_per_tile": 1
+    },
+    "source": "decode",
+    "source_weights": null,
+    "tensor_dtype": "uint8",
+    "tile_size": 512,
+    "train_photo_fraction": 0.005,
+    "train_photo_selection": [
+     {
+      "available": 459,
+      "camera_model": "Apple_IpadPro-1stGen",
+      "photo_ids": [
+       "alaska_13271",
+       "alaska_13818"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Apple_IpadPro-2ndGen",
+      "photo_ids": [
+       "alaska_15360",
+       "alaska_15465"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Canon_EOS-100D",
+      "photo_ids": [
+       "alaska_42543",
+       "alaska_43239"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Canon_EOS-500D",
+      "photo_ids": [
+       "alaska_28460",
+       "alaska_30133"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Canon_EOS20D",
+      "photo_ids": [
+       "alaska_64896",
+       "alaska_65143"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 372,
+      "camera_model": "Canon_EOS700D",
+      "photo_ids": [
+       "alaska_31000",
+       "alaska_31322"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 333,
+      "camera_model": "Canon_PowerShot-G11",
+      "photo_ids": [
+       "alaska_66937",
+       "alaska_67025"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "HTC_OneA9",
+      "photo_ids": [
+       "alaska_01825",
+       "alaska_02376"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "HTC_OneM9-OPJA100",
+      "photo_ids": [
+       "alaska_03227",
+       "alaska_03784"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Huawei_Honor8-FRDL09",
+      "photo_ids": [
+       "alaska_04627",
+       "alaska_04647"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Kodak_Z990",
+      "photo_ids": [
+       "alaska_79447",
+       "alaska_79793"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "LG_G5-H840",
+      "photo_ids": [
+       "alaska_06506",
+       "alaska_06547"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "LG_G7fit-LMQ850",
+      "photo_ids": [
+       "alaska_08389",
+       "alaska_08697"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Leica_M9",
+      "photo_ids": [
+       "alaska_31861",
+       "alaska_32533"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Nikon_1-AW1",
+      "photo_ids": [
+       "alaska_34026",
+       "alaska_34284"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Nikon_D3000",
+      "photo_ids": [
+       "alaska_22436",
+       "alaska_22469"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 461,
+      "camera_model": "Nikon_D5200",
+      "photo_ids": [
+       "alaska_45163",
+       "alaska_47695"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Nikon_D5600",
+      "photo_ids": [
+       "alaska_22764",
+       "alaska_25089"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Nikon_D610",
+      "photo_ids": [
+       "alaska_49701",
+       "alaska_51193"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Nikon_D7100",
+      "photo_ids": [
+       "alaska_48132",
+       "alaska_48601"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Nikon_D810",
+      "photo_ids": [
+       "alaska_16964",
+       "alaska_18387"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 395,
+      "camera_model": "Nikon_D90",
+      "photo_ids": [
+       "alaska_16435",
+       "alaska_16507"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Panasonic_DMC-GM1",
+      "photo_ids": [
+       "alaska_52199",
+       "alaska_52616"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Panasonic_FZ28",
+      "photo_ids": [
+       "alaska_53602",
+       "alaska_54837"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Pentax_K10D",
+      "photo_ids": [
+       "alaska_76874",
+       "alaska_76876"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Pentax_ist-DS",
+      "photo_ids": [
+       "alaska_69616",
+       "alaska_69793"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Samsung_GalaxyS8-SM-G950F",
+      "photo_ids": [
+       "alaska_10601",
+       "alaska_11076"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Sigma_SD10",
+      "photo_ids": [
+       "alaska_67422",
+       "alaska_69280"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Sigma_SD1Merrill",
+      "photo_ids": [
+       "alaska_60970",
+       "alaska_62178"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Sony_Alpha6000",
+      "photo_ids": [
+       "alaska_35308",
+       "alaska_35761"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 7000,
+      "camera_model": "",
+      "photo_ids": [
+       "lsdir_0001000_0000052",
+       "lsdir_0003000_0002193",
+       "lsdir_0004000_0003055",
+       "lsdir_0007000_0006830",
+       "lsdir_0013000_0012003",
+       "lsdir_0014000_0013323",
+       "lsdir_0015000_0014149",
+       "lsdir_0015000_0014406",
+       "lsdir_0018000_0017606",
+       "lsdir_0025000_0024428",
+       "lsdir_0026000_0025697",
+       "lsdir_0031000_0030138",
+       "lsdir_0032000_0031963",
+       "lsdir_0033000_0032249",
+       "lsdir_0034000_0033494",
+       "lsdir_0036000_0035237",
+       "lsdir_0036000_0035963",
+       "lsdir_0037000_0036331",
+       "lsdir_0048000_0047241",
+       "lsdir_0049000_0048442",
+       "lsdir_0056000_0055370",
+       "lsdir_0057000_0056452",
+       "lsdir_0058000_0057392",
+       "lsdir_0065000_0064395",
+       "lsdir_0065000_0064807",
+       "lsdir_0066000_0065679",
+       "lsdir_0068000_0067454",
+       "lsdir_0070000_0069595",
+       "lsdir_0072000_0071565",
+       "lsdir_0074000_0073146",
+       "lsdir_0075000_0074464",
+       "lsdir_0076000_0075116",
+       "lsdir_0080000_0079089",
+       "lsdir_0080000_0079873",
+       "lsdir_0083000_0082006"
+      ],
+      "selected": 35,
+      "source": "lsdir"
+     },
+     {
+      "available": 6,
+      "camera_model": "NIKON D40",
+      "photo_ids": [
+       "r684e92a7t"
+      ],
+      "selected": 1,
+      "source": "raise"
+     },
+     {
+      "available": 500,
+      "camera_model": "NIKON D7000",
+      "photo_ids": [
+       "r4cb981b2t",
+       "rc8713000t"
+      ],
+      "selected": 2,
+      "source": "raise"
+     },
+     {
+      "available": 195,
+      "camera_model": "NIKON D90",
+      "photo_ids": [
+       "r006b0e4bt"
+      ],
+      "selected": 1,
+      "source": "raise"
+     }
+    ],
+    "train_prefetch_images": 128,
+    "val_cap_lsdir": 1500,
+    "val_cap_raise": 5000,
+    "validation_pair_counts": {
+     "alaska": 6,
+     "lsdir": 5,
+     "raise": 5
+    },
+    "validation_pairs_sha256": "b3c07cc084e2edd1dd25273a8228c97c01499a92046e3e5bdceac0807e21a283",
+    "variants_per_tile": 1,
+    "workers": 6
+   },
+   "epoch_timing_columns": [
+    "epoch",
+    "train_first_wait_s",
+    "train_steps_s",
+    "train_end_to_val_start_s",
+    "val_loader_setup_s",
+    "val_first_wait_s",
+    "val_compute_s",
+    "val_last_to_end_s",
+    "val_end_to_next_first_s",
+    "curves_s",
+    "scalars_s",
+    "lr_trace_s",
+    "prime_s",
+    "checkpoint_s"
+   ],
+   "files": [
+    "best-epoch00-val_pe0.3438-val_auc0.6211.ckpt",
+    "data_run_settings.json",
+    "epoch_timing.csv",
+    "extra-test-bpp1/clipped_by_placement.csv",
+    "extra-test-bpp1/run.json",
+    "extra-test-bpp1/summary.csv",
+    "extra-test-bpp1/test_predictions.csv",
+    "last.ckpt",
+    "logs/csv/run/hparams.yaml",
+    "logs/csv/run/metrics.csv",
+    "logs/tb/run/custom_scalars_layout.json",
+    "logs/tb/run/hparams.yaml",
+    "lr_trace.csv",
+    "model_run_settings.json",
+    "test_predictions.csv",
+    "test_predictions_heatmap_detection_lowest.png",
+    "test_predictions_heatmap_detection_plane.png",
+    "test_predictions_heatmap_pe_lowest.png",
+    "test_predictions_heatmap_pe_plane.png",
+    "test_predictions_per_setting.csv",
+    "training_curves.png",
+    "validation_pairs.csv"
+   ],
+   "last_ckpt": {
+    "callback_state_keys": [
+     "PerEpochScalars",
+     "TimedModelCheckpoint{'monitor': 'val_pe', 'mode': 'min', 'every_n_train_steps': 0, 'every_n_epochs': 1, 'train_time_interval': None}",
+     "TrainingCurves"
+    ],
+    "epoch": 1,
+    "global_step": 114,
+    "hyper_parameters": {
+     "batch_size": 8,
+     "clip_t": 3.0,
+     "grad_clip": 1.0,
+     "lr": 0.0003,
+     "lr_drops": [
+      [
+       2,
+       0.3
+      ]
+     ],
+     "max_epochs": 2,
+     "model": "xunet_wide",
+     "norm": "none",
+     "paired_batches": false,
+     "precision": "32",
+     "steps_per_epoch": 57,
+     "warmup_epochs": 1,
+     "weight_decay": 0.0001,
+     "width": 4
+    },
+    "loops_keys": [
+     "fit_loop",
+     "predict_loop",
+     "test_loop",
+     "validate_loop"
+    ],
+    "lr_scheduler_count": 1,
+    "optimizer_param_group_keys": [
+     [
+      "amsgrad",
+      "betas",
+      "capturable",
+      "decoupled_weight_decay",
+      "differentiable",
+      "eps",
+      "foreach",
+      "fused",
+      "initial_lr",
+      "lr",
+      "maximize",
+      "params",
+      "weight_decay"
+     ]
+    ],
+    "optimizer_state_keys": [
+     [
+      "param_groups",
+      "state"
+     ]
+    ],
+    "pytorch_lightning_version_present": true,
+    "state_dict_keys": [
+     [
+      "net.kv.conv.weight",
+      [
+       3,
+       1,
+       5,
+       5
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv1.weight",
+      [
+       16,
+       3,
+       5,
+       5
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv1.bias",
+      [
+       16
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv2.weight",
+      [
+       64,
+       16,
+       5,
+       5
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv2.bias",
+      [
+       64
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv3.weight",
+      [
+       128,
+       64,
+       1,
+       1
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv3.bias",
+      [
+       128
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv4.weight",
+      [
+       256,
+       128,
+       1,
+       1
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv4.bias",
+      [
+       256
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv5.weight",
+      [
+       512,
+       256,
+       1,
+       1
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv5.bias",
+      [
+       512
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.classifier.weight",
+      [
+       2,
+       256
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.classifier.bias",
+      [
+       2
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv6.weight",
+      [
+       512,
+       512,
+       1,
+       1
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv6.bias",
+      [
+       512
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv7.weight",
+      [
+       256,
+       512,
+       1,
+       1
+      ],
+      "torch.float32"
+     ],
+     [
+      "net.conv7.bias",
+      [
+       256
+      ],
+      "torch.float32"
+     ]
+    ],
+    "top_level_keys": [
+     "callbacks",
+     "epoch",
+     "global_step",
+     "hparams_name",
+     "hyper_parameters",
+     "loops",
+     "lr_schedulers",
+     "optimizer_states",
+     "pytorch-lightning_version",
+     "state_dict"
+    ]
+   },
+   "lr_trace.csv": {
+    "rows": [
+     [
+      0,
+      0,
+      3e-06
+     ],
+     [
+      1,
+      0,
+      8.21052631579e-06
+     ],
+     [
+      56,
+      0,
+      0.000294789473684
+     ],
+     [
+      57,
+      1,
+      9e-05
+     ],
+     [
+      58,
+      1,
+      9e-05
+     ]
+    ],
+    "sha256": "fcc621c6aab89e4ef15526fbd054ecc47f17f9fa8f51f1f1d13f679cfde9b48e"
+   },
+   "metrics_csv": {
+    "columns": [
+     "epoch",
+     "step",
+     "train_acc",
+     "train_loss",
+     "val_acc",
+     "val_auc",
+     "val_fa",
+     "val_loss",
+     "val_loss_alaska",
+     "val_loss_lsdir",
+     "val_loss_raise",
+     "val_md",
+     "val_pe",
+     "val_pe_alaska",
+     "val_pe_lsdir",
+     "val_pe_raise"
+    ],
+    "kept_columns": [
+     "epoch",
+     "step",
+     "train_acc",
+     "train_loss",
+     "val_acc",
+     "val_auc",
+     "val_fa",
+     "val_loss",
+     "val_loss_alaska",
+     "val_loss_lsdir",
+     "val_loss_raise",
+     "val_md",
+     "val_pe",
+     "val_pe_alaska",
+     "val_pe_lsdir",
+     "val_pe_raise"
+    ],
+    "rows": [
+     [
+      0,
+      56,
+      null,
+      null,
+      0.5,
+      0.62109375,
+      0.0,
+      0.6933101415634155,
+      0.6933012008666992,
+      0.6932536363601685,
+      0.6933773159980774,
+      1.0,
+      0.34375,
+      0.25,
+      0.3000000119209289,
+      0.3000000119209289
+     ],
+     [
+      0,
+      56,
+      0.4955555498600006,
+      0.6944137811660767,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     [
+      1,
+      113,
+      null,
+      null,
+      0.5,
+      0.625,
+      0.0,
+      0.6931018829345703,
+      0.6931197047233582,
+      0.6929734945297241,
+      0.6932086944580078,
+      1.0,
+      0.34375,
+      0.25,
+      0.3000000119209289,
+      0.3000000119209289
+     ],
+     [
+      1,
+      113,
+      0.5,
+      0.693640410900116,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    ]
+   },
+   "model_run_settings.json": {
+    "batch_size": 8,
+    "clip_t": 3.0,
+    "compile_dynamic": null,
+    "compile_fullgraph": null,
+    "compile_mode": "off",
+    "compile_target": null,
+    "extra_tests": "test-bpp1",
+    "grad_clip_norm": 1.0,
+    "lr": 0.0003,
+    "lr_drops": [
+     [
+      2,
+      0.3
+     ]
+    ],
+    "max_epochs": 2,
+    "model": "xunet_wide",
+    "norm": "none",
+    "persistent_validation_workers": true,
+    "precision": "32",
+    "steps_per_epoch": 57,
+    "tf32_cudnn": true,
+    "tf32_matmul": false,
+    "torch_version": "2.14.0+rocm10.1.0",
+    "train_yaml": "/work/configs/train-k1to4.yaml",
+    "warmup_epochs": 1,
+    "weight_decay": 0.0001,
+    "width": 4
+   },
+   "tensorboard_event_files": 3,
+   "test_predictions.csv": {
+    "identities_sha256": "9594f775d40fe4ae6f33ab169428475a0901d54c8e02c7ee6a0fbd5080511aa9",
+    "prob_stego": [
+     0.4869031310081482,
+     0.4869604110717773,
+     0.4870941340923309,
+     0.4871644973754883,
+     0.4872848093509674,
+     0.4875747859477997,
+     0.4871875941753387,
+     0.4872385859489441,
+     0.4856978356838226,
+     0.4862600564956665,
+     0.4871419668197632,
+     0.4871588945388794,
+     0.486993134021759,
+     0.4870162010192871,
+     0.4872235357761383,
+     0.4872480034828186,
+     0.4873192608356476,
+     0.4880186021327972,
+     0.487136572599411,
+     0.4871642887592315,
+     0.4870658814907074,
+     0.4874321520328522,
+     0.4870420396327972,
+     0.4873015880584717,
+     0.4872792661190033,
+     0.4873798489570617,
+     0.4870935678482055,
+     0.4875136315822601,
+     0.4866054952144623,
+     0.4868796467781067,
+     0.4869965314865112,
+     0.4876172542572021
+    ],
+    "sha256": "f5c0685f076a1434e2f4cbef1d08022b7f710e4b4c2b91beb5b8e4062c2a7059"
+   },
+   "test_predictions_per_setting.csv": {
+    "sha256": "5a608a6fcf53ab7fad46e09a234e071d14d9149dc4bfb6c15bd9ba33482d663d"
+   },
+   "validation_pairs.csv": {
+    "sha256": "b3c07cc084e2edd1dd25273a8228c97c01499a92046e3e5bdceac0807e21a283"
+   }
+  },
+  "note": "GPU QUICK via run_notebook.py (6/4 workers)",
+  "output_top_level": [
+   "checkpoints",
+   "executed.ipynb",
+   "run.log",
+   "status.json"
+  ],
+  "run_folder_relative": "checkpoints/xunet_v4_clip3_nonorm_lr0.0003_warm1_drops2x0.3_k1to4_e2_wide-w4_quick_otf",
+  "run_notebook_state": "done",
+  "runtime_settings": {
+   "BATCH_SIZE": 8,
+   "COMPILE_MODE": "off",
+   "EPOCHS": 2,
+   "QUICK": true,
+   "RUN_NAME": "xunet_v4_clip3_nonorm_lr0.0003_warm1_drops2x0.3_k1to4_e2_wide-w4_quick_otf",
+   "V3_DATA": "otf",
+   "data_run_settings": {
+    "batch_images": 8,
+    "buffer_images": 1024,
+    "buffer_payload_bytes": 805306368,
+    "checkpoint_validation": "capped",
+    "compile_mode": "off",
+    "data": "otf",
+    "diagnostic_pair_ids": {
+     "train": [
+      "alaska_13271:trim512:512:1:0:v1",
+      "alaska_15360:trim512:512:0:0:v1",
+      "alaska_43239:trim512:512:0:0:v1",
+      "alaska_28460:trim512:512:1:0:v1",
+      "alaska_65143:trim512:512:0:0:v1",
+      "alaska_31000:trim512:512:0:0:v1",
+      "alaska_66937:trim512:512:0:1:v1",
+      "alaska_02376:trim512:512:1:1:v1",
+      "alaska_03227:trim512:512:0:0:v1",
+      "alaska_04647:trim512:512:0:0:v1",
+      "alaska_79793:trim512:512:0:0:v1",
+      "alaska_06547:trim512:512:0:1:v1",
+      "alaska_08389:trim512:512:1:0:v1",
+      "alaska_31861:trim512:512:0:0:v1",
+      "alaska_34284:trim512:512:0:0:v1",
+      "alaska_22436:trim512:512:0:0:v1",
+      "alaska_45163:trim512:512:0:0:v1",
+      "alaska_22764:trim512:512:0:0:v1",
+      "alaska_49701:trim512:512:0:0:v1",
+      "alaska_48601:trim512:512:0:0:v1",
+      "alaska_16964:trim512:512:0:0:v1",
+      "alaska_16507:trim512:512:0:0:v1",
+      "alaska_52616:trim512:512:0:0:v1",
+      "alaska_53602:trim512:512:0:0:v1",
+      "alaska_76876:trim512:512:1:0:v1",
+      "alaska_69616:trim512:512:0:0:v1",
+      "alaska_10601:trim512:512:0:0:v1",
+      "alaska_69280:trim512:512:0:0:v1",
+      "alaska_62178:trim512:512:0:0:v1",
+      "alaska_35308:trim512:512:1:0:v1",
+      "lsdir_0031000_0030138:trim512:512:0:1:v1",
+      "r684e92a7t:overlap_last:512:0:3:v1"
+     ],
+     "val": [
+      "alaska_14646:trim512:512:0:0:v1",
+      "alaska_14933:trim512:512:0:0:v1",
+      "alaska_42805:trim512:512:1:0:v1",
+      "alaska_29936:trim512:512:0:0:v1",
+      "alaska_65102:trim512:512:1:1:v1",
+      "alaska_30922:trim512:512:1:0:v1",
+      "alaska_02271:trim512:512:0:0:v1",
+      "alaska_03826:trim512:512:1:0:v1",
+      "alaska_04557:trim512:512:0:0:v1",
+      "alaska_79321:trim512:512:0:1:v1",
+      "alaska_06399:trim512:512:0:0:v1",
+      "alaska_08265:trim512:512:0:0:v1",
+      "alaska_32935:trim512:512:0:0:v1",
+      "alaska_33698:trim512:512:0:0:v1",
+      "alaska_20206:trim512:512:0:0:v1",
+      "alaska_45770:trim512:512:0:0:v1",
+      "alaska_23795:trim512:512:0:1:v1",
+      "alaska_50509:trim512:512:0:1:v1",
+      "alaska_48162:trim512:512:0:0:v1",
+      "alaska_19473:trim512:512:0:0:v1",
+      "alaska_52833:trim512:512:0:0:v1",
+      "alaska_54673:trim512:512:0:1:v1",
+      "alaska_78021:trim512:512:0:1:v1",
+      "alaska_69558:trim512:512:0:0:v1",
+      "alaska_12235:trim512:512:0:0:v1",
+      "alaska_68668:trim512:512:0:0:v1",
+      "alaska_62900:trim512:512:0:0:v1",
+      "alaska_35843:trim512:512:0:0:v1",
+      "div2k_0114:overlap_last:512:2:0:v1",
+      "lsdir_0072000_0071415:trim512:512:0:1:v1",
+      "r26d5bcc0t:overlap_last:512:3:4:v1",
+      "r041c02cat:overlap_last:512:3:0:v1"
+     ]
+    },
+    "eval_persistent_workers": true,
+    "eval_prefetch_by_split": {
+     "test": 16,
+     "train_eval": 1,
+     "val": 64
+    },
+    "eval_prefetch_factor": 64,
+    "eval_profile": "overlap_full_mix",
+    "eval_task": "one_photo",
+    "eval_workers": 4,
+    "extra_pair_counts": {
+     "alaska-test_seen": 16,
+     "alaska-test_unseen": 16,
+     "alaska-val": 16,
+     "lsdir-test": 16,
+     "lsdir-val": 16
+    },
+    "fixed_variants": false,
+    "grid": "overlap_last",
+    "group_images": 4,
+    "in_order": true,
+    "main_threads": 1,
+    "prefetch_factor": 32,
+    "prefetch_images": 128,
+    "prefetch_override": null,
+    "prime_next_epoch": true,
+    "quick": true,
+    "quick_eval_pair_ids": {
+     "test": [
+      "div2k_0809:overlap_last:512:1:2:v1",
+      "rf26241d5t:overlap_last:512:1:0:v1",
+      "rce28e1c2t:overlap_last:512:4:1:v1",
+      "rf1dafb88t:overlap_last:512:1:1:v1",
+      "div2k_0818:overlap_last:512:0:1:v1",
+      "rf26241d5t:overlap_last:512:2:3:v1",
+      "r5f7dff30t:overlap_last:512:4:2:v1",
+      "rdde9a595t:overlap_last:512:2:8:v1",
+      "div2k_0815:overlap_last:512:1:2:v1",
+      "rf26241d5t:overlap_last:512:0:0:v1",
+      "r5f4cf23et:overlap_last:512:4:6:v1",
+      "r0667a51ft:overlap_last:512:5:7:v1",
+      "div2k_0856:overlap_last:512:2:1:v1",
+      "rf26241d5t:overlap_last:512:2:2:v1",
+      "r91403508t:overlap_last:512:2:1:v1",
+      "r0667a51ft:overlap_last:512:2:7:v1"
+     ],
+     "val": [
+      "alaska_24752:trim512:512:0:0:v1",
+      "lsdir_0070000_0069773:trim512:512:0:0:v1",
+      "r1ced1907t:overlap_last:512:0:2:v1",
+      "alaska_46286:trim512:512:0:1:v1",
+      "lsdir_0057000_0056222:trim512:512:1:0:v1",
+      "r1344c943t:overlap_last:512:1:6:v1",
+      "alaska_79629:trim512:512:0:0:v1",
+      "lsdir_0052000_0051588:trim512:512:0:0:v1",
+      "red4874ebt:overlap_last:512:2:1:v1",
+      "alaska_06390:trim512:512:0:0:v1",
+      "lsdir_0016000_0015354:trim512:512:0:0:v1",
+      "rc47bb311t:overlap_last:512:5:4:v1",
+      "alaska_75708:trim512:512:0:0:v1",
+      "lsdir_0006000_0005456:trim512:512:0:1:v1",
+      "r3c53386ct:overlap_last:512:6:7:v1",
+      "alaska_02655:trim512:512:1:0:v1"
+     ]
+    },
+    "run_seed": 0,
+    "settings": {
+     "augment": true,
+     "buffer_size": 1024,
+     "cache_root": null,
+     "evaluation_yaml": null,
+     "fixed_variants": false,
+     "grid": "overlap_last",
+     "manifest_root": null,
+     "paired_batches": false,
+     "run_seed": 0,
+     "settings_yaml": "/work/configs/train-k1to4.yaml",
+     "source": "decode",
+     "source_mix": {
+      "alaska": 0.4,
+      "lsdir": 0.2,
+      "raise": 0.4
+     },
+     "source_weights": null,
+     "sources": [
+      "raise",
+      "lsdir",
+      "alaska"
+     ],
+     "tensor_dtype": "uint8",
+     "tile_size": 512,
+     "tiles_per_epoch": 225,
+     "train_photo_fraction": 0.005,
+     "variants_per_tile": 1
+    },
+    "source": "decode",
+    "source_weights": null,
+    "tensor_dtype": "uint8",
+    "tile_size": 512,
+    "train_photo_fraction": 0.005,
+    "train_photo_selection": [
+     {
+      "available": 459,
+      "camera_model": "Apple_IpadPro-1stGen",
+      "photo_ids": [
+       "alaska_13271",
+       "alaska_13818"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Apple_IpadPro-2ndGen",
+      "photo_ids": [
+       "alaska_15360",
+       "alaska_15465"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Canon_EOS-100D",
+      "photo_ids": [
+       "alaska_42543",
+       "alaska_43239"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Canon_EOS-500D",
+      "photo_ids": [
+       "alaska_28460",
+       "alaska_30133"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Canon_EOS20D",
+      "photo_ids": [
+       "alaska_64896",
+       "alaska_65143"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 372,
+      "camera_model": "Canon_EOS700D",
+      "photo_ids": [
+       "alaska_31000",
+       "alaska_31322"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 333,
+      "camera_model": "Canon_PowerShot-G11",
+      "photo_ids": [
+       "alaska_66937",
+       "alaska_67025"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "HTC_OneA9",
+      "photo_ids": [
+       "alaska_01825",
+       "alaska_02376"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "HTC_OneM9-OPJA100",
+      "photo_ids": [
+       "alaska_03227",
+       "alaska_03784"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Huawei_Honor8-FRDL09",
+      "photo_ids": [
+       "alaska_04627",
+       "alaska_04647"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Kodak_Z990",
+      "photo_ids": [
+       "alaska_79447",
+       "alaska_79793"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "LG_G5-H840",
+      "photo_ids": [
+       "alaska_06506",
+       "alaska_06547"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "LG_G7fit-LMQ850",
+      "photo_ids": [
+       "alaska_08389",
+       "alaska_08697"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Leica_M9",
+      "photo_ids": [
+       "alaska_31861",
+       "alaska_32533"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Nikon_1-AW1",
+      "photo_ids": [
+       "alaska_34026",
+       "alaska_34284"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Nikon_D3000",
+      "photo_ids": [
+       "alaska_22436",
+       "alaska_22469"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 461,
+      "camera_model": "Nikon_D5200",
+      "photo_ids": [
+       "alaska_45163",
+       "alaska_47695"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Nikon_D5600",
+      "photo_ids": [
+       "alaska_22764",
+       "alaska_25089"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Nikon_D610",
+      "photo_ids": [
+       "alaska_49701",
+       "alaska_51193"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Nikon_D7100",
+      "photo_ids": [
+       "alaska_48132",
+       "alaska_48601"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Nikon_D810",
+      "photo_ids": [
+       "alaska_16964",
+       "alaska_18387"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 395,
+      "camera_model": "Nikon_D90",
+      "photo_ids": [
+       "alaska_16435",
+       "alaska_16507"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Panasonic_DMC-GM1",
+      "photo_ids": [
+       "alaska_52199",
+       "alaska_52616"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Panasonic_FZ28",
+      "photo_ids": [
+       "alaska_53602",
+       "alaska_54837"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Pentax_K10D",
+      "photo_ids": [
+       "alaska_76874",
+       "alaska_76876"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Pentax_ist-DS",
+      "photo_ids": [
+       "alaska_69616",
+       "alaska_69793"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Samsung_GalaxyS8-SM-G950F",
+      "photo_ids": [
+       "alaska_10601",
+       "alaska_11076"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Sigma_SD10",
+      "photo_ids": [
+       "alaska_67422",
+       "alaska_69280"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Sigma_SD1Merrill",
+      "photo_ids": [
+       "alaska_60970",
+       "alaska_62178"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Sony_Alpha6000",
+      "photo_ids": [
+       "alaska_35308",
+       "alaska_35761"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 7000,
+      "camera_model": "",
+      "photo_ids": [
+       "lsdir_0001000_0000052",
+       "lsdir_0003000_0002193",
+       "lsdir_0004000_0003055",
+       "lsdir_0007000_0006830",
+       "lsdir_0013000_0012003",
+       "lsdir_0014000_0013323",
+       "lsdir_0015000_0014149",
+       "lsdir_0015000_0014406",
+       "lsdir_0018000_0017606",
+       "lsdir_0025000_0024428",
+       "lsdir_0026000_0025697",
+       "lsdir_0031000_0030138",
+       "lsdir_0032000_0031963",
+       "lsdir_0033000_0032249",
+       "lsdir_0034000_0033494",
+       "lsdir_0036000_0035237",
+       "lsdir_0036000_0035963",
+       "lsdir_0037000_0036331",
+       "lsdir_0048000_0047241",
+       "lsdir_0049000_0048442",
+       "lsdir_0056000_0055370",
+       "lsdir_0057000_0056452",
+       "lsdir_0058000_0057392",
+       "lsdir_0065000_0064395",
+       "lsdir_0065000_0064807",
+       "lsdir_0066000_0065679",
+       "lsdir_0068000_0067454",
+       "lsdir_0070000_0069595",
+       "lsdir_0072000_0071565",
+       "lsdir_0074000_0073146",
+       "lsdir_0075000_0074464",
+       "lsdir_0076000_0075116",
+       "lsdir_0080000_0079089",
+       "lsdir_0080000_0079873",
+       "lsdir_0083000_0082006"
+      ],
+      "selected": 35,
+      "source": "lsdir"
+     },
+     {
+      "available": 6,
+      "camera_model": "NIKON D40",
+      "photo_ids": [
+       "r684e92a7t"
+      ],
+      "selected": 1,
+      "source": "raise"
+     },
+     {
+      "available": 500,
+      "camera_model": "NIKON D7000",
+      "photo_ids": [
+       "r4cb981b2t",
+       "rc8713000t"
+      ],
+      "selected": 2,
+      "source": "raise"
+     },
+     {
+      "available": 195,
+      "camera_model": "NIKON D90",
+      "photo_ids": [
+       "r006b0e4bt"
+      ],
+      "selected": 1,
+      "source": "raise"
+     }
+    ],
+    "train_prefetch_images": 128,
+    "val_cap_lsdir": 1500,
+    "val_cap_raise": 5000,
+    "validation_pair_counts": {
+     "alaska": 6,
+     "lsdir": 5,
+     "raise": 5
+    },
+    "validation_pairs_sha256": "b3c07cc084e2edd1dd25273a8228c97c01499a92046e3e5bdceac0807e21a283",
+    "variants_per_tile": 1,
+    "workers": 6
+   }
+  }
+ },
+ "models": {
+  "checkpoints": {
+   "g4-prime-1": {
+    "class_source": "scripts/map_demo.py",
+    "cpu": {
+     "argmax_sha": "39f5ecccbd6cf948fd0a96eab5886c61aa5c03e749684e1dd0242701207a73b2",
+     "cell_map_sha": "fef895a60cfbe80b3b6d7363fb55af5c3fec35734cda7bd4bbaf6782b0f03e9b",
+     "cell_shape": [
+      64,
+      16,
+      16
+     ],
+     "logit_abs_max": 8.171844482421875,
+     "logits_sha": "e3f25c16fa0717b3a07fef2ec21f96f4421e72b6f9ed41c79cdbc44c305d1e9a"
+    },
+    "cuda": {
+     "argmax_sha": "39f5ecccbd6cf948fd0a96eab5886c61aa5c03e749684e1dd0242701207a73b2",
+     "cell_map_sha": "381dcb00b3f117fb8c63bcd2d24a99a62692676065af14072feec3903744d2df",
+     "cell_shape": [
+      64,
+      16,
+      16
+     ],
+     "logit_abs_max": 8.17155933380127,
+     "logits_sha": "11df0dde0bab670e1d86581dd49cb3a10874a5565ff9ecb93fff7056bade609c",
+     "vs_cpu_cell_map_max_abs": 0.02191925048828125,
+     "vs_cpu_logits_max_abs": 0.001239776611328125
+    },
+    "file_sha256": "741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d",
+    "hparams": {
+     "clip_t": 3.0,
+     "model": null,
+     "norm": "group",
+     "width": null
+    },
+    "missing_keys": [],
+    "model_class": "XuNet",
+    "path": "runs/g4-prime-1/checkpoints/g4-prime-1/best-epoch08-val_pe0.0147-val_auc0.9973.ckpt",
+    "state_keys_sha": "bc2cb4496e28569fe4642d3863e0a3e470ccebd5619b9206fe5c9c46276f3b74",
+    "training_flag_after_eval": false,
+    "unexpected_keys": []
+   },
+   "g4-v4-r2": {
+    "class_source": "scripts/map_demo.py",
+    "cpu": {
+     "argmax_sha": "1ad0dc4c339d772d8dc6ff856d54e031b870d85ee375fd96632419e98d91b972",
+     "cell_map_sha": "fa4499aa2a934e43cfc469e5bc68fc4a4f9f713e88dfebbbe895193475e68f0b",
+     "cell_shape": [
+      64,
+      16,
+      16
+     ],
+     "logit_abs_max": 709.7057495117188,
+     "logits_sha": "8ecf989f8b2b844ceb738683fd2a1b4424c522d0712932e899a158c46a4b006e"
+    },
+    "cuda": {
+     "argmax_sha": "1ad0dc4c339d772d8dc6ff856d54e031b870d85ee375fd96632419e98d91b972",
+     "cell_map_sha": "bad2e1d25737ea51b17e4e18b0b6b311dc89a13e59656dbece2e6018576d9f54",
+     "cell_shape": [
+      64,
+      16,
+      16
+     ],
+     "logit_abs_max": 709.7058715820312,
+     "logits_sha": "ed858295e27801d23172ed4acd120df6b2ce5c52c1fbeed7bbd97f845f167859",
+     "vs_cpu_cell_map_max_abs": 0.0073699951171875,
+     "vs_cpu_logits_max_abs": 0.0003662109375
+    },
+    "file_sha256": "a942fdf0af8428548a242c1dd258bc301358f7b94e78cbfbfd71ae8f53c4554e",
+    "hparams": {
+     "clip_t": 3.0,
+     "model": null,
+     "norm": "none",
+     "width": null
+    },
+    "missing_keys": [],
+    "model_class": "XuNet",
+    "path": "runs/g4-v4-r2/checkpoints/xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_r2/best-epoch19-val_pe0.0227-val_auc0.9939.ckpt",
+    "state_keys_sha": "845704dba30481e120df0e0aac0dd358d0fc2c50ba72e74dc7c3eff64b4dbdef",
+    "training_flag_after_eval": false,
+    "unexpected_keys": []
+   },
+   "wide-w4_mixr2": {
+    "class_source": "scripts/map_demo.py",
+    "cpu": {
+     "argmax_sha": "5de6915264fb4b132be562599d17f3e4e5bd3e7a0d623f23a0406706e3d722ce",
+     "cell_map_sha": "834d0712562ba68dcc7933f4027610852f99d4574974597841553a04d32c92ee",
+     "cell_shape": [
+      64,
+      16,
+      16
+     ],
+     "logit_abs_max": 89.84160614013672,
+     "logits_sha": "eea58fa15df1653c79a6f8bd10baeefb28aac855e62f6484f133a864cb5789d9"
+    },
+    "cuda": {
+     "argmax_sha": "5de6915264fb4b132be562599d17f3e4e5bd3e7a0d623f23a0406706e3d722ce",
+     "cell_map_sha": "18784950109817859af3bf0856368681b80db5b0347ae6c0b5e3b42158458352",
+     "cell_shape": [
+      64,
+      16,
+      16
+     ],
+     "logit_abs_max": 89.8416748046875,
+     "logits_sha": "27484c7ce1dba2dfa7b5b84ac2b24e0fc91391908bb0a083622b20b865ec9713",
+     "vs_cpu_cell_map_max_abs": 0.00286102294921875,
+     "vs_cpu_logits_max_abs": 0.000133514404296875
+    },
+    "file_sha256": "a3866b7c645ef1f05314ecb5a4df0cfaff1d45c9e51c488dd81995abbbe45ae4",
+    "hparams": {
+     "clip_t": 3.0,
+     "model": "xunet_wide",
+     "norm": "none",
+     "width": 4
+    },
+    "missing_keys": [],
+    "model_class": "XuNetWide",
+    "path": "runs/xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_mixr2-20261016T024859Z-9032/checkpoints/xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_mixr2/best-epoch25-val_pe0.0574-val_auc0.9841.ckpt",
+    "state_keys_sha": "793478b32001dbfc1e5af70914791d971276e1a39d8d7ac9d96f85bbf5f46c5c",
+    "training_flag_after_eval": false,
+    "unexpected_keys": []
+   },
+   "wide-w4_r2": {
+    "class_source": "scripts/map_demo.py",
+    "cpu": {
+     "argmax_sha": "1df37e6603bc40ec3901f8e7df1140917db0cdd8b76cc7b2d5d625bb627c18c4",
+     "cell_map_sha": "e8fd05cfaed557456ed43f1632b3c73def0ef78e4016d8273eb95adf245e6048",
+     "cell_shape": [
+      64,
+      16,
+      16
+     ],
+     "logit_abs_max": 928.9957275390625,
+     "logits_sha": "441b0f02042fb44b9ef9ce91d4ec90b1f059c5c36ec879e5f1942b2310fe7fcd"
+    },
+    "cuda": {
+     "argmax_sha": "1df37e6603bc40ec3901f8e7df1140917db0cdd8b76cc7b2d5d625bb627c18c4",
+     "cell_map_sha": "ff040f7b8a0185bd402b41f859a8314b59588356b83d8dabc3795957cbaed5ca",
+     "cell_shape": [
+      64,
+      16,
+      16
+     ],
+     "logit_abs_max": 928.9956665039062,
+     "logits_sha": "f18e3058538003473f2b0a25c4ab28bcefbabe1d5d6f35003dc82d95d8f387fe",
+     "vs_cpu_cell_map_max_abs": 0.0317840576171875,
+     "vs_cpu_logits_max_abs": 0.00030517578125
+    },
+    "file_sha256": "9ba63252e8eecbf398f646f2d69641b70ad37c914ed8b7d6b4665dda54a961e1",
+    "hparams": {
+     "clip_t": 3.0,
+     "model": "xunet_wide",
+     "norm": "none",
+     "width": 4
+    },
+    "missing_keys": [],
+    "model_class": "XuNetWide",
+    "path": "runs/xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_r2-20261015T121753Z-29499/checkpoints/xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_r2/best-epoch23-val_pe0.0177-val_auc0.9957.ckpt",
+    "state_keys_sha": "793478b32001dbfc1e5af70914791d971276e1a39d8d7ac9d96f85bbf5f46c5c",
+    "training_flag_after_eval": false,
+    "unexpected_keys": []
+   }
+  },
+  "pixel_sha": "cd8bc887fc1610b202815b060d6db86bc65e73f932af20fdb8a0ebe801ba6ff6",
+  "tile_count": 64,
+  "tiles": [
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 2773,
+    "y": 2616
+   },
+   {
+    "k": 3,
+    "kind": "stego",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 2773,
+    "y": 2616
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 976,
+    "y": 1753
+   },
+   {
+    "k": 1,
+    "kind": "stego",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 976,
+    "y": 1753
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 564,
+    "y": 606
+   },
+   {
+    "k": 4,
+    "kind": "stego",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 564,
+    "y": 606
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 3546,
+    "y": 225
+   },
+   {
+    "k": 3,
+    "kind": "stego",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 3546,
+    "y": 225
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 2677,
+    "y": 1795
+   },
+   {
+    "k": 4,
+    "kind": "stego",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 2677,
+    "y": 1795
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 1045,
+    "y": 1490
+   },
+   {
+    "k": 3,
+    "kind": "stego",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 1045,
+    "y": 1490
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 877,
+    "y": 1346
+   },
+   {
+    "k": 3,
+    "kind": "stego",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 877,
+    "y": 1346
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 1304,
+    "y": 1416
+   },
+   {
+    "k": 4,
+    "kind": "stego",
+    "photo": "Datasets/originals/raise/NEF/r00617aa1t.NEF",
+    "source": "raise",
+    "x": 1304,
+    "y": 1416
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 1409,
+    "y": 530
+   },
+   {
+    "k": 3,
+    "kind": "stego",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 1409,
+    "y": 530
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 621,
+    "y": 13
+   },
+   {
+    "k": 1,
+    "kind": "stego",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 621,
+    "y": 13
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 647,
+    "y": 50
+   },
+   {
+    "k": 2,
+    "kind": "stego",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 647,
+    "y": 50
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 226,
+    "y": 294
+   },
+   {
+    "k": 2,
+    "kind": "stego",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 226,
+    "y": 294
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 946,
+    "y": 155
+   },
+   {
+    "k": 2,
+    "kind": "stego",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 946,
+    "y": 155
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 474,
+    "y": 804
+   },
+   {
+    "k": 2,
+    "kind": "stego",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 474,
+    "y": 804
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 383,
+    "y": 831
+   },
+   {
+    "k": 4,
+    "kind": "stego",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 383,
+    "y": 831
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 3,
+    "y": 199
+   },
+   {
+    "k": 4,
+    "kind": "stego",
+    "photo": "Datasets/originals/div2k/DIV2K_train_HR/0001.png",
+    "source": "div2k",
+    "x": 3,
+    "y": 199
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 223,
+    "y": 0
+   },
+   {
+    "k": 1,
+    "kind": "stego",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 223,
+    "y": 0
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 5,
+    "y": 0
+   },
+   {
+    "k": 2,
+    "kind": "stego",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 5,
+    "y": 0
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 141,
+    "y": 0
+   },
+   {
+    "k": 4,
+    "kind": "stego",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 141,
+    "y": 0
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 367,
+    "y": 0
+   },
+   {
+    "k": 3,
+    "kind": "stego",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 367,
+    "y": 0
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 427,
+    "y": 0
+   },
+   {
+    "k": 3,
+    "kind": "stego",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 427,
+    "y": 0
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 5,
+    "y": 0
+   },
+   {
+    "k": 3,
+    "kind": "stego",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 5,
+    "y": 0
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 290,
+    "y": 0
+   },
+   {
+    "k": 3,
+    "kind": "stego",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 290,
+    "y": 0
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 115,
+    "y": 0
+   },
+   {
+    "k": 4,
+    "kind": "stego",
+    "photo": "Datasets/originals/alaska/tiff_various_color/00025.tif",
+    "source": "alaska",
+    "x": 115,
+    "y": 0
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 287,
+    "y": 116
+   },
+   {
+    "k": 4,
+    "kind": "stego",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 287,
+    "y": 116
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 988,
+    "y": 14
+   },
+   {
+    "k": 1,
+    "kind": "stego",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 988,
+    "y": 14
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 880,
+    "y": 29
+   },
+   {
+    "k": 4,
+    "kind": "stego",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 880,
+    "y": 29
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 539,
+    "y": 179
+   },
+   {
+    "k": 1,
+    "kind": "stego",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 539,
+    "y": 179
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 124,
+    "y": 149
+   },
+   {
+    "k": 3,
+    "kind": "stego",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 124,
+    "y": 149
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 694,
+    "y": 124
+   },
+   {
+    "k": 2,
+    "kind": "stego",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 694,
+    "y": 124
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 221,
+    "y": 29
+   },
+   {
+    "k": 1,
+    "kind": "stego",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 221,
+    "y": 29
+   },
+   {
+    "kind": "clean",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 87,
+    "y": 135
+   },
+   {
+    "k": 4,
+    "kind": "stego",
+    "photo": "Datasets/originals/lsdir/hr/0001000/0000056.png",
+    "source": "lsdir",
+    "x": 87,
+    "y": 135
+   }
+  ],
+  "tiles_sha": "aba4e96af7a13aab951d15f78946dea21483e509e2102de6c164bd4689d2f581"
+ },
+ "settings": {
+  "cpu-det": {
+   "data_record": {
+    "buffer_images": 1024,
+    "buffer_payload_bytes": 805306368,
+    "checkpoint_validation": "standard",
+    "compile_mode": "off",
+    "data": "otf",
+    "eval_profile": "overlap_full_mix",
+    "extra_pair_counts": {},
+    "fixed_variants": false,
+    "grid": "overlap_last",
+    "prime_next_epoch": false,
+    "quick": true,
+    "quick_eval_pair_ids": {
+     "test": [
+      "div2k_0809:overlap_last:512:1:2:v1",
+      "rf26241d5t:overlap_last:512:1:0:v1",
+      "rce28e1c2t:overlap_last:512:4:1:v1",
+      "rf1dafb88t:overlap_last:512:1:1:v1",
+      "div2k_0818:overlap_last:512:0:1:v1",
+      "rf26241d5t:overlap_last:512:2:3:v1",
+      "r5f7dff30t:overlap_last:512:4:2:v1",
+      "rdde9a595t:overlap_last:512:2:8:v1",
+      "div2k_0815:overlap_last:512:1:2:v1",
+      "rf26241d5t:overlap_last:512:0:0:v1",
+      "r5f4cf23et:overlap_last:512:4:6:v1",
+      "r0667a51ft:overlap_last:512:5:7:v1",
+      "div2k_0856:overlap_last:512:2:1:v1",
+      "rf26241d5t:overlap_last:512:2:2:v1",
+      "r91403508t:overlap_last:512:2:1:v1",
+      "r0667a51ft:overlap_last:512:2:7:v1"
+     ],
+     "val": [
+      "div2k_0318:overlap_last:512:2:3:v1",
+      "r26d5bcc0t:overlap_last:512:3:0:v1",
+      "rbce66e7dt:overlap_last:512:4:5:v1",
+      "r21c5b1fet:overlap_last:512:5:5:v1",
+      "div2k_0547:overlap_last:512:1:3:v1",
+      "r26d5bcc0t:overlap_last:512:2:0:v1",
+      "r52f2bb08t:overlap_last:512:0:4:v1",
+      "re9a83ac0t:overlap_last:512:2:1:v1",
+      "div2k_0105:overlap_last:512:1:0:v1",
+      "r26d5bcc0t:overlap_last:512:0:1:v1",
+      "rbce66e7dt:overlap_last:512:0:0:v1",
+      "rd286f8e2t:overlap_last:512:1:1:v1",
+      "div2k_0798:overlap_last:512:1:1:v1",
+      "r26d5bcc0t:overlap_last:512:0:5:v1",
+      "ree078dcbt:overlap_last:512:4:5:v1",
+      "r3d67144et:overlap_last:512:3:6:v1"
+     ]
+    },
+    "run_seed": 0,
+    "settings": {
+     "augment": true,
+     "buffer_size": 1024,
+     "cache_root": null,
+     "evaluation_yaml": null,
+     "fixed_variants": false,
+     "grid": "overlap_last",
+     "manifest_root": null,
+     "paired_batches": false,
+     "run_seed": 0,
+     "settings_yaml": null,
+     "source": "decode",
+     "source_mix": null,
+     "source_weights": null,
+     "sources": [
+      "raise",
+      "div2k"
+     ],
+     "tensor_dtype": "uint8",
+     "tile_size": 512,
+     "tiles_per_epoch": null,
+     "train_photo_fraction": 0.005,
+     "variants_per_tile": 1
+    },
+    "source": "decode",
+    "source_weights": null,
+    "tile_size": 512,
+    "train_photo_fraction": 0.005,
+    "train_photo_selection": [
+     {
+      "available": 680,
+      "camera_model": "",
+      "photo_ids": [
+       "div2k_0032",
+       "div2k_0133",
+       "div2k_0282"
+      ],
+      "selected": 3,
+      "source": "div2k"
+     },
+     {
+      "available": 6,
+      "camera_model": "NIKON D40",
+      "photo_ids": [
+       "r684e92a7t"
+      ],
+      "selected": 1,
+      "source": "raise"
+     },
+     {
+      "available": 500,
+      "camera_model": "NIKON D7000",
+      "photo_ids": [
+       "r4cb981b2t",
+       "rc8713000t"
+      ],
+      "selected": 2,
+      "source": "raise"
+     },
+     {
+      "available": 195,
+      "camera_model": "NIKON D90",
+      "photo_ids": [
+       "r006b0e4bt"
+      ],
+      "selected": 1,
+      "source": "raise"
+     }
+    ],
+    "variants_per_tile": 1
+   },
+   "env_settings": {
+    "QUICK": "true",
+    "V3_BATCH_SIZE": "8",
+    "V3_CLIP_T": "3",
+    "V3_COMPILE": "off",
+    "V3_DATA": "otf",
+    "V3_EPOCHS": "1",
+    "V3_EVAL_WORKERS": "0",
+    "V3_EXTRA_TESTS": "none",
+    "V3_LIMIT_TRAIN_BATCHES": "20",
+    "V3_MAIN_THREADS": "8",
+    "V3_MODEL": "xunet",
+    "V3_NORM": "none",
+    "V3_PERSISTENT_WORKERS": "off",
+    "V3_PRIME_NEXT_EPOCH": "off",
+    "V3_ROCM_CONV1_FIX": "false",
+    "V3_SOURCE": "decode",
+    "V3_WORKERS": "0"
+   },
+   "fixed_train_frame_sha": "49bdfc13afd6e209172f0e676b1351a1a7c2e57648d46cf6c53f7aa342345f5f",
+   "globals": {
+    "BATCH_SIZE": 8,
+    "CHECKPOINT_ROOT": "/work/runs",
+    "CLIP_T": 3.0,
+    "COMPILE_MODE": "off",
+    "DATA_ROOT": "/work/Datasets/generated/raise512-run1-records",
+    "DEVICE": "cpu",
+    "EPOCHS": 1,
+    "EVAL_PERSISTENT_WORKERS": false,
+    "EVAL_PROFILE": "overlap_full_mix",
+    "EVAL_WORKERS": 0,
+    "EXTRA_TESTS": "none",
+    "GRAD_CLIP": 1.0,
+    "LABELS_PATH": "/work/Datasets/generated/raise512-run1-records/labels.csv",
+    "LIMIT_TRAIN_BATCHES": 20,
+    "LR": 0.0003,
+    "LR_DROPS": [
+     [
+      1,
+      0.1
+     ]
+    ],
+    "MAIN_THREADS": 8,
+    "MODEL": "xunet",
+    "NORM": "none",
+    "OTF_PREFETCH": null,
+    "OTF_PREFETCH_IMAGES": 128,
+    "OTF_SOURCE": "decode",
+    "OTF_WORKERS": 0,
+    "PAIRED_BATCHES": false,
+    "PIL_VERSION": "12.3.0",
+    "PRECISION": "32",
+    "PRIME_NEXT_EPOCH": false,
+    "QUICK": true,
+    "QUICK_PAIRS": {
+     "test": 16,
+     "train": 32,
+     "val": 16
+    },
+    "ROCM_CONV1_FIX": false,
+    "ROCM_CONV1_FIX_ACTIVE": false,
+    "RUN_NAME": "xunet_v4_clip3_nonorm_lr0.0003_warm1_drop0_e1_quick_otf",
+    "SEED": 0,
+    "SPLIT_PATH": "/work/Datasets/generated/raise512-run1-records/splits/split_seed0.csv",
+    "TRAIN_YAML": null,
+    "V3_DATA": "otf",
+    "WARMUP_EPOCHS": 1,
+    "WIDTH": 4
+   },
+   "mode": "settings",
+   "run_name": "xunet_v4_clip3_nonorm_lr0.0003_warm1_drop0_e1_quick_otf",
+   "run_settings": {
+    "augment": true,
+    "buffer_size": 1024,
+    "cache_root": null,
+    "evaluation_yaml": null,
+    "fixed_variants": false,
+    "grid": "overlap_last",
+    "manifest_root": null,
+    "paired_batches": false,
+    "run_seed": 0,
+    "settings_yaml": null,
+    "source": "decode",
+    "source_mix": null,
+    "source_weights": null,
+    "sources": [
+     "raise",
+     "div2k"
+    ],
+    "tensor_dtype": "uint8",
+    "tile_size": 512,
+    "tiles_per_epoch": null,
+    "train_photo_fraction": 0.005,
+    "variants_per_tile": 1
+   },
+   "test_frame_sha": "bf038bd8da0ca828c4ea7c72bad4fa5fe627d737ebea50c40bad6ee5ed3f57cd",
+   "test_settings_sha": "e6b7c35f383c6c5f8adc58ac48f9d7544b6a166d469fa873d8f52c6439e84a55",
+   "train_len": 508,
+   "train_schedule_epoch0": {
+    "groups": 7,
+    "repeats": null,
+    "sha": "4a2e2ee950fc420105ded545ff409c4db21445a32ed6c94b88adef90d357db7e"
+   },
+   "train_schedule_epoch1": {
+    "groups": 7,
+    "repeats": null,
+    "sha": "c3f12b50c40e5d2919f51f94e35b8f59d12e15bebf34c283ff2600e4c40d1be5"
+   },
+   "val_frame_sha": "e0fe7a44ca60ef38f69e4a0db340e7167d4add9842b5aa5f894bc5b9ffeca4dc",
+   "val_settings_sha": "2051113914e3398545d8024837a861c6c6f2b59a0b8334387f19050e99cf487b",
+   "validation_pair_csv_sha": null
+  },
+  "newdata-1": {
+   "data_record": {
+    "buffer_images": 1024,
+    "buffer_payload_bytes": 805306368,
+    "checkpoint_validation": "capped",
+    "compile_mode": "default",
+    "data": "otf",
+    "eval_profile": "overlap_full_mix",
+    "extra_pair_counts": {
+     "alaska-test_seen": 2648,
+     "alaska-test_unseen": 3153,
+     "alaska-val": 1535,
+     "lsdir-test": 5245,
+     "lsdir-val": 3164
+    },
+    "fixed_variants": false,
+    "grid": "overlap_last",
+    "prime_next_epoch": true,
+    "quick": false,
+    "quick_eval_pair_ids": {
+     "test": null,
+     "val": null
+    },
+    "run_seed": 0,
+    "settings": {
+     "augment": true,
+     "buffer_size": 1024,
+     "cache_root": null,
+     "evaluation_yaml": null,
+     "fixed_variants": false,
+     "grid": "overlap_last",
+     "manifest_root": null,
+     "paired_batches": false,
+     "run_seed": 0,
+     "settings_yaml": "/work/configs/train-k1to4.yaml",
+     "source": "decode",
+     "source_mix": {
+      "alaska": 0.4,
+      "lsdir": 0.2,
+      "raise": 0.4
+     },
+     "source_weights": null,
+     "sources": [
+      "raise",
+      "lsdir",
+      "alaska"
+     ],
+     "tensor_dtype": "uint8",
+     "tile_size": 512,
+     "tiles_per_epoch": 45000,
+     "train_photo_fraction": 1.0,
+     "variants_per_tile": 1
+    },
+    "source": "decode",
+    "source_weights": null,
+    "tile_size": 512,
+    "train_photo_fraction": 1.0,
+    "train_photo_selection": [
+     {
+      "available": 459,
+      "camera_model": "Apple_IpadPro-1stGen",
+      "photo_ids": {
+       "__len__": 459,
+       "__sha256__": "14cf401022c026f32867267f1fce3623d71e1eff515a9533d462494fea37415d"
+      },
+      "selected": 459,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Apple_IpadPro-2ndGen",
+      "photo_ids": {
+       "__len__": 460,
+       "__sha256__": "eec029665186d19c99806f6a0b9225572dfa4630c4ffb98645ba8ae1ce1de5c4"
+      },
+      "selected": 460,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Canon_EOS-100D",
+      "photo_ids": {
+       "__len__": 460,
+       "__sha256__": "8c9b4982b7946754e3837f46d2cb22b36969f25d415d1684b94160e0f392d2fb"
+      },
+      "selected": 460,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Canon_EOS-500D",
+      "photo_ids": {
+       "__len__": 459,
+       "__sha256__": "d0c2908e0d1f832ea64c823e1bcc81e674d3f5a572d141188c16c6dd93917a36"
+      },
+      "selected": 459,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Canon_EOS20D",
+      "photo_ids": {
+       "__len__": 459,
+       "__sha256__": "1ad8747b44145393087706bc9c95840913dd7177f774b33d4c8b47a753a4704d"
+      },
+      "selected": 459,
+      "source": "alaska"
+     },
+     {
+      "available": 372,
+      "camera_model": "Canon_EOS700D",
+      "photo_ids": {
+       "__len__": 372,
+       "__sha256__": "a0e0604df2f74371ef8d04f3464a9096769d434fb7f6363c7b91e748cecafecf"
+      },
+      "selected": 372,
+      "source": "alaska"
+     },
+     {
+      "available": 333,
+      "camera_model": "Canon_PowerShot-G11",
+      "photo_ids": {
+       "__len__": 333,
+       "__sha256__": "39179dce9a37af1eafb0c75d6da2e33a97307b6ae2a5e607eacc94867c68b5bb"
+      },
+      "selected": 333,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "HTC_OneA9",
+      "photo_ids": {
+       "__len__": 459,
+       "__sha256__": "841664387326e1990a9f75869481b359b500a0f246698efe599e0fbb40be4342"
+      },
+      "selected": 459,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "HTC_OneM9-OPJA100",
+      "photo_ids": {
+       "__len__": 459,
+       "__sha256__": "4d034179f2171e029ab77ad9c77c3eeb301368683621852eb84aa2c2541c79de"
+      },
+      "selected": 459,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Huawei_Honor8-FRDL09",
+      "photo_ids": {
+       "__len__": 459,
+       "__sha256__": "e0ea87b23e9007eced0123048581f2054bb1accab5797850feee8a79ca9e3c9c"
+      },
+      "selected": 459,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Kodak_Z990",
+      "photo_ids": {
+       "__len__": 458,
+       "__sha256__": "4baf1cdee3b243074b6742d727bca09d4a83a64b0268e613ecc6ea9ab47d2e49"
+      },
+      "selected": 458,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "LG_G5-H840",
+      "photo_ids": {
+       "__len__": 460,
+       "__sha256__": "4f88382eb70a65b6b38fd05b11915d0b03828bb3fc27a360933e71fc842b4e4b"
+      },
+      "selected": 460,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "LG_G7fit-LMQ850",
+      "photo_ids": {
+       "__len__": 460,
+       "__sha256__": "ba8edbdc9ac24b732b2ed9a6eab2cf144bd1026fc4c107d0ed87fd1381cf63b2"
+      },
+      "selected": 460,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Leica_M9",
+      "photo_ids": {
+       "__len__": 459,
+       "__sha256__": "75de80209f9dad83c693c09ee052f97ff601118a69e86eda0b2420b7696b90c2"
+      },
+      "selected": 459,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Nikon_1-AW1",
+      "photo_ids": {
+       "__len__": 460,
+       "__sha256__": "b717eab3dc14534f8d10d8e293aa28cff520711df10b9bcea69298fd5ceba2c2"
+      },
+      "selected": 460,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Nikon_D3000",
+      "photo_ids": {
+       "__len__": 460,
+       "__sha256__": "11a612637c3a5932b87ba1cf81fc73d926eff94a4bd31957763e96dea3a774a8"
+      },
+      "selected": 460,
+      "source": "alaska"
+     },
+     {
+      "available": 461,
+      "camera_model": "Nikon_D5200",
+      "photo_ids": {
+       "__len__": 461,
+       "__sha256__": "27b2e25a7e60cfa04bc956c3fbe07fddbe1670866cd8a1424a35ab1c57e0afa4"
+      },
+      "selected": 461,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Nikon_D5600",
+      "photo_ids": {
+       "__len__": 459,
+       "__sha256__": "543df73a726bb7bc08fd29e799ca4fa7a639d8bb7b9b805be3f8a132167f54f8"
+      },
+      "selected": 459,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Nikon_D610",
+      "photo_ids": {
+       "__len__": 459,
+       "__sha256__": "42e307668943e8593eab8d8fc326b29f7e54e72c340d260741c80d73d39a29df"
+      },
+      "selected": 459,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Nikon_D7100",
+      "photo_ids": {
+       "__len__": 459,
+       "__sha256__": "e84dccbcc8333b43ed1e98612ad57bf95870941402bc7a28ee1037e0233cff3a"
+      },
+      "selected": 459,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Nikon_D810",
+      "photo_ids": {
+       "__len__": 460,
+       "__sha256__": "db7d591f91d5ab54af087d5e65a022595b74676d0ce940d55c625471541ace86"
+      },
+      "selected": 460,
+      "source": "alaska"
+     },
+     {
+      "available": 395,
+      "camera_model": "Nikon_D90",
+      "photo_ids": {
+       "__len__": 395,
+       "__sha256__": "03aa7644ef888a2c5e196bb064dc4a8404cbfae711e10b0af91ac98e8d54d6a1"
+      },
+      "selected": 395,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Panasonic_DMC-GM1",
+      "photo_ids": {
+       "__len__": 458,
+       "__sha256__": "2e215123e66ba936671aa0bc148174a040f81079d1f9082f2f1f860390c2d11a"
+      },
+      "selected": 458,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Panasonic_FZ28",
+      "photo_ids": {
+       "__len__": 460,
+       "__sha256__": "f931b7e9b776867e28e47e7a1c62d51ab52f5948e59a304b1665365ffcaa37b3"
+      },
+      "selected": 460,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Pentax_K10D",
+      "photo_ids": {
+       "__len__": 460,
+       "__sha256__": "718feb503458164a1d6f8c5bc0e9b0ba2fa5678b42dc99bd0ad1fe805e939604"
+      },
+      "selected": 460,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Pentax_ist-DS",
+      "photo_ids": {
+       "__len__": 460,
+       "__sha256__": "ce20196bbc21b25ded01ab90dc0911c2b18a01adf23c04ac354d75106021279d"
+      },
+      "selected": 460,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Samsung_GalaxyS8-SM-G950F",
+      "photo_ids": {
+       "__len__": 458,
+       "__sha256__": "7317510706ed0603403b62a1a791f17304dedb9be8bb2c5e2d27eaa4a46559a9"
+      },
+      "selected": 458,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Sigma_SD10",
+      "photo_ids": {
+       "__len__": 459,
+       "__sha256__": "96256f3a4436d67e9d77f63e64963f1b67b7a5a01899dca2e1677c5486ed3a8c"
+      },
+      "selected": 459,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Sigma_SD1Merrill",
+      "photo_ids": {
+       "__len__": 458,
+       "__sha256__": "729d93074acfff7b584b9d6e4ae31b822515f2761d55ca6a9358b3850c84058c"
+      },
+      "selected": 458,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Sony_Alpha6000",
+      "photo_ids": {
+       "__len__": 458,
+       "__sha256__": "a81cfd7170060ee4096919b0742a6fc7b8d6f1e43b2a090f01ea7fa4d4f7d765"
+      },
+      "selected": 458,
+      "source": "alaska"
+     },
+     {
+      "available": 7000,
+      "camera_model": "",
+      "photo_ids": {
+       "__len__": 7000,
+       "__sha256__": "7af7163c1e5433311c2924f8dc1220d5ecb2f50b704e6f3c36bedc28e5e5b082"
+      },
+      "selected": 7000,
+      "source": "lsdir"
+     },
+     {
+      "available": 6,
+      "camera_model": "NIKON D40",
+      "photo_ids": [
+       "r221dfc60t",
+       "r684e92a7t",
+       "r9099f063t",
+       "r92efa4det",
+       "rac5f452et",
+       "re0b498c4t"
+      ],
+      "selected": 6,
+      "source": "raise"
+     },
+     {
+      "available": 500,
+      "camera_model": "NIKON D7000",
+      "photo_ids": {
+       "__len__": 500,
+       "__sha256__": "7f79ff48a1ee99455c04e1c511beb09213954f0d1646d2ff66b7f4bf11818209"
+      },
+      "selected": 500,
+      "source": "raise"
+     },
+     {
+      "available": 195,
+      "camera_model": "NIKON D90",
+      "photo_ids": {
+       "__len__": 195,
+       "__sha256__": "5e2b23d24eac2b109ac844a1663cc25e0646f026fab8b786e0f4047eb34cdadd"
+      },
+      "selected": 195,
+      "source": "raise"
+     }
+    ],
+    "val_cap_lsdir": 1500,
+    "val_cap_raise": 5000,
+    "validation_pair_counts": {
+     "alaska": 1535,
+     "lsdir": 1500,
+     "raise": 5000
+    },
+    "validation_pairs_sha256": "6bb3c8efadad06af50ba014a95c98b4fc57008119bdd55b794ec2a1729e4d5ca",
+    "variants_per_tile": 1
+   },
+   "env_settings": {
+    "QUICK": "False",
+    "V3_BATCH_SIZE": "32",
+    "V3_CHECKPOINT_VAL": "capped",
+    "V3_CLIP_T": "3",
+    "V3_COMPILE": "default",
+    "V3_DATA": "otf",
+    "V3_EPOCHS": "30",
+    "V3_EVAL_WORKERS": "16",
+    "V3_EXTRA_TESTS": "test-bpp1,source-panels",
+    "V3_GRAD_CLIP": "1.0",
+    "V3_LR": "3e-4",
+    "V3_LR_DROPS": "5:0.3,20:0.1",
+    "V3_MODEL": "xunet_wide",
+    "V3_NORM": "none",
+    "V3_NOTEBOOK": "notebooks/05_xunet_v4_nonorm.ipynb",
+    "V3_PERSISTENT_WORKERS": "on",
+    "V3_PRECISION": "32",
+    "V3_PRIME_NEXT_EPOCH": "on",
+    "V3_RUN_NAME": "xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_mixr2",
+    "V3_SOURCE": "decode",
+    "V3_SOURCE_MIX": "raise:0.4,lsdir:0.2,alaska:0.4",
+    "V3_TILES_PER_EPOCH": "45000",
+    "V3_TRAIN_YAML": "configs/train-k1to4.yaml",
+    "V3_VAL_CAP_LSDIR": "1500",
+    "V3_VAL_CAP_RAISE": "5000",
+    "V3_WARMUP_EPOCHS": "1",
+    "V3_WIDTH": "4",
+    "V3_WORKERS": "32"
+   },
+   "fixed_train_frame_sha": "eb9593b73d08fa1d876f25054329191194864eb7c76f671fbd303e2d6926f5bf",
+   "globals": {
+    "BATCH_SIZE": 32,
+    "CHECKPOINT_ROOT": "/work/runs",
+    "CLIP_T": 3.0,
+    "COMPILE_MODE": "default",
+    "DATA_ROOT": "/work/Datasets/generated/raise512-run1-records",
+    "DEVICE": "cuda",
+    "EPOCHS": 30,
+    "EVAL_PERSISTENT_WORKERS": true,
+    "EVAL_PROFILE": "overlap_full_mix",
+    "EVAL_WORKERS": 16,
+    "EXTRA_TESTS": "test-bpp1,source-panels",
+    "GRAD_CLIP": 1.0,
+    "LABELS_PATH": "/work/Datasets/generated/raise512-run1-records/labels.csv",
+    "LIMIT_TRAIN_BATCHES": 0,
+    "LR": 0.0003,
+    "LR_DROPS": [
+     [
+      5,
+      0.3
+     ],
+     [
+      20,
+      0.1
+     ]
+    ],
+    "MAIN_THREADS": 1,
+    "MODEL": "xunet_wide",
+    "NORM": "none",
+    "OTF_PREFETCH": null,
+    "OTF_PREFETCH_IMAGES": 128,
+    "OTF_SOURCE": "decode",
+    "OTF_WORKERS": 32,
+    "PAIRED_BATCHES": false,
+    "PIL_VERSION": "12.3.0",
+    "PRECISION": "32",
+    "PRIME_NEXT_EPOCH": true,
+    "QUICK": false,
+    "QUICK_PAIRS": {
+     "test": 16,
+     "train": 32,
+     "val": 16
+    },
+    "ROCM_CONV1_FIX": true,
+    "ROCM_CONV1_FIX_ACTIVE": true,
+    "RUN_NAME": "xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_mixr2",
+    "SEED": 0,
+    "SPLIT_PATH": "/work/Datasets/generated/raise512-run1-records/splits/split_seed0.csv",
+    "TRAIN_YAML": "/work/configs/train-k1to4.yaml",
+    "V3_DATA": "otf",
+    "WARMUP_EPOCHS": 1,
+    "WIDTH": 4
+   },
+   "mode": "settings",
+   "run_name": "xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_mixr2",
+   "run_settings": {
+    "augment": true,
+    "buffer_size": 1024,
+    "cache_root": null,
+    "evaluation_yaml": null,
+    "fixed_variants": false,
+    "grid": "overlap_last",
+    "manifest_root": null,
+    "paired_batches": false,
+    "run_seed": 0,
+    "settings_yaml": "/work/configs/train-k1to4.yaml",
+    "source": "decode",
+    "source_mix": {
+     "alaska": 0.4,
+     "lsdir": 0.2,
+     "raise": 0.4
+    },
+    "source_weights": null,
+    "sources": [
+     "raise",
+     "lsdir",
+     "alaska"
+    ],
+    "tensor_dtype": "uint8",
+    "tile_size": 512,
+    "tiles_per_epoch": 45000,
+    "train_photo_fraction": 1.0,
+    "variants_per_tile": 1
+   },
+   "test_frame_sha": "f993069f94b35134e2520a27c7bf2531cecccd75d1b8572e096ee1ef246084f5",
+   "test_settings_sha": "fdd989f7bdab0ec6f9fd6f4c57bdde981d16b54aa8c37e5da8fd3dfcc8b06837",
+   "train_len": 90000,
+   "train_schedule_epoch0": {
+    "groups": 18454,
+    "repeats": {
+     "alaska": 0,
+     "lsdir": 0,
+     "raise": 0
+    },
+    "sha": "7d9531a88e473211c29f84814d54e6fac08e8da2182a355e6c87eb3a77a3d073"
+   },
+   "train_schedule_epoch1": {
+    "groups": 18536,
+    "repeats": {
+     "alaska": 0,
+     "lsdir": 0,
+     "raise": 0
+    },
+    "sha": "a408129803c4431b9b21490f1cfbe8d3cc18608b36df935e9b70e04aa703f6e1"
+   },
+   "val_frame_sha": "b589915dc757c268840b6c0d4b721e9f3e155c8b4b78ec18d10f79a4cc661739",
+   "val_settings_sha": "dc2e8cf7aba4562a42c7c786a5c4c60218530ab971bf15def8ef90fadcca1e13",
+   "validation_pair_csv_sha": "6bb3c8efadad06af50ba014a95c98b4fc57008119bdd55b794ec2a1729e4d5ca"
+  },
+  "quick-gpu": {
+   "data_record": {
+    "buffer_images": 1024,
+    "buffer_payload_bytes": 805306368,
+    "checkpoint_validation": "capped",
+    "compile_mode": "off",
+    "data": "otf",
+    "eval_profile": "overlap_full_mix",
+    "extra_pair_counts": {
+     "alaska-test_seen": 16,
+     "alaska-test_unseen": 16,
+     "alaska-val": 16,
+     "lsdir-test": 16,
+     "lsdir-val": 16
+    },
+    "fixed_variants": false,
+    "grid": "overlap_last",
+    "prime_next_epoch": true,
+    "quick": true,
+    "quick_eval_pair_ids": {
+     "test": [
+      "div2k_0809:overlap_last:512:1:2:v1",
+      "rf26241d5t:overlap_last:512:1:0:v1",
+      "rce28e1c2t:overlap_last:512:4:1:v1",
+      "rf1dafb88t:overlap_last:512:1:1:v1",
+      "div2k_0818:overlap_last:512:0:1:v1",
+      "rf26241d5t:overlap_last:512:2:3:v1",
+      "r5f7dff30t:overlap_last:512:4:2:v1",
+      "rdde9a595t:overlap_last:512:2:8:v1",
+      "div2k_0815:overlap_last:512:1:2:v1",
+      "rf26241d5t:overlap_last:512:0:0:v1",
+      "r5f4cf23et:overlap_last:512:4:6:v1",
+      "r0667a51ft:overlap_last:512:5:7:v1",
+      "div2k_0856:overlap_last:512:2:1:v1",
+      "rf26241d5t:overlap_last:512:2:2:v1",
+      "r91403508t:overlap_last:512:2:1:v1",
+      "r0667a51ft:overlap_last:512:2:7:v1"
+     ],
+     "val": [
+      "alaska_24752:trim512:512:0:0:v1",
+      "lsdir_0070000_0069773:trim512:512:0:0:v1",
+      "r1ced1907t:overlap_last:512:0:2:v1",
+      "alaska_46286:trim512:512:0:1:v1",
+      "lsdir_0057000_0056222:trim512:512:1:0:v1",
+      "r1344c943t:overlap_last:512:1:6:v1",
+      "alaska_79629:trim512:512:0:0:v1",
+      "lsdir_0052000_0051588:trim512:512:0:0:v1",
+      "red4874ebt:overlap_last:512:2:1:v1",
+      "alaska_06390:trim512:512:0:0:v1",
+      "lsdir_0016000_0015354:trim512:512:0:0:v1",
+      "rc47bb311t:overlap_last:512:5:4:v1",
+      "alaska_75708:trim512:512:0:0:v1",
+      "lsdir_0006000_0005456:trim512:512:0:1:v1",
+      "r3c53386ct:overlap_last:512:6:7:v1",
+      "alaska_02655:trim512:512:1:0:v1"
+     ]
+    },
+    "run_seed": 0,
+    "settings": {
+     "augment": true,
+     "buffer_size": 1024,
+     "cache_root": null,
+     "evaluation_yaml": null,
+     "fixed_variants": false,
+     "grid": "overlap_last",
+     "manifest_root": null,
+     "paired_batches": false,
+     "run_seed": 0,
+     "settings_yaml": "/work/configs/train-k1to4.yaml",
+     "source": "decode",
+     "source_mix": {
+      "alaska": 0.4,
+      "lsdir": 0.2,
+      "raise": 0.4
+     },
+     "source_weights": null,
+     "sources": [
+      "raise",
+      "lsdir",
+      "alaska"
+     ],
+     "tensor_dtype": "uint8",
+     "tile_size": 512,
+     "tiles_per_epoch": 225,
+     "train_photo_fraction": 0.005,
+     "variants_per_tile": 1
+    },
+    "source": "decode",
+    "source_weights": null,
+    "tile_size": 512,
+    "train_photo_fraction": 0.005,
+    "train_photo_selection": [
+     {
+      "available": 459,
+      "camera_model": "Apple_IpadPro-1stGen",
+      "photo_ids": [
+       "alaska_13271",
+       "alaska_13818"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Apple_IpadPro-2ndGen",
+      "photo_ids": [
+       "alaska_15360",
+       "alaska_15465"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Canon_EOS-100D",
+      "photo_ids": [
+       "alaska_42543",
+       "alaska_43239"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Canon_EOS-500D",
+      "photo_ids": [
+       "alaska_28460",
+       "alaska_30133"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Canon_EOS20D",
+      "photo_ids": [
+       "alaska_64896",
+       "alaska_65143"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 372,
+      "camera_model": "Canon_EOS700D",
+      "photo_ids": [
+       "alaska_31000",
+       "alaska_31322"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 333,
+      "camera_model": "Canon_PowerShot-G11",
+      "photo_ids": [
+       "alaska_66937",
+       "alaska_67025"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "HTC_OneA9",
+      "photo_ids": [
+       "alaska_01825",
+       "alaska_02376"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "HTC_OneM9-OPJA100",
+      "photo_ids": [
+       "alaska_03227",
+       "alaska_03784"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Huawei_Honor8-FRDL09",
+      "photo_ids": [
+       "alaska_04627",
+       "alaska_04647"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Kodak_Z990",
+      "photo_ids": [
+       "alaska_79447",
+       "alaska_79793"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "LG_G5-H840",
+      "photo_ids": [
+       "alaska_06506",
+       "alaska_06547"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "LG_G7fit-LMQ850",
+      "photo_ids": [
+       "alaska_08389",
+       "alaska_08697"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Leica_M9",
+      "photo_ids": [
+       "alaska_31861",
+       "alaska_32533"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Nikon_1-AW1",
+      "photo_ids": [
+       "alaska_34026",
+       "alaska_34284"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Nikon_D3000",
+      "photo_ids": [
+       "alaska_22436",
+       "alaska_22469"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 461,
+      "camera_model": "Nikon_D5200",
+      "photo_ids": [
+       "alaska_45163",
+       "alaska_47695"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Nikon_D5600",
+      "photo_ids": [
+       "alaska_22764",
+       "alaska_25089"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Nikon_D610",
+      "photo_ids": [
+       "alaska_49701",
+       "alaska_51193"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Nikon_D7100",
+      "photo_ids": [
+       "alaska_48132",
+       "alaska_48601"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Nikon_D810",
+      "photo_ids": [
+       "alaska_16964",
+       "alaska_18387"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 395,
+      "camera_model": "Nikon_D90",
+      "photo_ids": [
+       "alaska_16435",
+       "alaska_16507"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Panasonic_DMC-GM1",
+      "photo_ids": [
+       "alaska_52199",
+       "alaska_52616"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Panasonic_FZ28",
+      "photo_ids": [
+       "alaska_53602",
+       "alaska_54837"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Pentax_K10D",
+      "photo_ids": [
+       "alaska_76874",
+       "alaska_76876"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 460,
+      "camera_model": "Pentax_ist-DS",
+      "photo_ids": [
+       "alaska_69616",
+       "alaska_69793"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Samsung_GalaxyS8-SM-G950F",
+      "photo_ids": [
+       "alaska_10601",
+       "alaska_11076"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 459,
+      "camera_model": "Sigma_SD10",
+      "photo_ids": [
+       "alaska_67422",
+       "alaska_69280"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Sigma_SD1Merrill",
+      "photo_ids": [
+       "alaska_60970",
+       "alaska_62178"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 458,
+      "camera_model": "Sony_Alpha6000",
+      "photo_ids": [
+       "alaska_35308",
+       "alaska_35761"
+      ],
+      "selected": 2,
+      "source": "alaska"
+     },
+     {
+      "available": 7000,
+      "camera_model": "",
+      "photo_ids": [
+       "lsdir_0001000_0000052",
+       "lsdir_0003000_0002193",
+       "lsdir_0004000_0003055",
+       "lsdir_0007000_0006830",
+       "lsdir_0013000_0012003",
+       "lsdir_0014000_0013323",
+       "lsdir_0015000_0014149",
+       "lsdir_0015000_0014406",
+       "lsdir_0018000_0017606",
+       "lsdir_0025000_0024428",
+       "lsdir_0026000_0025697",
+       "lsdir_0031000_0030138",
+       "lsdir_0032000_0031963",
+       "lsdir_0033000_0032249",
+       "lsdir_0034000_0033494",
+       "lsdir_0036000_0035237",
+       "lsdir_0036000_0035963",
+       "lsdir_0037000_0036331",
+       "lsdir_0048000_0047241",
+       "lsdir_0049000_0048442",
+       "lsdir_0056000_0055370",
+       "lsdir_0057000_0056452",
+       "lsdir_0058000_0057392",
+       "lsdir_0065000_0064395",
+       "lsdir_0065000_0064807",
+       "lsdir_0066000_0065679",
+       "lsdir_0068000_0067454",
+       "lsdir_0070000_0069595",
+       "lsdir_0072000_0071565",
+       "lsdir_0074000_0073146",
+       "lsdir_0075000_0074464",
+       "lsdir_0076000_0075116",
+       "lsdir_0080000_0079089",
+       "lsdir_0080000_0079873",
+       "lsdir_0083000_0082006"
+      ],
+      "selected": 35,
+      "source": "lsdir"
+     },
+     {
+      "available": 6,
+      "camera_model": "NIKON D40",
+      "photo_ids": [
+       "r684e92a7t"
+      ],
+      "selected": 1,
+      "source": "raise"
+     },
+     {
+      "available": 500,
+      "camera_model": "NIKON D7000",
+      "photo_ids": [
+       "r4cb981b2t",
+       "rc8713000t"
+      ],
+      "selected": 2,
+      "source": "raise"
+     },
+     {
+      "available": 195,
+      "camera_model": "NIKON D90",
+      "photo_ids": [
+       "r006b0e4bt"
+      ],
+      "selected": 1,
+      "source": "raise"
+     }
+    ],
+    "val_cap_lsdir": 1500,
+    "val_cap_raise": 5000,
+    "validation_pair_counts": {
+     "alaska": 6,
+     "lsdir": 5,
+     "raise": 5
+    },
+    "validation_pairs_sha256": "b3c07cc084e2edd1dd25273a8228c97c01499a92046e3e5bdceac0807e21a283",
+    "variants_per_tile": 1
+   },
+   "env_settings": {
+    "QUICK": "true",
+    "V3_BATCH_SIZE": "8",
+    "V3_CLIP_T": "3",
+    "V3_COMPILE": "off",
+    "V3_DATA": "otf",
+    "V3_EPOCHS": "2",
+    "V3_EVAL_WORKERS": "4",
+    "V3_EXTRA_TESTS": "test-bpp1",
+    "V3_LR_DROPS": "2:0.3",
+    "V3_MODEL": "xunet_wide",
+    "V3_NORM": "none",
+    "V3_PERSISTENT_WORKERS": "on",
+    "V3_PRIME_NEXT_EPOCH": "on",
+    "V3_SOURCE": "decode",
+    "V3_SOURCE_MIX": "raise:0.4,lsdir:0.2,alaska:0.4",
+    "V3_TRAIN_YAML": "configs/train-k1to4.yaml",
+    "V3_WIDTH": "4",
+    "V3_WORKERS": "6"
+   },
+   "fixed_train_frame_sha": "33bb4de88bde279ccc41f180b856c1186905fca13d569efd64bd9f34fc0017e1",
+   "globals": {
+    "BATCH_SIZE": 8,
+    "CHECKPOINT_ROOT": "/work/runs",
+    "CLIP_T": 3.0,
+    "COMPILE_MODE": "off",
+    "DATA_ROOT": "/work/Datasets/generated/raise512-run1-records",
+    "DEVICE": "cuda",
+    "EPOCHS": 2,
+    "EVAL_PERSISTENT_WORKERS": true,
+    "EVAL_PROFILE": "overlap_full_mix",
+    "EVAL_WORKERS": 4,
+    "EXTRA_TESTS": "test-bpp1",
+    "GRAD_CLIP": 1.0,
+    "LABELS_PATH": "/work/Datasets/generated/raise512-run1-records/labels.csv",
+    "LIMIT_TRAIN_BATCHES": 0,
+    "LR": 0.0003,
+    "LR_DROPS": [
+     [
+      2,
+      0.3
+     ]
+    ],
+    "MAIN_THREADS": 1,
+    "MODEL": "xunet_wide",
+    "NORM": "none",
+    "OTF_PREFETCH": null,
+    "OTF_PREFETCH_IMAGES": 128,
+    "OTF_SOURCE": "decode",
+    "OTF_WORKERS": 6,
+    "PAIRED_BATCHES": false,
+    "PIL_VERSION": "12.3.0",
+    "PRECISION": "32",
+    "PRIME_NEXT_EPOCH": true,
+    "QUICK": true,
+    "QUICK_PAIRS": {
+     "test": 16,
+     "train": 32,
+     "val": 16
+    },
+    "ROCM_CONV1_FIX": true,
+    "ROCM_CONV1_FIX_ACTIVE": true,
+    "RUN_NAME": "xunet_v4_clip3_nonorm_lr0.0003_warm1_drops2x0.3_k1to4_e2_wide-w4_quick_otf",
+    "SEED": 0,
+    "SPLIT_PATH": "/work/Datasets/generated/raise512-run1-records/splits/split_seed0.csv",
+    "TRAIN_YAML": "/work/configs/train-k1to4.yaml",
+    "V3_DATA": "otf",
+    "WARMUP_EPOCHS": 1,
+    "WIDTH": 4
+   },
+   "mode": "settings",
+   "run_name": "xunet_v4_clip3_nonorm_lr0.0003_warm1_drops2x0.3_k1to4_e2_wide-w4_quick_otf",
+   "run_settings": {
+    "augment": true,
+    "buffer_size": 1024,
+    "cache_root": null,
+    "evaluation_yaml": null,
+    "fixed_variants": false,
+    "grid": "overlap_last",
+    "manifest_root": null,
+    "paired_batches": false,
+    "run_seed": 0,
+    "settings_yaml": "/work/configs/train-k1to4.yaml",
+    "source": "decode",
+    "source_mix": {
+     "alaska": 0.4,
+     "lsdir": 0.2,
+     "raise": 0.4
+    },
+    "source_weights": null,
+    "sources": [
+     "raise",
+     "lsdir",
+     "alaska"
+    ],
+    "tensor_dtype": "uint8",
+    "tile_size": 512,
+    "tiles_per_epoch": 225,
+    "train_photo_fraction": 0.005,
+    "variants_per_tile": 1
+   },
+   "test_frame_sha": "bf038bd8da0ca828c4ea7c72bad4fa5fe627d737ebea50c40bad6ee5ed3f57cd",
+   "test_settings_sha": "e6b7c35f383c6c5f8adc58ac48f9d7544b6a166d469fa873d8f52c6439e84a55",
+   "train_len": 450,
+   "train_schedule_epoch0": {
+    "groups": 92,
+    "repeats": {
+     "alaska": 4,
+     "lsdir": 0,
+     "raise": 0
+    },
+    "sha": "e7f0d200fa88254aad28890e770fe3fcd9954e3725dd5dc2cc75e1bb44ee5992"
+   },
+   "train_schedule_epoch1": {
+    "groups": 95,
+    "repeats": {
+     "alaska": 4,
+     "lsdir": 0,
+     "raise": 0
+    },
+    "sha": "70e34c1ccb755b8eca09c565070939781a62deb1deb719010e9087aeb44a734a"
+   },
+   "val_frame_sha": "7013c4ac404beb0987e819b71448ed7079e256ad243541b22a977a543cc7d294",
+   "val_settings_sha": "173b5c3ecf72d112e847ad84ce72868807ab9d8c394fa96fab926b61ff1b953b",
+   "validation_pair_csv_sha": "b3c07cc084e2edd1dd25273a8228c97c01499a92046e3e5bdceac0807e21a283"
+  },
+  "speed-1": {
+   "effective_pairs_steps_warmup_workers": [
+    [
+     [
+      32,
+      "32"
+     ],
+     [
+      32,
+      "bf16-mixed"
+     ],
+     [
+      64,
+      "32"
+     ],
+     [
+      64,
+      "bf16-mixed"
+     ],
+     [
+      128,
+      "32"
+     ],
+     [
+      128,
+      "bf16-mixed"
+     ]
+    ],
+    600,
+    50,
+    32
+   ],
+   "env_settings": {
+    "QUICK": "False",
+    "V3_COMPILE": "default",
+    "V3_DATA": "otf",
+    "V3_EXTRA_TESTS": "none",
+    "V3_LR": "3e-4",
+    "V3_NOTEBOOK": "notebooks/05_xunet_v4_nonorm.ipynb",
+    "V3_PRIME_NEXT_EPOCH": "on",
+    "V3_RUN_NAME": "g4-speed-batch-bf16",
+    "V3_SOURCE": "decode",
+    "V3_SPEED_BATCHES": "32,64,128",
+    "V3_SPEED_MATRIX": "on",
+    "V3_SPEED_PRECISIONS": "32,bf16-mixed",
+    "V3_SPEED_STEPS": "600",
+    "V3_SPEED_WARMUP": "50",
+    "V3_WORKERS": "32"
+   },
+   "note": "speed matrix: no notebook cells run; settings() parsed without training",
+   "run_name": "g4-speed-batch-bf16"
+  },
+  "standard_test": {
+   "matches_documented": true,
+   "pairs": 10956,
+   "sha256": "fdd989f7bdab0ec6f9fd6f4c57bdde981d16b54aa8c37e5da8fd3dfcc8b06837"
+  },
+  "wide-1": {
+   "data_record": {
+    "buffer_images": 1024,
+    "buffer_payload_bytes": 805306368,
+    "checkpoint_validation": "standard",
+    "compile_mode": "default",
+    "data": "otf",
+    "eval_profile": "overlap_full_mix",
+    "extra_pair_counts": {},
+    "fixed_variants": false,
+    "grid": "overlap_last",
+    "prime_next_epoch": true,
+    "quick": false,
+    "quick_eval_pair_ids": {
+     "test": null,
+     "val": null
+    },
+    "run_seed": 0,
+    "settings": {
+     "augment": true,
+     "buffer_size": 1024,
+     "cache_root": null,
+     "evaluation_yaml": null,
+     "fixed_variants": false,
+     "grid": "overlap_last",
+     "manifest_root": null,
+     "paired_batches": false,
+     "run_seed": 0,
+     "settings_yaml": "/work/configs/train-k1to4.yaml",
+     "source": "decode",
+     "source_mix": null,
+     "source_weights": null,
+     "sources": [
+      "raise",
+      "div2k"
+     ],
+     "tensor_dtype": "uint8",
+     "tile_size": 512,
+     "tiles_per_epoch": null,
+     "train_photo_fraction": 1.0,
+     "variants_per_tile": 1
+    },
+    "source": "decode",
+    "source_weights": null,
+    "tile_size": 512,
+    "train_photo_fraction": 1.0,
+    "train_photo_selection": [
+     {
+      "available": 680,
+      "camera_model": "",
+      "photo_ids": {
+       "__len__": 680,
+       "__sha256__": "e992b951fc2b0e2e3359d1c9beb07cc3ba0d69d28277274e57b956d39637fc55"
+      },
+      "selected": 680,
+      "source": "div2k"
+     },
+     {
+      "available": 6,
+      "camera_model": "NIKON D40",
+      "photo_ids": [
+       "r221dfc60t",
+       "r684e92a7t",
+       "r9099f063t",
+       "r92efa4det",
+       "rac5f452et",
+       "re0b498c4t"
+      ],
+      "selected": 6,
+      "source": "raise"
+     },
+     {
+      "available": 500,
+      "camera_model": "NIKON D7000",
+      "photo_ids": {
+       "__len__": 500,
+       "__sha256__": "7f79ff48a1ee99455c04e1c511beb09213954f0d1646d2ff66b7f4bf11818209"
+      },
+      "selected": 500,
+      "source": "raise"
+     },
+     {
+      "available": 195,
+      "camera_model": "NIKON D90",
+      "photo_ids": {
+       "__len__": 195,
+       "__sha256__": "5e2b23d24eac2b109ac844a1663cc25e0646f026fab8b786e0f4047eb34cdadd"
+      },
+      "selected": 195,
+      "source": "raise"
+     }
+    ],
+    "variants_per_tile": 1
+   },
+   "env_settings": {
+    "QUICK": "False",
+    "V3_BATCH_SIZE": "32",
+    "V3_CLIP_T": "3",
+    "V3_COMPILE": "default",
+    "V3_DATA": "otf",
+    "V3_EPOCHS": "30",
+    "V3_EVAL_WORKERS": "16",
+    "V3_EXTRA_TESTS": "test-bpp1",
+    "V3_GRAD_CLIP": "1.0",
+    "V3_LR": "3e-4",
+    "V3_LR_DROPS": "5:0.3,20:0.1",
+    "V3_MODEL": "xunet_wide",
+    "V3_NORM": "none",
+    "V3_NOTEBOOK": "notebooks/05_xunet_v4_nonorm.ipynb",
+    "V3_PRECISION": "32",
+    "V3_PRIME_NEXT_EPOCH": "on",
+    "V3_RUN_NAME": "xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_r2",
+    "V3_SOURCE": "decode",
+    "V3_TRAIN_YAML": "configs/train-k1to4.yaml",
+    "V3_WARMUP_EPOCHS": "1",
+    "V3_WIDTH": "4",
+    "V3_WORKERS": "32"
+   },
+   "fixed_train_frame_sha": "e9cf6e84a838e17f6a4faabd99387dde1922270e12af552e33415ec1d0833523",
+   "globals": {
+    "BATCH_SIZE": 32,
+    "CHECKPOINT_ROOT": "/work/runs",
+    "CLIP_T": 3.0,
+    "COMPILE_MODE": "default",
+    "DATA_ROOT": "/work/Datasets/generated/raise512-run1-records",
+    "DEVICE": "cuda",
+    "EPOCHS": 30,
+    "EVAL_PERSISTENT_WORKERS": true,
+    "EVAL_PROFILE": "overlap_full_mix",
+    "EVAL_WORKERS": 16,
+    "EXTRA_TESTS": "test-bpp1",
+    "GRAD_CLIP": 1.0,
+    "LABELS_PATH": "/work/Datasets/generated/raise512-run1-records/labels.csv",
+    "LIMIT_TRAIN_BATCHES": 0,
+    "LR": 0.0003,
+    "LR_DROPS": [
+     [
+      5,
+      0.3
+     ],
+     [
+      20,
+      0.1
+     ]
+    ],
+    "MAIN_THREADS": 1,
+    "MODEL": "xunet_wide",
+    "NORM": "none",
+    "OTF_PREFETCH": null,
+    "OTF_PREFETCH_IMAGES": 128,
+    "OTF_SOURCE": "decode",
+    "OTF_WORKERS": 32,
+    "PAIRED_BATCHES": false,
+    "PIL_VERSION": "12.3.0",
+    "PRECISION": "32",
+    "PRIME_NEXT_EPOCH": true,
+    "QUICK": false,
+    "QUICK_PAIRS": {
+     "test": 16,
+     "train": 32,
+     "val": 16
+    },
+    "ROCM_CONV1_FIX": true,
+    "ROCM_CONV1_FIX_ACTIVE": true,
+    "RUN_NAME": "xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_r2",
+    "SEED": 0,
+    "SPLIT_PATH": "/work/Datasets/generated/raise512-run1-records/splits/split_seed0.csv",
+    "TRAIN_YAML": "/work/configs/train-k1to4.yaml",
+    "V3_DATA": "otf",
+    "WARMUP_EPOCHS": 1,
+    "WIDTH": 4
+   },
+   "mode": "settings",
+   "run_name": "xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_r2",
+   "run_settings": {
+    "augment": true,
+    "buffer_size": 1024,
+    "cache_root": null,
+    "evaluation_yaml": null,
+    "fixed_variants": false,
+    "grid": "overlap_last",
+    "manifest_root": null,
+    "paired_batches": false,
+    "run_seed": 0,
+    "settings_yaml": "/work/configs/train-k1to4.yaml",
+    "source": "decode",
+    "source_mix": null,
+    "source_weights": null,
+    "sources": [
+     "raise",
+     "div2k"
+    ],
+    "tensor_dtype": "uint8",
+    "tile_size": 512,
+    "tiles_per_epoch": null,
+    "train_photo_fraction": 1.0,
+    "variants_per_tile": 1
+   },
+   "test_frame_sha": "f993069f94b35134e2520a27c7bf2531cecccd75d1b8572e096ee1ef246084f5",
+   "test_settings_sha": "fdd989f7bdab0ec6f9fd6f4c57bdde981d16b54aa8c37e5da8fd3dfcc8b06837",
+   "train_len": 107900,
+   "train_schedule_epoch0": {
+    "groups": 1381,
+    "repeats": null,
+    "sha": "52c28d60266411ce3edfb9578d24ac68afa40d0e71123432d6a91d8bd72fb917"
+   },
+   "train_schedule_epoch1": {
+    "groups": 1381,
+    "repeats": null,
+    "sha": "d3142ff0381429f5270fbfb285bcc0e87fb4b6b118872396d2fab2faf4d8ad61"
+   },
+   "val_frame_sha": "02b27b9d5b0290d3e83f1add2206e92bcfdd33874796cd9ec4244b8e4e55b050",
+   "val_settings_sha": "2d24d4236c46629d4f1f906282ae173ca9eeac9fdff05897e9cb6f10aad31a74",
+   "validation_pair_csv_sha": null
+  }
+ }
+}

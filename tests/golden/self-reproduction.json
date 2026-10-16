@@ -1,0 +1,32 @@
+{
+  "capture_repeats": 2,
+  "settings_exact": true,
+  "data_exact": true,
+  "models_cpu_gpu_exact": true,
+  "cpu_exact": true,
+  "cpu_train_steps": 20,
+  "cpu_final_weights_sha": "5525eb379fe37a74b9b1d28bc3caee453cf7835edfb548385ab1b04d28812edb",
+  "gpu_loss_max_abs_delta": 4.649162292480469e-06,
+  "gpu_standard_probability_max_abs_delta": 3.018975257867984e-05,
+  "gpu_panels_report_only": {
+    "P_E": {
+      "overall_abs_delta": 0.00018254837531939128,
+      "max_abs_delta": 0.003355704697986628
+    },
+    "AUC": {
+      "overall_abs_delta": 9.053273067716194e-05,
+      "max_abs_delta": 0.0004340277777777901
+    }
+  },
+  "gpu_loss_score_atol": 0.0001,
+  "gpu_panel_warning_atol": 0.01,
+  "gpu_counts_keys_filelist_epoch_auc_pe_acc_exact": true,
+  "part_runtime_seconds_approx": {
+    "settings": 23,
+    "data": 56,
+    "models": 58,
+    "cpu": 26,
+    "gpu": 122
+  },
+  "result": "ALL EQUAL under documented rules; GPU panel rank metrics report-only"
+}

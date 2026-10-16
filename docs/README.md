@@ -7,6 +7,7 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **All res
 - [G4 batch-runner guide](active/g4-batch-runner.md)
 - [Pi host state](active/pi-host-changes.md)
 - [Settings and seed rules](active/settings-and-seeds.md)
+- [Notebook refactor before-values and checks](active/refactor-golden.md)
 - [Frozen RAISE/DIV2K records](active/frozen-source-records.md)
 - [ALASKA selection v2](active/alaska-selection-v2.md)
 - [LSDIR selection v1](active/lsdir-selection-v1.md)
