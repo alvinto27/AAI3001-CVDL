@@ -179,6 +179,7 @@ SCHEMA = MappingProxyType({
     'prime_next_epoch': Definition('bool', boolean, False, 'bool', 'Prime next train epoch.', env='V3_PRIME_NEXT_EPOCH', legacy_global='PRIME_NEXT_EPOCH', machine=True),
     'run_name': Definition('str?', optional_string, None, 'derived prefix + optional suffix', 'Derived run name / legacy suffix.', env='V3_RUN_NAME', legacy_global='RUN_NAME'),
     'notebook': Definition('path?', optional_string, None, 'notebook path', 'Runner notebook selector.', env='V3_NOTEBOOK', machine=True),
+    'job_id': Definition('str?', optional_string, None, 'job identity or None', 'G4 job identity.', env='CVDL_JOB_ID', machine=True),
     'speed_matrix': Definition('bool', boolean, False, 'bool', 'Legacy speed tool mode.', env='V3_SPEED_MATRIX', machine=True),
     'speed_batches': Definition('tuple', lambda x:tuple(map(integer,sequence(x))), (32,64,128), 'distinct 32/64/128', 'Speed-tool batch sweep.', lambda v:bool(v) and len(v)==len(set(v)) and set(v)<={32,64,128}, 'V3_SPEED_BATCHES', machine=True),
     'speed_precisions': Definition('tuple', sequence, ('32','bf16-mixed'), '32/bf16-mixed', 'Speed-tool precision sweep.', lambda v:bool(v) and len(v)==len(set(v)) and set(v)<={'32','bf16-mixed'}, 'V3_SPEED_PRECISIONS', machine=True),
@@ -195,21 +196,44 @@ class MachineProfile:
     values: object
 
 
+def machine_profile(name, *, root=ROOT, device='cuda', rocm=False, precision_limits=('32','bf16-mixed')):
+    """Declared machine values; preflight may use G4 values without a local GPU."""
+    if name not in {'pc','g4'}:
+        raise ValueError('machine profile must be pc/g4')
+    g4 = name == 'g4'
+    values = dict(root=str(root), output_root=str(Path(root)/('runs-out' if g4 else 'runs')),
+        device=device, rocm=rocm, quick=False if g4 else SCHEMA['quick'].default,
+        workers=32 if g4 else SCHEMA['workers'].default,
+        eval_workers=16 if g4 else SCHEMA['eval_workers'].default,
+        precision_limits=precision_limits)
+    if g4:
+        values.update(compile='default', prime_next_epoch=True)
+    return MachineProfile(name, MappingProxyType(values))
+
+
 def automatic_profile():
+    """Detect G4 from Google DMI + CUDA RTX PRO 6000; reject contradictions."""
     import torch
-    try:
-        gce = (Path('/sys/class/dmi/id/product_name').read_text().strip() == 'Google Compute Engine'
-               or Path('/sys/class/dmi/id/sys_vendor').read_text().strip() == 'Google')
-    except OSError:
-        gce = False
+    dmi = []
+    for field in ('product_name','sys_vendor'):
+        try:
+            dmi.append(Path('/sys/class/dmi/id',field).read_text().strip())
+        except OSError:
+            dmi.append('')
+    gce = dmi[0] == 'Google Compute Engine' or dmi[1] == 'Google'
     gpu = torch.cuda.is_available()
+    rocm = torch.version.hip is not None
+    gpu_name = torch.cuda.get_device_name(0) if gpu and not rocm else ''
+    if gce and (not gpu or rocm or 'RTX PRO 6000' not in gpu_name):
+        raise ValueError(f'G4 profile mismatch: Google DMI requires CUDA RTX PRO 6000, found {gpu_name or "no CUDA GPU"}')
+    if not gce and 'RTX PRO 6000' in gpu_name:
+        raise ValueError('G4 profile mismatch: RTX PRO 6000 found without Google DMI; refuse PC fallback')
+    name = 'g4' if gce else 'pc'
+    expected = os.environ.get('CVDL_EXPECTED_PROFILE')
+    if expected is not None and expected != name:
+        raise ValueError(f'machine profile mismatch: job requires {expected!r}, detected {name!r}; DMI={dmi!r}')
     precisions = ('32','bf16-mixed') if gpu and torch.cuda.is_bf16_supported() else ('32',)
-    return MachineProfile('g4' if gce else 'pc', MappingProxyType(dict(
-        root=str(ROOT), output_root=str(ROOT / ('runs-out' if gce else 'runs')),
-        device='cuda' if gpu else 'cpu', rocm=torch.version.hip is not None,
-        quick=False if gce else SCHEMA['quick'].default,
-        workers=32 if gce else SCHEMA['workers'].default, eval_workers=16 if gce else SCHEMA['eval_workers'].default,
-        precision_limits=precisions)))
+    return machine_profile(name, device='cuda' if gpu else 'cpu', rocm=rocm, precision_limits=precisions)
 
 
 def canonical(name):

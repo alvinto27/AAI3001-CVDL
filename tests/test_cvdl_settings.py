@@ -89,7 +89,10 @@ class SettingsTests(unittest.TestCase):
     def test_automatic_pc_g4_defaults(self):
         for dmi, name, workers, eval_workers, quick in [('Google Compute Engine','g4',32,16,False),
                                                        ('Workstation','pc',6,4,True)]:
-            with patch.object(Path,'read_text',return_value=dmi), patch('torch.cuda.is_available',return_value=False):
+            with patch.object(Path,'read_text',return_value=dmi), \
+                 patch('torch.cuda.is_available',return_value=name=='g4'), \
+                 patch('torch.cuda.get_device_name',return_value='NVIDIA RTX PRO 6000 Blackwell'), \
+                 patch('torch.cuda.is_bf16_supported',return_value=False), patch('torch.version.hip',None):
                 machine = automatic_profile()
                 actual = load(environ={},_profile=machine)
             self.assertEqual((actual.profile,actual.workers,actual.eval_workers,actual.quick),

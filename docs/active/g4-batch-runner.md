@@ -47,15 +47,20 @@ after it started (the file could change while Bash reads it).
 
 `boot.log` shows which copy ran. The bootstrap line has `bootstrap sha256=`.
 The next line is `job_run copy: checkout|last-good path=... sha256=...`.
-The `Run` line includes `notebook=`. A G4 notebook job writes `host.csv` into
-its job folder at 60-second intervals. The checked-out `run_notebook.py`
-starts the sampler by default on Google Compute Engine. Thus even the old
-installed one-file `job.sh` uses the sampler when it calls the new checkout.
-If the stable bootstrap is installed, `job_run.sh` also passes
-`--host-monitor on` explicitly. The old installed path **does not require a
-maintenance install for host.csv**. The one-time bootstrap install below is
-still useful for other changes to `job_run.sh`; verify the installed copy in
-`boot.log` during a future approved boot. Do not start the VM just to check it.
+The `Run` line includes `notebook=`. The installed bootstrap was verified on
+2026-10-16: SHA-256
+`89cc83e9c73cc43476f6daf5e77825ddc298a32a22a52af8ded0909f15b1f2af`.
+This is the unchanged repository `job.sh`, not the old one-file runner. It does
+not inspect `V3_NOTEBOOK`. Its source selects
+`target="$ROOT/scripts/g4/job_run.sh"` and ends with
+`exec /usr/bin/env bash "$target" "$@"`. Thus the job's checkout owns notebook
+validation and runs its own `scripts/run_notebook.py`. **No reinstall or
+maintenance boot is needed for this submission change.** No selector shim is
+needed. `boot.log` must identify the checkout copy, not a last-good fallback.
+
+A G4 notebook job writes `host.csv` into its job folder at 60-second intervals.
+The checked-out runner starts the sampler; `job_run.sh` passes
+`--host-monitor on` explicitly.
 The sampler needs `/proc` and Linux cgroup files and delivers `host.csv` with
 other job files. The first CPU and disk rates are blank until the next sample.
 Notebook 05 also writes `checkpoints/<run-name>/epoch_timing.csv`: one row per
@@ -63,21 +68,11 @@ zero-based epoch with first-batch wait, train and validation spans, transition
 spans, and callback durations. See [the time-field guide](../archive/plan-epoch-overhead.md#new-read-only-timers-for-the-next-run).
 The monitor and timers do not change data streams or model selection.
 
-**One-time step.** The installed `job.sh` must be the bootstrap. The old
-installed copy holds the job logic and does not run the checkout copy. In
-the next **maintenance** boot, update the checkout and install both files:
-
-```sh
-cd ~/AAI3001-CVDL && git fetch -q origin yx && git checkout -q --detach origin/yx
-install -m 755 scripts/g4/job.sh ~/.local/lib/cvdl-g4/job.sh
-install -m 755 scripts/g4/job_run.sh ~/.local/lib/cvdl-g4/job_run.last-good
-bash -n ~/.local/lib/cvdl-g4/job.sh && grep -c CVDL_G4_STAGE ~/.local/lib/cvdl-g4/job.sh
-```
-
-The count must be 1 or more. After that, do not install `job.sh` again unless
-`job.sh` itself changes (rare). The service file does not change. A change
-to `job.sh` needs a new maintenance install. A change to `job_run.sh` needs only
-a pushed commit.
+The stable bootstrap is already installed. Do not reinstall it for changes
+to `job_run.sh`, `run_notebook.py`, notebooks or profiles: push the job commit
+instead. `setup.sh base` installs it only when setting up a new VM. A future
+change to `job.sh` itself needs a maintenance install; that is not part of this
+workflow.
 
 ## First boot (person, maintenance mode)
 
@@ -232,232 +227,163 @@ gcloud config set project personal-compute-511601
 gcloud config set compute/zone us-central1-c
 ```
 
-After the user says **go**, the Orchestrator checks the VM is stopped and
-runs a dry run first. It must review the job name, commit, timeout, and env
-file before it removes `--dry-run`:
+After the user says **go**, review a dry run before any paid boot:
 
 ```sh
-bash scripts/g4/submit.sh status
+git fetch origin yx
+# The notebook and its settings must already be committed and pushed.
+bash scripts/g4/submit.sh run --notebook notebooks/newdata-1.ipynb --commit SHA --timeout-min 105 --dry-run
+# Only after approval: repeat the same command without --dry-run.
+```
+
+The command is `run --notebook PATH [--commit SHA] [--timeout-min N]
+[--dry-run]`. The default commit is `HEAD`; the submitted value is always the
+resolved SHA, never a moving branch name. Even in dry-run, it refuses a dirty
+checkout or a commit not reachable from the local `origin/yx` tracking ref.
+Fetch that ref after a push. A notebook must be a regular tracked `.ipynb`
+under `notebooks/`, outside every `archive/` directory, **at that commit**.
+A missing file, symlink, traversal path or archived notebook fails on the PC.
+Notebook jobs require a phase-5-or-newer commit that understands the minimal
+job-ID metadata; pre-flight rejects older commits before any boot. The speed
+tool retains its old metadata interface.
+
+### PC pre-flight, before metadata or boot
+
+`submit.sh` runs Python only through `podman exec -w /work aai3001`. It reads
+the selected commit's notebook, settings package and configs in a temporary
+snapshot, not the working-tree notebook or current shell's experiment env.
+It reads the first code cell's literal `settings = load(...)` keyword values
+and resolves them with the declared G4 profile. No photos, model, data loader
+or GPU computation is started. It prints final settings, sources and RUN_NAME.
+`<checkout>` in printed paths means the VM's selected checkout root. A typo,
+bad value or machine-owned notebook value stops here, including in dry-run.
+
+Use the same first-cell format as notebook 05: import `load` from
+`cvdl.settings`, then one `settings = load(...)` call. Values must be literals
+(numbers, strings, tuples, lists or dictionaries), not computed expressions,
+`**kwargs`, env reads or profile/override arguments. All experiment choices
+belong here, in git. Frozen notebook 04 lacks this settings format and remains
+unchanged; it is not a new-format submission recipe.
+
+### G4 detection and machine-owned values
+
+Runtime detection requires both Google DMI (`product_name = Google Compute
+Engine` or `sys_vendor = Google`) and an available **CUDA, not ROCm, RTX PRO
+6000** GPU. Google DMI without that GPU fails; that GPU without Google DMI also
+fails rather than falling back to PC settings. The checked-out job runner sets
+`CVDL_EXPECTED_PROFILE=g4`, so any PC result on a G4 job fails loudly too.
+The PC pre-flight uses declared G4 capabilities only; it does not weaken these
+runtime hardware checks.
+
+| G4 setting | Value |
+| --- | --- |
+| Train/eval workers | 32 / 16 |
+| QUICK | false |
+| Precision | 32; BF16 mixed allowed only when runtime capability permits it |
+| Compile / next-epoch prime | default / true (machine performance flags) |
+| Persistent validation workers | true when eval workers are nonzero |
+| Paths | checkout-relative data/configs; `runs-out/` output root; `--output` chooses the job's checkpoint root |
+
+PC keeps 6/4 workers, QUICK true, eager compilation and no next-epoch prime.
+Notebook top cells cannot set machine fields. Worker/path/capability fields
+are not copied from experiment env files.
+
+### Metadata and checkout handover
+
+A notebook submission generates a temporary **two-line** job env:
+
+```text
+V3_NOTEBOOK=notebooks/newdata-1.ipynb
+CVDL_JOB_ID=newdata-1-YYYYMMDDTHHMMSSZ-NNNN
+```
+
+It contains no experiment values. The file is sent through the existing
+`job-env` instance-metadata channel and removed locally, including after a dry
+run. The separate instance keys stay `job-mode`, `job-id`, `job-commit`,
+`job-timeout-min`, and `max-run-minutes`. The matching ID is checked on the VM.
+The installed `job.sh` fetches/checks out the commit and execs its checked-out
+`job_run.sh`. That script validates the two-line env and notebook against the
+pinned checkout before training, then calls that checkout's runner. A malformed
+or missing notebook fails and follows the existing delivery/shutdown trap.
+`V3_NOTEBOOK` and `CVDL_JOB_ID` are machine metadata, not experiment settings;
+the settings parser accepts them and records their source.
+
+`submit.sh` changes no GCE state in dry-run. Otherwise it checks the VM is
+`TERMINATED` or `STOPPED`, sets metadata, and starts it. **Removing --dry-run
+starts a billable VM.** Maintenance/off still change only `job-mode`; status
+only describes the instance. Other metadata is left alone. The user needs
+Compute Instance Admin (v1), plus Service Account User when required for the
+attached account; see [Google's metadata permissions](https://docs.cloud.google.com/compute/docs/metadata/setting-custom-metadata).
+The generated env is far below the 256 KiB single-value / 512 KiB total
+metadata limits. Credentials are the user's `gcloud auth login`, not the VM's
+service account.
+
+### Reproduce the past recipes
+
+| Recipe | Tracked experiment notebook | Historical env fixture |
+| --- | --- | --- |
+| Mixed-source wide R2 | [newdata-1](../../notebooks/newdata-1.ipynb) | [archived env](../../scripts/g4/jobs/archive/newdata-1.env) |
+| Standard-source wide R2 | [wide-1](../../notebooks/wide-1.ipynb) | [archived env](../../scripts/g4/jobs/archive/wide-1.env) |
+
+Each is a copy of notebook 05 with only its top cell filled in. Tests require
+exact experiment values, RunSettings, RUN_NAME and every comparable golden
+global. The only two named machine differences are asserted explicitly:
+`CHECKPOINT_ROOT` is `runs-out/`, not the old PC capture's `/work/runs`, and
+`ROCM_CONV1_FIX_ACTIVE` is false on CUDA G4, not true as in that ROCm capture.
+The archived env files are read-only parity fixtures and cannot submit a
+notebook job. The historical golden JSON stays unchanged.
+
+Timing estimates are not promises. Historical full-data counts were 107,900
+images / batch 32 = 3,372 steps per epoch. Prime-1 measured 915 s fit over 10
+epochs and 1,138 s for the full runner (including 87 s diagnostics); doubling
+fit plus 223 s overhead estimated 2,053 s (34:13) for 20 epochs. R1 later
+measured 1,627 s fit over 20 epochs. At that rate 30 epochs estimate 2,441 s;
+97 s standard test, 86 s diagnostics, 100–120 s extra test and 38 s other work
+estimate 2,762–2,782 s (46–47 min). A 75-minute timeout leaves about 28 minutes
+above that estimate. Do not use the old incorrect 1,686-step estimate.
+
+### Separate speed matrix (env retained)
+
+The speed matrix is a tool, not a notebook experiment. It still uses
+[speed-1.env](../../scripts/g4/jobs/speed-1.env), unchanged:
+
+```sh
 bash scripts/g4/submit.sh run --env-file scripts/g4/jobs/speed-1.env --timeout-min 50 --dry-run
-bash scripts/g4/submit.sh run --env-file scripts/g4/jobs/speed-1.env --timeout-min 50
 ```
 
-The last line **starts a billable VM**; run it only after the user says go.
-`submit.sh` checks that the VM is `TERMINATED` or `STOPPED`. It makes a new job
-ID from the run name and UTC time, updates the instance keys `job-mode`,
-`job-id`, `job-commit`, `job-timeout-min`, `max-run-minutes`, and `job-env`, and
-starts the VM. It leaves other instance metadata untouched. A prior `job-env`
-or job ID is overwritten on a run, but other console keys stay. `maintenance`
-and `off` change only `job-mode`; stale run keys are then inert. The instance
-`job-env` value must be at most 256 KiB and all metadata at most 512 KiB.
-The speed env file is far below these limits. The PC command uses the user's
-own `gcloud auth login`, **not** the VM service account. To describe the VM,
-update its instance metadata, and start it, the user needs Compute Instance
-Admin (v1) (`roles/compute.instanceAdmin.v1`). If the VM uses an attached
-service account, Google's [metadata permissions guide](https://docs.cloud.google.com/compute/docs/metadata/setting-custom-metadata)
-also calls for Service Account User (`roles/iam.serviceAccountUser`) on that
-account (`iam.serviceAccounts.actAs`). The script does not attach or change a
-service account. If IAM denies a command, check the exact permission in its
-error before changing roles.
+`--env-file` is accepted **only** for `V3_SPEED_MATRIX=on` with the notebook-05
+selector. Its settings are also validated on the PC against the selected
+commit and declared G4 capabilities before any metadata/boot command. The
+checked-out `run_notebook.py` dispatches `scripts/speed_matrix.py`
+instead of notebook cells. It runs six independent batch/precision train speed
+configurations, with 50 warm-up and 600 measured steps, and saves
+`speed-matrix.json`, one `*-nvidia.csv` per configuration, `run.log` and
+`status.json`. There is no validation, diagnostics, extra panel or convergence
+comparison. BF16 uses autocast without loss scaling. Priming is set but not
+exercised before the first epoch boundary. LR is manual, never batch-scaled.
+Reports include steps/images per second, loader wait, model/transfer time,
+peak memory and measure-phase NVIDIA samples. Estimate 20–35 minutes
+($0.54–$0.95 at $1.63/hour); a full 50-minute timeout is about $1.36. These are
+estimates, not results. Normal notebook submissions cannot use legacy envs.
 
-Inspect other commands without starting the VM:
+The default runner timeout is 100 minutes, never above `max-run-minutes - 15`
+(default maximum 120). SIGTERM is followed by SIGKILL after 30 s; interrupted
+files are delivered when possible. GPU telemetry is sampled every 60 s.
+Spot preemption or Pi downtime can leave `delivered=no`; the next boot retries
+pending transfers, with the existing bounded five-minute total retry budget.
+A recorded ID never runs twice. Use a new ID for a new attempt.
 
-```sh
-bash scripts/g4/submit.sh run --env-file path/to/job.env --dry-run
-bash scripts/g4/submit.sh maintenance --dry-run
-bash scripts/g4/submit.sh off --dry-run
-bash scripts/g4/submit.sh status --dry-run
-```
+## Approved-boot checklist
 
-Remove `--dry-run` only when ready. The env file must include `QUICK` and a
-simple `V3_RUN_NAME`; for a full run use `QUICK=False`, `V3_DATA=otf`,
-`V3_SOURCE=cache`, `V3_CACHE_ROOT=/home/yangxuan/otf-cache/v1`, and a new
-`V3_RUN_NAME`. See the [runner instructions](../../README.md#run-notebook-04-without-jupyter).
-`submit.sh` makes an ID from the run name and UTC time, sends the env text as
-`job-env` instance metadata, sets `job-mode=run`, `job-id`, `job-commit`,
-`job-timeout-min`, and `max-run-minutes`, then starts the stopped VM. It refuses
-an already-running VM. The default commit is `origin/yx`. Set `--commit SHA`
-to pin another reachable commit. The checkout must be clean. Git fetch and
-checkout failures prevent training. After checkout, the job runs
-`uv sync --locked` to match the pinned environment; failure uploads the error
-files and shuts down.
-
-The optional `V3_NOTEBOOK` env key selects only `notebooks/04_baseline_kv_xunet_v3.ipynb` (default if absent) or `notebooks/05_xunet_v4_nonorm.ipynb`; both submit and boot reject other values. It is never executed as shell code. For a v4 R1 full-data job, use a fresh env file like this (submit only after the notebook commit is available on the VM; do not reuse an older checkpoint):
-
-```text
-QUICK=False
-V3_NOTEBOOK=notebooks/05_xunet_v4_nonorm.ipynb
-V3_DATA=otf
-V3_SOURCE=decode
-V3_RUN_NAME=xunet_v4_clip3_nonorm_lr0.0003_warm1_drop10_e20_r1
-V3_EPOCHS=20
-V3_LR=3e-4
-V3_WARMUP_EPOCHS=1
-V3_GRAD_CLIP=1.0
-V3_NORM=none
-V3_WORKERS=32
-V3_EVAL_WORKERS=16
-V3_COMPILE=default
-V3_PRIME_NEXT_EPOCH=on
-```
-
-Run `bash scripts/g4/submit.sh run --env-file path/to/v4-r1.env --timeout-min 60 --dry-run` first; remove `--dry-run` only after review and approval. For the 20-epoch budget, measured full-data training has **107,900 train images / 32 = 3,372 steps per epoch** (rounded up), and `g4-prime-1` fit took 915 s over 10 epochs. Its full runner took 18:58 (1,138 s), including 87 s for diagnostic cell 29. Doubling fit and retaining the 223 s non-fit overhead estimates **2,053 s (34:13)** for 20 epochs. A 60-minute runner timeout leaves about 26 minutes above that estimate. The remaining VM time (at most 60 minutes, less boot and setup time) covers delivery and shutdown; the script's minimum reserve is 15 minutes. This is an estimate, not a guarantee: compilation, IO, or diagnostics can run longer. Do not use the incorrect 1,686-step estimate.
-
-### R2 full-data job (notebook 05)
-
-Use a **new** job ID. Make an env file with these exact lines. The R2 notebook
-commit must be on `origin/yx` before you submit the job. The VM still has the
-old installed one-file `job.sh`; it supports `V3_NOTEBOOK=05`, so R2 does not
-need the bootstrap install. Install the new bootstrap on a later maintenance
-boot (see the one-time step above).
-
-```text
-QUICK=False
-V3_NOTEBOOK=notebooks/05_xunet_v4_nonorm.ipynb
-V3_DATA=otf
-V3_SOURCE=decode
-V3_RUN_NAME=xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_r2
-V3_WORKERS=32
-V3_EVAL_WORKERS=16
-V3_COMPILE=default
-V3_PRIME_NEXT_EPOCH=on
-V3_EPOCHS=30
-V3_LR=3e-4
-V3_WARMUP_EPOCHS=1
-V3_GRAD_CLIP=1.0
-V3_NORM=none
-V3_LR_DROPS=5:0.3,20:0.1
-V3_TRAIN_YAML=configs/train-k1to4.yaml
-V3_EXTRA_TESTS=test-bpp1
-```
-
-Use `bash scripts/g4/submit.sh run --env-file path/to/v4-r2.env
---timeout-min 75 --dry-run` to inspect the command. Do not start the G4
-without the user's approval. R1 measured 1,627 s to fit 20 epochs; 30 epochs
-estimate 2,441 s. Its test cell took 97 s and diagnostics took 86 s. Allow
-100–120 s for the new extra test, plus about 38 s for other work: the total
-estimate is **2,762–2,782 s (46–47 min)**. A 75-minute timeout leaves about
-28 minutes above this estimate. It is at most `120 - 15 = 105` minutes, so the
-job script accepts it. The VM maximum also needs room for boot, upload and
-shutdown. These are estimates, not guarantees.
-
-### One-boot batch and BF16 speed matrix
-
-The installed one-file `job.sh` can start this job: it calls the checked-out
-`scripts/run_notebook.py`. Set `V3_SPEED_MATRIX=on` and select notebook 05.
-The runner then calls `scripts/speed_matrix.py` instead of notebook cells.
-This is a **speed test**, not model training for a checkpoint. It runs six
-short, independent train configurations in one VM boot and saves
-`speed-matrix.json`, one `*-nvidia.csv` per configuration, `run.log`, and
-`status.json`. It does not run validation, diagnostics or the extra test.
-Each configuration uses a fresh eager or compiled XuNet and AdamW at the
-same manually set LR. The measured interval starts after 50 warm-up steps,
-which excludes first compilation. CUDA BF16 mixed precision uses autocast
-without loss scaling. A 600-step interval does not reach the first epoch
-boundary, so `V3_PRIME_NEXT_EPOCH=on` is **set but not exercised**. Do not use
-this test to compare convergence or P_E.
-
-Use a new job ID and an env file with these lines:
-
-```text
-QUICK=False
-V3_NOTEBOOK=notebooks/05_xunet_v4_nonorm.ipynb
-V3_SPEED_MATRIX=on
-V3_RUN_NAME=g4-speed-batch-bf16
-V3_DATA=otf
-V3_SOURCE=decode
-V3_WORKERS=32
-V3_COMPILE=default
-V3_PRIME_NEXT_EPOCH=on
-V3_EXTRA_TESTS=none
-V3_LR=3e-4
-V3_SPEED_BATCHES=32,64,128
-V3_SPEED_PRECISIONS=32,bf16-mixed
-V3_SPEED_STEPS=600
-V3_SPEED_WARMUP=50
-```
-
-The script writes steps/s, images/s, loader-wait ms per step, model-and-transfer
-ms per step, peak PyTorch memory, and NVIDIA use and memory samples.
-The reported NVIDIA mean uses measure-phase samples only; each CSV marks
-warm-up and measure samples. Use
-`bash scripts/g4/submit.sh run --env-file path/to/speed-matrix.env
---timeout-min 50 --dry-run` to check the job before the user starts the VM.
-**Estimate:** allow 20–35 minutes for six warm-up/measure cycles, compile,
-worker start, boot and upload. At about $1.63/hour this costs about
-$0.54–$0.95; a 50-minute job timeout can cost about $1.36 if it is used in
-full. The timeout is at most `120 - 15 = 105` minutes, so it is allowed.
-These times and costs are estimates, not speed results.
-
-Notebook 05 supports `V3_BATCH_SIZE` (full default 32; QUICK default 8)
-and `V3_PRECISION` (`32` by default, or `bf16-mixed` on a BF16 GPU).
-Only `V3_COMPILE=off` and `default` exist. Run names gain batch/precision
-tags only for overrides. `V3_LR` stays manual: do not scale it without an
-explicit setting. The training loader uses the selected batch; pair-based
-validation and test loaders use half that batch count, so the number of
-images per evaluation step is similar. Notebook checkpoint reload and
-`scripts/eval_checkpoint.py` use float32 model weights and float32 inference
-for the final test, even for a BF16 mixed training run.
-
-The default runner timeout is **100 minutes**. The job refuses a timeout above
-`max-run-minutes - 15` (default maximum: 120). The reserve leaves time for
-boot, upload and shutdown. `timeout` sends SIGTERM to the runner and then
-SIGKILL after 30 seconds; interrupted results are sent if possible. The job
-also logs GPU use, memory, power and temperature every 60 seconds in
-`runs-out/<job-id>/nvidia.csv`. Check `status.json` in the delivered folder
-before using its results. The Pi receives `<job-id>/` under
-`/srv/cvdl-results`; the inbox account cannot read back. Each `rsync` attempt
-has a bounded SSH connection timeout. A Pi outage leaves the VM record
-`delivered=no`; the next run tries it first. Before each attempt, it waits
-up to 30 seconds (inside the five-minute retry budget) for Tailscale and
-`rpi400-server` name resolution. A Spot preemption can interrupt a transfer;
-the next boot resends the files available on disk.
-
-## First real boot checklist (in order)
-
-1. In the Google Cloud console set **instance metadata** `job-mode=maintenance`,
-   then start the VM. Get its new external IP. The service does not exist yet
-   on the first setup boot, but set this value for the next boot too.
-2. Copy the inbox key from the PC with the `scp` command above. Copy and run
-   `setup.sh base` over SSH. Approve the Tailscale URL printed by `tailscale up`.
-   Check NVIDIA, CUDA and free disk in the summary.
-3. From the PC run `setup.sh upload --host EXTERNAL_IP`. On the VM run
-   `setup.sh cache`; verify the 1,900 records. Then run `setup.sh speed` and
-   inspect the cold rates and loader/GPU comparison.
-   **Next boot after the first setup:** the service treats a start without
-   `job-mode` metadata as **off**: it sends pending results and shuts down at
-   once. To run `setup.sh speed` (the first setup boot skipped it), set
-   `job-mode=maintenance` in the console **before** starting the VM, then
-   connect over SSH with the new external IP.
-4. Stop the maintenance VM (`sudo shutdown -h now`). In the Google Cloud
-   console replace instance metadata with these keys, then start it again:
-
-   | Key | QUICK smoke-test value |
-   | --- | --- |
-   | `job-mode` | `run` |
-   | `job-id` | `g4-quick-YYYYMMDDTHHMMSSZ` (new, one folder name) |
-   | `job-commit` | `origin/yx` (after this change is pushed) |
-   | `job-timeout-min` | `20` |
-   | `max-run-minutes` | `120` |
-   | `job-env` | Literal multi-line text below, not a filename |
-
-   ```text
-   QUICK=True
-   V3_DATA=otf
-   V3_SOURCE=cache
-   V3_CACHE_ROOT=/home/yangxuan/otf-cache/v1
-   V3_RUN_NAME=g4-quick
-   V3_WORKERS=8
-   V3_EVAL_WORKERS=4
-   V3_COMPILE=off
-   ```
-
-5. Confirm boot service `cvdl-g4-job` ran, the Pi received
-   `/srv/cvdl-results/<job-id>/status.json` and `executed.ipynb`, its status is
-   `done` with exit code 0, and the VM shut down. The write-only key cannot
-   inspect the Pi: check with the Pi admin account. A plain console start with
-   missing `job-mode` now **sends pending folders and shuts down**, not idle
-   maintenance. For maintenance later, set the mode explicitly each time.
+1. For a new machine only, complete the maintenance setup/upload/cache/speed
+   steps above. Existing G4 bootstrap and disk-layout setup are already done.
+2. Commit/push the intended notebook and code; fetch `origin/yx` on the PC.
+3. Run the exact notebook + SHA command with `--dry-run`. Review effective
+   settings, RUN_NAME, job ID, timeout and the two-line metadata env.
+4. Only after explicit user approval, repeat without `--dry-run`.
+5. Check delivered `status.json`, `executed.ipynb`, `run_settings.json`,
+   `boot.log` checkout-script evidence and final VM stop. The write-only inbox
+   key cannot inspect results; use the Pi admin account.
 
 ## Result folders and headless output
 

@@ -47,8 +47,8 @@ STANDARD_TEST_SHA = "fdd989f7bdab0ec6f9fd6f4c57bdde981d16b54aa8c37e5da8fd3dfcc8b
 SETTING_FIELDS = ["cover_id", "k", "bit_mode", "method", "placement", "payload_kind", "stride",
                   "requested_bpp", "effective_bpp", "clipped"]
 ENV_FILES = {
-    "newdata-1": ROOT / "scripts/g4/jobs/newdata-1.env",
-    "wide-1": ROOT / "scripts/g4/jobs/wide-1.env",
+    "newdata-1": ROOT / "scripts/g4/jobs/archive/newdata-1.env",
+    "wide-1": ROOT / "scripts/g4/jobs/archive/wide-1.env",
     "speed-1": ROOT / "scripts/g4/jobs/speed-1.env",
     "quick-gpu": ROOT / "tests/golden/quick-gpu.env",
     "cpu-det": ROOT / "tests/golden/cpu-det.env",

@@ -24,7 +24,7 @@ import time
 import traceback
 
 ROOT = Path(__file__).resolve().parents[1]
-KEY = re.compile(r"^(?:QUICK|V3_[A-Z0-9_]+)$")
+KEY = re.compile(r"^(?:QUICK|V3_[A-Z0-9_]+|CVDL_JOB_ID)$")
 
 
 def now():
@@ -231,8 +231,23 @@ def run(args):
     notebook_path = args.notebook.resolve()
     if not notebook_path.is_file():
         raise ValueError(f"notebook not found: {notebook_path}")
-    compact = notebook_path == ROOT / "notebooks/05_xunet_v4_nonorm.ipynb"
+    document = json.loads(notebook_path.read_text())
+    package_notebook = document.get('metadata', {}).get('cvdl_package', False)
+    if not package_notebook:
+        from scripts.g4.preflight import top_values
+        try:
+            top_values(document)
+            package_notebook = True
+        except (ValueError, SyntaxError):
+            pass
+    compact = package_notebook or notebook_path == ROOT / "notebooks/05_xunet_v4_nonorm.ipynb"
     settings = settings_file(args.env_file.resolve(), args.set, allow_native=compact)
+    if settings.get('CVDL_JOB_ID'):
+        from scripts.g4.preflight import validate_notebook
+        relative = notebook_path.relative_to(ROOT).as_posix()
+        if settings.get('V3_NOTEBOOK') != relative:
+            raise ValueError('job notebook argument differs from the pinned job-env path')
+        validate_notebook(relative, root=ROOT)
     output = args.output.resolve()
     if output == ROOT or ROOT not in output.parents:
         raise ValueError("--output must be inside this repository")

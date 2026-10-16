@@ -75,6 +75,19 @@ Notebook checkpoints, predictions, figures and settings records remain under
 `runs/my-run/checkpoints/<run name>/`; the status file lists them. Git
 ignores `runs/`. The runner refuses a nonempty output folder.
 
+### G4 notebook jobs
+
+G4 experiments are tracked notebooks, not experiment env files. Put literal
+experiment values in the notebook's first `settings = load(...)` call, commit
+and push, then inspect the PC pre-flight without starting the VM:
+
+```sh
+bash scripts/g4/submit.sh run --notebook notebooks/newdata-1.ipynb --commit SHA --timeout-min 105 --dry-run
+```
+
+Do not remove `--dry-run` without approval. The [G4 runbook](docs/active/g4-batch-runner.md#submit-a-run)
+explains machine detection, pinned settings validation and the separate speed tool.
+
 ## Data and citations
 
 The `raise512-run1` source is RAISE. Cite it as [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](Datasets/README.md#citations-and-terms) RAISE is for **non-commercial research and educational purposes**.

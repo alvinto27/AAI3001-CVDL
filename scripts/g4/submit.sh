@@ -1,20 +1,23 @@
 #!/usr/bin/env bash
-# Submit one metadata job and boot rtx6000pro. --dry-run needs no gcloud install.
+# Validate locally, then submit one pinned metadata job. --dry-run never calls GCE.
 set -euo pipefail
 ACTION=${1:-}
 [[ $ACTION == run || $ACTION == maintenance || $ACTION == off || $ACTION == status ]] || {
-    echo 'Usage: submit.sh {run|maintenance|off|status} [--env-file FILE] [--commit SHA] [--timeout-min 100] [--dry-run]' >&2
+    echo 'Usage: submit.sh run --notebook PATH [--commit SHA] [--timeout-min N] [--dry-run]' >&2
+    echo 'Speed tool only: submit.sh run --env-file scripts/g4/jobs/speed-1.env [options]' >&2
     exit 2
 }
 shift
+NOTEBOOK=
 ENV_FILE=
-COMMIT=origin/yx
+COMMIT=HEAD
 TIMEOUT=100
 MAX_RUN=120
 DRY=0
 while (($#)); do
     case "$1" in
-        --env-file) ENV_FILE=${2:?missing env file}; shift 2 ;;
+        --notebook) NOTEBOOK=${2:?missing notebook}; shift 2 ;;
+        --env-file) ENV_FILE=${2:?missing speed env file}; shift 2 ;;
         --commit) COMMIT=${2:?missing commit}; shift 2 ;;
         --timeout-min) TIMEOUT=${2:?missing timeout}; shift 2 ;;
         --max-run-minutes) MAX_RUN=${2:?missing maximum}; shift 2 ;;
@@ -22,34 +25,52 @@ while (($#)); do
         *) echo "Unknown argument: $1" >&2; exit 2 ;;
     esac
 done
+ROOT=$(git -C "$(dirname "${BASH_SOURCE[0]}")/../.." rev-parse --show-toplevel)
+cd "$ROOT"
 INSTANCE=rtx6000pro
 ZONE=us-central1-c
+TEMP_ENV=
+trap '[[ -z $TEMP_ENV ]] || rm -f -- "$TEMP_ENV"' EXIT
 if [[ $ACTION == run ]]; then
-    [[ -f $ENV_FILE ]] || { echo 'run needs --env-file FILE' >&2; exit 2; }
-    ENV_FILE=$(realpath "$ENV_FILE")
-    RUN_NAME=$(grep -m1 '^V3_RUN_NAME=' "$ENV_FILE" | cut -d= -f2- || true)
-    [[ $RUN_NAME =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ && $RUN_NAME != *..* ]] || {
-        echo 'Set a simple V3_RUN_NAME in the env file' >&2; exit 2;
+    [[ -z $(git status --porcelain) ]] || { echo 'Dirty checkout: commit or remove changes before submission (also dry-run)' >&2; exit 2; }
+    [[ $COMMIT =~ ^[a-zA-Z0-9][a-zA-Z0-9._/-]*$ && $COMMIT != *..* ]] || { echo 'Invalid commit' >&2; exit 2; }
+    COMMIT=$(git rev-parse --verify "$COMMIT^{commit}")
+    git merge-base --is-ancestor "$COMMIT" refs/remotes/origin/yx || {
+        echo 'Commit is not published on origin/yx; push it before submission (also dry-run)' >&2; exit 2;
     }
-    NOTEBOOK=$(grep -m1 '^V3_NOTEBOOK=' "$ENV_FILE" | cut -d= -f2- || true)
-    NOTEBOOK=${NOTEBOOK:-notebooks/04_baseline_kv_xunet_v3.ipynb}
-    case "$NOTEBOOK" in
-        notebooks/04_baseline_kv_xunet_v3.ipynb|notebooks/05_xunet_v4_nonorm.ipynb) ;;
-        *) echo "Invalid V3_NOTEBOOK: $NOTEBOOK" >&2; exit 2 ;;
-    esac
-    [[ $COMMIT =~ ^[a-zA-Z0-9][a-zA-Z0-9._/-]*$ && $COMMIT != *..* ]] || exit 2
     [[ $TIMEOUT =~ ^[0-9]+$ && $MAX_RUN =~ ^[0-9]+$ ]] && \
         (( TIMEOUT > 0 && MAX_RUN >= 16 && TIMEOUT <= MAX_RUN - 15 )) || {
         echo 'timeout must leave at least 15 minutes before the GCE max run duration' >&2; exit 2;
     }
-    JOB_ID="${RUN_NAME}-$(date -u +%Y%m%dT%H%M%SZ)-$(printf '%04d' "$RANDOM")"
-    [[ ${#JOB_ID} -le 101 ]] || { echo 'Run name is too long for a job-id' >&2; exit 2; }
-    printf 'job-id=%s\n' "$JOB_ID"
+    if [[ -n $ENV_FILE ]]; then
+        [[ -z $NOTEBOOK && -f $ENV_FILE ]] && grep -qx 'V3_SPEED_MATRIX=on' "$ENV_FILE" || {
+            echo '--env-file is reserved for the speed matrix; notebook jobs use --notebook PATH' >&2; exit 2;
+        }
+        ENV_FILE=$(realpath "$ENV_FILE")
+        NOTEBOOK=$(grep -m1 '^V3_NOTEBOOK=' "$ENV_FILE" | cut -d= -f2-)
+        [[ $NOTEBOOK == notebooks/05_xunet_v4_nonorm.ipynb ]] || { echo 'Speed tool needs notebook 05 selector' >&2; exit 2; }
+        podman exec -i -w /work aai3001 python scripts/g4/preflight.py --commit "$COMMIT" --speed-env-stdin < "$ENV_FILE"
+        label=g4-speed
+        echo 'Speed tool: scripts/run_notebook.py dispatches scripts/speed_matrix.py; legacy tool env retained.'
+    else
+        [[ -n $NOTEBOOK ]] || { echo 'run needs --notebook PATH' >&2; exit 2; }
+        # Python, including validation in --dry-run, runs only in the ROCm container.
+        podman exec -w /work aai3001 python scripts/g4/preflight.py --commit "$COMMIT" --notebook "$NOTEBOOK"
+        label=$(basename "$NOTEBOOK" .ipynb | tr -cs 'A-Za-z0-9_-' '-' | cut -c1-50)
+        [[ $label =~ ^[A-Za-z0-9] ]] || label="nb-$label"
+    fi
+    JOB_ID="${label}-$(date -u +%Y%m%dT%H%M%SZ)-$(printf '%04d' "$RANDOM")"
+    if [[ -z $ENV_FILE ]]; then
+        TEMP_ENV=$(mktemp)
+        printf 'V3_NOTEBOOK=%s\nCVDL_JOB_ID=%s\n' "$NOTEBOOK" "$JOB_ID" > "$TEMP_ENV"
+        ENV_FILE=$TEMP_ENV
+        printf 'job-env (generated; no experiment values):\n'
+        while IFS= read -r line; do printf '  %s\n' "$line"; done < "$ENV_FILE"
+    fi
+    printf 'job-id=%s\njob-commit=%s\n' "$JOB_ID" "$COMMIT"
 fi
 command_line() { printf '+ '; printf '%q ' "$@"; printf '\n'; }
-execute() {
-    if (( DRY )); then command_line "$@"; else "$@"; fi
-}
+execute() { if (( DRY )); then command_line "$@"; else "$@"; fi; }
 if (( ! DRY )); then command -v gcloud >/dev/null || { echo 'Install and authenticate gcloud first' >&2; exit 2; }; fi
 if [[ $ACTION == status ]]; then
     execute gcloud compute instances describe "$INSTANCE" --zone="$ZONE" \

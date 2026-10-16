@@ -127,7 +127,7 @@ reading photos. `legacy_globals()` is the temporary golden/runner adapter.
 
 | Machine choice | Rule |
 | --- | --- |
-| Detection | Google DMI product/vendor selects `g4`; otherwise `pc` (also the unknown-machine fallback) |
+| Detection | Google DMI plus CUDA RTX PRO 6000 selects `g4`; contradictory hardware or a job/profile mismatch fails loudly (phase 5) |
 | Train/eval workers | PC 6/4; G4 32/16 |
 | QUICK default | PC true; G4 false; legacy env and explicit overrides can change it |
 | Precision | Default 32; bf16-mixed only with GPU BF16 support |
@@ -230,3 +230,46 @@ override history and source `override` in `run_settings.json`. Used allow-list
 entries were only `run-settings-file`, `thin-cell-layout` and
 `quick-extra-panel-cap`. The 16-pair extra-panel settings SHA is
 `e50a63091a5a6abb82f09fca11619a3a5641f102a8f6e2c743684ed4e20061cb`.
+
+### Phase 5: pinned notebook jobs
+
+G4 submissions use `run --notebook PATH [--commit SHA] [--timeout-min N]
+[--dry-run]`. A clean checkout and a commit reachable from `origin/yx` are
+required even in dry-run. The PC container validates the selected commit's
+notebook and settings/config code in a temporary snapshot with the declared
+G4 profile; it reads literal experiment keywords from the first code cell and
+prints effective values, provenance and RUN_NAME before any cloud command.
+No data or GPU work is needed for pre-flight.
+
+[Newdata-1](../../notebooks/newdata-1.ipynb) and
+[wide-1](../../notebooks/wide-1.ipynb) copy notebook 05 with only their top code
+cell changed. Historical env files now live in
+[scripts/g4/jobs/archive](../../scripts/g4/jobs/archive/README.md) as golden
+fixtures, not submission inputs. Every experiment value, RunSettings field,
+RUN_NAME and comparable global matches the golden. The two hardware differences
+are asserted separately: the output root is `runs-out/` and the ROCm conv1 fix
+is inactive on CUDA G4. G4 owns compile=default and next-epoch prime=true as
+machine performance flags, along with 32/16 workers and QUICK=false.
+
+The existing `job-env` channel carries only `V3_NOTEBOOK` and `CVDL_JOB_ID`.
+The checked-out job script validates the path at the pinned checkout; archive,
+missing, symlink and traversal paths fail. The installed bootstrap is unchanged
+(SHA-256 `89cc83e9c73cc43476f6daf5e77825ddc298a32a22a52af8ded0909f15b1f2af`)
+and already execs the checked-out `job_run.sh`, which calls its checked-out
+`run_notebook.py`. No selector shim, reinstall or maintenance boot is needed.
+The [runbook](g4-batch-runner.md#submit-a-run) records the handover and strict
+DMI/CUDA GPU detection checks. Runtime jobs require the detected G4 profile;
+wrong detection cannot silently select PC workers.
+
+The separate speed matrix retains `speed-1.env` and its existing
+`run --env-file ...` command. That exception is accepted only for the speed
+tool, whose settings also receive a PC pre-flight. It still dispatches
+`scripts/speed_matrix.py`, not notebook cells.
+
+Evidence: default compare is ALL EQUAL; **166 tests pass**, including 10
+no-cloud recipe/profile/submission tests. Valid dry runs print G4 settings and
+only the two metadata lines; dirty/unpublished commits, bad/archive/symlink
+paths, top-cell typos and old metadata-incompatible commits fail before cloud
+commands. The installed-bootstrap → checkout-job-script → checked-out-runner
+handover is tested with a stub runner, without training or network access.
+No VM boot or GPU run is part of this phase.

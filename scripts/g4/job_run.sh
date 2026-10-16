@@ -183,7 +183,7 @@ cleanup() {
         mkdir -p "$out"
         # Notebook 05 keeps the full cell output only in run.log. Preserve a
         # small console record only if the runner failed before run.log existed.
-        if [[ $NOTEBOOK != notebooks/05_xunet_v4_nonorm.ipynb || ! -f $out/run.log ]]; then
+        if [[ $NOTEBOOK == notebooks/04_baseline_kv_xunet_v3.ipynb || ! -f $out/run.log ]]; then
             [[ -f "$STATE_ROOT/logs/$JOB_ID-run.log" ]] && cp "$STATE_ROOT/logs/$JOB_ID-run.log" "$out/job-console.log"
         fi
         [[ -n $RUN_ENV && -f $RUN_ENV ]] && cp "$RUN_ENV" "$out/job.env"
@@ -228,13 +228,8 @@ fi
 RUN_ENV="$STATE_ROOT/env/$JOB_ID.env"
 if ! metadata job-env "$RUN_ENV"; then note 'Missing job-env metadata'; exit 2; fi
 chmod 600 "$RUN_ENV"
-# Exact allowlist: the env file is data, never source shell code or an arbitrary path.
+# Metadata is data, never shell code. Validate against the job checkout below.
 NOTEBOOK=$(grep -m1 '^V3_NOTEBOOK=' "$RUN_ENV" | cut -d= -f2- || true)
-NOTEBOOK=${NOTEBOOK:-notebooks/04_baseline_kv_xunet_v3.ipynb}
-case "$NOTEBOOK" in
-    notebooks/04_baseline_kv_xunet_v3.ipynb|notebooks/05_xunet_v4_nonorm.ipynb) ;;
-    *) note "Invalid V3_NOTEBOOK: $NOTEBOOK"; exit 2 ;;
-esac
 if [[ $MODE == production ]]; then
     if [[ -n $(git status --porcelain) ]]; then note 'Dirty checkout; refuse git checkout'; exit 2; fi
     # The bootstrap has normally done this already. Bash reads a script while it runs,
@@ -250,13 +245,21 @@ if [[ $MODE == production ]]; then
 else
     note "TEST: skip checkout and uv sync for $COMMIT (keep PC ROCm container intact)"
 fi
+if [[ $MODE == test ]]; then
+    [[ $RUN_ENV == "$ROOT/"* ]] || { note 'Test state root must be inside the checkout'; exit 2; }
+    env_in_container="/work/${RUN_ENV#"$ROOT"/}"
+    validation=(podman exec -w /work aai3001 python scripts/g4/preflight.py --job-env "$env_in_container" --job-id "$JOB_ID" --commit HEAD)
+else
+    validation=("$ROOT/.venv/bin/python" scripts/g4/preflight.py --job-env "$RUN_ENV" --job-id "$JOB_ID" --commit "$COMMIT")
+fi
+if ! NOTEBOOK=$("${validation[@]}"); then note 'Invalid pinned notebook or job-env; refuse training'; exit 2; fi
 note "Run $JOB_ID commit=$COMMIT timeout=${TIMEOUT_MIN}m notebook=$NOTEBOOK"
 if [[ $MODE == test ]]; then
     [[ $RUN_ENV == "$ROOT/"* ]] || { note 'Test state root must be inside the checkout'; exit 2; }
     env_in_container="/work/${RUN_ENV#"$ROOT"/}"
     runner=(podman exec -w /work aai3001 timeout --signal=TERM --kill-after=20s "${TIMEOUT_MIN}m" python scripts/run_notebook.py --notebook "$NOTEBOOK" --env-file "$env_in_container" --output "runs-out/$JOB_ID")
 else
-    runner=("$ROOT/.venv/bin/python" scripts/run_notebook.py --notebook "$NOTEBOOK" --env-file "$RUN_ENV" --output "runs-out/$JOB_ID" --host-monitor on)
+    runner=(env CVDL_EXPECTED_PROFILE=g4 "$ROOT/.venv/bin/python" scripts/run_notebook.py --notebook "$NOTEBOOK" --env-file "$RUN_ENV" --output "runs-out/$JOB_ID" --host-monitor on)
 fi
 write_record "$JOB_ID" running "$STARTED" '' '' no
 RUN_STARTED=1
