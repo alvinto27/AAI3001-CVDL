@@ -237,6 +237,19 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
   source of each value, and the commit. A G4 job then names a notebook and
   a commit instead of an env file.
 
+- Discussed: the user finds the final held-out test large. Facts: the
+  standard test has 10,956 pairs from only 249 photos (RAISE about 65 tiles
+  per photo); all post-fit scoring took about 6 of 45 min (~$0.16) in the
+  mixed run. Decided: keep the standard test unchanged. Idea from the user:
+  weight evaluation towards hard cases. Orchestrator view: a dedicated hard
+  test set with about 1,000 pairs per hard group (95% margin about +/-3% on
+  a 60% miss rate, against +/-11% for today's 81-pair noisiest-quarter k=1
+  group), reported separately, instead of one weighted score. Status: idea
+  only; the user wants to discuss it further; not automatic.
+- Found: QUICK runs do not cap the extra test panels (each runs the full
+  panel, e.g. 10,956 bpp-1 pairs). Recorded in the refactor golden as a known
+  defect, to be fixed on purpose in the settings phase.
+
 ### Next
 
 - Done: B checks (`042903d`).

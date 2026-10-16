@@ -8,6 +8,8 @@
 
 - **Layout (2026-10-16):** all run outputs in git-ignored `runs/<run>/` (best + `last.ckpt` only, one `run.log`); photos in `Datasets/originals/{raise,div2k,alaska,lsdir}` on the PC and the G4; `V3_SOURCE` defaults to `decode` (the cache is deleted; rebuild it to use `cache`). See `runs/README.md` and `Datasets/README.md`.
 
+- **Hard test (idea, under discussion with the user; NOT approved, do not start):** a separate held-out test made mostly of hard cases (k=1, low bpp, balanced across tile-noise quarters set on validation, ~1,000 pairs per hard group) reported as its own number next to the unchanged standard test. Pick up after the refactor, only when the user continues the discussion.
+
 - **Notebook refactor (in design):** shared notebook code to move into one importable package; survey first, proof rules before any change. Pending user decision: convert notebook 04 or freeze it.
 
 - **Code tidy-up (2026-10-16):** one-off checks moved to `scripts/archive/`, Mode 2 (full-photo/MIL) dropped and archived in `LSB-Dataset-Generator/archive/`, notebooks 01 and 03 in `notebooks/archive/`, all tests in `tests/`. See `scripts/archive/README.md`.
