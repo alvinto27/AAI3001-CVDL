@@ -87,7 +87,7 @@ def replay_one(job):
         if reference:
             start=time.perf_counter()
             for kind,a in (("clean",clean),("stego",stego)):
-                with Image.open(root/"Datasets/raise512-run1"/tile[f"{kind}_path"]) as image:
+                with Image.open(root/"Datasets/generated/raise512-run1-records"/tile[f"{kind}_path"]) as image:
                     check(np.array_equal(a,np.asarray(image)),f"cache {kind} mismatch {tile['cover_id']}")
             comparison+=time.perf_counter()-start
     return dict(photo_id=row["photo_id"],pairs=len(tiles),read=read,generation=generation,

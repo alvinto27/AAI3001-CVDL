@@ -37,7 +37,7 @@ def main():
     mismatches, examples, placements = Counter(), [], Counter()
     rows = 0
     started = time.perf_counter()
-    with (root / "Datasets/raise512-run1/labels.csv").open(newline="", encoding="utf-8") as stream:
+    with (root / "Datasets/generated/raise512-run1-records/labels.csv").open(newline="", encoding="utf-8") as stream:
         for row in csv.DictReader(stream):
             if row["label"] != "1":
                 continue
@@ -80,21 +80,21 @@ def main():
     (covers / "done.jsonl").write_text("")
     (covers / "manifest.csv").write_text("")
     samples = []
-    with (root / "Datasets/raise512-run1/metadata.csv").open(newline="", encoding="utf-8") as stream:
+    with (root / "Datasets/generated/raise512-run1-records/metadata.csv").open(newline="", encoding="utf-8") as stream:
         for row in csv.DictReader(stream):
             if row["label"] == "stego" and int(row["cover_index"]) in (3, 4, 5):
                 samples.append(row)
     if len(samples) != 3:
         raise ValueError("missing original covers 3/4/5")
     for row in samples:
-        shutil.copyfile(root / "Datasets/raise512-run1/clean" / f"{row['cover_id']}.png",
+        shutil.copyfile(root / "Datasets/generated/raise512-run1-records/clean" / f"{row['cover_id']}.png",
                         covers / row["source_file"])
     config = batch.Config(**{**cfg.as_dict(), "input": str(covers), "output": str(output)})
     generated = batch.generate(config, workers=1)
     checks = []
     for row in samples:
         actual_path = output / row["file"]
-        reference_path = root / "Datasets/raise512-run1" / row["file"]
+        reference_path = root / "Datasets/generated/raise512-run1-records" / row["file"]
         with Image.open(actual_path) as actual, Image.open(reference_path) as reference:
             pixels_equal = np.array_equal(np.asarray(actual), np.asarray(reference))
         bytes_equal = actual_path.read_bytes() == reference_path.read_bytes()

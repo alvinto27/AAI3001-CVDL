@@ -84,13 +84,13 @@ root. Remove that test folder after tests. Long jobs can run in the background
 with logs in code scratch; keep the real cache when cleaning scratch.
 
 On the PC, the Git-ignored cache is inside the checkout and uses the container
-path `/work/Datasets/otf-cache/v1`:
+path `/work/Datasets/generated/otf-cache/v1`:
 
 ```sh
 podman exec -w /work aai3001 python scripts/build_cache.py \
-  --repo-root /work --cache-root /work/Datasets/otf-cache/v1 --workers 8
+  --repo-root /work --cache-root /work/Datasets/generated/otf-cache/v1 --workers 8
 podman exec -w /work aai3001 python scripts/check_cache.py \
-  --repo-root /work --cache-root /work/Datasets/otf-cache/v1 --gate verify
+  --repo-root /work --cache-root /work/Datasets/generated/otf-cache/v1 --gate verify
 ```
 
 The builder runs `git check-ignore` before it creates or resumes this cache.
@@ -99,7 +99,7 @@ The builder runs `git check-ignore` before it creates or resumes this cache.
 
 The PC container did not include Git, so Git 2.43.0 was installed in the
 container before the build. `git check-ignore` then confirmed that
-`/work/Datasets/otf-cache/v1` is ignored by the checkout. The build used the
+`/work/Datasets/generated/otf-cache/v1` is ignored by the checkout. The build used the
 maximum allowed eight workers, OMP=1, and completed in 170.430413 seconds.
 It created 1,900 NPY files, 1,900 entry JSON records, one header JSON, and
 1,901 persistent lock files. Cache content is 52,763,054,963 bytes

@@ -110,13 +110,13 @@ trap on_error ERR
 step_start 1 download
 uv run python scripts/download_raise.py \
     --selection data/raise/selection.csv \
-    --out ImageSets/RAISE/NEF
+    --out Datasets/originals/raise/NEF
 step_done
 
 step_start 2 prepare
 uv run python LSB-Dataset-Generator/prepare.py \
-    --input ImageSets/RAISE/NEF \
-    --output ImageSets/RAISE/tiles512 \
+    --input Datasets/originals/raise/NEF \
+    --output Datasets/originals/raise/tiles512 \
     --tile 512 \
     --seed 0 \
     --png-compress-level 1
@@ -129,18 +129,18 @@ step_done
 
 step_start 4 verify
 uv run python LSB-Dataset-Generator/generate.py \
-    --verify Datasets/raise512-run1
+    --verify Datasets/generated/raise512-run1-records
 step_done
 
 step_start 5 build-labels
 uv run python scripts/build_labels.py \
-    --dataset Datasets/raise512-run1 \
-    --tiles-manifest ImageSets/RAISE/tiles512/manifest.csv
+    --dataset Datasets/generated/raise512-run1-records \
+    --tiles-manifest Datasets/originals/raise/tiles512/manifest.csv
 step_done
 
 step_start 6 copy-split
-mkdir -p Datasets/raise512-run1/splits
-cp -f data/raise/split_seed0.csv Datasets/raise512-run1/splits/split_seed0.csv
+mkdir -p Datasets/generated/raise512-run1-records/splits
+cp -f data/raise/split_seed0.csv Datasets/generated/raise512-run1-records/splits/split_seed0.csv
 step_done
 
 check_count() {
@@ -154,10 +154,10 @@ check_count() {
 }
 
 step_start 7 count-checks
-clean_count="$(find Datasets/raise512-run1/clean -type f -name '*.png' -print | wc -l)"
-stego_count="$(find Datasets/raise512-run1/stego -type f -name '*.png' -print | wc -l)"
-mask_count="$(find Datasets/raise512-run1/masks -type f -name '*.png' -print | wc -l)"
-label_count="$(awk 'NR > 1 { count++ } END { print count + 0 }' Datasets/raise512-run1/labels.csv)"
+clean_count="$(find Datasets/generated/raise512-run1-records/clean -type f -name '*.png' -print | wc -l)"
+stego_count="$(find Datasets/generated/raise512-run1-records/stego -type f -name '*.png' -print | wc -l)"
+mask_count="$(find Datasets/generated/raise512-run1-records/masks -type f -name '*.png' -print | wc -l)"
+label_count="$(awk 'NR > 1 { count++ } END { print count + 0 }' Datasets/generated/raise512-run1-records/labels.csv)"
 check_count clean "$clean_count" 49796
 check_count stego "$stego_count" 49796
 check_count masks "$mask_count" 49796
@@ -165,7 +165,7 @@ check_count labels "$label_count" 99592
 step_done
 
 if ((DELETE_INTERMEDIATE == 1)); then
-    rm -rf ImageSets/RAISE/NEF ImageSets/RAISE/tiles512
+    rm -rf Datasets/originals/raise/NEF Datasets/originals/raise/tiles512
     printf '[%s] Deleted intermediate NEF and tile folders\n' "$(stamp)"
 fi
 

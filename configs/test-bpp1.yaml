@@ -1,6 +1,6 @@
 seed: 1
-input: ../ImageSets/RAISE/tiles512
-output: ../Datasets/raise512-run1
+input: ../Datasets/originals/raise/tiles512
+output: ../Datasets/generated/raise512-run1-records
 png_compress_level: 1
 variants_per_cover: 1
 write_masks: true

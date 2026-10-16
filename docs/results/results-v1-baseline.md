@@ -22,10 +22,10 @@ claim about all images or all embedding methods.
 
 ### Data
 
-The data is in [`Datasets/raise512-run1`](../../Datasets/raise512-run1/). It has
+The data is in [`Datasets/generated/raise512-run1-records`](../../Datasets/generated/raise512-run1-records/). It has
 49,796 clean 512 x 512 RGB tiles and 49,796 stego tiles. The tiles came from
 1,000 RAISE RAW photos from Nikon D7000, D90, and D40 cameras. The source
-citation is [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](../../ImageSets/README.md#citations-and-terms)
+citation is [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](../../Datasets/README.md#citations-and-terms)
 
 Each stego tile has one randomly selected setting:
 

@@ -31,8 +31,8 @@ or all embedding tools.
 
 ### Data and split
 
-The dataset is `Datasets/raise512-run1`: 49,796 clean/stego pairs of 512 x 512
-RGB tiles from 1,000 RAISE RAW photos. The source citation is [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](../../ImageSets/README.md#citations-and-terms) Each stego tile has one random LSB
+The dataset is `Datasets/generated/raise512-run1-records`: 49,796 clean/stego pairs of 512 x 512
+RGB tiles from 1,000 RAISE RAW photos. The source citation is [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](../../Datasets/README.md#citations-and-terms) Each stego tile has one random LSB
 setting: lowest or plane bit mode, k=1..8, replace or match, contiguous,
 random, or stride placement, letters or random bytes, and 0.05-0.50 bpp.
 
@@ -46,7 +46,7 @@ photo and all its tiles stay in one split. Each pair stays in one split too.
 | Test | 149 | 7,433 | 14,866 |
 
 The cameras are Nikon D40, D7000, and D90. The saved split is
-`Datasets/raise512-run1/splits/split_seed0.csv`.
+`Datasets/generated/raise512-run1-records/splits/split_seed0.csv`.
 
 ### Model and training
 

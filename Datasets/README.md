@@ -1,60 +1,56 @@
 # Datasets
 
-This folder stores generated datasets. The data is local only. Only this
-README is tracked.
+Local data only. Git tracks only this README. The small records that describe
+the data are in [`data/`](../data/) and are tracked.
 
-## Current dataset
+## What is where
 
-`raise512-run1/` contains paired 512 x 512 RGB tiles:
+| Path | Contents | Size | Record in `data/` | Re-fetch |
+| --- | --- | ---: | --- | --- |
+| `originals/raise/` | `NEF/` (1,000 RAISE RAW photos), `RAISE_all.csv`, `selection.csv`, `tiles512-records/`, logs | 17 GB | `data/raise/` | [RAISE site](https://loki.disi.unitn.it/RAISE): `uv run python scripts/download_raise.py --selection data/raise/selection.csv --out Datasets/originals/raise/NEF` |
+| `originals/div2k/` | `DIV2K_train_HR/` (800 PNG), `DIV2K_valid_HR/` (100 PNG) | 3.8 GB | `data/div2k/` | [DIV2K site](https://data.vision.ee.ethz.ch/cvl/DIV2K/): `DIV2K_train_HR.zip`, `DIV2K_valid_HR.zip` |
+| `originals/alaska/tiff_various_color/` | 22,096 ALASKA2 TIFF and `SHA256SUMS`. 18,200 are selected | 33 GB | `data/alaska/` | Pi SSD `rpi400@rpi400-server:/srv/datasets/alaska/tiff_various_color/` |
+| `originals/lsdir/hr/` | 11,000 selected LSDIR PNG in 84 shard folders and `SHA256SUMS` | 19 GB | `data/lsdir/` | Pi SSD `rpi400@rpi400-server:/srv/datasets/lsdir/hr/` (full copy and `inventory.csv`) |
+| `generated/raise512-run1-records/` | `labels.csv`, `metadata.csv`, `splits/`, `dataset_info.json`, `records/`. The PNG images are not kept | 0.12 GB | `data/raise/run1_*.csv.gz` | see "Rebuild" below |
+| `generated/otf-cache/` | Optional decoded-photo cache. Not present by default | 0 | none | see "Cache" below |
 
-| Path or file | Contents | Local size |
-| --- | --- | ---: |
-| `clean/` | 49,796 clean PNG tiles | about 18 GB |
-| `stego/` | 49,796 stego PNG tiles | about 19 GB |
-| `masks/` | 49,796 mask PNG files | about 507 MB |
-| `labels.csv` | 99,592 data rows | about 19 MB |
-| `metadata.csv` | generator metadata | about 15 MB |
-| `records/` | rebuild and verification records | small |
-| `splits/split_seed0.csv` | source-photo train/validation/test split | about 2.24 MB |
+`master_path` in the `data/*/photo_manifest.csv` files points into `originals/`.
+Frozen source records: [frozen-source-records.md](../docs/active/frozen-source-records.md),
+[alaska-selection-v2.md](../docs/active/alaska-selection-v2.md),
+[lsdir-selection-v1.md](../docs/active/lsdir-selection-v1.md).
 
-The complete local dataset is about 38 GB. Clean and stego images stay in
-their own folders. A source photo must stay in one split.
+## Cache (optional, `V3_SOURCE=cache`)
 
-Cite [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](../ImageSets/README.md#citations-and-terms). RAISE is for non-commercial research and educational purposes.
-
-## Full-photo OTF cache
-
-`otf-cache/v1/` stores decoded full-photo RGB arrays for the on-the-fly (OTF)
-loader. A complete cache has 1,900 photos and uses about 52.8 GB (49.2 GiB).
-It is local generated data and Git does not track it.
-
-Build and verify the PC cache in container `aai3001`:
+Training reads the photos directly (`V3_SOURCE=decode`, the default). The cache holds
+decoded RAISE and DIV2K photos (1,900 photos, about 53 GB). To build it in container `aai3001`:
 
 ```sh
 podman exec -w /work aai3001 python scripts/build_cache.py \
-  --repo-root /work --cache-root /work/Datasets/otf-cache/v1 --workers 8
+  --repo-root /work --cache-root /work/Datasets/generated/otf-cache/v1 --workers 8
 podman exec -w /work aai3001 python scripts/check_cache.py \
-  --repo-root /work --cache-root /work/Datasets/otf-cache/v1 --gate verify
+  --repo-root /work --cache-root /work/Datasets/generated/otf-cache/v1 --gate verify
 ```
 
-An in-checkout cache is accepted only when `git check-ignore` confirms that
-Git ignores its path. See the [cache verification record](../docs/archive/cache-verification.md).
+Then set `V3_SOURCE=cache` and `V3_CACHE_ROOT=<that path>`. The cache must sit in a
+Git-ignored path. See the [cache record](../docs/archive/cache-verification.md).
 
-## Rebuild
+## Rebuild the old PNG dataset (notebooks 01-03, `V3_DATA=png`, `scripts/check_*.py`)
 
-Run the [RAISE 512 rebuild guide](../docs/archive/rebuild-raise512-run1.md) from the
-repository root. The unattended command is:
+The `clean/`, `stego/`, and `masks/` images (about 38 GB) were deleted. Notebook 04 and 05
+OTF runs do not need them. To make them again, follow the
+[rebuild guide](../docs/archive/rebuild-raise512-run1.md) from the repository root:
+`bash scripts/rebuild_raise512_run1.sh`. It writes into
+`generated/raise512-run1-records/` and needs the RAISE photos in `originals/raise/NEF/`.
 
-```sh
-bash scripts/rebuild_raise512_run1.sh --shutdown 2>&1 | tee -a rebuild-raise512-run1.log
-```
+## Citations and terms
 
-The guide uses `scripts/`, `configs/raise512-run1.yaml`, the committed
-`data/raise/selection.csv`, and the RAISE source files in `ImageSets/RAISE/`.
-It checks for 49,796 clean, stego, and mask files and 99,592 label rows.
+- RAISE: D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images
+  Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon,
+  March 18-20, 2015. For **non-commercial research and educational purposes**
+  ([guide](https://loki.disi.unitn.it/RAISE/guide.html)).
+- DIV2K: E. Agustsson and R. Timofte, “NTIRE 2017 Challenge on Single Image
+  Super-Resolution: Dataset and Study,” CVPR Workshops, July 2017. For **academic research
+  only**; copyright belongs to the original owners.
+- ALASKA2 and LSDIR: follow the terms of their source sites.
 
-## Do not commit
-
-Never commit `clean/`, `stego/`, `masks/`, `otf-cache/`, CSV records, split
-copies, checkpoints, or other generated dataset files. Keep only this README
-in git.
+Never commit images, caches, or generated files. Keep only this README here.

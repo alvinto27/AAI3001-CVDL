@@ -234,7 +234,7 @@ def input_photos():
 def read_photo(source, row):
     if source != 'alaska':
         return load_photo(row, ROOT)
-    path = ROOT / 'Datasets/alaska/tiff_various_color' / (row['alaska_id'] + '.tif')
+    path = ROOT / 'Datasets/originals/alaska/tiff_various_color' / (row['alaska_id'] + '.tif')
     with Image.open(path) as image:
         if image.format != 'TIFF' or image.mode != 'RGB' or min(image.size) < 512:
             raise ValueError(f'invalid ALASKA cover: {path}')

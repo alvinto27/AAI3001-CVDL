@@ -29,7 +29,7 @@ appendix with extra plots and checks for that run.
 
 All versions use the same 512 x 512 RAISE tile data, source-photo split, KV
 filter, Xu-Net-style classifier, AdamW settings, and ten epochs. The source
-citation is [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](../../ImageSets/README.md#citations-and-terms) Only the
+citation is [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](../../Datasets/README.md#citations-and-terms) Only the
 normalization and clipping choices differ.
 
 | Version | Clip | Norm | Machine | Speed | Time per epoch | Run name |

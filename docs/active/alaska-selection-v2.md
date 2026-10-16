@@ -12,7 +12,7 @@
 | input | rows | SHA-256 | check |
 |---|---|---|---|
 | Pi scan of `/srv/datasets/alaska/tiff_various_color` | 70,282 | `d76537a3…aae8f0` | every file re-hashed and equal to the Pi `SHA256SUMS` (0 bad) |
-| PC scan of v1 copy `Datasets/alaska/tiff_various_color` | 9,723 | `c4d178fe…afc67` | every file re-hashed and equal to its `SHA256SUMS` (0 bad) |
+| PC scan of v1 copy `Datasets/originals/alaska/tiff_various_color` | 9,723 | `c4d178fe…afc67` | every file re-hashed and equal to its `SHA256SUMS` (0 bad) |
 
 - Together the two scans cover all 80,005 IDs, with no ID missing.
 - Every file is an uncompressed RGB TIFF with 8 bits per channel and sides of 512, 640, 720 or 1024.

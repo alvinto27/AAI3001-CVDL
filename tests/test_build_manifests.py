@@ -57,7 +57,7 @@ class ManifestTests(unittest.TestCase):
 
     def test_identity_and_source_fields(self):
         row = builder.photo("div2k", "div2k_0001", 1000,
-                            "ImageSets/DIV2K_train_HR/0001.png", 1404, 2040, "train")
+                            "Datasets/originals/div2k/DIV2K_train_HR/0001.png", 1404, 2040, "train")
         self.assertEqual((row["overlap512_rows"], row["overlap512_cols"]), (3, 4))
         self.assertEqual(row["legacy512_rows"], "")
         self.assertEqual(row["noise"], "not_applicable")

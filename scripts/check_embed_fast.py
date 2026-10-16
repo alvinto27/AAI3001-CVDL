@@ -98,7 +98,7 @@ def properties(path, count, workers):
 
 def legacy(root, count):
     config = batch.read_config(root / "configs/raise512-run1.yaml")
-    with (root / "Datasets/raise512-run1/labels.csv").open(newline="", encoding="utf-8") as stream:
+    with (root / "Datasets/generated/raise512-run1-records/labels.csv").open(newline="", encoding="utf-8") as stream:
         rows = [r for r in csv.DictReader(stream) if r["label"] == "1"]
     # Uniform spread across all covers, plus mandatory groups if needed.
     chosen = {int(x) for x in np.linspace(0, len(rows)-1, count, dtype=int)}
@@ -108,7 +108,7 @@ def legacy(root, count):
     groups = Counter()
     for index in sorted(chosen):
         row = rows[index]
-        with Image.open(root / "Datasets/raise512-run1/clean" / f"{row['cover_id']}.png") as image:
+        with Image.open(root / "Datasets/generated/raise512-run1-records/clean" / f"{row['cover_id']}.png") as image:
             carrier = np.array(image)
         key = tuple(int(row[f"embed_seed_{f}"]) for f in ("seed", "cover_index", "variant", "stream"))
         # Shared settings redraw preserves requested bpp and all legacy settings.
@@ -116,7 +116,7 @@ def legacy(root, count):
                     np.random.default_rng(settings.legacy_seed_sequence(key[0], key[1], key[2], 0)))
         kwargs["rng"] = np.random.default_rng(settings.legacy_seed_sequence(*key))
         fast, meta, _ = engine.embed_fast(carrier, **kwargs)
-        with Image.open(root / "Datasets/raise512-run1" / row["file"]) as image:
+        with Image.open(root / "Datasets/generated/raise512-run1-records" / row["file"]) as image:
             require(np.array_equal(fast, np.asarray(image)), f"stored pixel mismatch {row['cover_id']}")
         for field in ("bit_mode", "k", "method", "placement", "start", "stride", "payload_kind",
                       "payload_bytes", "embedded_bits", "units_used", "units_changed", "bpp_actual"):

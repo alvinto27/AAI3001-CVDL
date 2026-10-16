@@ -48,7 +48,7 @@ def verify_one(root_string, record, legacy, coverage):
             original = by_position.pop((tile.row, tile.column))
             check((tile.y, tile.x) == (int(original["pixel_y"]), int(original["pixel_x"])),
                   "legacy start mismatch")
-            with Image.open(root / "Datasets/raise512-run1" / original["clean_path"]) as image:
+            with Image.open(root / "Datasets/generated/raise512-run1-records" / original["clean_path"]) as image:
                 check(image.mode == "RGB", "reference clean tile is not RGB")
                 reference = np.asarray(image)
             check(reference.dtype == np.uint8 and np.array_equal(tile.pixels, reference),

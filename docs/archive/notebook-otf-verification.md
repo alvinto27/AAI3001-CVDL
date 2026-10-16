@@ -14,7 +14,7 @@ cannot silently resume the PNG baseline. `V3_RUN_NAME` overrides the name.
 
 | Environment variable | Default / meaning |
 | --- | --- |
-| `V3_SOURCE` | decode unless `V3_CACHE_ROOT` is supplied; explicit override wins. |
+| `V3_SOURCE` | `decode` by default. `cache` must be set explicitly and needs `V3_CACHE_ROOT`. (Changed 2026-10-16: before, a supplied `V3_CACHE_ROOT` selected cache.) |
 | `V3_CACHE_ROOT` | Empty; required for cache source. |
 | `V3_MAIN_THREADS` | 1; explicit main-process torch CPU thread count, also in reused kernels. |
 | `V3_WORKERS` | 6 training workers. |

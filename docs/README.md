@@ -40,4 +40,4 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **All res
 - [2026-10-15 session handoff](archive/handoff-2026-10-15.md)
 - [Superseded research checklist](archive/research-checklist.md)
 
-Local data guides: [ImageSets](../ImageSets/README.md), [Datasets](../Datasets/README.md), [runs](../runs/README.md), and [logs](../logs/README.md).
+Local data guides: [Datasets](../Datasets/README.md), [runs](../runs/README.md), and [logs](../logs/README.md).

@@ -79,7 +79,7 @@ def legacy(root,cache):
         clean,stego,_=dataset[int(i)]
         original=dataset.entries[int(i)][4]
         for kind,a in (("clean",clean),("stego",stego)):
-            with Image.open(root/"Datasets/raise512-run1"/original[f"{kind}_path"]) as image:
+            with Image.open(root/"Datasets/generated/raise512-run1-records"/original[f"{kind}_path"]) as image:
                 check(np.array_equal(a.permute(1,2,0).numpy(),np.asarray(image)),f"legacy mismatch {i}/{kind}")
     return dict(status="PASS",gate="legacy",profile_pairs=len(dataset),sample_pairs=len(chosen),mismatches=0)
 

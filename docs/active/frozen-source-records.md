@@ -10,10 +10,10 @@ Row counts exclude the header. Sizes are bytes. All files use UTF-8 and LF.
 
 | File | Rows | Bytes |
 | --- | ---: | ---: |
-| `data/raise/photo_manifest.csv` | 1,000 | 385,759 |
+| `data/raise/photo_manifest.csv` | 1,000 | 394,759 |
 | `data/raise/legacy_tile_manifest.csv` | 49,796 | 4,191,526 |
-| `data/div2k/photo_manifest.csv` | 900 | 183,549 |
-| `data/div2k/split_seed0.csv` | 900 | 45,587 |
+| `data/div2k/photo_manifest.csv` | 900 | 197,049 |
+| `data/div2k/split_seed0.csv` | 900 | 59,087 |
 
 RAISE photo IDs keep their NEF stems. Indices 0..999 follow the full sorted
 RAISE list, not subset or worker order. DIV2K IDs are `div2k_0001` through
@@ -21,7 +21,7 @@ RAISE list, not subset or worker order. DIV2K IDs are `div2k_0001` through
 and indices are unique. Source fields are `raise` and `div2k`.
 
 Master paths are relative to the repository. Legacy `clean_path` and
-`stego_path` are relative to `Datasets/raise512-run1`, exactly as recorded in
+`stego_path` are relative to `Datasets/generated/raise512-run1-records`, exactly as recorded in
 its metadata. Original cover IDs retain leading zeros. Original cover
 indices are not renumbered. The builder does not require the old tile PNGs.
 
@@ -42,7 +42,7 @@ Before compression, both originals matched the VM copies byte-for-byte by
 SHA-256. Recompression produced identical gzip bytes. Decompression matched
 both original SHA-256 values and passed a byte comparison.
 
-| Stored file under `data/raise/` | Source under `Datasets/raise512-run1/` | Original bytes | Gzip bytes |
+| Stored file under `data/raise/` | Source under `Datasets/generated/raise512-run1-records/` | Original bytes | Gzip bytes |
 | --- | --- | ---: | ---: |
 | `run1_labels.csv.gz` | `labels.csv` | 19,806,781 | 3,307,725 |
 | `run1_metadata.csv.gz` | `metadata.csv` | 15,485,145 | 3,180,260 |
@@ -112,11 +112,11 @@ cd ~/otf-dev/step1-manifests
 PYTHONDONTWRITEBYTECODE=1 /srv/aai3001/AAI3001-CVDL/.venv/bin/python \
   scripts/build_manifests.py \
   --repo-root /srv/aai3001/AAI3001-CVDL \
-  --tiles-manifest ImageSets/RAISE/tiles512-records/manifest.csv \
+  --tiles-manifest Datasets/originals/raise/tiles512-records/manifest.csv \
   --output-root "$PWD/build-new"
 ```
 
-The preparation manifest is canonical under `ImageSets/RAISE/tiles512-records`.
+The preparation manifest is canonical under `Datasets/originals/raise/tiles512-records`.
 The VM has no dataset `records/tiles` directory. Its input SHA-256 is:
 
 ```text
@@ -144,10 +144,17 @@ Do not push. Remove the scratch copies and test outputs after review.
 
 | Output | SHA-256 |
 | --- | --- |
-| RAISE photo manifest | `75e92882a8734cdde0b11bcc48871dfcd4f8168a9286c99cc30ce6c38f2f5a6d` |
+| RAISE photo manifest | `fedab1b67cda8e90013ad8fde0cc9b03f62afca3df36d6af1b7a1b069645e7b8` |
 | RAISE legacy tile manifest | `7e2bcb4986102a5cf39b7a20b5634292bb8dcc9a6c2d64b38317370aca0a0ee5` |
-| DIV2K photo manifest | `83cdfd2fe5c1cd2eff731c47d5d5aad1751405f0ae723e0afde8a02231e25640` |
-| DIV2K split | `7d43a8275c8bbeb9b85161ee97a18f65dddda68682be2d14f3a4bf65018bd3e3` |
+| DIV2K photo manifest | `109fb64568c182e5586db8af2365142540d26ddbb68755f597d25083dd8125f8` |
+| DIV2K split | `2a19c117b33f0d053f24e77366c340e4920aa8d1d6f9644d6f3d09ec2d1fd3f8` |
+
+**Data-folder move (2026-10-16 layout).** Source photos moved to `Datasets/originals/`. Only the
+`master_path` column of the RAISE and DIV2K photo manifests and the DIV2K split changed. The SHA-256
+values above are for the new text. The VM builds above produced these old SHA-256 values, with
+`ImageSets/` paths: RAISE photo manifest `75e92882…5a6d`, DIV2K photo manifest `83cdfd2f…5640`,
+DIV2K split `7d43a827…d3e3`. Every other column is byte-equal. The legacy tile manifest has no
+`master_path` and did not change.
 
 Done: full source decode and grid cutting in
 [plan step 2 verification](../archive/source-verification.md) and
@@ -157,4 +164,4 @@ The [Mode 1 sample API](../archive/mode1-verification.md) composes these helpers
 The [Mode 1 torch loader](../archive/torch-loader-verification.md) uses the frozen splits
 and identities. [Notebook integration](../archive/notebook-otf-verification.md) is also
 verified. Pending: Mode 2 tile labels and user-run full OTF training.
-Source terms and citations remain in the [ImageSets guide](../../ImageSets/README.md#citations-and-terms).
+Source terms and citations remain in the [Datasets guide](../../Datasets/README.md#citations-and-terms).

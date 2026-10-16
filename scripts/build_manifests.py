@@ -109,7 +109,7 @@ def build_raise(root: Path, tiles_manifest: Path) -> tuple[list[dict], list[dict
     selection = unique(read_csv(root / "data/raise/selection.csv", {"File"}, comments=True),
                        "File", "selection")
     require(len(selection) == 1000, "RAISE selection must contain 1,000 photos")
-    dataset = root / "Datasets/raise512-run1"
+    dataset = root / "Datasets/generated/raise512-run1-records"
     manifest = unique(read_csv(tiles_manifest, {
         "tile_file", "source_file", "source_format", "source_height", "source_width",
         "camera_make", "camera_model", "tile_row", "tile_col", "pixel_x", "pixel_y",
@@ -176,7 +176,7 @@ def build_raise(root: Path, tiles_manifest: Path) -> tuple[list[dict], list[dict
     for index, ident in enumerate(sorted(selection)):
         require(len(photo_splits[ident]) == 1, f"photo split leakage: {ident}")
         h, w, make, model = photo_info[ident]
-        photos.append(photo("raise", ident, index, f"ImageSets/RAISE/NEF/{ident}.NEF",
+        photos.append(photo("raise", ident, index, f"Datasets/originals/raise/NEF/{ident}.NEF",
                             h, w, next(iter(photo_splits[ident])), make, model))
     by_photo = {p["photo_id"]: p for p in photos}
     positions: dict[str, set[tuple[int, int]]] = defaultdict(set)
@@ -237,7 +237,7 @@ def build_div2k(root: Path) -> list[dict]:
     train_ids = div2k_train_ids()
     photos = []
     for folder, low, high in (("DIV2K_train_HR", 1, 800), ("DIV2K_valid_HR", 801, 900)):
-        directory = root / "ImageSets" / folder
+        directory = root / "Datasets/originals/div2k" / folder
         files = sorted(directory.glob("*.png"))
         require([p.name for p in files] == [f"{i:04d}.png" for i in range(low, high + 1)],
                 f"unexpected PNG inventory: {directory}")
@@ -317,7 +317,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo-root", type=Path, required=True, help="read-only source repository/data root")
     parser.add_argument("--output-root", type=Path, required=True, help="scratch root for NEW CSV files only")
     parser.add_argument("--tiles-manifest", type=Path,
-                        default=Path("ImageSets/RAISE/tiles512-records/manifest.csv"),
+                        default=Path("Datasets/originals/raise/tiles512-records/manifest.csv"),
                         help="preparation manifest; relative to repo root unless absolute")
     args = parser.parse_args(argv)
     try:

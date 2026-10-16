@@ -3,8 +3,6 @@ __pycache__/
 # checkpoints/ is a notebook's working folder for an active run only; a
 # leftover folder here is scratch, never committed.
 checkpoints/
-ImageSets/*
-!ImageSets/README.md
 Datasets/*
 !Datasets/README.md
 logs/*

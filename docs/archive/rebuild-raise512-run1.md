@@ -2,8 +2,8 @@
 
 # Rebuild the RAISE 512 dataset
 
-This guide rebuilds `Datasets/raise512-run1` from the RAISE source files.
-Cite [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](../../ImageSets/README.md#citations-and-terms); RAISE is for non-commercial research and educational purposes.
+This guide rebuilds `Datasets/generated/raise512-run1-records` from the RAISE source files.
+Cite [D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, G. Boato, “RAISE – A Raw Images Dataset for Digital Image Forensics,” ACM Multimedia Systems, Portland, Oregon, March 18-20, 2015.](../../Datasets/README.md#citations-and-terms); RAISE is for non-commercial research and educational purposes.
 Run every command from the repository root.
 
 ## Before you start
@@ -74,7 +74,7 @@ The last line must start with `REBUILD DONE:` and show `clean=49796 stego=49796 
    ```sh
    uv run python scripts/download_raise.py \
      --selection data/raise/selection.csv \
-     --out ImageSets/RAISE/NEF
+     --out Datasets/originals/raise/NEF
    ```
 
    The committed manifest has 1,000 rows and the header `seed=0 count=1000`.
@@ -83,14 +83,14 @@ The last line must start with `REBUILD DONE:` and show `clean=49796 stego=49796 
 
    ```sh
    uv run python LSB-Dataset-Generator/prepare.py \
-     --input ImageSets/RAISE/NEF \
-     --output ImageSets/RAISE/tiles512 \
+     --input Datasets/originals/raise/NEF \
+     --output Datasets/originals/raise/tiles512 \
      --tile 512 \
      --seed 0 \
      --png-compress-level 1
    ```
 
-3. Generate the clean images, stego images, and masks. `read_config` resolves a relative path from the YAML file's folder, not from the current folder. Therefore `../ImageSets/RAISE/tiles512` and `../Datasets/raise512-run1` in `configs/raise512-run1.yaml` resolve to the two paths below when the command runs from the repository root.
+3. Generate the clean images, stego images, and masks. `read_config` resolves a relative path from the YAML file's folder, not from the current folder. Therefore `../Datasets/originals/raise/tiles512` and `../Datasets/generated/raise512-run1-records` in `configs/raise512-run1.yaml` resolve to the two paths below when the command runs from the repository root.
 
    ```sh
    uv run python LSB-Dataset-Generator/generate.py \
@@ -101,31 +101,31 @@ The last line must start with `REBUILD DONE:` and show `clean=49796 stego=49796 
 
    ```sh
    uv run python LSB-Dataset-Generator/generate.py \
-     --verify Datasets/raise512-run1
+     --verify Datasets/generated/raise512-run1-records
    ```
 
 5. Build the label file from the generator metadata and tile manifest.
 
    ```sh
    uv run python scripts/build_labels.py \
-     --dataset Datasets/raise512-run1 \
-     --tiles-manifest ImageSets/RAISE/tiles512/manifest.csv
+     --dataset Datasets/generated/raise512-run1-records \
+     --tiles-manifest Datasets/originals/raise/tiles512/manifest.csv
    ```
 
 6. Install the committed train/test split.
 
    ```sh
-   mkdir -p Datasets/raise512-run1/splits
-   cp data/raise/split_seed0.csv Datasets/raise512-run1/splits/split_seed0.csv
+   mkdir -p Datasets/generated/raise512-run1-records/splits
+   cp data/raise/split_seed0.csv Datasets/generated/raise512-run1-records/splits/split_seed0.csv
    ```
 
 7. Check the file counts.
 
    ```sh
-   test "$(find Datasets/raise512-run1/clean -type f -name '*.png' | wc -l)" -eq 49796
-   test "$(find Datasets/raise512-run1/stego -type f -name '*.png' | wc -l)" -eq 49796
-   test "$(find Datasets/raise512-run1/masks -type f -name '*.png' | wc -l)" -eq 49796
-   test "$(awk 'NR > 1 { count++ } END { print count + 0 }' Datasets/raise512-run1/labels.csv)" -eq 99592
+   test "$(find Datasets/generated/raise512-run1-records/clean -type f -name '*.png' | wc -l)" -eq 49796
+   test "$(find Datasets/generated/raise512-run1-records/stego -type f -name '*.png' | wc -l)" -eq 49796
+   test "$(find Datasets/generated/raise512-run1-records/masks -type f -name '*.png' | wc -l)" -eq 49796
+   test "$(awk 'NR > 1 { count++ } END { print count + 0 }' Datasets/generated/raise512-run1-records/labels.csv)" -eq 99592
    ```
 
 ## Expected result
@@ -141,10 +141,10 @@ The clean, stego, and mask files must remain in their `clean/`, `stego/`, and `m
 
 ## Free intermediate space
 
-Keep `ImageSets/RAISE/NEF` and `ImageSets/RAISE/tiles512` until the label and count checks finish. Then they are no longer needed for this dataset:
+Keep `Datasets/originals/raise/NEF` and `Datasets/originals/raise/tiles512` until the label and count checks finish. Then they are no longer needed for this dataset:
 
 ```sh
-rm -rf ImageSets/RAISE/NEF ImageSets/RAISE/tiles512
+rm -rf Datasets/originals/raise/NEF Datasets/originals/raise/tiles512
 ```
 
 On the reference run, the NEF files used about 17 GB and the tile PNG files used about 18 GB. Removing both freed about 35 GB. Check the size on your machine with `du -sh` before removal.

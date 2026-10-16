@@ -63,7 +63,7 @@ def _manifest(source, selection):
             ident=row['alaska_id']
             if not re.fullmatch(r'[0-9]{5}',ident):raise ValueError(f'invalid Alaska ID: {ident}')
             photo_id=f'alaska_{ident}'
-            master=f'Datasets/alaska/tiff_various_color/{ident}.tif'
+            master=f'Datasets/originals/alaska/tiff_various_color/{ident}.tif'
             camera=row['camera_model']
             if not camera or row['in_v1'] not in {'0','1'} or not row['url'].startswith('https://'):
                 raise ValueError('invalid ALASKA camera, in_v1, or URL')
@@ -73,7 +73,7 @@ def _manifest(source, selection):
             if not ident.endswith('.png') or not re.fullmatch(r'shard-\d+',row['shard']):
                 raise ValueError('invalid LSDIR member/shard')
             photo_id='lsdir_'+ident.removesuffix('.png').replace('/','_')
-            master=f'Datasets/lsdir/hr/{ident}'
+            master=f'Datasets/originals/lsdir/hr/{ident}'
             if not re.fullmatch(r'[A-Za-z0-9_.-]+',row['lsdir_id']):
                 raise ValueError('invalid LSDIR selection ID')
             camera='';kind='png8'

@@ -42,7 +42,7 @@ Related records:
 - [Current v3c baseline](../results/results-v3.md)
 - [Existing generator](../../LSB-Dataset-Generator/README.md)
 - [RAISE rebuild record](rebuild-raise512-run1.md)
-- [Source citation and terms](../../ImageSets/README.md#citations-and-terms)
+- [Source citation and terms](../../Datasets/README.md#citations-and-terms)
 - [Noise proposal, not active](plan-noisy-covers.md)
 
 ## 1. Fixed requirements
@@ -192,7 +192,7 @@ settings, not evaluation changes.
 DIV2K is for **academic research only**; copyright remains with the original
 image owners. Cite E. Agustsson and R. Timofte, "NTIRE 2017 Challenge on
 Single Image Super-Resolution: Dataset and Study," CVPR Workshops, July 2017,
-as recorded in the [source terms](../../ImageSets/README.md#citations-and-terms).
+as recorded in the [source terms](../../Datasets/README.md#citations-and-terms).
 Do not treat the download as permission to redistribute the images.
 
 DIV2K was collected from the Internet. Its PNGs may retain an earlier JPEG
@@ -762,7 +762,7 @@ team VM. The following values are user-provided, not new measurements:
 | GPU | One NVIDIA L4. |
 | CPU / RAM | 8 vCPUs and 31 GB RAM. |
 | Free disk | About 100 GB; check it again before cache creation. |
-| Master sources | Selected NEFs under `ImageSets/RAISE`, plus `ImageSets/DIV2K_train_HR` and `ImageSets/DIV2K_valid_HR`, are already on the VM. Use recorded paths; no duplicate master downloads. |
+| Master sources | Selected NEFs under `ImageSets/RAISE`, plus `Datasets/originals/div2k/DIV2K_train_HR` and `Datasets/originals/div2k/DIV2K_valid_HR`, are already on the VM. Use recorded paths; no duplicate master downloads. |
 | Normal reads | Full-photo `.npy` for RAISE; direct `png8` for DIV2K initially. Direct NEF remains a correctness/speed reference. |
 | Initial loader workers | Test 4 and 8, with `OMP_NUM_THREADS=1` and PyTorch CPU threads 1 per worker. |
 | Initial speed target | At least 215 output tiles/s for the measured 512-pixel single-L4 baseline. Measure actual consumer demand again for new settings or 256-pixel inputs. |
@@ -859,7 +859,7 @@ All gates below must pass before an image-removal operation:
 
 Delete only the approved large image artifacts, not the dataset directory
 with its records. Keep records in `data/raise/` and the proposed `data/otf/`.
-Retain small records in `Datasets/raise512-run1/` and its `records/` tree. Historical
+Retain small records in `Datasets/generated/raise512-run1-records/` and its `records/` tree. Historical
 image paths in CSV rows remain replay identifiers; loaders must resolve them
 through the NEF/photo mapping, not require those PNG paths to exist.
 Do not remove model checkpoints, predictions, reports, NEFs, or DIV2K master

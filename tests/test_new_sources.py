@@ -63,8 +63,8 @@ class NewSources(unittest.TestCase):
         self.image('alpha.png',mode='RGBA')
         with self.assertRaises(ValueError):load_photo({**png,'master_path':'alpha.png'},self.root)
     def test_manifest_selection_provenance(self):
-        alaska=self.image('Datasets/alaska/tiff_various_color/00001.tif')
-        lsdir=self.image('Datasets/lsdir/hr/0001000/0000551.png')
+        alaska=self.image('Datasets/originals/alaska/tiff_various_color/00001.tif')
+        lsdir=self.image('Datasets/originals/lsdir/hr/0001000/0000551.png')
         def metadata(path):return dict(bytes=path.stat().st_size,sha256=hashlib.sha256(path.read_bytes()).hexdigest())
         cases=[('alaska',dict(alaska_id='00001',camera_group='Alpha',camera_model='Alpha',split='train',block='1',
                               width='512',height='512',tiles512='1',in_v1='1',url='https://example.org/1.tif',**metadata(alaska))),

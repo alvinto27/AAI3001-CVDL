@@ -50,7 +50,7 @@ def verify_photo(root, record, tiles, configuration):
         generation += time.perf_counter() - start
         start = time.perf_counter()
         for kind, actual in (("clean", clean), ("stego", stego)):
-            with Image.open(root / "Datasets/raise512-run1" / row[f"{kind}_path"]) as image:
+            with Image.open(root / "Datasets/generated/raise512-run1-records" / row[f"{kind}_path"]) as image:
                 check(image.mode == "RGB" and np.array_equal(actual, np.asarray(image)),
                       f"STOP: {kind} mismatch {row['cover_id']} photo {row['photo_id']}")
         comparison += time.perf_counter() - start

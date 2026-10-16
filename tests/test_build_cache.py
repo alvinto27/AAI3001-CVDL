@@ -25,7 +25,7 @@ class CacheLocationTests(unittest.TestCase):
         return subprocess.CompletedProcess([],returncode,"",stderr)
 
     def test_ignored_path_inside_checkout_passes(self):
-        cache=self.root/"Datasets/otf-cache/v1"
+        cache=self.root/"Datasets/generated/otf-cache/v1"
         with patch.object(build_cache.subprocess,"run",return_value=self.result(0)) as run:
             build_cache.validate_cache_location(self.root,cache)
         run.assert_called_once_with(["git","check-ignore","-q","--",str(cache.resolve())],
