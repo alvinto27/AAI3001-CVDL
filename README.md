@@ -62,7 +62,7 @@ V3_RUN_NAME=my-run
 ```
 
 ```sh
-python scripts/run_notebook.py --env-file run.env --output runs-out/my-run
+python scripts/run_notebook.py --env-file run.env --output runs/my-run
 ```
 
 `--notebook` selects another input notebook; `--set V3_WORKERS=4` overrides an
@@ -72,8 +72,8 @@ live `run.log`. The status heartbeat updates every 10 seconds. Check
 `status.json` for `done` and exit code 0 before using results. A failed or
 interrupted run exits non-zero and keeps its partial notebook and traceback.
 Notebook checkpoints, predictions, figures and settings records remain under
-`runs-out/my-run/checkpoints/<run name>/`; the status file lists them. Git
-ignores `runs-out/`. The runner refuses a nonempty output folder.
+`runs/my-run/checkpoints/<run name>/`; the status file lists them. Git
+ignores `runs/`. The runner refuses a nonempty output folder.
 
 ## Data and citations
 
@@ -109,7 +109,7 @@ Only run training that can resume on the VM. If a run cannot resume and the VM i
    ```sh
    uv run python my_train.py --run-name my-run --epochs 20
    ```
-3. If the run stops, run the same command again. It continues from `checkpoints/my-run/last.ckpt`.
+3. If the run stops, run the same command again. It continues from `runs/my-run/last.ckpt`.
 4. To start fresh, use a new `--run-name`.
 
 The template uses PyTorch Lightning. It saves `last.ckpt` after every epoch (model, optimizer, and progress), and it also keeps the best epoch by `val_loss`. A preemption loses at most the epoch in progress.

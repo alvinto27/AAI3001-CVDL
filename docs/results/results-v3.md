@@ -64,10 +64,10 @@ may be too high at that point. This possible cause was not tested.
 The V3a metrics came from the VM file
 `/srv/aai3001/AAI3001-CVDL/checkpoints/lightning_logs/version_5/metrics.csv`.
 The V3b metrics came from the PC file
-`runs-out/early-pc/lightning_logs/version_2/metrics.csv` (moved from the PC working folder). Git tracks copies of both
+`runs/early-pc/lightning_logs/version_2/metrics.csv` (moved from the PC working folder). Git tracks copies of both
 at `logs/csv/run/metrics.csv` in each run folder (commit `3787b14`). The V3c
 metrics came from
-`checkpoints/baseline_kv_xunet_v3_clip3_group/logs/csv/run/metrics.csv`.
+`runs/baseline_kv_xunet_v3_clip3_group/logs/csv/run/metrics.csv`.
 
 ## 4. Test results
 

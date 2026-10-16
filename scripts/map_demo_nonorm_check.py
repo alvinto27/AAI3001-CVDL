@@ -2,7 +2,7 @@
 """Check that no-norm suspicion cells do not change in unaffected chunks.
 
 Use the fixed-settings R1 checkpoint and the same seeds as map_demo.py.
-Run in the GPU container; write only to runs-out/map-demo-r1/.
+Run in the GPU container; write only to runs/map-demo-r1/.
 """
 import csv
 from pathlib import Path
@@ -14,8 +14,8 @@ from map_demo import (ROOT, RATES, XuNet, chunk_map, input_photos,
                       read_photo, starts, cell_mask)
 from lsb_engine import embed_fast
 
-OUTPUT = ROOT / 'runs-out/map-demo-r1'
-CHECKPOINT = next((ROOT / 'runs-out/g4-v4-r1b/checkpoints').glob('*/best-*.ckpt'))
+OUTPUT = ROOT / 'runs/map-demo-r1'
+CHECKPOINT = next((ROOT / 'runs/g4-v4-r1b/checkpoints').glob('*/best-*.ckpt'))
 
 
 def owner_mask(changed, shape):

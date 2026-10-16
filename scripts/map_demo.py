@@ -2,8 +2,8 @@
 """Demo last-layer XuNet suspicion cells on full-photo LSB modifications.
 
 Run only in the PC GPU container: podman exec -w /work aai3001 python scripts/map_demo.py
-Pass --fixed-settings for comparable k=1/k=4 figures in runs-out/map-demo-v2/.
-The default retains the original drawn-settings demo in runs-out/map-demo/.
+Pass --fixed-settings for comparable k=1/k=4 figures in runs/map-demo-v2/.
+The default retains the original drawn-settings demo in runs/map-demo/.
 This is inference, not training.
 """
 from __future__ import annotations
@@ -32,8 +32,9 @@ from lsb_engine import embed_fast
 from lsb_source import load_photo, grid_axes
 from lsb_settings import draw_otf_settings
 
-OUTPUT = ROOT / 'runs-out/map-demo'
-CHECKPOINT = OUTPUT / 'best-epoch08-val_pe0.0147-val_auc0.9973.ckpt'
+OUTPUT = ROOT / 'runs/map-demo'
+# Points at the g4-prime-1 result folder: map-demo no longer keeps its own copy of this checkpoint.
+CHECKPOINT = ROOT / 'runs/g4-prime-1/checkpoints/g4-prime-1/best-epoch08-val_pe0.0147-val_auc0.9973.ckpt'
 RATES = (0.05, 0.275, 0.5)  # low, midpoint, high of the training [0.05, 0.5] bpp range
 PLACEMENTS = ('contiguous', 'random')
 KV_ARRAY = np.array([[-1, 2, -2, 2, -1], [2, -6, 8, -6, 2],
@@ -383,7 +384,7 @@ def main():
     args = parser.parse_args()
     CHECKPOINT = args.checkpoint.resolve()
     if args.fixed_settings:
-        OUTPUT = ROOT / 'runs-out/map-demo-v2'
+        OUTPUT = ROOT / 'runs/map-demo-v2'
     if args.output is not None:
         OUTPUT = args.output.resolve()
     OUTPUT.mkdir(parents=True, exist_ok=True)

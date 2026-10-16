@@ -2,7 +2,7 @@
 """Score a fixed evaluation split without changing the standard notebook test.
 
 Run in the project GPU environment, for example:
-  python scripts/eval_checkpoint.py --checkpoint runs-out/g4-prime-1/checkpoints/g4-prime-1/best-epoch08-val_pe0.0147-val_auc0.9973.ckpt --eval-yaml configs/test-bpp1.yaml --split test --output runs-out/eval-bpp1/v3c --workers 6
+  python scripts/eval_checkpoint.py --checkpoint runs/g4-prime-1/checkpoints/g4-prime-1/best-epoch08-val_pe0.0147-val_auc0.9973.ckpt --eval-yaml configs/test-bpp1.yaml --split test --output runs/eval-bpp1/v3c --workers 6
 Bpp bins refer to REQUESTED bpp; stride capacity can reduce effective bpp.
 """
 from __future__ import annotations

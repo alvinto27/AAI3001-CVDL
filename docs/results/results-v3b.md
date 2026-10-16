@@ -113,9 +113,9 @@ See the [journal](../journal/README.md) for both diagnoses and the
 *Figure 1. Per-epoch loss, accuracy, validation P_E, and validation AUC. The
 vertical line marks the learning-rate drop before epoch 6.*
 
-The source is the local PC file `runs-out/early-pc/lightning_logs/version_2/metrics.csv`.
+The source is the local PC file `runs/early-pc/lightning_logs/version_2/metrics.csv`.
 A tracked copy is at
-`checkpoints/baseline_kv_xunet_v3_noclip_group/logs/csv/run/metrics.csv`.
+`runs/baseline_kv_xunet_v3_noclip_group/logs/csv/run/metrics.csv`.
 Its epoch-1 train loss
 0.1643 and validation P_E 0.02683 match `logs/v3b_pc.log`. Training and
 validation metrics are on separate CSV rows; the plot joins them by epoch.
@@ -163,7 +163,7 @@ small overlapping tails remain visible.*
 *Figure 3. ROC curve, with a closer view of the low false-alarm region.*
 
 The local executed notebook is
-`runs-out/early-pc/baseline_kv_xunet_v3_noclip_group/v3b_pc_9070xt.ipynb`.
+`runs/baseline_kv_xunet_v3_noclip_group/v3b_pc_9070xt.ipynb`.
 It reproduced the original test probabilities exactly: maximum absolute
 per-image difference 0. All per-setting P_E values also matched.
 
@@ -306,11 +306,11 @@ from hardware and run variation.
 - The test-optimal threshold is descriptive; a threshold for use on new data
   must be chosen from validation data and checked independently.
 
-Run records are under `checkpoints/baseline_kv_xunet_v3_noclip_group/`.
+Run records are under `runs/baseline_kv_xunet_v3_noclip_group/`.
 Git tracks `test_predictions.csv`, `test_predictions_per_setting.csv`, the
 four heatmaps, and `logs/csv/run/metrics.csv` (commit `3787b14`). Git ignores
-the `.ckpt` model files and the executed notebook `v3b_pc_9070xt.ipynb`; the local copies are now under `runs-out/early-pc/baseline_kv_xunet_v3_noclip_group/`. The
-model files are on the VM; see the [checkpoints guide](../../checkpoints/README.md).
+the `.ckpt` model files and the executed notebook `v3b_pc_9070xt.ipynb`; the local copies are now under `runs/baseline_kv_xunet_v3_noclip_group/`. The
+model files are on the VM; see the [checkpoints guide](../../runs/README.md).
 The training log `logs/v3b_pc.log` was deleted after its numbers were
 recorded here. The report figures are committed copies or CPU plots made from
 those records.

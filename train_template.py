@@ -4,7 +4,7 @@ Copy this file, edit the two EDIT sections, and run:
     uv run python my_train.py --run-name my-run --epochs 20
 
 If the run stops (Spot VM preemption, crash, Ctrl+C), run the SAME command again.
-It continues from checkpoints/<run-name>/last.ckpt. Use a new --run-name to start fresh.
+It continues from runs/<run-name>/last.ckpt. Use a new --run-name to start fresh.
 """
 
 import argparse
@@ -59,13 +59,13 @@ def main():
     L.seed_everything(42, workers=True)
     train_loader, val_loader = make_loaders(args.batch_size)
     checkpoint = ModelCheckpoint(
-        dirpath=f"checkpoints/{args.run_name}",
+        dirpath=f"runs/{args.run_name}",
         save_last=True,       # writes last.ckpt after every epoch
         save_top_k=1,         # also keeps the best epoch by val_loss
         monitor="val_loss",
     )
-    trainer = L.Trainer(max_epochs=args.epochs, callbacks=[checkpoint], default_root_dir="checkpoints")
-    # "last" loads checkpoints/<run-name>/last.ckpt if it exists; otherwise starts from scratch.
+    trainer = L.Trainer(max_epochs=args.epochs, callbacks=[checkpoint], default_root_dir="runs")
+    # "last" loads runs/<run-name>/last.ckpt if it exists; otherwise starts from scratch.
     trainer.fit(Model(), train_loader, val_loader, ckpt_path="last")
 
 

@@ -24,7 +24,7 @@ podman exec -w /work aai3001 python scripts/build_new_source_manifests.py --sour
 podman exec -w /work aai3001 python scripts/build_new_source_manifests.py --source lsdir --selection data/lsdir/selection_v1.csv --output-root /work
 ```
 
-The command checks each file's size and SHA-256. It refuses to overwrite any output. Each source has `photo_manifest.csv`, `split.csv`, `provenance.csv`, and `build_record.json` (selection hash, counts, decoder/grid policy, and verification state). Use `--output-root runs-out/<scratch>` for an independent repeat. `--no-verify-files` is only for a metadata dry run; **never use it to make final records**. ALASKA has 13,500/1,000/1,700/2,000 photos (train/val/test_seen/test_unseen) and 21,139/1,535/2,648/3,153 trim512 tiles. LSDIR has 7,000/1,500/2,500 photos (train/val/test) and 14,475/3,164/5,245 trim512 tiles. See [ALASKA selection](../active/alaska-selection-v2.md) and [LSDIR selection](../active/lsdir-selection-v1.md) for split rules.
+The command checks each file's size and SHA-256. It refuses to overwrite any output. Each source has `photo_manifest.csv`, `split.csv`, `provenance.csv`, and `build_record.json` (selection hash, counts, decoder/grid policy, and verification state). Use `--output-root runs/<scratch>` for an independent repeat. `--no-verify-files` is only for a metadata dry run; **never use it to make final records**. ALASKA has 13,500/1,000/1,700/2,000 photos (train/val/test_seen/test_unseen) and 21,139/1,535/2,648/3,153 trim512 tiles. LSDIR has 7,000/1,500/2,500 photos (train/val/test) and 14,475/3,164/5,245 trim512 tiles. See [ALASKA selection](../active/alaska-selection-v2.md) and [LSDIR selection](../active/lsdir-selection-v1.md) for split rules.
 
 ## Decode and grid rules
 

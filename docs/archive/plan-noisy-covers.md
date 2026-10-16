@@ -18,7 +18,7 @@ The goals are:
 - Possibly reduce confident false alarms on noisy clean photos. This is an
   unconfirmed guess. In v3b, 54 of 7,433 clean test tiles had
   `prob_stego >= 0.99`. The count comes from
-  `checkpoints/baseline_kv_xunet_v3_noclip_group/test_predictions.csv`
+  `runs/baseline_kv_xunet_v3_noclip_group/test_predictions.csv`
   (rows with `label` 0). See the [V3b report](../results/results-v3b.md).
 
 ## 2. Key rule

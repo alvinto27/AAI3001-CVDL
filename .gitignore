@@ -1,18 +1,17 @@
 .venv/
 __pycache__/
-checkpoints/**/*.ckpt
-checkpoints/**/logs/tb/
-checkpoints/lightning_logs/
-checkpoints/*_quick/
-checkpoints/baseline_kv_xunet/
-checkpoints/baseline_kv_xunet_pc/
-checkpoints/baseline_kv_xunet_v2/
-checkpoints/baseline_kv_xunet_v2_from_vm/
-checkpoints/baseline_kv_xunet_v3_noclip_group/v3b_pc_9070xt.ipynb
+# checkpoints/ is a notebook's working folder for an active run only; a
+# leftover folder here is scratch, never committed.
+checkpoints/
 ImageSets/*
 !ImageSets/README.md
 Datasets/*
 !Datasets/README.md
 logs/*
 !logs/README.md
-runs-out/
+# runs/ holds all finished run results; files already tracked in git (the
+# frozen v3a/v3b/v3c records and the user's otf/clip3_group notebooks) stay
+# tracked even though the folder is ignored for anything new.
+runs/
+runs/**/*.ckpt
+runs/**/logs/tb/
