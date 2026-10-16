@@ -25,6 +25,25 @@ def capped_validation(dataset,raise_cap,lsdir_cap):
     return PairSubset(dataset,sorted(selected))
 
 
+def source_balanced_subset(dataset,count,seed=0):
+    """Keep every capped-validation source in the tiny QUICK smoke subset."""
+    groups=list(dataset.frame.groupby("source",sort=True).groups.values())
+    if count<len(groups):
+        raise ValueError("QUICK validation needs one pair per source")
+    if count>=len(dataset):
+        return dataset
+    rng=np.random.default_rng(seed)
+    queues=[list(rng.permutation(list(group))) for group in groups]
+    indices=[]
+    while len(indices)<count and any(queues):
+        for queue in queues:
+            if queue and len(indices)<count:
+                indices.append(queue.pop())
+    if isinstance(dataset,PairSubset):
+        return PairSubset(dataset.dataset,[dataset.indices[int(i)] for i in indices])
+    return PairSubset(dataset,indices)
+
+
 def fixed_subset(dataset,count,seed=0):
     """Stable camera/source-stratified subset, with every nonempty stratum."""
     if count>=len(dataset):
@@ -71,7 +90,8 @@ class NotebookData:
                 for split in splits:
                     self.extra_pairs[f"{source}-{split}"]=FixedPairs(self.corpus,split,profile,sources=(source,))
         if quick:
-            self.val=fixed_subset(self.val,eval_pairs,0)
+            self.val=(source_balanced_subset(self.val,eval_pairs,0)
+                      if checkpoint_validation=="capped" else fixed_subset(self.val,eval_pairs,0))
             self.test=fixed_subset(self.test,eval_pairs,1)
             self.extra_pairs={name:fixed_subset(dataset,eval_pairs,2+i)
                               for i,(name,dataset) in enumerate(self.extra_pairs.items())}

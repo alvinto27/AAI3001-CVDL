@@ -17,7 +17,7 @@ sys.path.insert(0,str(ROOT/'scripts'))
 from build_new_source_manifests import build
 from lsb_source import load_photo,grid_axes
 from lsb_torch import Corpus,RunSettings,TrainingImages,FixedPairs,PhotoPairTasks,PairSubset,training_loader
-from lsb_notebook import capped_validation,fixed_subset
+from lsb_notebook import capped_validation,fixed_subset,source_balanced_subset
 from test_lsb_source import record as old_record
 
 
@@ -149,6 +149,10 @@ class NewSources(unittest.TestCase):
             self.assertIsInstance(quick,PairSubset)
             self.assertIsInstance(quick.dataset,FixedPairs)
             self.assertEqual(sum(len(group) for group in PhotoPairTasks(quick).groups),8)
+            smoke=source_balanced_subset(selected,3,0)
+            self.assertEqual(smoke.frame['source'].value_counts().to_dict(),
+                             {'raise':1,'alaska':1,'lsdir':1})
+            self.assertIsInstance(smoke.dataset,FixedPairs)
             ids.append(frame['cover_id'].tolist())
         self.assertEqual(ids[0],ids[1])
         with self.assertRaises(ValueError):capped_validation(full,0,2)
