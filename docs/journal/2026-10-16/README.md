@@ -167,7 +167,21 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
   only). The Orchestrator dropped all 4 notebook 04 stashes.
 - Did: PR #2 to `main` (branch `runs-folder-main`) with only the same folder
   move for main's files: https://github.com/alvinto27/AAI3001-CVDL/pull/2.
-  Pending: user merge.
+  Done: the user merged PR #2 (`0981ce7`) and deleted the branch.
+- Did: Worker_3 reorganised the PC data folders (`76f6257`, `a26ebda`):
+  `Datasets/originals/{raise,div2k,alaska,lsdir}` (72 GB) and
+  `Datasets/generated/raise512-run1-records` (117 MB); `ImageSets/` removed.
+  `master_path` rewritten in 9 record CSVs. Proof: standard test hash
+  `fdd989f7...06837`, capped validation SHA `6bb3c8ef...e4d5ca`, 4 RAISE/DIV2K
+  panels, 5 new-source panels, fixed train pairs (81,288), and decoded pixels
+  of 24 photos are all unchanged; all masters present with correct size and
+  SHA. Deleted the otf-cache (50 GB) and the raise512-run1 images (37.5 GB).
+  All 22,097 ALASKA files kept (user). PC free space 700 -> 778 GB.
+- Decided: `V3_SOURCE` defaults to `decode` (notebooks 04 and 05); `cache` is
+  an explicit option and the cache must be rebuilt to use it.
+- Pending: the G4 disk and `scripts/g4/{setup.sh,upload_masters.sh}` still
+  use the old layout. Reorganise the G4 before the next G4 job (code from
+  `76f6257` on needs the new layout). Then a PR for `main`.
 
 ### Next
 
