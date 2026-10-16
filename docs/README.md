@@ -1,8 +1,9 @@
 # Documentation — start here
 
-This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **All research is on hold.** Read [status](status.md) before acting, [findings](findings.md) for run comparisons, and the [dated journal](journal/README.md) for the original records.
+This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Research is on hold except the approved training-tiling experiment (design stage).** Read [status](status.md) before acting, [findings](findings.md) for run comparisons, and the [dated journal](journal/README.md) for the original records.
 
 ## Current references (`active/` means kept for use, not permission to run)
+- [Training tiling — three-arm design; no runs yet](active/plan-training-tiling.md)
 - [Per-cell design — not approved, on hold](active/plan-per-cell-training.md)
 - [G4 batch-runner guide](active/g4-batch-runner.md)
 - [Pi host state](active/pi-host-changes.md)
