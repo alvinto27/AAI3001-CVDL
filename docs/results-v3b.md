@@ -155,7 +155,7 @@ small overlapping tails remain visible.*
 *Figure 3. ROC curve, with a closer view of the low false-alarm region.*
 
 The local executed notebook is
-`checkpoints/baseline_kv_xunet_v3_noclip_group/v3b_pc_9070xt.ipynb`.
+`runs/baseline_kv_xunet_v3_noclip_group/v3b_pc_9070xt.ipynb`.
 It reproduced the original test probabilities exactly: maximum absolute
 per-image difference 0. All per-setting P_E values also matched.
 
@@ -298,7 +298,7 @@ from hardware and run variation.
   must be chosen from validation data and checked independently.
 
 Local-only records are under
-`checkpoints/baseline_kv_xunet_v3_noclip_group/`: checkpoints,
+`runs/baseline_kv_xunet_v3_noclip_group/`: checkpoints,
 `test_predictions.csv`, `test_predictions_per_setting.csv`, four heatmaps,
 and the executed notebook. The training log is `logs/v3b_pc.log`.
 These paths are ignored by git and do not work on GitHub. The report figures
