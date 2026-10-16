@@ -161,3 +161,31 @@ cover provenance, errors, machine guards, immutable values, repeated CLI
 settings, saved git metadata, the runner-to-JSON path with a no-training shell
 stub, notebook/env conflicts, and deterministic QUICK panel selection. Default
 golden compare is ALL EQUAL; **144 tests pass**. Notebooks remain independent.
+
+### Phase 4b: evaluation and diagnostics
+
+`cvdl.evaluation` provides explicit-device paired prediction, prediction CSV
+saving, notebook-05 per-setting tables, fixed checkpoint panels, and saved-file
+breakdowns with four heatmaps. `cvdl.metrics.global_summary` preserves notebook
+02's threshold scan, including its first tied minimum and infinite endpoints;
+this differs from the validation-cutoff tie rule. Other metric formulas remain
+in `cvdl.metrics`. The checkpoint scorer is moved, not copied:
+`scripts/eval_checkpoint.py` is its CLI and legacy env-aware boundary. Package
+calls receive root, device, QUICK and panel selection as arguments and do not
+read env values. QUICK still caps extra panels at 16 pairs with seed 1.
+
+`cvdl.diagnostics` selects/preloads seed-0 pairs and returns full-precision
+batch-dependence results for eval and train modes c/e/f. The caller passes a
+split dataset and owns the diagnostic pair-ID record. The original network is
+not changed. Workers, normalization, device and QUICK are explicit.
+
+Notebooks 02, 04 and 05 are unchanged. Notebook 02 remains the standalone
+saved-file reference until notebook thinning; the package already accepts
+self-contained OTF predictions and PNG predictions with an explicit label CSV.
+Same-process tests compare real g4-v4-r2 saved predictions and synthetic PNG
+metadata against notebook 02: tables, CSV bytes, global metrics and all four
+PNG heatmap bytes match exactly. Notebook-05 tests compare CPU predictions,
+CSV bytes and setting tables in OTF/PNG mode, plus diagnostic numbers for
+none/group/batch normalization on both train and val. The panel scorer is
+checked with a small CPU checkpoint and full/QUICK subsets. Default golden
+compare is ALL EQUAL; **151 tests pass**. No GPU runs.

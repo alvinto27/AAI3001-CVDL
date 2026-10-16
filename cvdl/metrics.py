@@ -181,3 +181,30 @@ def rates(frame: pd.DataFrame, cutoff: float) -> dict:
                 pe_at_cutoff=(fa + miss) / 2)
 
 
+def global_summary(frame):
+    """Notebook-02 minimum-error threshold, including its first-tie rule."""
+    labels_array = frame["label"].to_numpy(dtype=np.int64)
+    scores_array = frame["prob_stego"].to_numpy(dtype=np.float64)
+    if set(np.unique(labels_array)) != {0, 1} or not np.isfinite(scores_array).all():
+        raise ValueError('global summary requires finite scores and both labels 0 and 1')
+    thresholds = np.r_[np.inf, np.sort(np.unique(scores_array))[::-1], -np.inf]
+    threshold_errors = []
+    for threshold in thresholds:
+        predicted = scores_array >= threshold
+        p_fa = float(predicted[labels_array == 0].mean())
+        p_md = float((~predicted[labels_array == 1]).mean())
+        threshold_errors.append((p_fa + p_md) / 2.0)
+    best_threshold_index = int(np.argmin(threshold_errors))
+    GLOBAL_THRESHOLD = float(thresholds[best_threshold_index])
+    GLOBAL_P_E = probability_error(labels_array, scores_array)
+    global_predicted = scores_array >= GLOBAL_THRESHOLD
+    GLOBAL_P_FA = float(global_predicted[labels_array == 0].mean())
+    GLOBAL_P_MD = float((~global_predicted[labels_array == 1]).mean())
+    GLOBAL_DETECTION_RATE = float(global_predicted[labels_array == 1].mean())
+    assert np.isclose(GLOBAL_P_E, threshold_errors[best_threshold_index], atol=1e-12, rtol=0)
+    assert np.isclose(GLOBAL_DETECTION_RATE, 1.0 - GLOBAL_P_MD, atol=1e-12, rtol=0)
+
+    return dict(threshold=GLOBAL_THRESHOLD, P_E=GLOBAL_P_E,
+        AUC=auc_numpy(labels_array, scores_array), false_alarm_rate=GLOBAL_P_FA,
+        miss_rate=GLOBAL_P_MD, detection_rate=GLOBAL_DETECTION_RATE,
+        accuracy=float(((scores_array >= .5) == labels_array).mean()))
