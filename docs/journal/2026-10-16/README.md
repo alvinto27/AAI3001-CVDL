@@ -130,10 +130,26 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
   per-source thresholds chosen on validation) -> A (per-cell training) -> C
   (more capacity / longer training, bf16).
 
+### Afternoon: per-cell design, hold, documentation tidy-up
+
+- Did: Worker_2 wrote the per-cell training design
+  (`a6170ed`, [plan](../../active/plan-per-cell-training.md)): separate 1x1
+  cell head, hard "any changed pixel" cell label with a reliability weight,
+  50% region payloads, loss `tile CE + 0.2 x cell BCE`, pass marks fixed
+  before a run. Not approved.
+- Decided: the user put all research work on hold and asked for a
+  documentation tidy-up first.
+- Did: Worker_2 reorganised `docs/` (`45ec074`): `status.md`, `findings.md`,
+  one journal folder per day, `active/`, `results/`, `archive/`. Nothing was
+  deleted; the day folders join back to the old journal text. 309 links
+  resolve; 93/93 tests pass.
+- Decided: from now on, `docs/status.md` replaces the research checklist as
+  the record that changes in the same commit as the journal.
+
 ### Next
 
 - Done: B checks (`042903d`).
-- Pending: A, per-cell (dense) training design and run.
-- Pending: C, capacity / epochs / bf16.
+- On hold: A, per-cell training (design written, not approved).
+- On hold: C, capacity / epochs / bf16.
 - Pending: start a new Scribe session (the old Scribe alias shows the
   Orchestrator session ID).

@@ -14,3 +14,4 @@ The dated entries were moved from the former single journal file without deletin
   Speed work and the late-output fix remain here; see also the [wide result](../results/result-wide-xunet.md).
 - [2026-10-16](2026-10-16/README.md) — Recorded final source data, the mixed G4 run, and Pi swap changes.
   The corrected old-model ALASKA 5%-FA finding is in the [check B result](../results/result-check-b.md).
+  Afternoon: per-cell design written (not approved), all research on hold, docs reorganised.

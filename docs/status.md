@@ -34,5 +34,6 @@ The old checkpoint-selection validation decision is **done**: the mixed run used
 | `042903d` | PC [check B](results/result-check-b.md). |
 | `a6170ed` | Per-cell [design only](active/plan-per-cell-training.md). |
 | `465de12` | Latest dated journal update before this documentation reorganization. |
+| `45ec074` | Documentation reorganization (status, findings, journal by day). |
 
 The [documentation index](README.md) lists each current, result, and historical record. The [run guide](active/g4-batch-runner.md) is reference material only while work is on hold.
