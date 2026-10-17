@@ -10,11 +10,12 @@ States: `queued` (approved, waiting) · `preparing` (code or notebook not ready)
 | # | Run (notebook) | Purpose | Commit | State | Job ID | Result |
 | ---: | --- | --- | --- | --- | --- | --- |
 | 1 | `experiments/tiling-overlap.ipynb` | Tiling arm 1: overlap-last, 512 | `8fff50d` | evaluated (14:00-14:40Z; 39m49s; best epoch 29, val P_E .0586) | `tiling-overlap-20261016T135926Z-8501` | `runs/<job>/pc-comparison/` (standard P_E 2.80%; padding: misses about double at 50% pad) |
-| 2 | `experiments/tiling-trim.ipynb` | Tiling arm 2: centre trim, 512 | `8fff50d` | delivered (14:41-15:22Z; 39m53s notebook time) | `tiling-trim-20261016T144117Z-3222` | evaluated: standard P_E 4.07% |
-| 3 | `experiments/tiling-pad.ipynb` | Tiling arm 3: centre zero-pad, 512 | `8fff50d` | delivered (01:31-02:11Z; 40m05s; best epoch 27, val P_E .0668; 54.65 steps/s, GPU-bound) | `tiling-pad-20261017T013055Z-7210` | evaluated: standard P_E 4.32% (overlap 2.80, trim 4.07); padding-trained model cuts padding misses about 60% |
-| 4 | `experiments/tiling-overlap-256.ipynb` | Tiling arm 1 at 256: overlap-last (batch 128, 180,000 tiles/epoch, LR 3e-4) | `30bac1f` | delivered (02:22-03:18Z; 55m36s; 32-33 steps/s, loader-bound) | `tiling-overlap-256-20261017T022212Z-9778` | evaluated: standard P_E 2.25% (512 overlap 2.80); best so far |
-| 5 | `experiments/tiling-trim-256.ipynb` | Tiling arm 2 at 256: centre trim (same 256 budget) | `30bac1f` | delivered (03:20-04:16Z; 55m38s; best epoch 27, val P_E .0630) | `tiling-trim-256-20261017T032025Z-8579` | evaluating |
-| 6 | `experiments/tiling-pad-256.ipynb` | Tiling arm 3 at 256: centre zero-pad (same 256 budget) | `30bac1f` | queued (dry run OK) | — | — |
+| 2 | `experiments/tiling-trim.ipynb` | Tiling arm 2: centre trim, 512 | `8fff50d` | evaluated (14:41-15:22Z; 39m53s notebook time) | `tiling-trim-20261016T144117Z-3222` | evaluated: standard P_E 4.07% |
+| 3 | `experiments/tiling-pad.ipynb` | Tiling arm 3: centre zero-pad, 512 | `8fff50d` | evaluated (01:31-02:11Z; 40m05s; best epoch 27, val P_E .0668; 54.65 steps/s, GPU-bound) | `tiling-pad-20261017T013055Z-7210` | evaluated: standard P_E 4.32% (overlap 2.80, trim 4.07); padding-trained model cuts padding misses about 60% |
+| 4 | `experiments/tiling-overlap-256.ipynb` | Tiling arm 1 at 256: overlap-last (batch 128, 180,000 tiles/epoch, LR 3e-4) | `30bac1f` | evaluated (02:22-03:18Z; 55m36s; 32-33 steps/s, loader-bound) | `tiling-overlap-256-20261017T022212Z-9778` | evaluated: standard P_E 2.25% (512 overlap 2.80); best so far |
+| 5 | `experiments/tiling-trim-256.ipynb` | Tiling arm 2 at 256: centre trim (same 256 budget) | `30bac1f` | evaluated (03:20-04:16Z; 55m38s; best epoch 27, val P_E .0630) | `tiling-trim-256-20261017T032025Z-8579` | evaluated: standard P_E 3.55% (256 overlap 2.25) |
+| 6 | `experiments/tiling-pad-256.ipynb` | Tiling arm 3 at 256: centre zero-pad (same 256 budget) | `30bac1f` | delivered (04:31-05:27Z; 54m56s; best epoch 26, val P_E .0641; 33.1 steps/s, loader-bound) | `tiling-pad-256-20261017T043145Z-9721` | evaluating |
+| 7 | `experiments/srm.ipynb` | SRM front end (30 fixed filters per channel) with the 256 overlap recipe | `0d851b6` | running (start 05:29Z; stop early if the warm speed cannot fit 30 epochs in 105 min) | `srm-20261017T052857Z-4521` | — |
 
 ## Next (approved in principle, not queued)
 
