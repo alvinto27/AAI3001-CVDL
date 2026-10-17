@@ -14,8 +14,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
-HIST_MAX=50.0
-HIST_BINS=50000
+HIST_MAX=1000.0
+HIST_BINS=200000
 LAYERS=(('tanh1','bn1'),('tanh2','bn2'))
 
 

@@ -32,8 +32,8 @@ class TanhSaturationTests(unittest.TestCase):
     def test_pair_choice_is_fixed_and_stats_overflow(self):
         self.assertEqual(fixed_pairs(10,0,100),fixed_pairs(10,0,100));self.assertNotEqual(fixed_pairs(10,0,100),fixed_pairs(10,1,100))
         self.assertEqual(len(set(fixed_pairs(10,0,100))),10);self.assertEqual(len(fixed_pairs(500,0,100)),100)
-        s=Stats();s.add(torch.tensor([0.5,1.5,100.,-200.]))
-        self.assertEqual(s.max,200.);self.assertEqual(s.result(False)['share_abs_gt3'],.5);self.assertEqual(s.quantile(.99),float('inf'))
+        s=Stats();s.add(torch.tensor([0.5,1.5,100.,-2000.]))
+        self.assertEqual(s.max,2000.);self.assertEqual(s.result(False)['share_abs_gt3'],.5);self.assertEqual(s.quantile(.99),float('inf'))
 
 if __name__=='__main__':unittest.main()
 
