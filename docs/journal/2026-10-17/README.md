@@ -65,6 +65,7 @@ Recorded by the Orchestrator.
 - User: default evaluation = standard suite + hard suite. Padding, temperature and tanh checks only on request.
 - User: hard training notebook `srm-hard` = SRM recipe, 30 epochs, with per epoch RAISE 72,000 / ALASKA 72,000 / LSDIR 72,000 pairs (LSDIR doubled; 216,000 total); k=1 50%, k=2-4 one sixth each; half of the bpp draws from 0.05-0.15, half from 0.05-0.5; stego type unchanged. No texture-weighted sampling in this run. Prepare launch-ready today; launch tomorrow on the user's go. Worker_4 builds it.
 - Rule: after every PC run or kill, check `pgrep -af spawn_main` for orphan workers.
+- User (late): validation must follow the training set, so that the training and validation curves show overfitting. The final holdout test needs a major update (scope to agree). `srm-hard` launch on hold until the new validation exists (to confirm).
 
 ### Next
 
