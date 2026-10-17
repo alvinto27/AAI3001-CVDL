@@ -40,12 +40,12 @@ class SyntheticImages(torch.utils.data.IterableDataset):
             yield pool[i%16],i%2,i;i+=1
 
 
-def build(tile,batch,tiles,workers,group_images,pin_memory,synthetic=False,sharing=None):
+def build(tile,batch,tiles,workers,group_images,pin_memory,synthetic=False,sharing=None,pack_blocks=1):
     if synthetic:
         import lsb_torch
         dataset=SyntheticImages(tile,sharing)
         loader=lsb_torch.training_loader(dataset,batch_size=batch,num_workers=workers,pin_memory=pin_memory,
-                                         prefetch_images=128,group_images=group_images)
+                                         prefetch_images=128,group_images=group_images,pack_blocks=pack_blocks)
         return None,types.SimpleNamespace(train=dataset),loader
     from cvdl.settings import load
     from cvdl import data
@@ -57,7 +57,7 @@ def build(tile,batch,tiles,workers,group_images,pin_memory,synthetic=False,shari
     otf=data.build_otf_data(s.root,s.to_run_settings(),quick=False,checkpoint_validation='capped',
                             train_grid='overlap_last',train_tile=256 if tile==256 else None)
     loader=lsb_torch.training_loader(otf.train,batch_size=batch,num_workers=workers,pin_memory=pin_memory,
-                                     prefetch_images=s.prefetch_images,group_images=group_images)
+                                     prefetch_images=s.prefetch_images,group_images=group_images,pack_blocks=pack_blocks)
     return s,otf,loader
 
 
@@ -71,13 +71,17 @@ def main():
     p.add_argument('--warmup',type=int,default=30)
     p.add_argument('--steps',type=int,default=300)
     p.add_argument('--cprofile',type=int,default=0,metavar='TOP',help='print the top N main-process costs')
-    p.add_argument('--pin-memory',action='store_true')
+    p.add_argument('--pack-blocks',type=int,default=1,help='4-image blocks per worker message (1 = today)')
+    p.add_argument('--pin-memory',action='store_true',help='needs the GPU: ask first')
     p.add_argument('--synthetic',action='store_true',help='cheap workers sending the real IPC volume: main-side ceiling')
     p.add_argument('--sharing',choices=('file_descriptor','file_system'),default=None,help='tensor sharing strategy (synthetic only)')
     p.add_argument('--report-pids',action='store_true',help='print main and worker PIDs once the loop starts (for py-spy)')
     a=p.parse_args()
+    from scripts.pc_safety import check_workers, own_process_group
+    print(f'available RAM {check_workers(a.workers):.1f} GB; workers {a.workers}',flush=True)
+    own_process_group()
     tiles=a.tiles or 45000*(512//a.tile)**2
-    s,otf,loader=build(a.tile,a.batch,tiles,a.workers,a.group_images,a.pin_memory,a.synthetic,a.sharing)
+    s,otf,loader=build(a.tile,a.batch,tiles,a.workers,a.group_images,a.pin_memory,a.synthetic,a.sharing,a.pack_blocks)
     if hasattr(otf.train,'set_epoch'):otf.train.set_epoch(0)
     it=iter(loader);images=0;t0=None;profile=cProfile.Profile() if a.cprofile else None
     for step in range(a.warmup+a.steps):
@@ -90,14 +94,15 @@ def main():
         x,y,idx=next(it);images+=len(y)
     if profile:profile.disable()
     wall=time.perf_counter()-t0;cpu=time.process_time()-c0
-    print(f'RESULT {"synthetic " if a.synthetic else ""}tile={a.tile} batch={a.batch} workers={a.workers} group_images={a.group_images} sharing={a.sharing} steps={a.steps} '
+    print(f'RESULT {"synthetic " if a.synthetic else ""}tile={a.tile} batch={a.batch} workers={a.workers} group_images={a.group_images} pack_blocks={a.pack_blocks} sharing={a.sharing} steps={a.steps} '
           f'steps/s={a.steps/wall:.1f} images/s={images/wall:.0f} groups/s={images/a.group_images/wall:.0f} '
           f'Mpx/s={images*a.tile*a.tile/wall/1e6:.0f} main_cpu_share={cpu/wall:.2f} main_ms_per_step={1000*cpu/a.steps:.1f}',flush=True)
     if profile:
         out=io.StringIO();pstats.Stats(profile,stream=out).sort_stats('tottime').print_stats(a.cprofile)
         print(out.getvalue()[:6000])
-    try:loader.shutdown() if hasattr(loader,'shutdown') else None
-    finally:os._exit(0)
+    if hasattr(loader,'shutdown'):loader.shutdown()   # joins the DataLoader workers; then return normally (exit 0)
 
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    from scripts.pc_safety import guarded
+    guarded(main)
