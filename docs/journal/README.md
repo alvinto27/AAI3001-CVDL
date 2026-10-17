@@ -18,3 +18,5 @@ The dated entries were moved from the former single journal file without deletin
   Then bookkeeping: one `runs/` folder (best + latest checkpoints only), `Datasets/originals` +
   `generated` on PC and G4 (137 GB freed), code tidy-up (122 tests), model-copy parity proven,
   notebook refactor started.
+- [2026-10-17](2026-10-17/README.md) — Training tiling complete (6 arms; [result](../results/result-training-tiling.md)): overlap best, 256 tiles better.
+  One evaluation tool (`evaluate_run.py`), temperature and padding checks, loader profile, SRM run on the G4.

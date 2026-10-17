@@ -23,6 +23,7 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Researc
 - [Wide XuNet versus R2](results/result-wide-xunet.md)
 - [Mixed-source wide XuNet](results/result-newdata-1.md)
 - [PC check B: thresholds and ALASKA tiles](results/result-check-b.md)
+- [Training tiling: 6 arms](results/result-training-tiling.md)
 
 ## Historical records (`archive/`)
 - [OTF generator design; prebuilt writer deferred](archive/plan-otf-generator.md)

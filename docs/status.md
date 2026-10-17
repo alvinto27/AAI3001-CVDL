@@ -1,6 +1,6 @@
-# Project status — 2026-10-16
+# Project status — 2026-10-17
 
-**Start here:** All research and training work is **on hold at the user's request**; a bookkeeping tidy-up is in progress (docs, runs, data and code done; notebook refactor in design). Do not start a new PC experiment, G4 run, or work from a plan without a new user decision. The last mixed-source wide XuNet run completed, and the PC validation-threshold and ALASKA false-alarm check B completed. The [per-cell design](active/plan-per-cell-training.md) is written, **not approved**, and not implemented. Use [findings](findings.md) for the run table and [journal days](journal/README.md) for dated records.
+**Start here:** The research hold is lifted only for the approved experiments in the [run queue](active/run-queue.md). The training tiling experiment is complete ([result](results/result-training-tiling.md)): overlap is best, and 256 training tiles improve all arms (256 overlap standard P_E 2.25%). The SRM front-end run (256 overlap recipe) is on the G4. Other plans stay on hold. Use [findings](findings.md) for older runs and [journal days](journal/README.md) for dated records.
 
 ## Current state and items
 
@@ -10,7 +10,7 @@
 
 - **G4 run queue:** [`active/run-queue.md`](active/run-queue.md) lists every approved run and its state. Check it before and after each launch.
 
-- **Active experiment (user lifted the hold for this only): training tiling.** Arms: overlap-last, centre trim, centre zero-pad, each for all training sources; recipe newdata-1; tests and validation frozen. Arms 1-2 (512) done on the G4 on 2026-10-16; arm 3 and the three 256 arms are queued, paused until 2026-10-17. See `active/run-queue.md` for state and the PC task list (padding-check fix first).
+- **Active work (2026-10-17):** SRM run `srm-20261017T052857Z-4521` (G4, GPU-bound, ~94 min). PC: loader fix for 256 runs (Worker_5; batches must stay byte-identical), `--settings-from` fix and missing checks on old models (Worker_4). All evaluation uses `scripts/evaluate_run.py` (`c13ee00`+): main tables, `--padding-check`, `--temperature`, `--tanh-saturation`, `--only`. See the [2026-10-17 journal](journal/2026-10-17/README.md).
 
 - **Hard test (idea, under discussion with the user; NOT approved, do not start):** a separate held-out test made mostly of hard cases (k=1, low bpp, balanced across tile-noise quarters set on validation, ~1,000 pairs per hard group) reported as its own number next to the unchanged standard test. Pick up after the refactor, only when the user continues the discussion.
 
