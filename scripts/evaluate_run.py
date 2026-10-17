@@ -52,7 +52,7 @@ def settings_for_run(folder):
     return load(environ={},_profile=profile,overrides=overrides,**experiment)
 
 
-def evaluate(folder, *, padding_check=False, padding_pairs=2000):
+def evaluate(folder, *, padding_check=False, padding_pairs=2000, tanh=None, output=None):
     from cvdl import runtime, data, post_fit
     from cvdl.settings import plain
     from cvdl.lit import select_best_checkpoint
@@ -80,8 +80,11 @@ def evaluate(folder, *, padding_check=False, padding_pairs=2000):
     if padding_check:
         if otf is None:raise ValueError('padding diagnostic requires OTF data')
         from cvdl.padding import check
-        check(model.net,otf.test,predictions['test'],predictions['val'],folder,
+        check(model.net,otf.test,predictions['test'],predictions['val'],Path(output) if output else folder,
               device=settings.device,quick=settings.quick,limit=padding_pairs,workers=settings.eval_workers)
+    if tanh is not None:
+        from cvdl import saturation
+        saturation.run(settings,otf,model.net,Path(output) if output else folder,validation_sha256=VALIDATION_SHA256,**tanh)
     print(f'EVALUATION COMPLETE: {folder}',flush=True)
     return result
 
@@ -147,20 +150,99 @@ def calibrate(folder, *, settings_from=None, output=None):
     return result
 
 
+STAGES=('main','padding','temperature','tanh')
+
+
+def stage_outputs(stage, folder, out):
+    """Files a stage writes; a selected stage refuses to run if any exists (unless --overwrite)."""
+    if stage=='main':
+        return [folder/n for n in ('evaluation_settings.json','test_predictions.csv','evaluation_results.json','evaluation_data_run_settings.json')]
+    if stage=='padding':
+        return [out/'padding-check'/n for n in ('pairs.jsonl','predictions.csv','summary.json','padding-pairs.csv')]
+    if stage=='temperature':
+        return [out/n for n in ('validation_logits.csv','test_logits.csv','validation_predictions_calibrated.csv',
+                                'test_predictions_calibrated.csv','calibration.json')]
+    if stage=='tanh':
+        from cvdl.saturation import OUTPUT_FILES
+        return [out/n for n in OUTPUT_FILES]
+    raise ValueError(f'unknown stage {stage}')
+
+
+def refuse_existing(stages, folder, out, overwrite):
+    existing=[str(path) for stage in stages for path in stage_outputs(stage,folder,out) if path.exists()]
+    if existing and not overwrite:
+        raise ValueError('refusing to overwrite existing output (use --overwrite): '+', '.join(existing))
+
+
+def optional_stages(folder, stages, *, settings_from, out, padding_pairs, tanh):
+    """Run padding / tanh on a finished run: saved best checkpoint and saved prediction files, no main evaluation."""
+    import pandas as pd
+    from cvdl import runtime
+    from cvdl.lit import SteganalysisModule, select_best_checkpoint
+    settings=settings_for_run(checkpoint_folder(settings_from) if settings_from else folder)
+    checkpoint=Path(select_best_checkpoint('',folder))
+    runtime.configure(settings)
+    otf,_=runtime.create_data(settings)
+    if otf is None:raise ValueError('padding and tanh stages require OTF data')
+    model=SteganalysisModule.load_from_checkpoint(checkpoint,map_location=settings.device,weights_only=False).net
+    out.mkdir(parents=True,exist_ok=True)
+    if 'padding' in stages:
+        from cvdl.padding import check
+        read=lambda name:pd.read_csv(folder/name,dtype={'cover_id':'string'}) if (folder/name).exists() else None
+        test,val=read('test_predictions.csv'),read('validation_predictions.csv')
+        if test is None or val is None:
+            raise ValueError('padding stage needs saved test_predictions.csv and validation_predictions.csv in the run folder')
+        check(model,otf.test,test,val,out,device=settings.device,quick=settings.quick,limit=padding_pairs,workers=settings.eval_workers)
+    if 'tanh' in stages:
+        from cvdl import saturation
+        saturation.run(settings,otf,model,out,validation_sha256=VALIDATION_SHA256,**tanh)
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_folder',type=Path)
-    parser.add_argument('--padding-check',action='store_true')
+    parser.add_argument('--padding-check',action='store_true',help='add the padding check (runs after the main evaluation unless --skip-main/--only)')
     parser.add_argument('--padding-pairs',type=int,default=2000,
         help='cases per (pattern, level, real shape), chosen by a fixed hash from the standard test list; 0 = all')
     parser.add_argument('--temperature',action='store_true',
-        help='only fit temperature scaling on the capped validation logits; writes new files')
+        help='add temperature scaling on the capped validation logits (new files only)')
+    parser.add_argument('--tanh-saturation',action='store_true',help='add the tanh saturation measurement')
+    parser.add_argument('--tanh-pairs',type=int,default=2000,help='validation pairs (clean + stego) for the tanh measurement')
+    parser.add_argument('--tanh-train-batches',type=int,default=0,help='also measure N training-mode batches (with augmentation)')
+    parser.add_argument('--skip-main',action='store_true',help='do not run or overwrite the main evaluation; run only the selected checks on saved files')
+    parser.add_argument('--only',help='comma list of stages to run: '+','.join(STAGES)+' (implies --skip-main when "main" is absent)')
+    parser.add_argument('--overwrite',action='store_true',help='allow a selected stage to overwrite its existing output files')
     parser.add_argument('--settings-from',type=Path,help='take data settings from another run folder (old runs)')
-    parser.add_argument('--output',type=Path,help='folder for the new calibration files (default: the checkpoint folder)')
+    parser.add_argument('--output',type=Path,help='folder for the check outputs (default: the checkpoint folder)')
     args=parser.parse_args()
-    if args.temperature:
-        calibrate(args.run_folder,settings_from=args.settings_from,output=args.output);return
-    evaluate(args.run_folder,padding_check=args.padding_check,padding_pairs=args.padding_pairs)
+    folder=checkpoint_folder(args.run_folder)
+    if args.only:
+        stages=[x.strip() for x in args.only.split(',') if x.strip()]
+        if not stages or any(x not in STAGES for x in stages):raise ValueError(f'--only takes: {",".join(STAGES)}')
+        stages=set(stages)
+    else:
+        stages=set()
+        if args.padding_check:stages.add('padding')
+        if args.temperature:stages.add('temperature')
+        if args.tanh_saturation:stages.add('tanh')
+        # Legacy: --temperature / --tanh-saturation alone never ran the main evaluation; --padding-check did.
+        if not args.skip_main and (not stages or 'padding' in stages):stages.add('main')
+    if args.skip_main:stages.discard('main')
+    if not stages:raise ValueError('nothing to run')
+    out=args.output or folder
+    refuse_existing([x for x in STAGES if x in stages],folder,out,args.overwrite)
+    tanh=dict(pairs=args.tanh_pairs,train_batches=args.tanh_train_batches)
+    inline=dict(padding_check='padding' in stages,padding_pairs=args.padding_pairs,
+                tanh=tanh if 'tanh' in stages else None,output=args.output)
+    if 'main' in stages:
+        evaluate(args.run_folder,**inline)
+        rest=stages-{'main','padding','tanh'}
+    else:
+        rest=set(stages)
+    if rest&{'padding','tanh'}:
+        optional_stages(folder,rest&{'padding','tanh'},settings_from=args.settings_from,out=out,padding_pairs=args.padding_pairs,tanh=tanh)
+    if 'temperature' in rest:
+        calibrate(args.run_folder,settings_from=args.settings_from,output=args.output)
 
 
 if __name__=='__main__':main()
