@@ -32,7 +32,43 @@ def portable_config(value):
     return str(target)
 
 
-def settings_for_run(folder):
+EVALUATION_OVERRIDE_KEYS={'rocm_conv1_fix':'rocm_conv1_fix','eval_batch_size':'batch_size',
+                          'batch_size':'batch_size','eval_workers':'eval_workers'}
+
+
+def evaluation_override_records(arguments):
+    from cvdl.settings import parse
+    records=[]
+    for argument in arguments:
+        key,separator,value=argument.partition('=')
+        if not separator or key not in EVALUATION_OVERRIDE_KEYS:
+            raise ValueError('forbidden evaluation --set '+repr(argument)+'; allowed: '+
+                ', '.join(EVALUATION_OVERRIDE_KEYS)+'. Model, data and test identity cannot be overridden.')
+        target=EVALUATION_OVERRIDE_KEYS[key]
+        records.append(dict(argument=argument,key=target,value=parse(target,value),source='CLI --set (evaluation only)'))
+    return records
+
+
+def evaluation_override_values(arguments):
+    return {r['key']:r['value'] for r in evaluation_override_records(arguments)}
+
+
+def record_evaluation_overrides(out,settings,arguments):
+    if not arguments:return
+    from cvdl.settings import plain
+    record=dict(values=plain(settings.values),sources=plain(settings.provenance),profile=settings.profile,
+                evaluation_overrides=evaluation_override_records(arguments))
+    path=Path(out)/'evaluation_settings.json'
+    if path.exists():
+        old=json.loads(path.read_text())
+        if not all(old.get(k)==v for k,v in record.items()):
+            raise ValueError(f'evaluation overrides differ: {path}; use a fresh output folder')
+    else:
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text(json.dumps(record,indent=2)+'\n')
+
+
+def settings_for_run(folder, *, eval_overrides=()):
     from cvdl.settings import SCHEMA, automatic_profile, load
     profile=automatic_profile()
     if profile.name!='pc':raise ValueError('evaluate_run is PC-only; G4 jobs only train')
@@ -53,6 +89,7 @@ def settings_for_run(folder):
             experiment[key]=old[key]
         overrides=dict(quick=record['quick'])
     experiment['train_yaml']=portable_config(experiment.get('train_yaml'))
+    overrides.update(evaluation_override_values(eval_overrides))
     return load(environ={},_profile=profile,overrides=overrides,**experiment)
 
 
@@ -61,10 +98,12 @@ MODEL_DEFAULTS=dict(model='xunet',width=4,norm='group',clip_t=3.0,front_end='kv'
 MODEL_TRAINING_KEYS=('lr','warmup_epochs','lr_drops','grad_clip','epochs','seed')
 
 
-def settings_for_evaluation(folder, checkpoint, settings_from=None):
+def settings_for_evaluation(folder, checkpoint, settings_from=None, *, eval_overrides=()):
     """Borrow data, not the target model. Inspect trusted checkpoints on CPU only."""
+    context={'evaluation_overrides':evaluation_override_records(eval_overrides)} if eval_overrides else {}
     if settings_from is None:
-        return settings_for_run(folder),{},None
+        settings=settings_for_run(folder,eval_overrides=eval_overrides) if eval_overrides else settings_for_run(folder)
+        return settings,context,None
     import torch
     from cvdl.settings import SCHEMA, automatic_profile, load, plain, parse
     source=checkpoint_folder(settings_from)
@@ -92,7 +131,7 @@ def settings_for_evaluation(folder, checkpoint, settings_from=None):
     experiment.update(name=own.get('name'),run_name=own.get('run_name') if own.get('name') else None)
     experiment['train_yaml']=portable_config(experiment.get('train_yaml'))
     settings=load(environ={},_profile=automatic_profile(),
-        overrides=dict(quick=borrowed.quick,job_id=own.get('job_id')),**experiment)
+        overrides=dict(quick=borrowed.quick,job_id=own.get('job_id'),**evaluation_override_values(eval_overrides)),**experiment)
     original=source/'run_settings.json'
     if original.exists():
         snapshot=original.read_bytes();kind='saved'
@@ -108,7 +147,7 @@ def settings_for_evaluation(folder, checkpoint, settings_from=None):
         borrowed_checkpoint_folder=str(source),borrowed_run_settings_sha256=hashlib.sha256(snapshot).hexdigest(),
         borrowed_run_settings_kind=kind,borrowed_source_files_sha256=inputs,
         checkpoint_model_settings=architecture)
-    return settings,provenance,snapshot
+    return settings,{**provenance,**context},snapshot
 
 
 def write_borrowing(out, provenance, snapshot):
@@ -136,13 +175,14 @@ def default_label(folder):
     return name.replace('-','').replace('_','')[:40]
 
 
-def evaluate(folder, *, padding_check=False, padding_pairs=2000, tanh=None, output=None, label=None, settings_from=None):
+def evaluate(folder, *, padding_check=False, padding_pairs=2000, tanh=None, output=None, label=None, settings_from=None, eval_overrides=()):
     from cvdl import runtime, data, post_fit
     from cvdl.settings import plain
     from cvdl.lit import select_best_checkpoint
     folder=checkpoint_folder(folder)
     checkpoint=Path(select_best_checkpoint('',folder))
-    settings,borrowing,snapshot=settings_for_evaluation(folder,checkpoint,settings_from)
+    settings,borrowing,snapshot=settings_for_evaluation(folder,checkpoint,settings_from,eval_overrides=eval_overrides)
+    record_evaluation_overrides(Path(output) if output else folder,settings,eval_overrides)
     runtime.configure(settings)
     otf,tables=runtime.create_data(settings)
     if otf is not None:
@@ -200,7 +240,7 @@ def score_logits(model, loader, *, device):
     return pd.DataFrame(rows)
 
 
-def calibrate(folder, *, settings_from=None, output=None):
+def calibrate(folder, *, settings_from=None, output=None, eval_overrides=()):
     """Temperature scaling on the capped validation logits; writes NEW files only.
 
     One T minimises NLL of sigmoid(logit/T) on the capped validation set. Outputs:
@@ -212,8 +252,9 @@ def calibrate(folder, *, settings_from=None, output=None):
     from cvdl.lit import SteganalysisModule, select_best_checkpoint
     folder=checkpoint_folder(folder)
     checkpoint=Path(select_best_checkpoint('',folder))
-    settings,borrowing,snapshot=settings_for_evaluation(folder,checkpoint,settings_from)
+    settings,borrowing,snapshot=settings_for_evaluation(folder,checkpoint,settings_from,eval_overrides=eval_overrides)
     out=Path(output) if output else folder;out.mkdir(parents=True,exist_ok=True)
+    record_evaluation_overrides(out,settings,eval_overrides)
     write_borrowing(out,borrowing,snapshot)
     runtime.configure(settings)
     otf,_=runtime.create_data(settings)
@@ -281,13 +322,14 @@ def refuse_existing(stages, folder, out, overwrite, label='run'):
         raise ValueError('refusing to overwrite existing output (use --overwrite): '+', '.join(existing))
 
 
-def optional_stages(folder, stages, *, settings_from, out, padding_pairs, tanh):
+def optional_stages(folder, stages, *, settings_from, out, padding_pairs, tanh, eval_overrides=()):
     """Run padding / tanh on a finished run: saved best checkpoint and saved prediction files, no main evaluation."""
     import pandas as pd
     from cvdl import runtime
     from cvdl.lit import SteganalysisModule, select_best_checkpoint
     checkpoint=Path(select_best_checkpoint('',folder))
-    settings,borrowing,snapshot=settings_for_evaluation(folder,checkpoint,settings_from)
+    settings,borrowing,snapshot=settings_for_evaluation(folder,checkpoint,settings_from,eval_overrides=eval_overrides)
+    record_evaluation_overrides(out,settings,eval_overrides)
     runtime.configure(settings)
     otf,_=runtime.create_data(settings)
     if otf is None:raise ValueError('padding and tanh stages require OTF data')
@@ -324,7 +366,11 @@ def main():
     parser.add_argument('--label',help='label for the pc-comparison tables (default: experiment name without dashes)')
     parser.add_argument('--settings-from',type=Path,help='all inference stages: borrow data settings, retain and check the evaluated checkpoint model')
     parser.add_argument('--output',type=Path,help='folder for the check outputs (default: the checkpoint folder)')
+    parser.add_argument('--set',dest='eval_overrides',action='append',default=[],metavar='KEY=VALUE',
+        help='repeatable evaluation override: rocm_conv1_fix, eval_batch_size (or batch_size), eval_workers only')
     args=parser.parse_args()
+    evaluation_override_values(args.eval_overrides)  # Refuse identity/model changes before any work.
+    override_options={'eval_overrides':tuple(args.eval_overrides)} if args.eval_overrides else {}
     folder=checkpoint_folder(args.run_folder)
     if args.only:
         stages=[x.strip() for x in args.only.split(',') if x.strip()]
@@ -340,6 +386,7 @@ def main():
         if not args.skip_main and (not stages or 'padding' in stages):stages.add('main')
     if args.skip_main:stages.discard('main')
     if not stages:raise ValueError('nothing to run')
+    if args.eval_overrides and stages=={'tables'}:raise ValueError('--set requires an inference stage, not tables only')
     out=args.output or folder
     table_out=args.output or job_folder(folder)
     label=args.label or default_label(folder)
@@ -350,7 +397,7 @@ def main():
     inline=dict(padding_check='padding' in stages,padding_pairs=args.padding_pairs,
                 tanh=tanh if 'tanh' in stages else None,output=args.output,label=args.label,settings_from=args.settings_from)
     if 'main' in stages:
-        evaluate(args.run_folder,**inline)
+        evaluate(args.run_folder,**inline,**override_options)
         rest=stages-{'main','padding','tanh','tables'}
     else:
         rest=set(stages)
@@ -358,9 +405,9 @@ def main():
         from cvdl import panels
         panels.tables(folder,table_out,label)
     if rest&{'padding','tanh'}:
-        optional_stages(folder,rest&{'padding','tanh'},settings_from=args.settings_from,out=out,padding_pairs=args.padding_pairs,tanh=tanh)
+        optional_stages(folder,rest&{'padding','tanh'},settings_from=args.settings_from,out=out,padding_pairs=args.padding_pairs,tanh=tanh,**override_options)
     if 'temperature' in rest:
-        calibrate(args.run_folder,settings_from=args.settings_from,output=args.output)
+        calibrate(args.run_folder,settings_from=args.settings_from,output=args.output,**override_options)
 
 
 if __name__=='__main__':main()
