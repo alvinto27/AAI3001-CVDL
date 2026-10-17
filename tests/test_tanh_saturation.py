@@ -94,3 +94,31 @@ class StageSelectionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             with self.assertRaises(ValueError):self.run_main(['--only','bogus'],d)
             with self.assertRaisesRegex(ValueError,'nothing'):self.run_main(['--skip-main'],d)
+
+
+class TablesStageTests(StageSelectionTests):
+    def test_tables_stage_and_main_refuse_existing_tables(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            # default label comes from the folder name; build the same name here
+            import scripts.evaluate_run as er
+            from pathlib import Path
+            label=er.default_label(Path(d))
+            files=[f'pc-comparison/{label}.json']
+            with self.assertRaisesRegex(ValueError,'refusing to overwrite'):self.run_main(['--only','tables'],d,existing=files)
+            with self.assertRaisesRegex(ValueError,'refusing to overwrite'):self.run_main([],d,existing=files)
+            from unittest.mock import patch
+            with patch('cvdl.panels.tables') as tables:
+                self.run_main(['--only','tables','--overwrite'],d,existing=files)
+            self.assertEqual(tables.call_count,1)
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaisesRegex(ValueError,'refusing to overwrite'):
+                self.run_main([],d,existing=['validation_predictions.csv'])
+            with self.assertRaisesRegex(ValueError,'refusing to overwrite'):
+                self.run_main([],d,existing=['validation_calibration.json'])
+
+    def test_default_label(self):
+        from pathlib import Path
+        import scripts.evaluate_run as er
+        label=er.default_label(Path('/x/tiling-overlap-256-20261017T022212Z-9778/checkpoints/tiling-overlap-256-20261017T022212Z-9778'))
+        self.assertEqual(label,'tilingoverlap256')

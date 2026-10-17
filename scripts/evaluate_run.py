@@ -52,7 +52,20 @@ def settings_for_run(folder):
     return load(environ={},_profile=profile,overrides=overrides,**experiment)
 
 
-def evaluate(folder, *, padding_check=False, padding_pairs=2000, tanh=None, output=None):
+def job_folder(folder):
+    """The outer job folder (parent of checkpoints/) when the layout has one."""
+    folder=Path(folder)
+    return folder.parent.parent if folder.parent.name=='checkpoints' else folder
+
+
+def default_label(folder):
+    """Short result label: the job name without its timestamp/id, dashes removed (tiling-overlap-256-2026...-9778 -> tilingoverlap256)."""
+    import re
+    name=re.sub(r'-\d{8}T\d{6}Z-\d{4}$','',job_folder(folder).name)
+    return name.replace('-','').replace('_','')[:40]
+
+
+def evaluate(folder, *, padding_check=False, padding_pairs=2000, tanh=None, output=None, label=None):
     from cvdl import runtime, data, post_fit
     from cvdl.settings import plain
     from cvdl.lit import select_best_checkpoint
@@ -77,6 +90,11 @@ def evaluate(folder, *, padding_check=False, padding_pairs=2000, tanh=None, outp
         checkpoint=str(checkpoint),checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest())
     (folder/'evaluation_settings.json').write_text(json.dumps(provenance,indent=2)+'\n')
     model,predictions,result=post_fit.run(settings,otf,tables,loaders,checkpoint,folder)
+    if otf is not None:
+        from cvdl import panels
+        panels.write_validation(folder,predictions['val'],root=settings.root)
+        panels.write_standard_validation(checkpoint,folder,settings)
+        panels.tables(folder,job_folder(folder) if output is None else Path(output),label or default_label(folder),check=not settings.quick)
     if padding_check:
         if otf is None:raise ValueError('padding diagnostic requires OTF data')
         from cvdl.padding import check
@@ -131,6 +149,14 @@ def calibrate(folder, *, settings_from=None, output=None):
         pin_memory=settings.device=='cuda',prime_next_epoch=False,eval_persistent_workers=False)
     model=SteganalysisModule.load_from_checkpoint(checkpoint,map_location=settings.device,weights_only=False).to(settings.device)
     frames={name:score_logits(model,loader,device=settings.device) for name,loader in (('validation',loaders.val),('test',loaders.test))}
+    # Full validation panels (not the capped set): the same T is applied, never refitted.
+    from lsb_torch import Corpus, FixedPairs, OrderedPairLoader, RunSettings
+    standard=FixedPairs(Corpus(settings.root,RunSettings(evaluation_yaml=str(Path(settings.root)/'configs/raise512-run1.yaml'),sources=('raise','div2k'))),
+                        'val',sources=('raise','div2k'))
+    extra={'standard_val':standard,'alaska_val':otf.extra_pairs.get('alaska-val'),'lsdir_val':otf.extra_pairs.get('lsdir-val')}
+    for name,dataset in extra.items():
+        if dataset is not None:
+            frames[name]=score_logits(model,OrderedPairLoader(dataset,16,settings.eval_workers,settings.device=='cuda'),device=settings.device)
     saved=folder/'test_predictions.csv'
     check=None
     if saved.exists():
@@ -150,26 +176,32 @@ def calibrate(folder, *, settings_from=None, output=None):
     return result
 
 
-STAGES=('main','padding','temperature','tanh')
+STAGES=('main','tables','padding','temperature','tanh')
 
 
-def stage_outputs(stage, folder, out):
+def stage_outputs(stage, folder, out, label='run'):
     """Files a stage writes; a selected stage refuses to run if any exists (unless --overwrite)."""
     if stage=='main':
-        return [folder/n for n in ('evaluation_settings.json','test_predictions.csv','evaluation_results.json','evaluation_data_run_settings.json')]
+        return [folder/n for n in ('evaluation_settings.json','test_predictions.csv','evaluation_results.json','evaluation_data_run_settings.json',
+                                   'validation_predictions.csv','validation_calibration.json')]
+    if stage=='tables':
+        return [out/'pc-comparison'/f'{label}{suffix}' for suffix in ('.json','-thresholds.csv')]
     if stage=='padding':
         return [out/'padding-check'/n for n in ('pairs.jsonl','predictions.csv','summary.json','padding-pairs.csv')]
     if stage=='temperature':
         return [out/n for n in ('validation_logits.csv','test_logits.csv','validation_predictions_calibrated.csv',
-                                'test_predictions_calibrated.csv','calibration.json')]
+                                'test_predictions_calibrated.csv','calibration.json',
+                                'standard_val_logits.csv','standard_val_predictions_calibrated.csv',
+                                'alaska_val_logits.csv','alaska_val_predictions_calibrated.csv',
+                                'lsdir_val_logits.csv','lsdir_val_predictions_calibrated.csv')]
     if stage=='tanh':
         from cvdl.saturation import OUTPUT_FILES
         return [out/n for n in OUTPUT_FILES]
     raise ValueError(f'unknown stage {stage}')
 
 
-def refuse_existing(stages, folder, out, overwrite):
-    existing=[str(path) for stage in stages for path in stage_outputs(stage,folder,out) if path.exists()]
+def refuse_existing(stages, folder, out, overwrite, label='run'):
+    existing=[str(path) for stage in stages for path in stage_outputs(stage,folder,out,label) if path.exists()]
     if existing and not overwrite:
         raise ValueError('refusing to overwrite existing output (use --overwrite): '+', '.join(existing))
 
@@ -201,6 +233,7 @@ def optional_stages(folder, stages, *, settings_from, out, padding_pairs, tanh):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_folder',type=Path)
+    parser.add_argument('--tables',action='store_true',help='only rebuild the per-source cutoff tables (pc-comparison) from the saved prediction files; no GPU')
     parser.add_argument('--padding-check',action='store_true',help='add the padding check (runs after the main evaluation unless --skip-main/--only)')
     parser.add_argument('--padding-pairs',type=int,default=2000,
         help='cases per (pattern, level, real shape), chosen by a fixed hash from the standard test list; 0 = all')
@@ -212,6 +245,7 @@ def main():
     parser.add_argument('--skip-main',action='store_true',help='do not run or overwrite the main evaluation; run only the selected checks on saved files')
     parser.add_argument('--only',help='comma list of stages to run: '+','.join(STAGES)+' (implies --skip-main when "main" is absent)')
     parser.add_argument('--overwrite',action='store_true',help='allow a selected stage to overwrite its existing output files')
+    parser.add_argument('--label',help='label for the pc-comparison tables (default: experiment name without dashes)')
     parser.add_argument('--settings-from',type=Path,help='take data settings from another run folder (old runs)')
     parser.add_argument('--output',type=Path,help='folder for the check outputs (default: the checkpoint folder)')
     args=parser.parse_args()
@@ -223,6 +257,7 @@ def main():
     else:
         stages=set()
         if args.padding_check:stages.add('padding')
+        if args.tables:stages.add('tables')
         if args.temperature:stages.add('temperature')
         if args.tanh_saturation:stages.add('tanh')
         # Legacy: --temperature / --tanh-saturation alone never ran the main evaluation; --padding-check did.
@@ -230,15 +265,22 @@ def main():
     if args.skip_main:stages.discard('main')
     if not stages:raise ValueError('nothing to run')
     out=args.output or folder
-    refuse_existing([x for x in STAGES if x in stages],folder,out,args.overwrite)
+    table_out=args.output or job_folder(folder)
+    label=args.label or default_label(folder)
+    refuse_existing([x for x in STAGES if x in stages and x!='tables'],folder,out,args.overwrite,label)
+    if 'tables' in stages or 'main' in stages:
+        refuse_existing(['tables'],folder,table_out,args.overwrite,label)
     tanh=dict(pairs=args.tanh_pairs,train_batches=args.tanh_train_batches)
     inline=dict(padding_check='padding' in stages,padding_pairs=args.padding_pairs,
-                tanh=tanh if 'tanh' in stages else None,output=args.output)
+                tanh=tanh if 'tanh' in stages else None,output=args.output,label=args.label)
     if 'main' in stages:
         evaluate(args.run_folder,**inline)
-        rest=stages-{'main','padding','tanh'}
+        rest=stages-{'main','padding','tanh','tables'}
     else:
         rest=set(stages)
+    if 'tables' in rest:
+        from cvdl import panels
+        panels.tables(folder,table_out,label)
     if rest&{'padding','tanh'}:
         optional_stages(folder,rest&{'padding','tanh'},settings_from=args.settings_from,out=out,padding_pairs=args.padding_pairs,tanh=tanh)
     if 'temperature' in rest:
