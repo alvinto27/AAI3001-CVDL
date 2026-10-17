@@ -181,6 +181,7 @@ SCHEMA = MappingProxyType({
     'eval_profile': Definition('str', str, 'overlap_full_mix', 'overlap_full_mix/legacy_v6', 'Fixed evaluation grid.', lambda v:v in {'overlap_full_mix','legacy_v6'}, 'V3_EVAL_PROFILE', 'EVAL_PROFILE'),
     'prefetch': Definition('int?', lambda x:None if x is None else integer(x), None, 'None or >0', 'Prefetch override.', lambda v:v is None or v>0, 'V3_PREFETCH', 'OTF_PREFETCH', True),
     'prefetch_images': Definition('int', integer, 128, '>0', 'Prefetch image budget.', lambda v:v>0, 'V3_PREFETCH_IMAGES', 'OTF_PREFETCH_IMAGES', True),
+    'pack_blocks': Definition('int', integer, 16, '>=1; 1=off', 'Training loader: 4-image blocks per worker message (same batches).', lambda v:v>=1, 'V3_PACK_BLOCKS', machine=True),
     'prime_next_epoch': Definition('bool', boolean, False, 'bool', 'Prime next train epoch.', env='V3_PRIME_NEXT_EPOCH', legacy_global='PRIME_NEXT_EPOCH', machine=True),
     'run_name': Definition('str?', optional_string, None, 'derived prefix + optional suffix', 'Derived run name / legacy suffix.', env='V3_RUN_NAME', legacy_global='RUN_NAME'),
     'notebook': Definition('path?', optional_string, None, 'notebook path', 'Runner notebook selector.', env='V3_NOTEBOOK', machine=True),

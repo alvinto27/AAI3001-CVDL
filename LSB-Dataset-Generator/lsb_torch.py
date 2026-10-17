@@ -17,7 +17,7 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import Dataset, IterableDataset, DataLoader, get_worker_info
+from torch.utils.data import Dataset, IterableDataset, DataLoader, get_worker_info, default_collate
 
 from lsb_batch import read_config
 from lsb_cache import load_cached
@@ -500,25 +500,58 @@ def prefetch_for_images(images_per_task,prefetch_images=128):
     return (prefetch_images+images_per_task-1)//images_per_task
 
 
+DEFAULT_PACK_BLOCKS=16
+
+
+def effective_pack_blocks(pack_blocks,num_workers,group_images=4,in_order=True):
+    """Blocks per worker message. Packing needs worker processes, grouped blocks and in-order delivery."""
+    if type(pack_blocks) is not int or pack_blocks<1:
+        raise ValueError("pack_blocks must be a positive integer")
+    return pack_blocks if (pack_blocks>1 and num_workers>0 and group_images>0 and in_order) else 1
+
+
+class PackedCollate:
+    """Worker-side collate for packed messages: the default collate plus the worker id as a plain int.
+
+    The int is pickled inline, so it adds no tensor (no extra shared-memory handle) to a message.
+    """
+    def __call__(self,items):
+        info=get_worker_info()
+        return (*default_collate(items),0 if info is None else info.id)
+
+
 def training_loader(dataset,batch_size=32,num_workers=8,pin_memory=True,persistent_workers=True,
-                    prefetch_factor=None,in_order=True,group_images=4,prefetch_images=128):
-    """No shuffle=True; retain all worker tails. Paired batch size is pairs."""
+                    prefetch_factor=None,in_order=True,group_images=4,prefetch_images=128,pack_blocks=1):
+    """No shuffle=True; retain all worker tails. Paired batch size is pairs.
+
+    pack_blocks>1: each worker sends that many consecutive group_images-sized blocks in one message and
+    MixedLoader replays the original block-by-block round-robin, so the batches are identical.
+    """
     if batch_size<=0 or group_images<0:
         raise ValueError("batch size must be positive and group images nonnegative")
     images_per_item=2 if dataset.corpus.settings.paired_batches else 1
     group_items=max(1,group_images//images_per_item) if group_images else batch_size
-    task_images=min(group_items,batch_size)*images_per_item
+    block_rows=min(group_items,batch_size)
+    pack=effective_pack_blocks(pack_blocks,num_workers,group_images,in_order)
+    task_images=block_rows*images_per_item*pack
     derived=prefetch_for_images(task_images,prefetch_images)
     prefetch_factor=derived if prefetch_factor is None else prefetch_factor
     if prefetch_factor<=0:
         raise ValueError("prefetch factor must be positive")
-    kwargs=dict(batch_size=min(group_items,batch_size),num_workers=num_workers,pin_memory=pin_memory,
+    kwargs=dict(batch_size=block_rows*pack,num_workers=num_workers,pin_memory=pin_memory,
                 persistent_workers=persistent_workers and num_workers>0,worker_init_fn=initialize_worker,
                 drop_last=False,in_order=in_order)
+    if pack>1:
+        kwargs["collate_fn"]=PackedCollate()
+        kwargs["pin_memory"]=False  # MixedLoader pins each joined batch once
     if num_workers:
         kwargs.update(multiprocessing_context="spawn",prefetch_factor=prefetch_factor)
     loader=DataLoader(dataset,**kwargs)
-    return MixedLoader(loader,batch_size) if group_images else loader
+    if not group_images:
+        return loader
+    mixed=MixedLoader(loader,batch_size,block_rows=block_rows,pack_blocks=pack)
+    mixed.pin_memory=pin_memory  # the requested value; a packed DataLoader itself never pins
+    return mixed
 
 
 class PairSubset(Dataset):
@@ -771,10 +804,14 @@ class MixedLoader:
     workers even when the producer is waiting for queue space. Normal epochs
     keep persistent workers; set_epoch updates their shared epoch value.
     """
-    def __init__(self,loader,batch_size):
+    def __init__(self,loader,batch_size,block_rows=None,pack_blocks=1):
         self.loader=loader
         self.dataset=loader.dataset
         self.batch_size=batch_size
+        self.block_rows=block_rows
+        self.pack_blocks=pack_blocks
+        if pack_blocks>1 and not block_rows:
+            raise ValueError("packed messages need block_rows")
         self.pin_memory=loader.pin_memory
         self._producer=None
         self._batches_yielded=0
@@ -783,10 +820,46 @@ class MixedLoader:
     def __len__(self):
         return math.ceil(len(self.dataset)/self.batch_size)
 
+    def _blocks(self,stop):
+        """Blocks in the order the unpacked loader delivers them: round r = block r of every worker that has one."""
+        if self.pack_blocks==1:
+            for group in self.loader:
+                if stop.is_set():
+                    return
+                yield group
+            return
+        rows=self.block_rows
+        round_packs=[]
+        last_worker=-1
+
+        def replay(packs):
+            counts=[-(-len(pack[0])//rows) for pack in packs]
+            for r in range(self.pack_blocks):
+                for pack,count in zip(packs,counts):
+                    if r<count:
+                        yield tuple(part[r*rows:(r+1)*rows] for part in pack[:-1])
+
+        workers=self.loader.num_workers
+        for pack in self.loader:
+            if stop.is_set():
+                return
+            # Packs of one round arrive in ascending worker order; a lower or equal id starts the next round.
+            if round_packs and pack[-1]<=last_worker:
+                yield from replay(round_packs)
+                round_packs=[]
+            round_packs.append(pack)
+            last_worker=pack[-1]
+            if len(round_packs)==workers:  # every worker contributed: nothing more can join this round
+                yield from replay(round_packs)
+                round_packs=[]
+                last_worker=-1
+        if round_packs and not stop.is_set():
+            yield from replay(round_packs)
+
     def _joined_batches(self,stop):
         pending=[]
         count=0
-        for group in self.loader:
+        for group in self._blocks(stop):
             if stop.is_set():
                 break
             start=0
@@ -890,7 +963,8 @@ class MixedLoader:
 
     def _join(self,groups):
         parts=tuple(torch.cat([group[i] for group in groups]) for i in range(3))
-        return tuple(part.pin_memory() for part in parts) if self.pin_memory and groups[0][0].is_pinned() else parts
+        pinned=(torch.cuda.is_available() if self.pack_blocks>1 else groups[0][0].is_pinned())
+        return tuple(part.pin_memory() for part in parts) if self.pin_memory and pinned else parts
 
     def _stop_workers(self):
         iterator=getattr(self.loader,"_iterator",None)

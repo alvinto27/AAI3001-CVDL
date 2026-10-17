@@ -57,7 +57,8 @@ def create_loaders(s, otf, tables):
         pin_memory=s.device == 'cuda', eval_persistent_workers=s.persistent_workers)
     if otf is not None:
         loaders = data.build_otf_loaders(otf, **kwargs, prefetch=s.prefetch,
-            prefetch_images=s.prefetch_images, prime_next_epoch=s.prime_next_epoch)
+            prefetch_images=s.prefetch_images, prime_next_epoch=s.prime_next_epoch,
+            pack_blocks=s.pack_blocks)
         clean, stego, _ = otf.fixed_train[0]
         byte_images, _, _ = next(iter(loaders.val))
         assert byte_images.dtype == torch.uint8

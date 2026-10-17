@@ -6,7 +6,7 @@ import json
 import numpy as np
 import pandas as pd
 from lsb_torch import (torch,RunSettings,Corpus,TrainingImages,FixedPairs,PairSubset,
-                       training_loader,OrderedPairLoader,prefetch_for_images)
+                       training_loader,OrderedPairLoader,prefetch_for_images,effective_pack_blocks)
 
 
 def capped_validation(dataset,raise_cap,lsdir_cap):
@@ -108,16 +108,18 @@ class NotebookData:
         self.pairs=pd.concat([self.fixed_train.frame,self.val.frame,self.test.frame],ignore_index=True)
 
     def loaders(self,batch_size,workers,pin_memory,prefetch=None,*,eval_workers=4,prefetch_images=128,
-                eval_persistent_workers=False):
+                eval_persistent_workers=False,pack_blocks=1):
         if workers<0 or eval_workers<0:
             raise ValueError("worker counts must be nonnegative")
         paired=self.corpus.settings.paired_batches
         train_batch=max(1,batch_size//2) if paired else batch_size
         pair_batch=max(1,batch_size//2)
-        task_images=min(2 if paired else 4,train_batch)*(2 if paired else 1)
+        pack=effective_pack_blocks(pack_blocks,workers)
+        task_images=min(2 if paired else 4,train_batch)*(2 if paired else 1)*pack
         train_prefetch=prefetch_for_images(task_images,prefetch_images) if prefetch is None else prefetch
         train=training_loader(self.train,batch_size=train_batch,num_workers=workers,
-                              pin_memory=pin_memory,prefetch_factor=prefetch,prefetch_images=prefetch_images)
+                              pin_memory=pin_memory,prefetch_factor=prefetch,prefetch_images=prefetch_images,
+                              pack_blocks=pack_blocks)
         # Group pairs by photo in a worker, then restore their fixed table order.
         kwargs=dict(batch_size=pair_batch,num_workers=eval_workers,pin_memory=pin_memory,
                     prefetch_images=prefetch_images)
@@ -134,6 +136,7 @@ class NotebookData:
                            eval_task="one_photo",eval_persistent_workers=val.persistent_workers,
                            in_order=True,group_images=4,batch_images=batch_size,
                            tensor_dtype=self.corpus.settings.tensor_dtype)
+        if pack>1:self.record.update(pack_blocks=pack)  # absent when off, so old records keep their keys
         return train,val,test,train_eval
 
     def print_record(self):

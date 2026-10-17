@@ -225,10 +225,10 @@ class Loaders:
 
 def build_otf_loaders(data, *, batch_size, workers, eval_workers, pin_memory,
                       prefetch=None, prefetch_images=128, eval_persistent_workers=False,
-                      prime_next_epoch=False):
+                      prime_next_epoch=False, pack_blocks=1):
     train, val, test, train_eval = data.loaders(batch_size, workers, pin_memory, prefetch,
         eval_workers=eval_workers, prefetch_images=prefetch_images,
-        eval_persistent_workers=eval_persistent_workers)
+        eval_persistent_workers=eval_persistent_workers, pack_blocks=pack_blocks)
     if prime_next_epoch:
         train = PrimedTrainingLoader(train)
     return Loaders(train, val, test, train_eval, data.fixed_train.frame, data.val.frame, data.test.frame)

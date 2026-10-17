@@ -9,6 +9,7 @@ import threading
 import shutil
 import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 
@@ -18,6 +19,8 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"LSB-Dataset-Generator
 from lsb_torch import (torch,Corpus,RunSettings,TrainingImages,FixedPairs,PairSubset,
                        OrderedPairLoader,MixedLoader,training_loader,prefetch_for_images,
                        preload_pairs,PreloadedPairs,PrimedTrainingLoader)
+from torch.utils.data import IterableDataset, get_worker_info
+import torch
 from lsb_cache import build_entry
 from test_lsb_source import record
 
@@ -543,3 +546,198 @@ class TorchTests(unittest.TestCase):
 
 if __name__=="__main__":
     unittest.main()
+
+
+class PackedLoaderTests(unittest.TestCase):
+    """pack_blocks>1 must deliver exactly the batches of today's loader (pack_blocks=1)."""
+    class Stream(IterableDataset):
+        """Worker w yields counts[w] items (image, label, index); indices are unique and worker-keyed."""
+        def __init__(self,counts,tile=4,epoch_shift=0):
+            super().__init__()
+            self.counts,self.tile=counts,tile
+            self.corpus=types.SimpleNamespace(settings=types.SimpleNamespace(paired_batches=False))
+            self._epoch=torch.zeros(1,dtype=torch.int64).share_memory_()
+        def set_epoch(self,epoch):self._epoch[0]=epoch
+        def __iter__(self):
+            info=get_worker_info();w=0 if info is None else info.id;n=1 if info is None else info.num_workers
+            epoch=int(self._epoch.item());count=self.counts[w%len(self.counts)]+epoch
+            for k in range(count):
+                index=w*100000+epoch*1000+k
+                yield torch.full((3,self.tile,self.tile),index%251,dtype=torch.uint8),index%2,index
+        def __len__(self):return 10**6
+
+    @staticmethod
+    def batches(loader):
+        return [tuple(t.numpy().tobytes() for t in batch) for batch in loader]
+
+    def check(self,counts,workers,batch,pack,epochs=(0,1)):
+        old=training_loader(self.Stream(counts),batch_size=batch,num_workers=workers,pin_memory=False,pack_blocks=1)
+        new_ds=self.Stream(counts);old_ds=old.dataset
+        new=training_loader(new_ds,batch_size=batch,num_workers=workers,pin_memory=False,pack_blocks=pack)
+        try:
+            for epoch in epochs:
+                old_ds.set_epoch(epoch);new_ds.set_epoch(epoch)
+                expected=self.batches(old);actual=self.batches(new)
+                self.assertEqual(len(actual),len(expected),(counts,workers,batch,pack,epoch))
+                self.assertEqual(actual,expected,(counts,workers,batch,pack,epoch))
+                self.assertTrue(expected)
+        finally:
+            old.shutdown();new.shutdown()
+
+    def test_unequal_tails_are_replayed_in_the_original_order(self):
+        # Blocks are 4 images. Counts give: partial last blocks, workers that end exactly on a block or a
+        # pack boundary, a worker with no items, and different numbers of rounds per worker.
+        for counts in ([37,5,64,22],[16,16,16],[1,0,9,40,3],[200,8]):
+            for workers in (2,3,4):
+                for pack in (2,3,16):
+                    self.check(counts,workers,batch=8,pack=pack)
+
+    def test_single_worker_and_large_batch(self):
+        self.check([50],1,batch=8,pack=4)
+        self.check([30,31,32],3,batch=64,pack=5)      # a batch spans several rounds and packs
+
+    def test_off_cases_are_unchanged(self):
+        from lsb_torch import effective_pack_blocks
+        self.assertEqual(effective_pack_blocks(16,0),1)            # no worker processes
+        self.assertEqual(effective_pack_blocks(16,4,group_images=0),1)
+        self.assertEqual(effective_pack_blocks(16,4,in_order=False),1)
+        self.assertEqual(effective_pack_blocks(1,4),1);self.assertEqual(effective_pack_blocks(16,4),16)
+        with self.assertRaises(ValueError):effective_pack_blocks(0,4)
+        loader=training_loader(self.Stream([8,8]),batch_size=8,num_workers=2,pin_memory=False,pack_blocks=1)
+        try:self.assertEqual(loader.pack_blocks,1)
+        finally:loader.shutdown()
+
+    def test_real_dataset_hashes_equal_across_pack_sizes(self):
+        # The real TrainingImages stream (augmentation, keyed embedding) through 1, 2 and 3 workers.
+        case=TorchTests('test_worker_count_keyed_augmentation_and_persistent_epochs')
+        case.setUp()
+        try:
+            dataset=TrainingImages(case.corpus(RunSettings(tile_size=256,buffer_size=8)))
+            for workers in (1,2,3):
+                for epoch in (0,1):
+                    dataset.set_epoch(epoch)
+                    base=training_loader(dataset,batch_size=8,num_workers=workers,pin_memory=False,pack_blocks=1)
+                    expected=self.batches(base);base.shutdown()
+                    for pack in (2,16):
+                        dataset.set_epoch(epoch)
+                        packed=training_loader(dataset,batch_size=8,num_workers=workers,pin_memory=False,pack_blocks=pack)
+                        self.assertEqual(self.batches(packed),expected,(workers,epoch,pack));packed.shutdown()
+        finally:
+            case.tearDown()
+
+
+class FakeTorchDelivery:
+    """Deterministic model of torch's in-order multi-worker iterable delivery; no processes.
+
+    Tasks go round-robin to workers that are still believed available; the task list runs `lead`
+    tasks per worker ahead of delivery. A task to a worker with nothing left returns a stop marker,
+    which marks the worker unavailable and is skipped. Messages are handed out in task order.
+    """
+    def __init__(self,messages_per_worker,lead=2):
+        self.messages=[list(m) for m in messages_per_worker]
+        self.num_workers=len(self.messages)
+        self.lead=lead
+        self.dataset=types.SimpleNamespace()
+        self.pin_memory=False
+    def __iter__(self):
+        W=self.num_workers;taken=[0]*W;available=[True]*W;cycle=0;pending=[]
+        def dispatch():
+            nonlocal cycle
+            for _ in range(W):
+                w=cycle%W;cycle+=1
+                if available[w]:
+                    pending.append(w);return True
+            return False
+        for _ in range(self.lead*W):
+            if not dispatch():break
+        while pending:
+            w=pending.pop(0)
+            if taken[w]<len(self.messages[w]):
+                message=self.messages[w][taken[w]];taken[w]+=1
+                yield message
+            else:
+                available[w]=False
+            dispatch()
+
+
+class PackedOrderModelTests(unittest.TestCase):
+    """The pack replay equals the unpacked block order for many worker counts (up to 64) and tail patterns."""
+    ROWS=4
+
+    def block(self,w,j,rows):
+        """A block of `rows` items whose values name (worker, block index, row)."""
+        index=torch.tensor([w*10**6+j*10**3+i for i in range(rows)],dtype=torch.int64)
+        return (index.clone(),index%2,index)
+
+    def worker_blocks(self,counts):
+        """counts[w] items -> that worker's blocks: full blocks of ROWS, then one partial block."""
+        result=[]
+        for w,n in enumerate(counts):
+            blocks=[self.block(w,j,min(self.ROWS,n-j*self.ROWS)) for j in range((n+self.ROWS-1)//self.ROWS)]
+            result.append(blocks)
+        return result
+
+    def unpacked(self,counts,lead):
+        per_worker=self.worker_blocks(counts)
+        loader=FakeTorchDelivery(per_worker,lead)
+        return [tuple(t.tolist() for t in group) for group in MixedLoader(loader,8)._blocks(threading.Event())]
+
+    def packed(self,counts,pack,lead):
+        per_worker=self.worker_blocks(counts)
+        messages=[]
+        for w,blocks in enumerate(per_worker):
+            packs=[]
+            for k in range(0,len(blocks),pack):
+                chunk=blocks[k:k+pack]
+                packs.append((*[torch.cat([b[i] for b in chunk]) for i in range(3)],w))
+            messages.append(packs)
+        loader=FakeTorchDelivery(messages,lead);loader.dataset=types.SimpleNamespace()
+        mixed=MixedLoader(loader,8,block_rows=self.ROWS,pack_blocks=pack)
+        return [tuple(t.tolist() for t in group) for group in mixed._blocks(threading.Event())]
+
+    def test_replay_equals_unpacked_order(self):
+        rng=np.random.default_rng(0);checked=0
+        for workers in (1,2,3,6,12,32,64):
+            for trial in range(30):
+                counts=[int(c) for c in rng.integers(0,200,workers)]
+                if trial%5==0:counts=[int(c)*self.ROWS for c in rng.integers(0,40,workers)]  # exact block multiples
+                if trial%7==0:counts[int(rng.integers(workers))]=0
+                if not sum(counts):continue
+                for lead in (1,2,4):
+                    expected=self.unpacked(counts,lead)
+                    for pack in (2,3,16):
+                        self.assertEqual(self.packed(counts,pack,lead),expected,(workers,counts,pack,lead))
+                        checked+=1
+        self.assertGreater(checked,1000)
+
+    def test_model_reproduces_the_known_round_robin(self):
+        # 3 workers: worker 1 has one block, so rounds are w0b0 w1b0 w2b0 | w0b1 w2b1 | w0b2 w2b2 ...
+        order=[(g[2][0]//10**6,(g[2][0]%10**6)//10**3) for g in self.unpacked([12,3,12],2)]
+        self.assertEqual(order,[(0,0),(1,0),(2,0),(0,1),(2,1),(0,2),(2,2)])
+
+
+    def test_model_matches_real_torch_delivery_at_small_worker_counts(self):
+        """Validate the fake against real worker processes (tiny tensors, 1-4 workers) so the 32/64-worker
+        checks above rest on torch's actual delivery order, not only on my model of it."""
+        for counts in ([37,5,64,22],[16,16,16],[1,0,9,40,3],[200,8,8]):
+            workers=len(counts) if len(counts)<=4 else 4
+            counts=counts[:workers]
+            stream=PackedLoaderTests.Stream(counts)
+            real=training_loader(stream,batch_size=8,num_workers=workers,pin_memory=False,pack_blocks=1)
+            try:
+                actual=[tuple(t.tolist() for t in batch) for batch in real]
+            finally:
+                real.shutdown()
+            # The same data through the model: blocks of 4 items per worker, joined into batches of 8.
+            per_worker=[[self.block_from_stream(w,counts[w],j) for j in range((counts[w]+3)//4)] for w in range(workers)]
+            model=MixedLoader(FakeTorchDelivery(per_worker,lead=2),8)
+            expected=[tuple(t.tolist() for t in batch) for batch in model._joined_batches(threading.Event())]
+            self.assertEqual(actual,expected,counts)
+
+    @staticmethod
+    def block_from_stream(w,n,j):
+        """The block j of worker w exactly as PackedLoaderTests.Stream makes it (epoch 0)."""
+        rows=min(4,n-j*4)
+        index=torch.tensor([w*100000+k for k in range(j*4,j*4+rows)],dtype=torch.int64)
+        image=torch.stack([torch.full((3,4,4),int(i)%251,dtype=torch.uint8) for i in index])
+        return (image,index%2,index)
