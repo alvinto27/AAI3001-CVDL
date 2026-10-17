@@ -1,6 +1,6 @@
 # Project status — 2026-10-17
 
-**Start here:** The research hold is lifted only for the approved experiments in the [run queue](active/run-queue.md). The training tiling experiment is complete ([result](results/result-training-tiling.md)): overlap is best, and 256 training tiles improve all arms (256 overlap standard P_E 2.25%). The SRM front-end run (256 overlap recipe) is on the G4. Other plans stay on hold. Use [findings](findings.md) for older runs and [journal days](journal/README.md) for dated records.
+**Start here:** The research hold is lifted only for the approved experiments in the [run queue](active/run-queue.md). The training tiling experiment is complete ([result](results/result-training-tiling.md)): overlap is best, and 256 training tiles improve all arms. SRM front end (256 overlap recipe) is the best model: SRM-30 standard P_E 1.67%, SRM-e50 (50 epochs) 1.57%. **Next: `srm-hard` is launch-ready; launch only on the user's go** (command in the run queue). Other plans stay on hold. Use [findings](findings.md) for older runs and [journal days](journal/README.md) for dated records.
 
 ## Current state and items
 
@@ -10,9 +10,13 @@
 
 - **G4 run queue:** [`active/run-queue.md`](active/run-queue.md) lists every approved run and its state. Check it before and after each launch.
 
-- **Active work (2026-10-17):** SRM run `srm-20261017T052857Z-4521` (G4, GPU-bound, ~94 min). PC: loader fix for 256 runs (Worker_5; batches must stay byte-identical), `--settings-from` fix and missing checks on old models (Worker_4). All evaluation uses `scripts/evaluate_run.py` (`c13ee00`+): main tables, `--padding-check`, `--temperature`, `--tanh-saturation`, `--only`. See the [2026-10-17 journal](journal/2026-10-17/README.md).
+- **Evaluation (2026-10-17):** one tool, `scripts/evaluate_run.py`. **Default = standard suite (main stage) + hard test v1.** `--padding-check`, `--temperature`, `--tanh-saturation` run only on request. `--set` accepts machine settings only. The evaluator never writes into a run's training record. See the [2026-10-17 journal](journal/2026-10-17/README.md).
 
-- **Hard test (idea, under discussion with the user; NOT approved, do not start):** a separate held-out test made mostly of hard cases (k=1, low bpp, balanced across tile-noise quarters set on validation, ~1,000 pairs per hard group) reported as its own number next to the unchanged standard test. Pick up after the refactor, only when the user continues the discussion.
+- **Hard test v1 (`d74d716`):** `data/hard-test/v1/`, frozen. 4 panels (RAISE+DIV2K, ALASKA seen, ALASKA unseen, LSDIR) x k 1 and 2 x {all bpp, low bpp 0.05-0.15, noisiest quarter, low bpp and noisy} = 32 cells x 1,008 pairs. Test-split photos only; noise edges from validation only. Reported next to the unchanged standard test. Rebuild check: `scripts/build_hard_test.py --run runs/srm-20261017T052857Z-4521 --noise runs/srm-20261017T052857Z-4521/post-training/breakdown/clean_tile_noise.csv --check`.
+
+- **Next G4 run:** `srm-hard` (`795fd93`, `configs/train-hard-v1.yaml`): RAISE/ALASKA/LSDIR 72,000 pairs each per epoch, k=1 50%, half of bpp draws from 0.05-0.15; 30 epochs; ~112 min. Launch-ready (dry run PASS). Launch only on the user's go.
+
+- **PC rules:** at most 12 real data workers; keep total RAM use under ~20 GB; kill whole process groups; after each run `pgrep -af spawn_main` empty and `/dev/shm` normal; workers ask before GPU or heavy CPU work.
 
 - **Notebook refactor (done):** shared code moves into the `cvdl/` package (`active/plan-cvdl-package.md`). Notebook 04 is frozen as the v3 baseline; new work starts from 05. Phases 0-5 done (`bc7eba2`..`8c1c0dc`): models, metrics, data, training, settings, evaluation; notebook 05 is 10 short cells with experiment settings in its top cell (`settings = load(...)`). New experiment = copy notebook 05, fill the top cell. G4: `scripts/g4/submit.sh run --notebook PATH --timeout-min N [--dry-run]` (pre-flight on the PC; see `active/g4-batch-runner.md`). G4 smoke passed (tiling arm 1). Check after each phase: `python scripts/refactor_golden.py compare` (CPU, exact; `active/refactor-golden.md`).
 
@@ -20,8 +24,8 @@
 
 - **Completed:** ALASKA/LSDIR source records and mixed sampler; final verified masters; G4 mixed run and [result](results/result-newdata-1.md); PC threshold/noise check B and [result](results/result-check-b.md). The frozen standard test and RAISE/DIV2K records remain in use.
 - **On hold:** A, per-cell training (design only, no code or model run); C, capacity/longer training/BF16; seed repeats, front-end changes, and other free checks. No follow-up is authorized by the plans.
-- **Deferred records:** prebuilt writer, OTF plan step 17: [historical design](archive/plan-otf-generator.md), OTF implemented but writer deferred. Noisy covers: [parked by the user](archive/plan-noisy-covers.md). G4 GPU LSB generator: [shelved design](archive/plan-gpu-generator.md), not built. G4 resume after Spot preemption: postponed until C (longer training); today a preempted G4 run restarts with a fresh job ID (see [run guide](active/g4-batch-runner.md)). Long runs need resume across boots because one boot is limited to 105 min.
-- **Hardware and delivery:** the G4 is **stopped** (last boot: data-layout maintenance, 06:00:55-06:10:43Z on 2026-10-16). It keeps its internal `runs-out/` folder name until the next real G4 job. `main` stays at PR #2 until `yx` is merged as a whole (expect add/add conflicts from PR #1). The Pi is online. Its USB-SSD swap file was removed; **2 GiB zram only** remains. See the [Pi record](active/pi-host-changes.md) and [2026-10-16 journal](journal/2026-10-16/README.md). Do not start the VM to resend a result.
+- **Deferred records:** prebuilt writer, OTF plan step 17: [historical design](archive/plan-otf-generator.md), OTF implemented but writer deferred. Noisy covers: [parked by the user](archive/plan-noisy-covers.md). G4 GPU LSB generator: [shelved design](archive/plan-gpu-generator.md), not built. G4 resume after Spot preemption: postponed until C (longer training); today a preempted G4 run restarts with a fresh job ID (see [run guide](active/g4-batch-runner.md)). One boot is limited to 180 min since 2026-10-17 (`--timeout-min 165 --max-run-minutes 180` for long runs).
+- **Hardware and delivery:** the G4 is **stopped** (last boot: SRM-e50, 11:13-13:48Z on 2026-10-17). `main` stays at PR #2 until `yx` is merged as a whole (expect add/add conflicts from PR #1). The Pi is online. Its USB-SSD swap file was removed; **2 GiB zram only** remains. See the [Pi record](active/pi-host-changes.md) and [2026-10-16 journal](journal/2026-10-16/README.md). Do not start the VM to resend a result.
 
 ## User decisions still pending
 
@@ -53,5 +57,10 @@ The old checkpoint-selection validation decision is **done**: the mixed run used
 | `5881bbd`..`7d56dbe` | One `runs/` folder for all runs. PR #2 (merged, `0981ce7`) brought the same move to `main`. |
 | `76f6257`, `9798b56` | Data layout `Datasets/originals` + `generated` (PC), G4 scripts and one-time G4 reorganisation. |
 | `ac8810a`, `d6a3875` | Model-copy parity test; code tidy-up (122 tests). |
+| `632dd22`, `0d851b6`, `2841fdf` | SRM front end, SRM notebook, SRM-e50 notebook. |
+| `863d9fb`, `efde4df` | Packed loader (`pack_blocks=16`, default) and PC loader scripts. |
+| `7567501`, `d721e06` | Evaluator: no training-record writes; restricted `--set`. |
+| `795fd93` | Opt-in `k_weights` / `bpp_mixture`; `srm-hard` notebook. |
+| `d74d716` | Hard test v1 (270 tests). |
 
 The [documentation index](README.md) lists each current, result, and historical record. The [run guide](active/g4-batch-runner.md) is reference material only while work is on hold.

@@ -1,4 +1,4 @@
-## 2026-10-17 — Training tiling complete, one evaluation tool, SRM run
+## 2026-10-17 — Training tiling complete, one evaluation tool, SRM runs, hard test v1
 
 Recorded by the Orchestrator.
 
@@ -10,7 +10,7 @@ Recorded by the Orchestrator.
   - 256 trim `tiling-trim-256-20261017T032025Z-8579` (03:20-04:16Z).
   - 256 pad `tiling-pad-256-20261017T043145Z-9721` (04:31-05:27Z; 3 STOCKOUTs before).
   - SRM `srm-20261017T052857Z-4521` (05:29-07:03Z; commit `0d851b6`). Evaluated.
-  - SRM-e50 `srm-e50-20261017T111310Z-0214` (start 11:13Z after 1 STOCKOUT; commit `2841fdf`; timeout 165 min, boot limit 180 min). Warm epoch 181.4 s; projected 153.7 min. Pending.
+  - SRM-e50 `srm-e50-20261017T111310Z-0214` (start 11:13Z after 1 STOCKOUT; commit `2841fdf`; timeout 165 min, boot limit 180 min). Done 11:13-13:47Z (153.1 min; ~$4.3). Best epoch 43, val P_E .0432, AUC .9917. Pi=PC SHA verified.
 - Capacity retry: `runs/.scratch/retry-256.sh`, 4-min waits, at most 15 attempts, fresh job ID each.
 - PC evaluation of all 6 tiling arms by Worker_4: [result](../../results/result-training-tiling.md).
 - Code (Worker_5 unless noted):
@@ -25,6 +25,8 @@ Recorded by the Orchestrator.
   - `0d851b6` (Worker_4) SRM notebook filled with the 256 overlap recipe; only `name` and `front_end` differ.
 - Worker_5 32-worker loader hash runs filled the PC RAM (about 20 GB, swap 100%) and the kernel killed a golden capture; the Orchestrator killed the runs and their orphans. New rules: at most 12 real workers on the PC, a memory guard in the loader scripts, and ask Worker_4 before heavy PC work.
 - Removed 3 orphan DataLoader workers (left by a killed padding check at 01:49Z; about 4.3 GB of swap).
+- `srm-hard` notebook `795fd93` (Worker_4): opt-in `k_weights` and `bpp_mixture` in the generator settings; old configs draw exactly as before (fingerprints equal); validation/test hashes unchanged. 20,000-draw check: source 33.6/33.2/33.2%, k 49.8/16.7/16.9/16.6%, bpp bins 30.5/30.9/21.7/16.9%. 256 tests, golden ALL EQUAL, G4 preflight and PC QUICK pass; dry run PASS. Estimate 112 min. Launch tomorrow on the user's go (command in the run queue).
+- Hard test v1 `d74d716` (Worker_5): `data/hard-test/v1/` (4 frozen pair lists + `summary.json` with SHA-256). 32 cells x 1,008 pairs (24 balanced stego combinations x 42). Test-split photos only; noise edges from validation only. ALASKA noisy cells use 572/574 distinct tiles, each at most 2x; clean FA counts distinct tiles. Evaluator stage on by default (`--no-hard` off, `--only hard` for finished runs). 270 tests, golden ALL EQUAL, rebuild check identical (Orchestrator rerun).
 
 ### Found
 
@@ -47,6 +49,11 @@ Recorded by the Orchestrator.
 - The standard test uses k 1-8 and bpp 0.05-0.5 (bpp-1 panel: up to 1.0); training uses k 1-4. About half of the test pairs are k 5-8, and k=1 is about 12.5%.
 - With one shared threshold (5% FA on mixed validation), SRM clean FA on test: RAISE 1.8%, DIV2K 7.8%, LSDIR 6.0%, ALASKA 18-20%.
 
+- SRM-e50 vs SRM-30 (best epoch 43 vs 29; P_E at 0.5): standard 1.57 vs 1.67%; bpp-1 1.17 vs 1.21%; ALASKA seen 13.10 vs 13.86%; ALASKA unseen 11.02 vs 11.70%; LSDIR 5.04 vs 5.16%. AUC within 0.006.
+- SRM-e50 vs SRM-30 on hard test v1: miss lower in 25 of 32 cells, higher in 5, equal in 2; most gains 1-3 points. No cell has non-overlapping 95% Wilson intervals: a small, consistent trend, one seed each. Hard-test clean FA is higher for e50 in some noisy cells (RAISE+DIV2K noisy about .14 vs .10; ALASKA seen noisy .077 vs .047). ALASKA k1 low+noisy stays near chance (AUC .53-.54).
+- Hard test v1 results (miss at per-source validation FA5, SRM vs 256 overlap KV): SRM is better in 31 of 32 cells. Examples: LSDIR k1 all .328 vs .484; LSDIR k2 low+noisy .351 vs .583; ALASKA unseen k1 all .617 vs .637. ALASKA k1 low+noisy is near chance for both (AUC .52-.54; miss .88-.93).
+- Incident: the first hard-test scoring used the ordered loader, which buffered about 21 GB because the hard pairs spread over all photos. Worker_5 stopped it; `score()` now reads one task per photo. Second run held about 18 GB available.
+
 ### Decided
 
 - User: SRM uses the 256 overlap recipe (train tile 256, overlap_last, batch 128, 180,000 tiles/epoch). No PC speed test; read the speed on the G4 and stop early if 30 epochs cannot fit. Kept running.
@@ -61,11 +68,7 @@ Recorded by the Orchestrator.
 
 ### Next
 
-- SRM evaluated: best model so far. Next G4 run: user decision (longer SRM needs resume across boots; seed repeat). Pending.
-- `srm-hard` notebook `795fd93` (Worker_4): opt-in `k_weights` and `bpp_mixture` in the generator settings; old configs draw exactly as before (fingerprints equal); validation/test hashes unchanged. 20,000-draw check: source 33.6/33.2/33.2%, k 49.8/16.7/16.9/16.6%, bpp bins 30.5/30.9/21.7/16.9%. 256 tests, golden ALL EQUAL, G4 preflight and PC QUICK pass; dry run PASS. Estimate 112 min. Launch tomorrow on the user's go (command in the run queue).
-- Hard test v1 `d74d716` (Worker_5): `data/hard-test/v1/` (4 frozen pair lists + `summary.json` with SHA-256). 32 cells x 1,008 pairs (24 balanced stego combinations x 42). Test-split photos only; noise edges from validation only. ALASKA noisy cells use 572/574 distinct tiles, each at most 2x; clean FA counts distinct tiles. Evaluator stage on by default (`--no-hard` off, `--only hard` for finished runs). 270 tests, golden ALL EQUAL, rebuild check identical (Orchestrator rerun).
-- Hard test v1 results (miss at per-source validation FA5, SRM vs 256 overlap KV): SRM is better in 31 of 32 cells. Examples: LSDIR k1 all .328 vs .484; LSDIR k2 low+noisy .351 vs .583; ALASKA unseen k1 all .617 vs .637. ALASKA k1 low+noisy is near chance for both (AUC .52-.54; miss .88-.93).
-- Incident: the first hard-test scoring used the ordered loader, which buffered about 21 GB because the hard pairs spread over all photos. Worker_5 stopped it; `score()` now reads one task per photo. Second run held about 18 GB available.
-- SRM-e50 result (standard + hard suite). Pending.
-- Loader fix: pushed. PC speed: synthetic ceiling at 256 34 -> 76 steps/s, main-process time per step 27.5 -> 8.3 ms; real PC loader unchanged (decode-bound at 6-12 workers). G4 gain not measured yet. Pending.
+- `srm-hard` (`795fd93`): launch on the user's go (command in the run queue). Then evaluate with the default suite (standard + hard v1) and compare with SRM-30 and SRM-e50.
+- Pending user items: delete about 600 MB of old runs; check whether `job-console.log` duplicates `run.log`; the `yx` to `main` PR.
+- Loader fix: pushed. PC speed: synthetic ceiling at 256 34 -> 76 steps/s, main-process time per step 27.5 -> 8.3 ms; real PC loader unchanged (decode-bound at 6-12 workers). On the G4, SRM-e50 (pack 16) trained at 18.36 steps/s, the same as SRM-30 (pack 1, 18.4): SRM is GPU-bound, so no gain is visible. A loader-bound 256 KV run is needed to measure it. Pending.
 - Missing stages on old models: done. Combined 9-model table `runs/verification/post-training-model-comparison-20261017.csv`. Temperature helps only 256 overlap and SRM (slightly); tanh saturation only in SRM tanh1.
