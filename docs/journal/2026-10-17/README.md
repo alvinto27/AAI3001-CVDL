@@ -62,7 +62,8 @@ Recorded by the Orchestrator.
 ### Next
 
 - SRM evaluated: best model so far. Next G4 run: user decision (longer SRM needs resume across boots; seed repeat). Pending.
-- Hard test v1 build (Worker_5) and `srm-hard` notebook (Worker_4). Pending.
+- `srm-hard` notebook `795fd93` (Worker_4): opt-in `k_weights` and `bpp_mixture` in the generator settings; old configs draw exactly as before (fingerprints equal); validation/test hashes unchanged. 20,000-draw check: source 33.6/33.2/33.2%, k 49.8/16.7/16.9/16.6%, bpp bins 30.5/30.9/21.7/16.9%. 256 tests, golden ALL EQUAL, G4 preflight and PC QUICK pass; dry run PASS. Estimate 112 min. Launch tomorrow on the user's go (command in the run queue).
+- Hard test v1 build (Worker_5). Pending.
 - SRM-e50 result (standard + hard suite). Pending.
 - Loader fix: pushed. PC speed: synthetic ceiling at 256 34 -> 76 steps/s, main-process time per step 27.5 -> 8.3 ms; real PC loader unchanged (decode-bound at 6-12 workers). G4 gain not measured yet. Pending.
 - Missing stages on old models: done. Combined 9-model table `runs/verification/post-training-model-comparison-20261017.csv`. Temperature helps only 256 overlap and SRM (slightly); tanh saturation only in SRM tanh1.
