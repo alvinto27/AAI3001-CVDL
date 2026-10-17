@@ -29,12 +29,12 @@ States: `queued` (approved, waiting) · `preparing` (code or notebook not ready)
 
 | Task | State | Note |
 | --- | --- | --- |
-| SRM notebook build | done (`632dd22`, `97487b8`); 5 values unset; PC needs `rocm_conv1_fix=off`; G4 time untested | tile size, grid, batch, tiles/epoch unset |
+| SRM notebook build | done (`632dd22`, `97487b8`); user chose 2026-10-17: train tile 256, grid overlap_last, batch 128, 180,000 tiles/epoch (same as 256 overlap). G4 run approved after the 256 pad evaluation, no PC speed test: read the G4 speed after warm epoch 2; stop the VM early if 30 epochs cannot finish inside 105 min | values to fill in by Worker_4 |
 | **Fix the padding check first (blocks all padding checks)** | approved, first task on 2026-10-17 | the 2026-10-16 check ran in one process (~74% of one core, no data workers; 65,736 cases for one model). Fix: multi-worker loader for decode/embed (like the main evaluation) and a cap of 2,000 pairs per shape and level, the same seeded pairs for every model. Do not resume or rerun any padding check until this is fixed and reviewed. |
 | Temperature scaling in `scripts/evaluate_run.py` | approved, queued (next free worker) | one T fitted on validation; report calibration, 1.0 ties and FA5 reachability before/after; add only (old outputs unchanged); also run on wide-R2, newdata-1 and the tiling models |
 | tanh saturation measurement | approved, queued (next free worker) | existing models, PC; share of tanh inputs with abs > 3 per layer, clean vs stego; a G4 run only if a fix is tested later |
 | Photo-level decision | deferred by the user | — |
-| 256 loader speed (only if 256 is chosen) | deferred by the user | 256 overlap on the G4: 32-33 steps/s vs 54.6 at 512 (GPU 40-55%, host CPU about 1/3, main process about 72% of one core, workers about 1/3 core each, no disk wait). Hypothesis: per-tile hand-off overhead (4x more items per step). Fix idea: workers build whole batches; profile on the PC first; prove identical data hashes. Runs 5-6 keep the current code. |
+| 256 loader speed | approved 2026-10-17: Worker_5 implements the fix after its profile (in parallel with the SRM run) | 256 overlap on the G4: 32-33 steps/s vs 54.6 at 512 (GPU 40-55%, host CPU about 1/3, main process about 72% of one core, workers about 1/3 core each, no disk wait). Hypothesis: per-tile hand-off overhead (4x more items per step). Fix idea: workers build whole batches; profile on the PC first; prove identical data hashes. Runs 5-6 keep the current code. |
 
 ## After the runs
 
