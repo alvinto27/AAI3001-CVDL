@@ -110,10 +110,16 @@ class TrainingGridTests(unittest.TestCase):
 
     def test_notebook_names_recipe_and_post_fit_guards(self):
         base=json.loads((ROOT/'notebooks/newdata-1.ipynb').read_text())
-        for path in (ROOT/'notebooks/experiments').glob('*.ipynb'):
+        # The tiling recipe checks apply only to the tiling notebooks. Other experiments (srm, srm-e50, ...) have
+        # their own recipes and tests; they still must satisfy the notebook-name rule below.
+        tiling=[ROOT/f'notebooks/experiments/tiling-{arm}{suffix}.ipynb'
+                for arm in ('overlap','trim','pad') for suffix in ('','-256')]
+        self.assertEqual(sorted(p.stem for p in tiling if p.exists()),sorted(p.stem for p in tiling))
+        for path in sorted((ROOT/'notebooks/experiments').glob('*.ipynb')):
             nb=json.loads(path.read_text());values=top_values(nb)
             validate_notebook_name(path,values)
-            if path.stem=='srm':continue  # own recipe checks: tests/test_srm_front_end.py
+            self.assertEqual(values['name'],path.stem)
+            if path not in tiling:continue
             self.assertEqual(values['name'],path.stem);self.assertEqual(values['post_fit_eval'],'none')
             self.assertEqual(values['train_yaml'],'configs/train-k1to4.yaml')
             recipe=top_values(base);recipe.pop('run_name')
