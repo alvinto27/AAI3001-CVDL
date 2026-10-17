@@ -63,7 +63,9 @@ Recorded by the Orchestrator.
 
 - SRM evaluated: best model so far. Next G4 run: user decision (longer SRM needs resume across boots; seed repeat). Pending.
 - `srm-hard` notebook `795fd93` (Worker_4): opt-in `k_weights` and `bpp_mixture` in the generator settings; old configs draw exactly as before (fingerprints equal); validation/test hashes unchanged. 20,000-draw check: source 33.6/33.2/33.2%, k 49.8/16.7/16.9/16.6%, bpp bins 30.5/30.9/21.7/16.9%. 256 tests, golden ALL EQUAL, G4 preflight and PC QUICK pass; dry run PASS. Estimate 112 min. Launch tomorrow on the user's go (command in the run queue).
-- Hard test v1 build (Worker_5). Pending.
+- Hard test v1 `d74d716` (Worker_5): `data/hard-test/v1/` (4 frozen pair lists + `summary.json` with SHA-256). 32 cells x 1,008 pairs (24 balanced stego combinations x 42). Test-split photos only; noise edges from validation only. ALASKA noisy cells use 572/574 distinct tiles, each at most 2x; clean FA counts distinct tiles. Evaluator stage on by default (`--no-hard` off, `--only hard` for finished runs). 270 tests, golden ALL EQUAL, rebuild check identical (Orchestrator rerun).
+- Hard test v1 results (miss at per-source validation FA5, SRM vs 256 overlap KV): SRM is better in 31 of 32 cells. Examples: LSDIR k1 all .328 vs .484; LSDIR k2 low+noisy .351 vs .583; ALASKA unseen k1 all .617 vs .637. ALASKA k1 low+noisy is near chance for both (AUC .52-.54; miss .88-.93).
+- Incident: the first hard-test scoring used the ordered loader, which buffered about 21 GB because the hard pairs spread over all photos. Worker_5 stopped it; `score()` now reads one task per photo. Second run held about 18 GB available.
 - SRM-e50 result (standard + hard suite). Pending.
 - Loader fix: pushed. PC speed: synthetic ceiling at 256 34 -> 76 steps/s, main-process time per step 27.5 -> 8.3 ms; real PC loader unchanged (decode-bound at 6-12 workers). G4 gain not measured yet. Pending.
 - Missing stages on old models: done. Combined 9-model table `runs/verification/post-training-model-comparison-20261017.csv`. Temperature helps only 256 overlap and SRM (slightly); tanh saturation only in SRM tanh1.
