@@ -17,7 +17,7 @@ import torch
 
 from cvdl.settings import SCHEMA, automatic_profile, load, machine_profile
 from scripts.g4.preflight import preflight, top_values, validate_notebook, validate_job_env
-from scripts.refactor_golden import jsonable, settings_dict
+from scripts.refactor_golden import jsonable, repo_relative_paths, settings_dict
 
 ROOT=Path(__file__).resolve().parents[1]
 BOOTSTRAP_SHA='89cc83e9c73cc43476f6daf5e77825ddc298a32a22a52af8ded0909f15b1f2af'
@@ -41,12 +41,14 @@ class RecipeTests(unittest.TestCase):
             for key,spec in SCHEMA.items():
                 if not spec.machine:
                     self.assertEqual(settings.values[key],legacy.values[key],f'{name}: {key}')
-            self.assertEqual(jsonable(settings_dict(settings)),expected['run_settings'])
-            actual=settings.legacy_globals();before=expected['globals']
+            self.assertEqual(repo_relative_paths(jsonable(settings_dict(settings)),ROOT),
+                             repo_relative_paths(expected['run_settings'],'/work'))
+            actual=repo_relative_paths(settings.legacy_globals(),ROOT)
+            before=repo_relative_paths(expected['globals'],'/work')
             changed={key for key in set(actual)|set(before) if actual.get(key)!=before.get(key)}
             self.assertEqual(changed,{'CHECKPOINT_ROOT','ROCM_CONV1_FIX_ACTIVE'})
-            self.assertEqual(before['CHECKPOINT_ROOT'],str(ROOT/'runs'))
-            self.assertEqual(actual['CHECKPOINT_ROOT'],str(ROOT/'runs-out'))
+            self.assertEqual(before['CHECKPOINT_ROOT'],repo_relative_paths(str(ROOT/'runs'),ROOT))
+            self.assertEqual(actual['CHECKPOINT_ROOT'],repo_relative_paths(str(ROOT/'runs-out'),ROOT))
             self.assertIs(before['ROCM_CONV1_FIX_ACTIVE'],True)
             self.assertIs(actual['ROCM_CONV1_FIX_ACTIVE'],False)
             self.assertEqual((settings.workers,settings.eval_workers,settings.quick,settings.compile,settings.prime_next_epoch),

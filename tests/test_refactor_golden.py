@@ -5,9 +5,10 @@ import io
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from refactor_golden import compare_part
+from refactor_golden import compare_part, repo_relative_paths
 
 
 class GoldenComparisonTests(unittest.TestCase):
@@ -27,6 +28,23 @@ class GoldenComparisonTests(unittest.TestCase):
     def test_cpu_data_settings_are_exact(self):
         for part in ("cpu", "data", "settings"):
             self.assertTrue(self.check(part, {"loss": .7}, {"loss": .70000001}))
+
+    def test_repo_relocation_only_changes_absolute_root(self):
+        old={'paths':['/work/configs/train.yaml'],'value':.7}
+        new={'paths':['/relocated/repo/configs/train.yaml'],'value':.7}
+        with patch('refactor_golden.ROOT',Path('/relocated/repo')):
+            self.assertFalse(self.check('settings',old,new))
+            new['paths']=['/relocated/repo/other/train.yaml']
+            self.assertTrue(self.check('settings',old,new))  # Same basename, different relative path.
+            new['paths']=old['paths']
+            self.assertTrue(self.check('settings',old,new))  # Unrebased external path must fail.
+        self.assertEqual(old['paths'],['/work/configs/train.yaml'])
+
+    def test_path_rebasing_does_not_hide_non_path_changes(self):
+        for other in ('<ROOT>/a','/work-other/a','text /work/a',7,.70000001):
+            with self.subTest(other=other),patch('refactor_golden.ROOT',Path('/relocated/repo')):
+                self.assertTrue(self.check('settings',{'value':'/work/a'},{'value':other}))
+        self.assertEqual(repo_relative_paths({'path':'/outside/a','n':7},'/work'),{'path':'/outside/a','n':7})
 
     def test_model_cpu_exact_gpu_cross_run_ignored(self):
         a = {"checkpoints": {"m": {"class_source": "old", "cpu": {"logits_sha": "before"}, "cuda": {"logits_sha": "gpu"}}}}

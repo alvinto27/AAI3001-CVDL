@@ -733,9 +733,28 @@ def allow_quick_panel_cap(old, new):
     return allowed
 
 
+def repo_relative_paths(value, root):
+    """Compare absolute repo paths by suffix; keep all other values exact.
+
+    A tagged tuple (not a string placeholder) cannot match a non-path literal.
+    Only whole absolute strings below root qualify; prefix lookalikes do not.
+    """
+    prefix=str(root).rstrip('/')
+    if not prefix.startswith('/'):
+        raise ValueError('repository root must be an absolute non-root path')
+    if isinstance(value, dict):
+        return {key:repo_relative_paths(item,root) for key,item in value.items()}
+    if isinstance(value, list):
+        return [repo_relative_paths(item,root) for item in value]
+    if isinstance(value, str) and (value==prefix or value.startswith(prefix+'/')):
+        return ('<ROOT>',value[len(prefix):])
+    return value
+
+
 def compare_part(part, old, new):
     from copy import deepcopy
-    old, new = deepcopy(old), deepcopy(new)
+    # The saved oracle was captured at /work. Relocation is not a data difference.
+    old, new = repo_relative_paths(deepcopy(old), '/work'), repo_relative_paths(deepcopy(new), ROOT)
     if part == "models":
         # CPU hashes are the cross-run oracle. GPU kernels are not bit-exact
         # across processes; test_model_copy_parity checks GPU copies in-process.
