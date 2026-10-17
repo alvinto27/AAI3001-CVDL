@@ -51,7 +51,7 @@ def settings_for_run(folder):
     return load(environ={},_profile=profile,overrides=overrides,**experiment)
 
 
-def evaluate(folder, *, padding_check=False):
+def evaluate(folder, *, padding_check=False, padding_pairs=2000):
     from cvdl import runtime, data, post_fit
     from cvdl.settings import plain
     from cvdl.lit import select_best_checkpoint
@@ -80,7 +80,7 @@ def evaluate(folder, *, padding_check=False):
         if otf is None:raise ValueError('padding diagnostic requires OTF data')
         from cvdl.padding import check
         check(model.net,otf.test,predictions['test'],predictions['val'],folder,
-              device=settings.device,quick=settings.quick)
+              device=settings.device,quick=settings.quick,limit=padding_pairs,workers=settings.eval_workers)
     print(f'EVALUATION COMPLETE: {folder}',flush=True)
     return result
 
@@ -89,8 +89,10 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_folder',type=Path)
     parser.add_argument('--padding-check',action='store_true')
+    parser.add_argument('--padding-pairs',type=int,default=2000,
+        help='cases per (pattern, level, real shape), chosen by a fixed hash from the standard test list; 0 = all')
     args=parser.parse_args()
-    evaluate(args.run_folder,padding_check=args.padding_check)
+    evaluate(args.run_folder,padding_check=args.padding_check,padding_pairs=args.padding_pairs)
 
 
 if __name__=='__main__':main()
