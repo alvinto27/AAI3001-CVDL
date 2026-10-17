@@ -1,6 +1,6 @@
 # Project status — 2026-10-17
 
-**Start here:** The research hold is lifted only for the approved experiments in the [run queue](active/run-queue.md). The training tiling experiment is complete ([result](results/result-training-tiling.md)): overlap is best, and 256 training tiles improve all arms. SRM front end (256 overlap recipe) is the best model: SRM-30 standard P_E 1.67%, SRM-e50 (50 epochs) 1.57%. **Next: `srm-hard` is launch-ready; launch only on the user's go** (command in the run queue). Other plans stay on hold. Next session: read the [2026-10-17 handoff](active/handoff-2026-10-17.md) first. Use [findings](findings.md) for older runs and [journal days](journal/README.md) for dated records.
+**Start here:** The research hold is lifted only for the approved experiments in the [run queue](active/run-queue.md). The training tiling experiment is complete ([result](results/result-training-tiling.md)): overlap is best, and 256 training tiles improve all arms. SRM front end (256 overlap recipe) is the best model: SRM-30 standard P_E 1.67%, SRM-e50 (50 epochs) 1.57%. **Next: new train-matched validation, new 256 standard and hard tests, report notebook; `srm-hard` on hold** (see the handoff). Other plans stay on hold. Next session: read the [2026-10-17 handoff](active/handoff-2026-10-17.md) first. Use [findings](findings.md) for older runs and [journal days](journal/README.md) for dated records.
 
 ## Current state and items
 
@@ -10,11 +10,13 @@
 
 - **G4 run queue:** [`active/run-queue.md`](active/run-queue.md) lists every approved run and its state. Check it before and after each launch.
 
-- **Evaluation (2026-10-17):** one tool, `scripts/evaluate_run.py`. **Default = standard suite (main stage) + hard test v1.** `--padding-check`, `--temperature`, `--tanh-saturation` run only on request. `--set` accepts machine settings only. The evaluator never writes into a run's training record. See the [2026-10-17 journal](journal/2026-10-17/README.md).
+- **Evaluation (2026-10-17, to be replaced by the redesign below):** one tool, `scripts/evaluate_run.py`. **Default = standard suite (main stage) + hard test v1.** `--padding-check`, `--temperature`, `--tanh-saturation` run only on request. `--set` accepts machine settings only. The evaluator never writes into a run's training record. See the [2026-10-17 journal](journal/2026-10-17/README.md).
 
 - **Hard test v1 (`d74d716`):** `data/hard-test/v1/`, frozen. 4 panels (RAISE+DIV2K, ALASKA seen, ALASKA unseen, LSDIR) x k 1 and 2 x {all bpp, low bpp 0.05-0.15, noisiest quarter, low bpp and noisy} = 32 cells x 1,008 pairs. Test-split photos only; noise edges from validation only. Reported next to the unchanged standard test. Rebuild check: `scripts/build_hard_test.py --run runs/srm-20261017T052857Z-4521 --noise runs/srm-20261017T052857Z-4521/post-training/breakdown/clean_tile_noise.csv --check`.
 
-- **Next G4 run:** `srm-hard` (`795fd93`, `configs/train-hard-v1.yaml`): RAISE/ALASKA/LSDIR 72,000 pairs each per epoch, k=1 50%, half of bpp draws from 0.05-0.15; 30 epochs; ~112 min. Launch-ready (dry run PASS). Launch only on the user's go.
+- **Next G4 run:** `srm-hard` (`795fd93`, `configs/train-hard-v1.yaml`): RAISE/ALASKA/LSDIR 72,000 pairs each per epoch, k=1 50%, half of bpp draws from 0.05-0.15; 30 epochs; ~112 min. **On hold** until the train-matched validation exists (user decision 2026-10-17 late: validation follows training).
+
+- **Evaluation redesign (user, 2026-10-17 late):** standard test 256 tiles, k 1-4, bpp 0.05-0.5, overlap-last for all sources; k 5-8 opt-in; hard test rebuilt at 256 (32 x 1,008); per-source thresholds as the main report; one report notebook per run. Details: [2026-10-17 handoff](active/handoff-2026-10-17.md), section 2.
 
 - **PC rules:** at most 12 real data workers; keep total RAM use under ~20 GB; kill whole process groups; after each run `pgrep -af spawn_main` empty and `/dev/shm` normal; workers ask before GPU or heavy CPU work.
 

@@ -65,7 +65,12 @@ Recorded by the Orchestrator.
 - User: default evaluation = standard suite + hard suite. Padding, temperature and tanh checks only on request.
 - User: hard training notebook `srm-hard` = SRM recipe, 30 epochs, with per epoch RAISE 72,000 / ALASKA 72,000 / LSDIR 72,000 pairs (LSDIR doubled; 216,000 total); k=1 50%, k=2-4 one sixth each; half of the bpp draws from 0.05-0.15, half from 0.05-0.5; stego type unchanged. No texture-weighted sampling in this run. Prepare launch-ready today; launch tomorrow on the user's go. Worker_4 builds it.
 - Rule: after every PC run or kill, check `pgrep -af spawn_main` for orphan workers.
-- User (late): validation must follow the training set, so that the training and validation curves show overfitting. The final holdout test needs a major update: 256 x 256 tiles only, bpp 0.05 <= x <= 0.5, k 1-4 (user); k 5-8 as a separate opt-in check (SRM-e50 k8 misses 3.0-4.0% at threshold 0.5, above k4). Same total pairs as today, all on k 1-4 (user: option b). Overlap-last grid for all sources in training, validation and test (user; from the tiling arms). Sources unchanged (user). Hard test rebuilt at 256 with the same design and pair count (32 x 1,008) (user). Per-source thresholds as the main report; rescore old models on the new tests (user). New consolidated report notebook per run with plots and the training curves (user): one model per notebook, optional reference model, no HTML copy. Every run has two standard notebooks: training and report (user). Other scope to agree. `srm-hard` launch on hold until the new validation exists (to confirm).
+- User (late): validation must follow the training set (same tile size, grid, sources, mix, k and bpp), so that the training and validation curves show overfitting.
+- User (late): standard test = 256 x 256 tiles, bpp 0.05 <= x <= 0.5, k 1-4; same total pairs as today, all on k 1-4. k 5-8 as a separate opt-in check (SRM-e50 k8 misses 3.0-4.0% at threshold 0.5, above k4). bpp-1 panel dropped.
+- User (late): overlap-last grid for all sources in training, validation and test; sources unchanged; hard test rebuilt at 256 with the same design and pair count (32 x 1,008).
+- User (late): per-source thresholds are the main report; rescore old models on the new tests.
+- User (late): one report notebook per run (`runs/<run>/report.ipynb`, saved outputs only, training plots included, optional reference model, no HTML copy). Every run has two standard notebooks: training and report.
+- `srm-hard` launch on hold until the train-matched validation exists (to confirm with the user).
 
 ### Next
 
