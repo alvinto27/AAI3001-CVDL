@@ -1,4 +1,8 @@
-"""Evaluate one downloaded run on the PC; never fit or modify its checkpoints."""
+"""Evaluate one downloaded run on the PC; never fit or modify its checkpoints.
+
+--settings-from borrows data, validation and test settings, not model architecture.
+Borrowed settings and their SHA-256 are recorded as outputs; legacy input files stay intact.
+"""
 from __future__ import annotations
 import argparse
 import hashlib
@@ -52,6 +56,73 @@ def settings_for_run(folder):
     return load(environ={},_profile=profile,overrides=overrides,**experiment)
 
 
+# These are exactly the architecture choices read by model_from_hparams.
+MODEL_DEFAULTS=dict(model='xunet',width=4,norm='group',clip_t=3.0,front_end='kv')
+MODEL_TRAINING_KEYS=('lr','warmup_epochs','lr_drops','grad_clip','epochs','seed')
+
+
+def settings_for_evaluation(folder, checkpoint, settings_from=None):
+    """Borrow data, not the target model. Inspect trusted checkpoints on CPU only."""
+    if settings_from is None:
+        return settings_for_run(folder),{},None
+    import torch
+    from cvdl.settings import SCHEMA, automatic_profile, load, plain, parse
+    source=checkpoint_folder(settings_from)
+    borrowed=settings_for_run(source)
+    saved=folder/'run_settings.json'
+    if saved.exists():
+        own=json.loads(saved.read_text())['values']
+    else:
+        own=json.loads((folder/'model_run_settings.json').read_text())
+        own={**own,**{new:own[old] for old,new in (('max_epochs','epochs'),('grad_clip_norm','grad_clip')) if old in own}}
+    hparams=torch.load(checkpoint,map_location='cpu',weights_only=False).get('hyper_parameters',{})
+    architecture={k:parse(k,hparams.get(k,default)) for k,default in MODEL_DEFAULTS.items()}
+    needed=[k for k in MODEL_DEFAULTS if k!='width' or architecture['model']=='xunet_wide']
+    for key in needed:
+        if key in own and parse(key,own[key])!=architecture[key]:
+            raise ValueError(f'evaluated run disagrees with checkpoint model setting {key!r}')
+        if borrowed.values[key]!=architecture[key]:
+            raise ValueError(f'borrowed settings disagree with checkpoint model setting {key!r}: '
+                             f'{borrowed.values[key]!r} != {architecture[key]!r}')
+    experiment={k:v for k,v in plain(borrowed.values).items() if k in SCHEMA and not SCHEMA[k].machine}
+    experiment.update(architecture)
+    experiment.update({k:own[k] for k in MODEL_TRAINING_KEYS if k in own})
+    # An old derived run name describes its original data recipe, not this evaluation.
+    # Keep an explicit target identity when available; never borrow the donor identity.
+    experiment.update(name=own.get('name'),run_name=own.get('run_name') if own.get('name') else None)
+    experiment['train_yaml']=portable_config(experiment.get('train_yaml'))
+    settings=load(environ={},_profile=automatic_profile(),
+        overrides=dict(quick=borrowed.quick,job_id=own.get('job_id')),**experiment)
+    original=source/'run_settings.json'
+    if original.exists():
+        snapshot=original.read_bytes();kind='saved'
+        inputs={'run_settings.json':hashlib.sha256(snapshot).hexdigest()}
+    else:
+        # This is an OUTPUT snapshot of resolved legacy settings, never a fabricated input.
+        snapshot=(json.dumps(dict(values=plain(borrowed.values),sources=plain(borrowed.provenance),
+            profile=borrowed.profile,overrides=plain(borrowed.overrides)),indent=2)+'\n').encode()
+        kind='resolved-legacy'
+        inputs={name:hashlib.sha256((source/name).read_bytes()).hexdigest()
+                for name in ('model_run_settings.json','data_run_settings.json')}
+    provenance=dict(borrowed_settings_from=str(Path(settings_from).resolve()),
+        borrowed_checkpoint_folder=str(source),borrowed_run_settings_sha256=hashlib.sha256(snapshot).hexdigest(),
+        borrowed_run_settings_kind=kind,borrowed_source_files_sha256=inputs,
+        checkpoint_model_settings=architecture)
+    return settings,provenance,snapshot
+
+
+def write_borrowing(out, provenance, snapshot):
+    if snapshot is not None:
+        out=Path(out);out.mkdir(parents=True,exist_ok=True)
+        files={out/'borrowed_run_settings.json':snapshot,
+               out/'borrowed_settings.json':(json.dumps(provenance,indent=2)+'\n').encode()}
+        for path,content in files.items():
+            if path.exists() and path.read_bytes()!=content:
+                raise ValueError(f'borrowed provenance differs: {path}; use a fresh output folder')
+        for path,content in files.items():
+            if not path.exists():path.write_bytes(content)
+
+
 def job_folder(folder):
     """The outer job folder (parent of checkpoints/) when the layout has one."""
     folder=Path(folder)
@@ -65,16 +136,18 @@ def default_label(folder):
     return name.replace('-','').replace('_','')[:40]
 
 
-def evaluate(folder, *, padding_check=False, padding_pairs=2000, tanh=None, output=None, label=None):
+def evaluate(folder, *, padding_check=False, padding_pairs=2000, tanh=None, output=None, label=None, settings_from=None):
     from cvdl import runtime, data, post_fit
     from cvdl.settings import plain
     from cvdl.lit import select_best_checkpoint
-    folder=checkpoint_folder(folder);settings=settings_for_run(folder)
+    folder=checkpoint_folder(folder)
     checkpoint=Path(select_best_checkpoint('',folder))
+    settings,borrowing,snapshot=settings_for_evaluation(folder,checkpoint,settings_from)
     runtime.configure(settings)
     otf,tables=runtime.create_data(settings)
     if otf is not None:
-        existing=folder/'validation_pairs.csv'
+        identity_folder=checkpoint_folder(settings_from) if settings_from is not None else folder
+        existing=identity_folder/'validation_pairs.csv'
         if existing.exists() and existing.read_text()!=otf.validation_pair_csv:
             raise ValueError('saved validation identity differs; refuse evaluation')
         loaders=data.build_otf_loaders(otf,batch_size=settings.batch_size,workers=settings.workers,
@@ -87,7 +160,8 @@ def evaluate(folder, *, padding_check=False, padding_pairs=2000, tanh=None, outp
     import torch, numpy, PIL
     provenance=dict(runtime=dict(torch=str(torch.__version__),numpy=numpy.__version__,pillow=PIL.__version__),
         values=plain(settings.values),sources=plain(settings.provenance),profile=settings.profile,
-        checkpoint=str(checkpoint),checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest())
+        checkpoint=str(checkpoint),checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(),**borrowing)
+    write_borrowing(folder,borrowing,snapshot)
     (folder/'evaluation_settings.json').write_text(json.dumps(provenance,indent=2)+'\n')
     model,predictions,result=post_fit.run(settings,otf,tables,loaders,checkpoint,folder)
     if otf is not None:
@@ -137,9 +211,10 @@ def calibrate(folder, *, settings_from=None, output=None):
     from cvdl.calibration import fit_temperature, summarise, sigmoid
     from cvdl.lit import SteganalysisModule, select_best_checkpoint
     folder=checkpoint_folder(folder)
-    settings=settings_for_run(checkpoint_folder(settings_from) if settings_from else folder)
-    out=Path(output) if output else folder;out.mkdir(parents=True,exist_ok=True)
     checkpoint=Path(select_best_checkpoint('',folder))
+    settings,borrowing,snapshot=settings_for_evaluation(folder,checkpoint,settings_from)
+    out=Path(output) if output else folder;out.mkdir(parents=True,exist_ok=True)
+    write_borrowing(out,borrowing,snapshot)
     runtime.configure(settings)
     otf,_=runtime.create_data(settings)
     if otf is None:raise ValueError('temperature scaling requires OTF data')
@@ -165,7 +240,7 @@ def calibrate(folder, *, settings_from=None, output=None):
     T=fit_temperature(frames['validation'].logit.to_numpy(),frames['validation'].label.to_numpy())
     result=dict(version='temperature-v1',checkpoint=str(checkpoint),checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
         validation_pairs_sha256=identity,temperature=T,saved_test_prob_max_abs_diff=check,
-        fitted_on='capped validation (NLL of sigmoid(logit/T), both labels)')
+        fitted_on='capped validation (NLL of sigmoid(logit/T), both labels)',**borrowing)
     for name,frame in frames.items():
         frame.to_csv(out/f'{name}_logits.csv',index=False)
         calibrated=frame.copy();calibrated['prob_stego']=sigmoid(frame.logit.to_numpy()/T)
@@ -183,7 +258,7 @@ def stage_outputs(stage, folder, out, label='run'):
     """Files a stage writes; a selected stage refuses to run if any exists (unless --overwrite)."""
     if stage=='main':
         return [folder/n for n in ('evaluation_settings.json','test_predictions.csv','evaluation_results.json','evaluation_data_run_settings.json',
-                                   'validation_predictions.csv','validation_calibration.json')]
+                                   'validation_predictions.csv','validation_calibration.json','borrowed_run_settings.json','borrowed_settings.json')]
     if stage=='tables':
         return [out/'pc-comparison'/f'{label}{suffix}' for suffix in ('.json','-thresholds.csv')]
     if stage=='padding':
@@ -211,13 +286,14 @@ def optional_stages(folder, stages, *, settings_from, out, padding_pairs, tanh):
     import pandas as pd
     from cvdl import runtime
     from cvdl.lit import SteganalysisModule, select_best_checkpoint
-    settings=settings_for_run(checkpoint_folder(settings_from) if settings_from else folder)
     checkpoint=Path(select_best_checkpoint('',folder))
+    settings,borrowing,snapshot=settings_for_evaluation(folder,checkpoint,settings_from)
     runtime.configure(settings)
     otf,_=runtime.create_data(settings)
     if otf is None:raise ValueError('padding and tanh stages require OTF data')
     model=SteganalysisModule.load_from_checkpoint(checkpoint,map_location=settings.device,weights_only=False).net
     out.mkdir(parents=True,exist_ok=True)
+    write_borrowing(out,borrowing,snapshot)
     if 'padding' in stages:
         from cvdl.padding import check
         read=lambda name:pd.read_csv(folder/name,dtype={'cover_id':'string'}) if (folder/name).exists() else None
@@ -246,7 +322,7 @@ def main():
     parser.add_argument('--only',help='comma list of stages to run: '+','.join(STAGES)+' (implies --skip-main when "main" is absent)')
     parser.add_argument('--overwrite',action='store_true',help='allow a selected stage to overwrite its existing output files')
     parser.add_argument('--label',help='label for the pc-comparison tables (default: experiment name without dashes)')
-    parser.add_argument('--settings-from',type=Path,help='take data settings from another run folder (old runs)')
+    parser.add_argument('--settings-from',type=Path,help='all inference stages: borrow data settings, retain and check the evaluated checkpoint model')
     parser.add_argument('--output',type=Path,help='folder for the check outputs (default: the checkpoint folder)')
     args=parser.parse_args()
     folder=checkpoint_folder(args.run_folder)
@@ -272,7 +348,7 @@ def main():
         refuse_existing(['tables'],folder,table_out,args.overwrite,label)
     tanh=dict(pairs=args.tanh_pairs,train_batches=args.tanh_train_batches)
     inline=dict(padding_check='padding' in stages,padding_pairs=args.padding_pairs,
-                tanh=tanh if 'tanh' in stages else None,output=args.output,label=args.label)
+                tanh=tanh if 'tanh' in stages else None,output=args.output,label=args.label,settings_from=args.settings_from)
     if 'main' in stages:
         evaluate(args.run_folder,**inline)
         rest=stages-{'main','padding','tanh','tables'}
