@@ -98,30 +98,41 @@ class SettingTests(unittest.TestCase):
         # A machine-profile default does not count as set.
         self.assertEqual(load(environ={},_profile=profile(),must_set=()).batch_size,load(environ={},_profile=profile()).batch_size)
 
+    def open_notebook(self):
+        """Keep a synthetic unset recipe to test must_set, not the ready-to-run notebook."""
+        nb=json.loads(NOTEBOOK.read_text());cell=next(c for c in nb['cells'] if c['cell_type']=='code')
+        lines=[line for line in cell['source'] if not any(line.lstrip().startswith(key+'=') for key in OPEN)]
+        at=next(i for i,line in enumerate(lines) if 'front_end' in line)+1
+        lines.insert(at,'    must_set=("tile_size", "train_tile_size", "train_grid", "batch_size", "tiles_per_epoch"),\n')
+        cell['source']=lines
+        return nb
+
     def test_notebook_top_cell(self):
         nb=json.loads(NOTEBOOK.read_text());values=top_values(nb)
         self.assertEqual((values['name'],values['front_end'],values['post_fit_eval']),('srm','srm','none'))
-        self.assertEqual(tuple(values['must_set']),OPEN)
-        for key in OPEN:self.assertNotIn(key,values)
-        base=top_values(json.loads((ROOT/'notebooks/experiments/tiling-overlap.ipynb').read_text()))
-        keep={k:v for k,v in base.items() if k not in {'name','train_grid','tiles_per_epoch','batch_size'}}
-        self.assertEqual({k:v for k,v in values.items() if k not in {'name','front_end','must_set'}},keep)
+        self.assertNotIn('must_set',values)
+        self.assertEqual(tuple(values[key] for key in OPEN),(512,256,'overlap_last',128,180000))
+        base=top_values(json.loads((ROOT/'notebooks/experiments/tiling-overlap-256.ipynb').read_text()))
+        self.assertEqual({k:v for k,v in values.items() if k not in {'name','front_end','tile_size'}},
+                         {k:v for k,v in base.items() if k!='name'})
         base_nb=json.loads((ROOT/'notebooks/experiments/tiling-overlap.ipynb').read_text())
         self.assertEqual(nb['cells'][2:],base_nb['cells'][2:])
-        filled={k:v for k,v in values.items() if k!='must_set'}
-        resolved=load(environ={},_profile=profile(),**filled,must_set=(),tile_size=512,train_tile_size=512,
-                      train_grid='overlap_last',batch_size=32,tiles_per_epoch=45000)
+        resolved=load(environ={},_profile=profile(),**values)
         self.assertEqual(resolved.run_name,'srm');self.assertEqual(resolved.front_end,'srm')
 
     def test_preflight_and_runner_fail_naming_open_values(self):
         from scripts.g4.preflight import preflight
         from scripts.run_notebook import run
         from types import SimpleNamespace
-        with self.assertRaisesRegex(ValueError,'must be set.*tile_size.*tiles_per_epoch'):
-            preflight('notebooks/experiments/srm.ipynb','HEAD')
-        with tempfile.TemporaryDirectory(dir=ROOT/'runs/.scratch') as directory:
+        opened=self.open_notebook()
+        with patch('scripts.g4.preflight.validate_notebook',return_value=opened):
+            with self.assertRaisesRegex(ValueError,'must be set.*tile_size.*tiles_per_epoch'):
+                preflight('notebooks/experiments/srm.ipynb','HEAD')
+        with tempfile.TemporaryDirectory(dir=ROOT/'runs',prefix='.srm-test-') as directory:
+            parent=Path(directory)/'experiments';parent.mkdir();path=parent/'srm.ipynb'
+            path.write_text(json.dumps(opened))
             env=Path(directory)/'e.env';env.write_text('')
-            args=SimpleNamespace(notebook=NOTEBOOK,env_file=env,set=[],resume=False,
+            args=SimpleNamespace(notebook=path,env_file=env,set=[],resume=False,
                                  output=Path(directory)/'output',host_monitor='off')
             with self.assertRaisesRegex(ValueError,'must be set.*train_grid'):run(args)
 
