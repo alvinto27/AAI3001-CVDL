@@ -34,6 +34,7 @@ States: `queued` (approved, waiting) · `preparing` (code or notebook not ready)
 | Temperature scaling in `scripts/evaluate_run.py` | approved, queued (next free worker) | one T fitted on validation; report calibration, 1.0 ties and FA5 reachability before/after; add only (old outputs unchanged); also run on wide-R2, newdata-1 and the tiling models |
 | tanh saturation measurement | approved, queued (next free worker) | existing models, PC; share of tanh inputs with abs > 3 per layer, clean vs stego; a G4 run only if a fix is tested later |
 | Photo-level decision | deferred by the user | — |
+| 256 loader speed (only if 256 is chosen) | deferred by the user | 256 overlap on the G4: 32-33 steps/s vs 54.6 at 512 (GPU 40-55%, host CPU about 1/3, main process about 72% of one core, workers about 1/3 core each, no disk wait). Hypothesis: per-tile hand-off overhead (4x more items per step). Fix idea: workers build whole batches; profile on the PC first; prove identical data hashes. Runs 5-6 keep the current code. |
 
 ## After the runs
 
