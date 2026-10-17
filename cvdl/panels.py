@@ -62,6 +62,20 @@ def missing_panels(folder):
         [] if (Path(folder)/'validation_calibration.json').exists() else [str(Path(folder)/'validation_calibration.json')])
 
 
+def source_cutoffs(folder):
+    """Per-source validation FA5 cut-off: the same values the standard tables apply to the tests."""
+    folder=Path(folder)
+    gone=missing_panels(folder)
+    if gone:raise ValueError('cut-offs need these saved files: '+', '.join(gone))
+    files=panel_files(folder)
+    result={}
+    for source,where in VALIDATION_SOURCES.items():
+        path=files['standard_val'] if where==STANDARD_VAL else files[where]
+        frame=pd.read_csv(path).query('source==@source')
+        result[source]=float(threshold(frame,'fa5')[0])
+    return result
+
+
 def tables(folder, out, label, *, check=True):
     """Per-source validation cutoffs applied to untouched test panels; no test row enters a cutoff."""
     from scripts.check_b_thresholds import build

@@ -1,0 +1,511 @@
+{
+  "cells": [
+    {
+      "by_source": {
+        "div2k": 109,
+        "raise": 899
+      },
+      "cell": "raise_div2k/k1/all",
+      "condition": "all",
+      "distinct_photos": 215,
+      "distinct_tiles": 1008,
+      "k": 1,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "raise_div2k",
+      "pool_photos": 249,
+      "pool_tiles": 10956
+    },
+    {
+      "by_source": {
+        "div2k": 117,
+        "raise": 891
+      },
+      "cell": "raise_div2k/k1/low",
+      "condition": "low",
+      "distinct_photos": 215,
+      "distinct_tiles": 1008,
+      "k": 1,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "raise_div2k",
+      "pool_photos": 249,
+      "pool_tiles": 10956
+    },
+    {
+      "by_source": {
+        "div2k": 93,
+        "raise": 915
+      },
+      "cell": "raise_div2k/k1/noisy",
+      "condition": "noisy",
+      "distinct_photos": 122,
+      "distinct_tiles": 1008,
+      "k": 1,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "raise_div2k",
+      "pool_photos": 142,
+      "pool_tiles": 2788
+    },
+    {
+      "by_source": {
+        "div2k": 100,
+        "raise": 908
+      },
+      "cell": "raise_div2k/k1/low_noisy",
+      "condition": "low_noisy",
+      "distinct_photos": 124,
+      "distinct_tiles": 1008,
+      "k": 1,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "raise_div2k",
+      "pool_photos": 142,
+      "pool_tiles": 2788
+    },
+    {
+      "by_source": {
+        "div2k": 99,
+        "raise": 909
+      },
+      "cell": "raise_div2k/k2/all",
+      "condition": "all",
+      "distinct_photos": 217,
+      "distinct_tiles": 1008,
+      "k": 2,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "raise_div2k",
+      "pool_photos": 249,
+      "pool_tiles": 10956
+    },
+    {
+      "by_source": {
+        "div2k": 115,
+        "raise": 893
+      },
+      "cell": "raise_div2k/k2/low",
+      "condition": "low",
+      "distinct_photos": 219,
+      "distinct_tiles": 1008,
+      "k": 2,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "raise_div2k",
+      "pool_photos": 249,
+      "pool_tiles": 10956
+    },
+    {
+      "by_source": {
+        "div2k": 84,
+        "raise": 924
+      },
+      "cell": "raise_div2k/k2/noisy",
+      "condition": "noisy",
+      "distinct_photos": 118,
+      "distinct_tiles": 1008,
+      "k": 2,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "raise_div2k",
+      "pool_photos": 142,
+      "pool_tiles": 2788
+    },
+    {
+      "by_source": {
+        "div2k": 84,
+        "raise": 924
+      },
+      "cell": "raise_div2k/k2/low_noisy",
+      "condition": "low_noisy",
+      "distinct_photos": 124,
+      "distinct_tiles": 1008,
+      "k": 2,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "raise_div2k",
+      "pool_photos": 142,
+      "pool_tiles": 2788
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_seen/k1/all",
+      "condition": "all",
+      "distinct_photos": 836,
+      "distinct_tiles": 1008,
+      "k": 1,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "alaska_seen",
+      "pool_photos": 1700,
+      "pool_tiles": 2648
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_seen/k1/low",
+      "condition": "low",
+      "distinct_photos": 848,
+      "distinct_tiles": 1008,
+      "k": 1,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "alaska_seen",
+      "pool_photos": 1700,
+      "pool_tiles": 2648
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_seen/k1/noisy",
+      "condition": "noisy",
+      "distinct_photos": 394,
+      "distinct_tiles": 572,
+      "k": 1,
+      "max_tile_use": 2,
+      "pairs": 1008,
+      "panel": "alaska_seen",
+      "pool_photos": 394,
+      "pool_tiles": 572
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_seen/k1/low_noisy",
+      "condition": "low_noisy",
+      "distinct_photos": 394,
+      "distinct_tiles": 572,
+      "k": 1,
+      "max_tile_use": 2,
+      "pairs": 1008,
+      "panel": "alaska_seen",
+      "pool_photos": 394,
+      "pool_tiles": 572
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_seen/k2/all",
+      "condition": "all",
+      "distinct_photos": 846,
+      "distinct_tiles": 1008,
+      "k": 2,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "alaska_seen",
+      "pool_photos": 1700,
+      "pool_tiles": 2648
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_seen/k2/low",
+      "condition": "low",
+      "distinct_photos": 845,
+      "distinct_tiles": 1008,
+      "k": 2,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "alaska_seen",
+      "pool_photos": 1700,
+      "pool_tiles": 2648
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_seen/k2/noisy",
+      "condition": "noisy",
+      "distinct_photos": 394,
+      "distinct_tiles": 572,
+      "k": 2,
+      "max_tile_use": 2,
+      "pairs": 1008,
+      "panel": "alaska_seen",
+      "pool_photos": 394,
+      "pool_tiles": 572
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_seen/k2/low_noisy",
+      "condition": "low_noisy",
+      "distinct_photos": 394,
+      "distinct_tiles": 572,
+      "k": 2,
+      "max_tile_use": 2,
+      "pairs": 1008,
+      "panel": "alaska_seen",
+      "pool_photos": 394,
+      "pool_tiles": 572
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_unseen/k1/all",
+      "condition": "all",
+      "distinct_photos": 863,
+      "distinct_tiles": 1008,
+      "k": 1,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "alaska_unseen",
+      "pool_photos": 2000,
+      "pool_tiles": 3153
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_unseen/k1/low",
+      "condition": "low",
+      "distinct_photos": 869,
+      "distinct_tiles": 1008,
+      "k": 1,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "alaska_unseen",
+      "pool_photos": 2000,
+      "pool_tiles": 3153
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_unseen/k1/noisy",
+      "condition": "noisy",
+      "distinct_photos": 396,
+      "distinct_tiles": 574,
+      "k": 1,
+      "max_tile_use": 2,
+      "pairs": 1008,
+      "panel": "alaska_unseen",
+      "pool_photos": 396,
+      "pool_tiles": 574
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_unseen/k1/low_noisy",
+      "condition": "low_noisy",
+      "distinct_photos": 396,
+      "distinct_tiles": 574,
+      "k": 1,
+      "max_tile_use": 2,
+      "pairs": 1008,
+      "panel": "alaska_unseen",
+      "pool_photos": 396,
+      "pool_tiles": 574
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_unseen/k2/all",
+      "condition": "all",
+      "distinct_photos": 873,
+      "distinct_tiles": 1008,
+      "k": 2,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "alaska_unseen",
+      "pool_photos": 2000,
+      "pool_tiles": 3153
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_unseen/k2/low",
+      "condition": "low",
+      "distinct_photos": 881,
+      "distinct_tiles": 1008,
+      "k": 2,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "alaska_unseen",
+      "pool_photos": 2000,
+      "pool_tiles": 3153
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_unseen/k2/noisy",
+      "condition": "noisy",
+      "distinct_photos": 396,
+      "distinct_tiles": 574,
+      "k": 2,
+      "max_tile_use": 2,
+      "pairs": 1008,
+      "panel": "alaska_unseen",
+      "pool_photos": 396,
+      "pool_tiles": 574
+    },
+    {
+      "by_source": {
+        "alaska": 1008
+      },
+      "cell": "alaska_unseen/k2/low_noisy",
+      "condition": "low_noisy",
+      "distinct_photos": 396,
+      "distinct_tiles": 574,
+      "k": 2,
+      "max_tile_use": 2,
+      "pairs": 1008,
+      "panel": "alaska_unseen",
+      "pool_photos": 396,
+      "pool_tiles": 574
+    },
+    {
+      "by_source": {
+        "lsdir": 1008
+      },
+      "cell": "lsdir/k1/all",
+      "condition": "all",
+      "distinct_photos": 845,
+      "distinct_tiles": 1008,
+      "k": 1,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "lsdir",
+      "pool_photos": 2500,
+      "pool_tiles": 5245
+    },
+    {
+      "by_source": {
+        "lsdir": 1008
+      },
+      "cell": "lsdir/k1/low",
+      "condition": "low",
+      "distinct_photos": 848,
+      "distinct_tiles": 1008,
+      "k": 1,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "lsdir",
+      "pool_photos": 2500,
+      "pool_tiles": 5245
+    },
+    {
+      "by_source": {
+        "lsdir": 1008
+      },
+      "cell": "lsdir/k1/noisy",
+      "condition": "noisy",
+      "distinct_photos": 623,
+      "distinct_tiles": 1008,
+      "k": 1,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "lsdir",
+      "pool_photos": 762,
+      "pool_tiles": 1377
+    },
+    {
+      "by_source": {
+        "lsdir": 1008
+      },
+      "cell": "lsdir/k1/low_noisy",
+      "condition": "low_noisy",
+      "distinct_photos": 631,
+      "distinct_tiles": 1008,
+      "k": 1,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "lsdir",
+      "pool_photos": 762,
+      "pool_tiles": 1377
+    },
+    {
+      "by_source": {
+        "lsdir": 1008
+      },
+      "cell": "lsdir/k2/all",
+      "condition": "all",
+      "distinct_photos": 822,
+      "distinct_tiles": 1008,
+      "k": 2,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "lsdir",
+      "pool_photos": 2500,
+      "pool_tiles": 5245
+    },
+    {
+      "by_source": {
+        "lsdir": 1008
+      },
+      "cell": "lsdir/k2/low",
+      "condition": "low",
+      "distinct_photos": 830,
+      "distinct_tiles": 1008,
+      "k": 2,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "lsdir",
+      "pool_photos": 2500,
+      "pool_tiles": 5245
+    },
+    {
+      "by_source": {
+        "lsdir": 1008
+      },
+      "cell": "lsdir/k2/noisy",
+      "condition": "noisy",
+      "distinct_photos": 627,
+      "distinct_tiles": 1008,
+      "k": 2,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "lsdir",
+      "pool_photos": 762,
+      "pool_tiles": 1377
+    },
+    {
+      "by_source": {
+        "lsdir": 1008
+      },
+      "cell": "lsdir/k2/low_noisy",
+      "condition": "low_noisy",
+      "distinct_photos": 628,
+      "distinct_tiles": 1008,
+      "k": 2,
+      "max_tile_use": 1,
+      "pairs": 1008,
+      "panel": "lsdir",
+      "pool_photos": 762,
+      "pool_tiles": 1377
+    }
+  ],
+  "combinations": 24,
+  "files_sha256": {
+    "pairs-alaska_seen.csv": "fd2b45e004749f95ad7624c5f8b367c97bc174950e6714adc5957d3783c5087f",
+    "pairs-alaska_unseen.csv": "b668206989c4ad633bd9b17bcf7dcb29a6fbba9eb52b3ca8df11d514d0aeaed2",
+    "pairs-lsdir.csv": "60cb030f89706b4e6965a579992275a838dc9ee4fec2398fbd266fee88f89914",
+    "pairs-raise_div2k.csv": "13b18ff6bd006d19a89f39637ce17f55d8e93221484ab9d548d4af5c95753e0e"
+  },
+  "noise_edges_from_validation_only": {
+    "alaska": 2.6002625226974487,
+    "div2k": 2.4094008207321163,
+    "lsdir": 2.3676723241806035,
+    "raise": 1.691033810377121
+  },
+  "noise_file": "clean_tile_noise.csv",
+  "noise_file_sha256": "fe9ade88b7c4f6d5562730ed78cd7c503c4a4861f77cf456214deca30f32cf07",
+  "noise_quantile": 0.75,
+  "pairs_per_cell": 1008,
+  "per_combination": 42,
+  "version": "hard-test-v1"
+}

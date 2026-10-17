@@ -175,7 +175,7 @@ def default_label(folder):
     return name.replace('-','').replace('_','')[:40]
 
 
-def evaluate(folder, *, padding_check=False, padding_pairs=2000, tanh=None, output=None, label=None, settings_from=None, eval_overrides=()):
+def evaluate(folder, *, padding_check=False, padding_pairs=2000, tanh=None, output=None, label=None, settings_from=None, eval_overrides=(), hard=False):
     from cvdl import runtime, data, post_fit
     from cvdl.settings import plain
     from cvdl.lit import select_best_checkpoint
@@ -209,6 +209,9 @@ def evaluate(folder, *, padding_check=False, padding_pairs=2000, tanh=None, outp
         panels.write_validation(folder,predictions['val'],root=settings.root)
         panels.write_standard_validation(checkpoint,folder,settings)
         panels.tables(folder,job_folder(folder) if output is None else Path(output),label or default_label(folder),check=not settings.quick)
+    if hard and otf is not None:
+        from cvdl import hardtest
+        hardtest.run(settings,otf,model.net,folder,Path(output) if output else folder)
     if padding_check:
         if otf is None:raise ValueError('padding diagnostic requires OTF data')
         from cvdl.padding import check
@@ -292,7 +295,7 @@ def calibrate(folder, *, settings_from=None, output=None, eval_overrides=()):
     return result
 
 
-STAGES=('main','tables','padding','temperature','tanh')
+STAGES=('main','tables','padding','temperature','tanh','hard')
 
 
 def stage_outputs(stage, folder, out, label='run'):
@@ -313,6 +316,9 @@ def stage_outputs(stage, folder, out, label='run'):
     if stage=='tanh':
         from cvdl.saturation import OUTPUT_FILES
         return [out/n for n in OUTPUT_FILES]
+    if stage=='hard':
+        from cvdl.hardtest import OUTPUT_FILES
+        return [out/'hard-test'/n for n in OUTPUT_FILES]
     raise ValueError(f'unknown stage {stage}')
 
 
@@ -346,6 +352,9 @@ def optional_stages(folder, stages, *, settings_from, out, padding_pairs, tanh, 
     if 'tanh' in stages:
         from cvdl import saturation
         saturation.run(settings,otf,model,out,validation_sha256=VALIDATION_SHA256,**tanh)
+    if 'hard' in stages:
+        from cvdl import hardtest
+        hardtest.run(settings,otf,model,folder,out)
 
 
 def main():
@@ -358,6 +367,8 @@ def main():
     parser.add_argument('--temperature',action='store_true',
         help='add temperature scaling on the capped validation logits (new files only)')
     parser.add_argument('--tanh-saturation',action='store_true',help='add the tanh saturation measurement')
+    parser.add_argument('--hard',action='store_true',help='the frozen hard test (runs by default with the main stage; alone it works on a finished run)')
+    parser.add_argument('--no-hard',action='store_true',help='do not run the hard test with the main stage')
     parser.add_argument('--tanh-pairs',type=int,default=2000,help='validation pairs (clean + stego) for the tanh measurement')
     parser.add_argument('--tanh-train-batches',type=int,default=0,help='also measure N training-mode batches (with augmentation)')
     parser.add_argument('--skip-main',action='store_true',help='do not run or overwrite the main evaluation; run only the selected checks on saved files')
@@ -382,8 +393,10 @@ def main():
         if args.tables:stages.add('tables')
         if args.temperature:stages.add('temperature')
         if args.tanh_saturation:stages.add('tanh')
+        if args.hard:stages.add('hard')
         # Legacy: --temperature / --tanh-saturation alone never ran the main evaluation; --padding-check did.
         if not args.skip_main and (not stages or 'padding' in stages):stages.add('main')
+    if 'main' in stages and not args.no_hard:stages.add('hard')   # default = standard suite + hard suite
     if args.skip_main:stages.discard('main')
     if not stages:raise ValueError('nothing to run')
     if args.eval_overrides and stages=={'tables'}:raise ValueError('--set requires an inference stage, not tables only')
@@ -394,18 +407,18 @@ def main():
     if 'tables' in stages or 'main' in stages:
         refuse_existing(['tables'],folder,table_out,args.overwrite,label)
     tanh=dict(pairs=args.tanh_pairs,train_batches=args.tanh_train_batches)
-    inline=dict(padding_check='padding' in stages,padding_pairs=args.padding_pairs,
+    inline=dict(padding_check='padding' in stages,padding_pairs=args.padding_pairs,hard='hard' in stages,
                 tanh=tanh if 'tanh' in stages else None,output=args.output,label=args.label,settings_from=args.settings_from)
     if 'main' in stages:
         evaluate(args.run_folder,**inline,**override_options)
-        rest=stages-{'main','padding','tanh','tables'}
+        rest=stages-{'main','padding','tanh','tables','hard'}
     else:
         rest=set(stages)
     if 'tables' in rest:
         from cvdl import panels
         panels.tables(folder,table_out,label)
-    if rest&{'padding','tanh'}:
-        optional_stages(folder,rest&{'padding','tanh'},settings_from=args.settings_from,out=out,padding_pairs=args.padding_pairs,tanh=tanh,**override_options)
+    if rest&{'padding','tanh','hard'}:
+        optional_stages(folder,rest&{'padding','tanh','hard'},settings_from=args.settings_from,out=out,padding_pairs=args.padding_pairs,tanh=tanh,**override_options)
     if 'temperature' in rest:
         calibrate(args.run_folder,settings_from=args.settings_from,output=args.output,**override_options)
 
