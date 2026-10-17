@@ -15,7 +15,7 @@ States: `queued` (approved, waiting) · `preparing` (code or notebook not ready)
 | 4 | `experiments/tiling-overlap-256.ipynb` | Tiling arm 1 at 256: overlap-last (batch 128, 180,000 tiles/epoch, LR 3e-4) | `30bac1f` | evaluated (02:22-03:18Z; 55m36s; 32-33 steps/s, loader-bound) | `tiling-overlap-256-20261017T022212Z-9778` | evaluated: standard P_E 2.25% (512 overlap 2.80); best so far |
 | 5 | `experiments/tiling-trim-256.ipynb` | Tiling arm 2 at 256: centre trim (same 256 budget) | `30bac1f` | evaluated (03:20-04:16Z; 55m38s; best epoch 27, val P_E .0630) | `tiling-trim-256-20261017T032025Z-8579` | evaluated: standard P_E 3.55% (256 overlap 2.25) |
 | 6 | `experiments/tiling-pad-256.ipynb` | Tiling arm 3 at 256: centre zero-pad (same 256 budget) | `30bac1f` | evaluated (04:31-05:27Z; 54m56s; best epoch 26, val P_E .0641; 33.1 steps/s, loader-bound) | `tiling-pad-256-20261017T043145Z-9721` | evaluated: standard P_E 3.60% |
-| 7 | `experiments/srm.ipynb` | SRM front end (30 fixed filters per channel) with the 256 overlap recipe | `0d851b6` | delivered (05:29-07:03Z; 93.1 min; 18.4 steps/s, GPU-bound; best epoch 29, val P_E .0466 vs 256 KV .0543) | `srm-20261017T052857Z-4521` | evaluating |
+| 7 | `experiments/srm.ipynb` | SRM front end (30 fixed filters per channel) with the 256 overlap recipe | `0d851b6` | evaluated (05:29-07:03Z; 93.1 min; 18.4 steps/s, GPU-bound; best epoch 29, val P_E .0466 vs 256 KV .0543) | `srm-20261017T052857Z-4521` | evaluated: standard P_E 1.67% (256 KV 2.25); better on all 5 tests and all sources; `runs/<job>/post-training/` |
 
 ## Next (approved in principle, not queued)
 
