@@ -1,6 +1,6 @@
 # Project status — 2026-10-17
 
-**Start here:** The research hold is lifted only for the approved experiments in the [run queue](active/run-queue.md). The training tiling experiment is complete ([result](results/result-training-tiling.md)): overlap is best, and 256 training tiles improve all arms. SRM front end (256 overlap recipe) is the best model: SRM-30 standard P_E 1.67%, SRM-e50 (50 epochs) 1.57%. **Next: `srm-hard` is launch-ready; launch only on the user's go** (command in the run queue). Other plans stay on hold. Use [findings](findings.md) for older runs and [journal days](journal/README.md) for dated records.
+**Start here:** The research hold is lifted only for the approved experiments in the [run queue](active/run-queue.md). The training tiling experiment is complete ([result](results/result-training-tiling.md)): overlap is best, and 256 training tiles improve all arms. SRM front end (256 overlap recipe) is the best model: SRM-30 standard P_E 1.67%, SRM-e50 (50 epochs) 1.57%. **Next: `srm-hard` is launch-ready; launch only on the user's go** (command in the run queue). Other plans stay on hold. Next session: read the [2026-10-17 handoff](active/handoff-2026-10-17.md) first. Use [findings](findings.md) for older runs and [journal days](journal/README.md) for dated records.
 
 ## Current state and items
 

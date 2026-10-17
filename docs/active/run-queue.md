@@ -2,7 +2,7 @@
 
 The Orchestrator keeps this list current. Add a run when the user approves it.
 Change its state in the same step as the launch, the end, or the evaluation.
-One G4 run per boot. Timeout 105 min; the VM stops 120 min after boot.
+One G4 run per boot. Since 2026-10-17 the boot limit is 180 min: use `--timeout-min 165 --max-run-minutes 180` for long runs (shorter runs may keep timeout 105).
 
 States: `queued` (approved, waiting) · `preparing` (code or notebook not ready)
 · `running` · `delivered` (on the Pi, not evaluated) · `evaluated` · `failed`.
@@ -21,23 +21,21 @@ States: `queued` (approved, waiting) · `preparing` (code or notebook not ready)
 
 ## Next (approved in principle, not queued)
 
-- **SRM filter bank instead of the KV filter** (front-end test, aimed at weak
-  k = 1 detection). Tiling strategy and tile size are decided after runs 1-6.
-  Notebook build (user decision): Worker_5, right after the 256 notebooks.
-  `tile_size`, `train_grid`, `batch_size` and `tiles_per_epoch` stay unset
-  ("must be set"; run and G4 pre-flight fail while unset). Default front end
-  stays `kv`; SRM = 30 fixed filters per colour channel, same +/-3 clip.
+- None. (The SRM front end became runs 7-9.)
 
 ## PC task queue (free, no G4)
 
 | Task | State | Note |
 | --- | --- | --- |
-| SRM notebook build | done (`632dd22`, `97487b8`); user chose 2026-10-17: train tile 256, grid overlap_last, batch 128, 180,000 tiles/epoch (same as 256 overlap). G4 run approved after the 256 pad evaluation, no PC speed test: read the G4 speed after warm epoch 2; stop the VM early if 30 epochs cannot finish inside 105 min | values to fill in by Worker_4 |
-| **Fix the padding check first (blocks all padding checks)** | approved, first task on 2026-10-17 | the 2026-10-16 check ran in one process (~74% of one core, no data workers; 65,736 cases for one model). Fix: multi-worker loader for decode/embed (like the main evaluation) and a cap of 2,000 pairs per shape and level, the same seeded pairs for every model. Do not resume or rerun any padding check until this is fixed and reviewed. |
-| Temperature scaling in `scripts/evaluate_run.py` | approved, queued (next free worker) | one T fitted on validation; report calibration, 1.0 ties and FA5 reachability before/after; add only (old outputs unchanged); also run on wide-R2, newdata-1 and the tiling models |
-| tanh saturation measurement | approved, queued (next free worker) | existing models, PC; share of tanh inputs with abs > 3 per layer, clean vs stego; a G4 run only if a fix is tested later |
+| SRM notebook build | done (`632dd22`, `97487b8`, `0d851b6`) | run 7 |
+| Padding check fix | done (`970d337`) | worker DataLoader, 2,000 pairs per shape and level (18,000 cases) |
+| Temperature scaling | done (`f0bb81d`) | opt-in stage; helps only wide-R2 (ties) and slightly 256 overlap / SRM |
+| tanh saturation | done (`0e05dcb`) | opt-in stage; only SRM tanh1 saturates (20.8% / 26.4%) |
+| 256 loader speed | done (`863d9fb`, `efde4df`) | `pack_blocks=16` default; batches identical; G4 gain not measured (SRM GPU-bound) |
+| SRM weakness breakdown | done | `runs/srm-20261017T052857Z-4521/post-training/breakdown/` |
+| Hard test v1 | done (`d74d716`) | `data/hard-test/v1/`; default evaluation stage |
+| `srm-hard` notebook | done (`795fd93`) | run 9, launch-ready |
 | Photo-level decision | deferred by the user | — |
-| 256 loader speed | approved 2026-10-17: Worker_5 implements the fix after its profile (in parallel with the SRM run) | 256 overlap on the G4: 32-33 steps/s vs 54.6 at 512 (GPU 40-55%, host CPU about 1/3, main process about 72% of one core, workers about 1/3 core each, no disk wait). Hypothesis: per-tile hand-off overhead (4x more items per step). Fix idea: workers build whole batches; profile on the PC first; prove identical data hashes. Runs 5-6 keep the current code. |
 
 ## After the runs
 

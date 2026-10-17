@@ -1,8 +1,9 @@
 # Documentation — start here
 
-This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Research is on hold except the approved training-tiling experiment (PC checks).** Read [status](status.md) before acting, [findings](findings.md) for run comparisons, and the [dated journal](journal/README.md) for the original records.
+This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Research is on hold except the approved runs in the [run queue](active/run-queue.md).** Read [status](status.md) before acting, [findings](findings.md) for run comparisons, and the [dated journal](journal/README.md) for the original records.
 
 ## Current references (`active/` means kept for use, not permission to run)
+- [2026-10-17 session handoff — read first next session](active/handoff-2026-10-17.md)
 - [Training tiling — rules and PC implementation gates](active/plan-training-tiling.md)
 - [Tiling at 256 — three prepared arms and a 256 test panel design](active/plan-tiling-256.md)
 - [G4 run queue — approved, running and finished runs](active/run-queue.md)
