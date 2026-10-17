@@ -19,6 +19,8 @@ Recorded by the Orchestrator.
   - `c13ee00` main stage writes validation files, standard-validation panels and the per-source cut-off tables. Worker_4 verified on 256 overlap: 9 files, 113,860 rows, max |delta prob| 0.0; 35-row check-B CSV byte-identical.
   - `95be1aa` `scripts/profile_loader.py` (256 loader profile).
   - `1503aac`, `ee401be`, `9c3addd`, `d721e06` (Worker_4): SRM test update, `--settings-from` for the main stage, path-relative golden compare, restricted evaluation `--set`.
+  - `7567501` (Worker_4): the evaluator no longer writes into a run's `data_run_settings.json`; the 6 tiling records restored from the Pi copies (SHA equal; old bytes kept in each evaluation folder).
+  - `863d9fb`, `efde4df` (Worker_5): packed worker messages (`pack_blocks`, default 16, 1 = off) and PC loader scripts with a worker cap, memory guard and clean exit. Batches identical to pack 1 at 1, 6 and 12 real workers for the 256 and 512 recipes (epochs 0 and 1); 32/64 workers by an ordering model. 248 tests, golden ALL EQUAL.
   - `0d851b6` (Worker_4) SRM notebook filled with the 256 overlap recipe; only `name` and `front_end` differ.
 - Removed 3 orphan DataLoader workers (left by a killed padding check at 01:49Z; about 4.3 GB of swap).
 
@@ -45,6 +47,5 @@ Recorded by the Orchestrator.
 ### Next
 
 - SRM evaluated: best model so far. Next G4 run: user decision (longer SRM needs resume across boots; seed repeat). Pending.
-- Loader fix (Worker_5). Pending.
-- `--settings-from` fix, then missing stages on old models (wide-R2, newdata-1, 512 arms). Pending.
-- Tanh saturation results across models. Pending.
+- Loader fix: pushed. PC speed: synthetic ceiling at 256 34 -> 76 steps/s, main-process time per step 27.5 -> 8.3 ms; real PC loader unchanged (decode-bound at 6-12 workers). G4 gain not measured yet. Pending.
+- Missing stages on old models: done. Combined 9-model table `runs/verification/post-training-model-comparison-20261017.csv`. Temperature helps only 256 overlap and SRM (slightly); tanh saturation only in SRM tanh1.
