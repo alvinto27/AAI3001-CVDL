@@ -38,10 +38,6 @@ def run(settings, otf, tables, loaders, checkpoint, folder):
         print(f'CHECK {split}: {checked[split]}',flush=True)
     if otf is not None:
         otf.save_record(folder/'evaluation_data_run_settings.json')
-        record_path=folder/'data_run_settings.json'
-        training_record=json.loads(record_path.read_text()) if record_path.exists() else dict(otf.record)
-        training_record['diagnostic_pair_ids']=otf.record['diagnostic_pair_ids']
-        record_path.write_text(json.dumps(training_record,indent=2)+'\n')
     result=dict(scores=scores,extra_panels={name:info for name,(info,_) in extras.items()},diagnostics=checked)
     (folder/'evaluation_results.json').write_text(json.dumps(result,indent=2,default=str)+'\n')
     return model,predicted,result
