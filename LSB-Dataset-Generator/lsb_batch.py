@@ -42,6 +42,8 @@ CONFIG_KEYS = {
     "write_masks",
     "bit_mode",
     "k",
+    "k_weights",
+    "bpp_mixture",
     "method",
     "placement",
     "stride",
@@ -131,6 +133,8 @@ class Config:
     payload: str | list[str] = "random_bytes"
     start: str | int = "random"
     size: dict[str, int | float | list[int] | list[float]] | int | float | list[int] | list[float] | None = None
+    k_weights: dict[int, float] | None = None
+    bpp_mixture: list[dict[str, Any]] | None = None
 
     def normalized(self) -> Config:
         """Return a validated configuration with canonical size syntax."""
@@ -162,6 +166,8 @@ class Config:
         if self.start != "random":
             _validate_scalar_int(self.start, "start", minimum=0)
         size = _normalize_size(self.size)
+        k_weights = _normalize_k_weights(self.k_weights, ks)
+        bpp_mixture = _normalize_bpp_mixture(self.bpp_mixture, size)
         return Config(
             seed=int(self.seed),
             input=str(self.input),
@@ -177,11 +183,17 @@ class Config:
             payload=_restore_choice(payloads, self.payload),
             start=self.start,
             size=size,
+            k_weights=k_weights,
+            bpp_mixture=bpp_mixture,
         )
 
     def as_dict(self) -> dict[str, Any]:
         """Return the canonical YAML-compatible mapping."""
         result = asdict(self.normalized())
+        # Absent opt-ins must not change legacy config bytes or recorded keys.
+        for key in ("k_weights", "bpp_mixture"):
+            if result[key] is None:
+                del result[key]
         return result
 
 
@@ -274,6 +286,41 @@ def _normalize_size(value: Any) -> dict[str, Any]:
     else:
         normalized = values
     return {kind: normalized}
+
+
+def _positive_weights(values: list[Any], name: str) -> list[float]:
+    if (not values or any(type(v) not in (int, float) or not math.isfinite(v) or v < 0 for v in values)
+            or not math.isfinite(sum(values)) or sum(values) <= 0):
+        raise ValueError(f"{name} must be finite non-negative weights with a positive sum")
+    return [float(v) for v in values]
+
+
+def _normalize_k_weights(value: Any, ks: list[int]) -> dict[int, float] | None:
+    if value is None:
+        return None
+    if (not isinstance(value, dict) or any(type(k) is not int for k in value)
+            or len(set(ks)) != len(ks) or set(value) != set(ks)):
+        raise ValueError("k_weights must name every unique configured k exactly once")
+    weights = _positive_weights([value[k] for k in ks], "k_weights")
+    return dict(zip(ks, weights))
+
+
+def _normalize_bpp_mixture(value: Any, size: dict[str, Any]) -> list[dict[str, Any]] | None:
+    if value is None:
+        return None
+    if "bpp" not in size or not isinstance(value, list) or not value:
+        raise ValueError("bpp_mixture requires size.bpp and a non-empty component list")
+    base = size["bpp"] if isinstance(size["bpp"], list) else [size["bpp"]]
+    result = []
+    for component in value:
+        if not isinstance(component, dict) or set(component) != {"weight", "bpp"}:
+            raise ValueError("bpp_mixture components require exactly weight and bpp")
+        bounds = _normalize_range(component["bpp"], "bpp_mixture bpp", integer=False, minimum=0.0)
+        if min(bounds) <= 0 or min(bounds) < base[0] or max(bounds) > base[-1]:
+            raise ValueError("bpp_mixture bounds must be positive and inside size.bpp")
+        result.append(dict(weight=component["weight"], bpp=_restore_range(bounds, component["bpp"])))
+    weights = _positive_weights([part["weight"] for part in result], "bpp_mixture")
+    return [dict(weight=weight, bpp=part["bpp"]) for weight, part in zip(weights, result)]
 
 
 def read_config(path: Path) -> Config:

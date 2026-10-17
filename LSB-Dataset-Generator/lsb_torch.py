@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor
 import math
@@ -284,6 +285,10 @@ class Corpus:
     def run_record(self):
         extra={} if self.grid_record is None else {'train_grid':self.grid_record}
         if self.train_tile!=self.settings.tile_size:extra['train_tile_size']=self.train_tile
+        if self.config.k_weights is not None or self.config.bpp_mixture is not None:
+            path=Path(self.settings.settings_yaml or self.root/'configs/raise512-run1.yaml')
+            extra['training_sampling']=dict(version='weighted-mixture-v1',
+                config_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),config=self.config.as_dict())
         return dict(**extra,settings=asdict(self.settings),source=self.settings.source,grid=self.settings.grid,tile_size=self.settings.tile_size,
                     run_seed=self.settings.run_seed,train_photo_fraction=self.settings.train_photo_fraction,
                     train_photo_selection=self.selection_record,source_weights=self.settings.source_weights,

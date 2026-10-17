@@ -1,0 +1,21 @@
+seed: 1
+input: ../Datasets/originals/raise/tiles512
+output: ../Datasets/generated/raise512-run1-records
+png_compress_level: 1
+variants_per_cover: 1
+write_masks: true
+bit_mode: [lowest, plane]
+k: [1, 2, 3, 4]
+k_weights: {1: 3, 2: 1, 3: 1, 4: 1}
+method: [replace, match]
+placement: [contiguous, stride, random]
+stride: [2, 16]
+payload: [random_bytes, letters]
+start: random
+size:
+  bpp: [0.05, 0.5]
+bpp_mixture:
+  - weight: 0.5
+    bpp: [0.05, 0.15]
+  - weight: 0.5
+    bpp: [0.05, 0.5]

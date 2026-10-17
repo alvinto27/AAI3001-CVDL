@@ -106,14 +106,25 @@ def _draw_settings(
     config = config.normalized()
     compression = config.png_compress_level
     bit_mode = str(_draw_choice(config.bit_mode, rng))
-    k = int(_draw_choice(config.k, rng))
+    if config.k_weights is None:
+        k = int(_draw_choice(config.k, rng))
+    else:
+        choices = config.k if isinstance(config.k, list) else [config.k]
+        weights = np.asarray([config.k_weights[value] for value in choices], dtype=float)
+        k = int(rng.choice(choices, p=weights / weights.sum()))
     method = str(_draw_choice(config.method, rng))
     placement = str(_draw_choice(config.placement, rng))
     stride = _draw_stride(config.stride, rng) if placement == "stride" else 1
     payload = str(_draw_choice(config.payload, rng))
     start: str | int = config.start
     maximum = _maximum_payload_bytes(image, bit_mode, k, placement, stride, start)
-    size_kind, size_value = size_draw(config.size, image, maximum, rng)
+    size = config.size
+    component = None
+    if config.bpp_mixture is not None:
+        weights = np.asarray([part['weight'] for part in config.bpp_mixture], dtype=float)
+        component = int(rng.choice(len(weights), p=weights / weights.sum()))
+        size = {'bpp': config.bpp_mixture[component]['bpp']}
+    size_kind, size_value = size_draw(size, image, maximum, rng)
     kwargs: dict[str, Any] = {
         "bit_mode": bit_mode,
         "k": k,
@@ -130,6 +141,8 @@ def _draw_settings(
         "size_kind": size_kind,
         "size_value": size_value,
     }
+    if component is not None:
+        draw_metadata['bpp_mixture_component'] = component
     return kwargs, draw_metadata
 
 

@@ -94,6 +94,45 @@ Unlike legacy upper-range clipping, new ranges draw a requested value first
 and then clip its bytes. This change is isolated to the new function/key
 route. Original batch generation never opts into it.
 
+## Optional weighted training draws
+
+A config can set two explicit options. Both are absent by default.
+
+- `k_weights` maps each configured `k` to a finite, non-negative weight.
+  The weights must have a positive sum. The sampler divides each weight by
+  that sum. Every configured `k` must occur exactly once in the mapping.
+- `bpp_mixture` is a list of `{weight, bpp}` components. The sampler first
+  selects a component by weight, then draws uniformly from its `bpp` range.
+  Every component range must be inside `size.bpp`. Byte rounding and carrier
+  capacity limits still apply after the requested draw.
+
+Without these options, the config record and all random draws stay unchanged.
+With them, the training data record adds `training_sampling`: the version,
+config SHA-256, and complete resolved config. Each sampled mixture draw also
+records `bpp_mixture_component`. Validation and test use the separate frozen
+`evaluation_config`, never the training config.
+
+[`configs/train-hard-v1.yaml`](../../configs/train-hard-v1.yaml) sets
+`k_weights: {1: 3, 2: 1, 3: 1, 4: 1}`. Its two bpp components have equal weights:
+`[0.05, 0.15]` and `[0.05, 0.50]`. Thus 61.111% of requested payloads are below
+0.15 bpp, not 50%: the full-range component also includes small payloads.
+
+| Requested bpp bin | Default share | Hard share |
+| --- | ---: | ---: |
+| 0.05–0.10 | 11.111% | 30.556% |
+| 0.10–0.15 | 11.111% | 30.556% |
+| 0.15–0.35 | 44.444% | 22.222% |
+| 0.35–0.50 | 33.333% | 16.667% |
+
+The [SRM-hard notebook](../../notebooks/experiments/srm-hard.ipynb) retains the
+30-epoch SRM model recipe. It uses 216,000 pairs per epoch and equal source
+weights. The source scheduler uses exact quotas, not independent random source
+choices: RAISE, ALASKA and LSDIR each supply 72,000 pairs. It samples without
+replacement until a source pool is exhausted. The approved 256-overlap pools
+contain 170,356 / 121,704 / 140,863 tiles respectively, so no source pool cycles
+within an epoch. The original SRM recipe supplies 72,000 / 72,000 / 36,000 pairs
+in that source order. Other stego choices remain uniform and unchanged.
+
 ## VM checks
 
 Environment: NumPy 2.5.3. All execution was in VM scratch, not the checkout.
