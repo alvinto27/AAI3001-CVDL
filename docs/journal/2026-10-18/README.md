@@ -49,6 +49,8 @@ Recorded by the Orchestrator.
 - Cleanup done by Worker_1: 7 old worktrees and the speed, profile, BF16 and map-demo outputs deleted; `runs/` 2.4 GB -> 2.0 GB (409 MiB freed). Kept because tracked files use them: `g4-prime-1` and `g4-v4-r2` (golden compare), `g4-v4-r1b` (findings, archived plans), `early-pc` (V1/V3 results).
 
 - User: report notebook template (#5) after tasks 2-4, not before.
+- User: launch `srm-hard` now (after its notebook uses the new validation and checks pass), supervised by Run_Supervisor; Worker_2 works on task #2 in parallel.
+- User: standard test at 256 approved as designed by Worker_2 ([plan](../../active/plan-standard-test-256.md)): new suite is the default with no flag; counts in multiples of 96 (10,944 / 2,688 / 3,168 / 5,280); photo-balanced tile selection; k 5-8 opt-in on the same tiles (k + 4).
 
 ### Next
 
