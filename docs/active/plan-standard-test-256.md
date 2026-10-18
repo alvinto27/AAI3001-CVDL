@@ -1,6 +1,6 @@
 # Plan: standard test at 256 (work list #2)
 
-Status: **approved for implementation** (user, 2026-10-18). Not built yet. Design by Worker_2 (2026-10-18); the user decisions below are final.
+Status: **built** in `bd36403` (2026-10-18, Worker_2): suite `standard-256-v1`, recipe `5045c1076ab3f540a61c`, 8 frozen lists in `data/test/standard-256-v1/`. Default of `scripts/evaluate_run.py`. Pending: timed GPU pilot, hard test at 256 (#3), validation-threshold columns (#4). Design by Worker_2 (2026-10-18); the user decisions below are final.
 
 Source decisions: [2026-10-17 handoff](handoff-2026-10-17.md) section 2 (standard test, grid, sources, k 5-8 opt-in), and the [2026-10-18 journal](../journal/2026-10-18/README.md) (one threshold from validation).
 

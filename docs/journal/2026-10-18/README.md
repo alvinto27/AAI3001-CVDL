@@ -14,6 +14,7 @@ Recorded by the Orchestrator.
 - Orchestrator re-check: both `--check` REBUILD IDENTICAL; `test_train_matched_validation` + `test_g4_jobs` 27 tests OK; all rows from `val` photos only, no repeated tiles, all 256.
 
 - `srm-hard` notebook moved to train-matched validation (`a0e72cd`, Run_Supervisor): PC QUICK smoke pass (record has recipe `bf7ede374cab01f73f5d`, per-source val metrics); dry run PASS. Launched on the G4 at 04:38:54Z (first attempt, no STOCKOUT): `srm-hard-20261018T043854Z-8467`. Running.
+- Standard test at 256 built by Worker_2: `bd36403` (`cvdl/standardtest.py`, `scripts/build_standard_test.py`, `configs/test-256-v1.yaml`, 8 frozen lists, recipe `5045c1076ab3f540a61c`). `evaluate_run.py runs/<run>` now runs it by default; `--higher-k` adds k 5-8; `--test-suite legacy-512` keeps the old suite. Hard test reported as pending until #3. Verification: 306 tests pass; golden ALL EQUAL (GPU visible); builder `--check` byte-identical twice (2.4 s). Orchestrator check: counts 10,944 / 2,688 / 3,168 / 5,280, k exactly one quarter, every k x type cell equal (RAISE 101, DIV2K 13, ALASKA seen 28, unseen 33, LSDIR 55), every test photo used, no repeated tile, k 5-8 lists match row for row with k + 4.
 
 ### Found
 
