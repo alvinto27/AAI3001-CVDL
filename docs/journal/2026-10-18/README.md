@@ -21,6 +21,9 @@ Recorded by the Orchestrator.
 
 - One deployment threshold built by Worker_2: `68e4f0b`. Default evaluation scores the validation list first, fixes one pooled min-P_E cut-off (float64; ties: smaller FA), and applies it to every standard-256 row, hard-256 cell and k 5-8 panel; per-source references separate (no DIV2K). Mapping `configs/evaluation-calibration-v1.json`: wide-R2 -> new list `8328cc6b0673cade0312` (RAISE 15,239 / DIV2K 2,761, shares from its saved training record: 45,674 / 8,276 pairs per epoch); runs 2-10 -> `60da4391043e8ce48ff2`; all labelled `post_hoc_256`. Verification: 338 tests pass; golden ALL EQUAL (GPU visible); builder `--check` identical. Orchestrator check: all 10 mapped checkpoint SHA-256 values match the files in `runs/`; wide-R2 list is val-only, 256, no repeated tile.
 
+- `srm-hard` done: 04:42:59-06:28:44Z (105.6 min, exit 0), VM TERMINATED, delivered to the Pi, copied to `runs/srm-hard-20261018T043854Z-8467/` (Pi = PC SHA-256 for both checkpoints; Orchestrator re-hashed). Best epoch 28: val P_E .1595, AUC .9325 on its own train-matched validation (k=1 50%, half of bpp 0.05-0.15), so not comparable with older val P_E. Last epoch per-source val P_E: RAISE .041, ALASKA .282, LSDIR .165.
+- SRM-e50 pilot of the new default evaluation (Worker_2): 4.2 min on the PC (validation 77 s, standard 42 s, source panels 37 s, hard 91 s). One cut-off 0.4506 (post_hoc_256, list `60da...`; validation P_E 10.29%). Standard-256 P_E at that cut-off 2.54% (RAISE 1.87, DIV2K 7.81), ALASKA seen 19.42% (FA 16.3%), unseen 16.30%, LSDIR 9.39%. k=1 misses: standard 9.8%, ALASKA seen 49.7%, LSDIR 38.7%. Hard: ALASKA seen k1 low+noisy FA 37.9% / miss 59.8%; LSDIR k1 low+noisy miss 82.1%. Training records unchanged (SHA). Not like-for-like with the old 512 numbers.
+
 ### Found
 
 - Validation pools at 256 overlap-last (val split only): RAISE 36,484 tiles (150 photos), DIV2K 5,720 (120), ALASKA 8,966 (1,000), LSDIR 30,584 (1,500).
