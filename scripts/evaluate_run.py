@@ -68,6 +68,40 @@ def record_evaluation_overrides(out,settings,arguments):
         path.write_text(json.dumps(record,indent=2)+'\n')
 
 
+# This historical notebook predates checkpoint-validation and mixed-epoch fields.
+# Its saved loader output has 22,476 validation images (all 11,238 RAISE/DIV2K
+# val pairs), and its RunSettings call has neither mixture nor epoch quotas.
+# See docs/active/legacy-wide-r2-migration.md. Never infer from a run name alone.
+WIDE_R2_EVIDENCE={
+    'data_run_settings.json':'bb9945fbd236497823c6b8e84bdf3f68b9e9300b39ed7683d5372154ed0b4ebb',
+    'model_run_settings.json':'9835987926ba07f439e262c7bd6d3d5a66d3edc58ab42cc847dd3e5e8eb5d24c',
+    'executed.ipynb':'431f0d2188f2641f0cc0a9b1af04a18e6dd4be9ae420f196164ed3447f52ed64',
+}
+
+
+def legacy_data_record(folder):
+    """Resolve only the evidenced old wide-R2 omissions; never change saved files."""
+    folder=Path(folder)
+    record=json.loads((folder/'data_run_settings.json').read_text())
+    old=record.get('settings',{})
+    required=('sources','source','tile_size','source_mix','tiles_per_epoch','run_seed','train_photo_fraction','paired_batches')
+    missing=[f'settings.{k}' for k in required if k not in old]
+    missing += [k for k in ('checkpoint_validation','eval_profile','data','quick') if k not in record]
+    if not missing:return record,None
+    evidence={name:folder/name for name in ('data_run_settings.json','model_run_settings.json')}
+    evidence['executed.ipynb']=folder.parent.parent/'executed.ipynb'
+    if set(missing)!={'checkpoint_validation','settings.source_mix','settings.tiles_per_epoch'} or any(
+        not p.is_file() or hashlib.sha256(p.read_bytes()).hexdigest()!=WIDE_R2_EVIDENCE[name]
+        for name,p in evidence.items()):
+        raise ValueError(f'missing legacy settings {missing} in {folder}; no approved saved-record evidence for migration')
+    # The three pinned files prove the historical standard/full-source loader.
+    record={**record,'checkpoint_validation':'standard',
+            'settings':{**old,'source_mix':None,'tiles_per_epoch':None}}
+    return record,dict(migration='wide-r2-full-source-v1',evidence_sha256=WIDE_R2_EVIDENCE,
+        derived={'checkpoint_validation':'standard','source_mix':None,'tiles_per_epoch':None},
+        original_validation_pairs=11238,original_training_pairs=53950)
+
+
 def settings_for_run(folder, *, eval_overrides=()):
     from cvdl.settings import SCHEMA, automatic_profile, load
     profile=automatic_profile()
@@ -80,7 +114,8 @@ def settings_for_run(folder, *, eval_overrides=()):
     else:
         # Explicit migration for pre-package G4 artefacts; never guess a notebook.
         model=json.loads((folder/'model_run_settings.json').read_text())
-        record=json.loads((folder/'data_run_settings.json').read_text());old=record['settings']
+        record,migration=legacy_data_record(folder);old=record['settings']
+        if migration:print('LEGACY SETTINGS MIGRATION: '+json.dumps(migration,sort_keys=True),flush=True)
         experiment={k:model[k] for k in ('norm','clip_t','lr','warmup_epochs','lr_drops','batch_size','model','width','train_yaml','extra_tests')}
         experiment.update(epochs=model['max_epochs'],grad_clip=model['grad_clip_norm'],run_name=folder.name,
             checkpoint_validation=record['checkpoint_validation'],val_cap_raise=record.get('val_cap_raise',5000),
@@ -103,6 +138,9 @@ def settings_for_evaluation(folder, checkpoint, settings_from=None, *, eval_over
     context={'evaluation_overrides':evaluation_override_records(eval_overrides)} if eval_overrides else {}
     if settings_from is None:
         settings=settings_for_run(folder,eval_overrides=eval_overrides) if eval_overrides else settings_for_run(folder)
+        if not (folder/'run_settings.json').exists() and (folder/'data_run_settings.json').is_file():
+            _,migration=legacy_data_record(folder)
+            if migration:context['legacy_settings_migration']=migration
         return settings,context,None
     import torch
     from cvdl.settings import SCHEMA, automatic_profile, load, plain, parse
