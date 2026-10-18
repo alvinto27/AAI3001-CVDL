@@ -17,12 +17,25 @@ Recorded by the Orchestrator.
 
 - Validation pools at 256 overlap-last (val split only): RAISE 36,484 tiles (150 photos), DIV2K 5,720 (120), ALASKA 8,966 (1,000), LSDIR 30,584 (1,500).
 - Photo split (train/val/test): RAISE 701/150/149, DIV2K 680/120/100, LSDIR 7,000/1,500/2,500, ALASKA 13,500/1,000/1,700 seen + 2,000 unseen.
-- The tiling result table labels its P_E as "validation min-P_E cut-off" (`docs/results/result-training-tiling.md` line 14); the 2026-10-17 handoff section 4 labels the same numbers "threshold 0.5". Pending check (side job A).
+- The tiling result table labels its P_E as "validation min-P_E cut-off" (`docs/results/result-training-tiling.md` line 14); the 2026-10-17 handoff section 4 labels the same numbers "threshold 0.5". Resolved (side job A, Worker_2; Orchestrator re-checked SRM-e50: fixed 0.5 = 1.6703%, matches): both labels are wrong.
 - Stale records: `README.md` calls notebook 04 the current baseline; `docs/status.md` says the Pi is online (handoff: shut down); the 2026-10-17 journal "Next" still says launch `srm-hard`; run queue row 8 has no result and "After the runs" still asks for the padding check.
 
 - Realised draws match the training configs. SRM: k 24.9/25.2/24.7/25.1%; bpp bins 11.4/10.7/44.6/33.3% (target 11.1/11.1/44.4/33.3). `srm-hard`: k 50.2/16.6/16.6/16.6%; bpp bins 30.7/30.2/22.8/16.3% (target 30.6/30.6/22.2/16.7). Stego types near equal.
 - Capacity clipping: 1,310 / 18,000 (7.3%) SRM, 899 / 21,600 (4.2%) `srm-hard`, from the unchanged shared draw policy.
 - A CPU-only golden compare differs in 6 machine fields (device, ROCm fix flag); with the GPU visible it is ALL EQUAL.
+
+- Side job A (Worker_2, read-only): every published test P_E (tiling table, handoff section 4, SRM-30, SRM-e50) is the **minimum P_E over thresholds on that test panel itself**, optimised separately for each panel and subgroup (`cvdl/metrics.py:84-96`, called per frame from `cvdl/post_fit.py:14-16` and `cvdl/evaluation.py:185-196`). It is not threshold 0.5 and not a validation cut-off. The comparison JSONs also hold a separate `at_capped_val_min_pe.pe_at_cutoff` (`cvdl/panels.py:95`).
+
+  | Run | Panel | Fixed 0.5 | Full-panel val cut-off | Capped val cut-off | Test minimum (published) |
+  | --- | --- | ---: | ---: | ---: | ---: |
+  | 256 overlap | standard | 2.31 | 2.32 | 2.27 | 2.25 |
+  | 256 overlap | ALASKA seen | 16.50 | 16.37 | 15.92 | 15.75 |
+  | SRM-30 | standard | 1.86 | 1.69 | 1.69 | 1.67 |
+  | SRM-30 | ALASKA seen | 15.11 | 14.92 | 14.75 | 13.86 |
+  | SRM-e50 | standard | 1.67 | 1.70 | 1.63 | 1.57 |
+  | SRM-e50 | ALASKA seen | 14.20 | 13.54 | 13.24 | 13.10 |
+
+  Order SRM-e50 < SRM-30 < 256 overlap holds at every validation cut-off. The SRM-e50 gain over SRM-30 shrinks (standard: 0.10 points test-optimised, 0.06 at the capped cut-off, and reverses at the full-panel cut-off: 1.70 vs 1.69). Labels corrected in the tiling result, the 2026-10-17 handoff and journal, and status.
 
 ### Decided
 

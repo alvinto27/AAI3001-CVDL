@@ -49,7 +49,7 @@ Recorded by the Orchestrator.
 - The standard test uses k 1-8 and bpp 0.05-0.5 (bpp-1 panel: up to 1.0); training uses k 1-4. About half of the test pairs are k 5-8, and k=1 is about 12.5%.
 - With one shared threshold (5% FA on mixed validation), SRM clean FA on test: RAISE 1.8%, DIV2K 7.8%, LSDIR 6.0%, ALASKA 18-20%.
 
-- SRM-e50 vs SRM-30 (best epoch 43 vs 29; P_E at 0.5): standard 1.57 vs 1.67%; bpp-1 1.17 vs 1.21%; ALASKA seen 13.10 vs 13.86%; ALASKA unseen 11.02 vs 11.70%; LSDIR 5.04 vs 5.16%. AUC within 0.006.
+- SRM-e50 vs SRM-30 (best epoch 43 vs 29; P_E = minimum over thresholds on each test panel, corrected 2026-10-18; was labelled "at 0.5"): standard 1.57 vs 1.67%; bpp-1 1.17 vs 1.21%; ALASKA seen 13.10 vs 13.86%; ALASKA unseen 11.02 vs 11.70%; LSDIR 5.04 vs 5.16%. AUC within 0.006.
 - SRM-e50 vs SRM-30 on hard test v1: miss lower in 25 of 32 cells, higher in 5, equal in 2; most gains 1-3 points. No cell has non-overlapping 95% Wilson intervals: a small, consistent trend, one seed each. Hard-test clean FA is higher for e50 in some noisy cells (RAISE+DIV2K noisy about .14 vs .10; ALASKA seen noisy .077 vs .047). ALASKA k1 low+noisy stays near chance (AUC .53-.54).
 - Hard test v1 results (miss at per-source validation FA5, SRM vs 256 overlap KV): SRM is better in 31 of 32 cells. Examples: LSDIR k1 all .328 vs .484; LSDIR k2 low+noisy .351 vs .583; ALASKA unseen k1 all .617 vs .637. ALASKA k1 low+noisy is near chance for both (AUC .52-.54; miss .88-.93).
 - Incident: the first hard-test scoring used the ordered loader, which buffered about 21 GB because the hard pairs spread over all photos. Worker_5 stopped it; `score()` now reads one task per photo. Second run held about 18 GB available.

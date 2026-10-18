@@ -11,7 +11,9 @@ Runs and job IDs: [run queue](../active/run-queue.md). One seed per arm.
 - Validation and all tests are frozen 512 tiles (standard test `fdd989f7...`, capped validation `6bb3c8ef...`). All 9 frozen identities are equal across the 6 arms.
 - Evaluation on the PC. From 256 trim on: one tool, `scripts/evaluate_run.py` at `c13ee00` (proved exactly equal to the earlier pinned scripts on 256 overlap: max |delta prob| 0.0).
 
-## Test P_E (%, threshold = validation min-P_E cut-off per test panel)
+## Test P_E (%, minimum P_E over thresholds on each test panel; test-optimised, not validation-calibrated)
+
+> Correction 2026-10-18: these P_E values are the **minimum P_E over thresholds on each test panel itself** (test-optimised, optimistic; `cvdl/metrics.py:84-96`), not validation-calibrated and not threshold 0.5. Standard test, P_E % (fixed 0.5 / capped-validation min-P_E cut-off / test minimum): 256 overlap 2.31 / 2.27 / 2.25; SRM-30 1.86 / 1.69 / 1.67; SRM-e50 1.67 / 1.63 / 1.57. See the [2026-10-18 journal](../journal/2026-10-18/README.md).
 
 | Test | newdata-1 | 512 overlap | 512 trim | 512 pad | **256 overlap** | 256 trim | 256 pad |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
