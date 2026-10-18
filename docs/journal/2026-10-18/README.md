@@ -78,6 +78,8 @@ Recorded by the Orchestrator.
 
 - User on the demo reports: ids and hashes are not useful; tables are too dense and it is not clear what to look at. Approved to try a question-first layout ([plan](../../active/plan-report-readability.md)): headline numbers, one chart per question, full tables in a collapsed appendix, plain labels, ids hidden in metadata.
 
+- B1 (noisy ALASKA k=1 at chance for all models): Orchestrator read the SRM-e50 hard predictions at its validation cut-off. k=1 misses: contiguous (packed) payloads are easier than random (scattered) ones when not noisy (standard 8-10% vs 26-28%; ALASKA 42-49% vs 67-70%), but on noisy ALASKA both are missed (53-60% vs 58-60%). LSB replacement and +/-1 matching are missed equally (ALASKA noisy k1: 53-60% vs 58-60%), so the model does not appear to use the known replacement fingerprint. Per-cell labels add little for scattered low-bpp payloads (almost every 32 px cell holds a change). User: run a classic-detector check (Weighted Stego on the noisy ALASKA k=1 hard tiles, replace vs match; CPU only) **later, after the user returns**. Pending. Per-cell training plan stays on hold and is out of date (512 tiles, old tests).
+
 ### Next
 
 - Evaluator `--validation-recipe` rescoring path: deferred (needed for rescoring old models on the new validation).
