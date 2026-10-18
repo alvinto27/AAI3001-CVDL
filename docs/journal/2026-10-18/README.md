@@ -13,6 +13,8 @@ Recorded by the Orchestrator.
 - Verification (Worker_1): 286 tests pass (415 s); `refactor_golden.py compare` ALL EQUAL (GPU visible, approved by the Orchestrator); builder `--check` REBUILD IDENTICAL twice; old capped hash `6bb3c8ef...` unchanged; 6 pairs per recipe byte-identical at 0 and 2 loader workers.
 - Orchestrator re-check: both `--check` REBUILD IDENTICAL; `test_train_matched_validation` + `test_g4_jobs` 27 tests OK; all rows from `val` photos only, no repeated tiles, all 256.
 
+- `srm-hard` notebook moved to train-matched validation (`a0e72cd`, Run_Supervisor): PC QUICK smoke pass (record has recipe `bf7ede374cab01f73f5d`, per-source val metrics); dry run PASS. Launched on the G4 at 04:38:54Z (first attempt, no STOCKOUT): `srm-hard-20261018T043854Z-8467`. Running.
+
 ### Found
 
 - Validation pools at 256 overlap-last (val split only): RAISE 36,484 tiles (150 photos), DIV2K 5,720 (120), ALASKA 8,966 (1,000), LSDIR 30,584 (1,500).
