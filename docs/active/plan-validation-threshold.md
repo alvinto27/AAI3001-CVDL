@@ -1,6 +1,6 @@
 # Plan: one deployment threshold from validation (work list #4)
 
-Status: **approved for implementation** (user, 2026-10-18). Not built yet. Design by Worker_2 (2026-10-18).
+Status: **built** in `68e4f0b` (2026-10-18, Worker_2): `cvdl/deployment.py`, `scripts/build_calibration.py`, mapping `configs/evaluation-calibration-v1.json` (10 checkpoints), wide-R2 list `data/val/8328cc6b0673cade0312/` (RAISE 15,239 / DIV2K 2,761 from its 45,674 / 8,276 training pairs per epoch). No threshold values yet: they come from rescoring (#6). Design by Worker_2 (2026-10-18).
 
 Source decisions: [2026-10-18 journal](../journal/2026-10-18/README.md) (one threshold; per-source thresholds reference only; no DIV2K reference) and the [2026-10-17 handoff](handoff-2026-10-17.md) section 2 row "Thresholds" (superseded text).
 
