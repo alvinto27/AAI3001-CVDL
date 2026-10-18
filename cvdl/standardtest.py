@@ -242,15 +242,6 @@ def diagnostic_rows(frame):
     return pd.DataFrame(rows)
 
 
-def main_placeholder(diagnostics):
-    """Task #4 replaces these pending columns from saved validation predictions only."""
-    result = diagnostics[['panel', 'category', 'value', 'pairs', 'images', 'photos', 'AUC']].copy()
-    result['threshold_origin'] = 'pending_validation_min_pe'
-    for key in ('cutoff', 'FA', 'miss', 'P_E_at_validation_cutoff'):
-        result[key] = None
-    return result
-
-
 def prepare_output(path, *, overwrite=False):
     path = Path(path)
     if path.exists() and any(path.iterdir()) and not overwrite:
@@ -266,12 +257,14 @@ def run(settings, checkpoint, run_folder, *, higher_k=False, hard=True, output=N
     from .models import model_from_hparams
     from .hardtest import score
     from .settings import plain
+    from . import deployment as C
     if not 0 <= settings.eval_workers <= 12:
         raise ValueError('standard test requires 0..12 workers')
     start = time.perf_counter()
     frames, recipe, frozen = load_frozen(settings.root, higher_k=higher_k)
     checkpoint = Path(checkpoint)
     checkpoint_sha = digest(checkpoint.read_bytes())
+    validation, calibration_identity = C.resolve(settings,checkpoint,checkpoint_sha)
     hard_frame = hard_frozen = None
     if hard:
         from . import hardtest256
@@ -283,7 +276,8 @@ def run(settings, checkpoint, run_folder, *, higher_k=False, hard=True, output=N
         if settings.quick:
             frame = frame.groupby(['source', 'k', 'bit_mode', 'method', 'placement', 'payload_kind'], sort=False).head(1).copy()
         selected[name] = frame.reset_index(drop=True)
-    identity = dict(suite=SUITE, recipe_sha256=frozen['recipe_sha256'], checkpoint_sha256=checkpoint_sha,
+    C.assert_disjoint(validation,list(selected.values())+([hard_frame] if hard else []))
+    identity = dict(calibration_inputs=calibration_identity,software=dict(torch=str(torch.__version__),numpy=np.__version__),suite=SUITE, recipe_sha256=frozen['recipe_sha256'], checkpoint_sha256=checkpoint_sha,
         selected_pairs_sha256={n: digest(csv_text(f).encode()) for n, f in selected.items()},
         higher_k=higher_k, quick=bool(settings.quick), device=str(settings.device), batch_size=settings.batch_size,
         workers=settings.eval_workers, rocm_conv1_fix=bool(settings.rocm_conv1_fix), hard_enabled=hard,
@@ -318,11 +312,18 @@ def run(settings, checkpoint, run_folder, *, higher_k=False, hard=True, output=N
         train_geometry=dict(tile_size=settings.train_tile_size or settings.tile_size, grid=settings.train_grid),
         test_geometry=dict(tile_size=256, grid='overlap_last'),
         hard_test=dict(status='selected', recipe_sha256=hard_frozen['recipe_sha256']) if hard else dict(status='disabled'),
-        validation_threshold=dict(status='pending', reason='task #4', main_file='main_summary.csv'),
+        validation_threshold=dict(status='selected', inputs=calibration_identity, main_file='main_summary.csv'),
         code_commit=code_commit(settings.root),
         runtime=dict(torch=str(torch.__version__), numpy=np.__version__, pillow=PIL.__version__))
     (out/'evaluation_settings.json').write_text(json.dumps(meta, indent=2)+'\n')
-    timings, summaries = [], {False: [], True: []}
+    before=time.perf_counter()
+    validation_scores=score(network,MatchedValidationPairs(corpus,validation),device=settings.device,
+        batch_size=max(1,settings.batch_size//2),workers=settings.eval_workers)
+    calibration, references=C.write(out/'validation',validation_scores,calibration_identity)
+    meta['validation_threshold']=dict(status='complete',**calibration)
+    (out/'evaluation_settings.json').write_text(json.dumps(meta,indent=2)+'\n')
+    timings=[dict(panel='validation',pairs=len(validation),seconds=time.perf_counter()-before)]
+    summaries, mains, reference_tables = {False: [], True: []}, {False: [], True: []}, {False: [], True: []}
     for name, frame in selected.items():
         higher = name.startswith('pairs-k5to8-')
         panel = str(frame.panel.iloc[0])
@@ -335,7 +336,11 @@ def run(settings, checkpoint, run_folder, *, higher_k=False, hard=True, output=N
         diagnostics = diagnostic_rows(scored)
         diagnostics.insert(0, 'panel', panel)
         diagnostics.to_csv(target/'diagnostic_summary.csv', index=False)
-        main_placeholder(diagnostics).to_csv(target/'main_summary.csv', index=False)
+        main=C.main_rows(scored,diagnostics,calibration)
+        reference=C.reference_rows(scored,references,panel=panel)
+        main.to_csv(target/'main_summary.csv',index=False,float_format='%.17g')
+        reference.to_csv(target/'source_reference_summary.csv',index=False,float_format='%.17g')
+        mains[higher].append(main);reference_tables[higher].append(reference)
         summaries[higher].append(diagnostics)
         timings.append(dict(panel=panel, higher_k=higher, pairs=len(frame), seconds=time.perf_counter()-before))
     for higher, tables in summaries.items():
@@ -343,9 +348,10 @@ def run(settings, checkpoint, run_folder, *, higher_k=False, hard=True, output=N
             target = out/'higher-k' if higher else out
             combined = pd.concat(tables, ignore_index=True)
             combined.to_csv(target/'diagnostic_summary.csv', index=False)
-            main_placeholder(combined).to_csv(target/'main_summary.csv', index=False)
+            pd.concat(mains[higher],ignore_index=True).to_csv(target/'main_summary.csv',index=False,float_format='%.17g')
+            pd.concat(reference_tables[higher],ignore_index=True).to_csv(target/'source_reference_summary.csv',index=False,float_format='%.17g')
     if hard:
-        meta['hard_test'] = hardtest256.run(settings, network, corpus, hard_frame, hard_frozen, out)
+        meta['hard_test'] = hardtest256.run(settings, network, corpus, hard_frame, hard_frozen, out,calibration=calibration,references=references)
         (out/'evaluation_settings.json').write_text(json.dumps(meta, indent=2)+'\n')
     result = dict(evaluation_id=eid, output=str(out), suite=SUITE, quick=bool(settings.quick), timings=timings,
                   total_seconds=time.perf_counter()-start, hard_test=meta['hard_test'], validation_threshold=meta['validation_threshold'])

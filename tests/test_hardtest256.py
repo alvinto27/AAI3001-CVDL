@@ -12,7 +12,8 @@ import pandas as pd
 import torch
 from PIL import Image
 
-from cvdl import hardnoise as N, hardtest256 as H, standardtest as S
+from cvdl import hardnoise as N, hardtest256 as H, standardtest as S, deployment as C
+from test_deployment import mock_resolution
 from cvdl.validation import csv_text
 from scripts.build_hard_test_256 import publish
 
@@ -147,14 +148,16 @@ class Hard256Tests(unittest.TestCase):
         settings=SimpleNamespace(root=ROOT,quick=True,device='cpu',batch_size=4,eval_workers=0)
         with tempfile.TemporaryDirectory() as tmp,patch('cvdl.hardtest.score',side_effect=score), \
              patch.object(S,'StandardTestPairs',side_effect=lambda c,f:SimpleNamespace(frame=f)):
-            report=H.run(settings,torch.nn.Identity(),None,sample,self.summary,tmp)
+            report=H.run(settings,torch.nn.Identity(),None,sample,self.summary,tmp,
+                calibration=dict(cutoff=.8,threshold_origin='post_hoc_256',threshold_id='one'),
+                references=pd.DataFrame([dict(source='raise',cutoff=.8,threshold_id='one')]))
             out=Path(tmp)/'hard-test'
             self.assertEqual({p.name for p in out.iterdir()},set(H.OUTPUT_FILES))
             self.assertEqual(report['status'],'complete');self.assertEqual(report['cells'],32)
             self.assertEqual(set(report['overlap_standard']),set(H.PANELS))
             self.assertIn('overlap_standard',pd.read_csv(out/'hard_predictions.csv').columns)
             cells=pd.read_csv(out/'hard_cells.csv')
-            self.assertTrue(cells.cutoff.isna().all());self.assertNotIn('P_E',cells.columns)
+            self.assertTrue((cells.cutoff==.8).all());self.assertNotIn('P_E',cells.columns)
 
     def test_standard_default_wires_hard_identity_and_no_hard_separately(self):
         sample=self.frame.groupby('cell',sort=False).head(2).reset_index(drop=True)
@@ -168,6 +171,8 @@ class Hard256Tests(unittest.TestCase):
              patch('lsb_torch.Corpus',return_value=SimpleNamespace()), \
              patch.object(S,'StandardTestPairs',side_effect=lambda c,f:SimpleNamespace(frame=f)), \
              patch('cvdl.hardtest.score',side_effect=score), \
+             patch.object(S,'MatchedValidationPairs',side_effect=lambda c,f:SimpleNamespace(frame=f)), \
+             patch.object(C,'resolve',return_value=mock_resolution()), \
              patch.object(H,'load_frozen',return_value=(sample,self.recipe,self.summary)) as load, \
              patch.object(H,'run',return_value={'status':'complete'}) as run:
             folder=Path(tmp);checkpoint=folder/'best.ckpt';torch.save({'hyper_parameters':{},'state_dict':{}},checkpoint)

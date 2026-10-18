@@ -15,7 +15,7 @@ from .validation import csv_text
 VERSION = 'hard-test-256-v1'
 DATA_DIR = N.DATA_DIR
 PANELS = tuple(S.PANELS)
-OUTPUT_FILES = ('hard_predictions.csv', 'hard_cells.csv', 'hard_summary.json')
+OUTPUT_FILES = ('hard_predictions.csv', 'hard_cells.csv', 'hard_summary.json','source_reference_summary.csv')
 
 
 def seed_key(*parts):
@@ -186,9 +186,10 @@ def load_frozen(root):
     return pd.concat(frames,ignore_index=True),recipe,summary
 
 
-def cell_report(scored):
+def cell_report(scored,calibration=None):
     """FA and test-min FA use distinct clean tiles; AUC retains v1 paired-row weighting."""
     from .metrics import auc_numpy,metrics,threshold,rates
+    scored=scored.copy();scored['prob_stego']=scored.prob_stego.astype(np.float64)
     rows=[]
     for cell,g in scored.groupby('cell',sort=False):
         clean=g[g.label==0].drop_duplicates('cover_id');stego=g[g.label==1]
@@ -205,11 +206,19 @@ def cell_report(scored):
             overlap_standard_distinct_tiles=int(clean.overlap_standard.sum()) if 'overlap_standard' in clean else None,
             overlap_standard_pairs=int(stego.overlap_standard.sum()) if 'overlap_standard' in stego else None,
             threshold_origin='pending_validation_min_pe',cutoff=None,FA=None,miss=None,P_E_at_validation_cutoff=None)
+        if calibration is not None:
+            r=rates(unique,np.float64(calibration['cutoff']))
+            fa=int((clean.prob_stego>=np.float64(calibration['cutoff'])).sum())
+            missed=int((stego.prob_stego<np.float64(calibration['cutoff'])).sum())
+            row.update(threshold_origin=calibration['threshold_origin'],threshold_id=calibration['threshold_id'],
+                cutoff=calibration['cutoff'],FA=r['fa'],miss=r['miss'],P_E_at_validation_cutoff=r['pe_at_cutoff'],
+                FA_events=fa,miss_events=missed,FA_ci95_low=wilson(fa,len(clean))[0],FA_ci95_high=wilson(fa,len(clean))[1],
+                miss_ci95_low=wilson(missed,len(stego))[0],miss_ci95_high=wilson(missed,len(stego))[1])
         rows.append(row)
     return pd.DataFrame(rows)
 
 
-def run(settings,network,corpus,frame,frozen,out):
+def run(settings,network,corpus,frame,frozen,out,*,calibration,references):
     from .hardtest import score
     target=Path(out)/'hard-test';target.mkdir(parents=True,exist_ok=True)
     before=time.perf_counter()
@@ -220,11 +229,14 @@ def run(settings,network,corpus,frame,frozen,out):
     scored=score(network,S.StandardTestPairs(corpus,frame),device=settings.device,
                  batch_size=max(1,settings.batch_size//2),workers=settings.eval_workers)
     scored.to_csv(target/OUTPUT_FILES[0],index=False,float_format='%.17g')
-    cell_report(scored).to_csv(target/OUTPUT_FILES[1],index=False)
+    cell_report(scored,calibration).to_csv(target/OUTPUT_FILES[1],index=False,float_format='%.17g')
+    from .deployment import reference_rows
+    pd.concat([reference_rows(g,references,panel=str(g.panel.iloc[0]),cell=cell)
+        for cell,g in scored.groupby('cell',sort=False)],ignore_index=True).to_csv(target/'source_reference_summary.csv',index=False,float_format='%.17g')
     summary=dict(status='complete',version=VERSION,recipe_sha256=frozen['recipe_sha256'],
         files_sha256=frozen['files_sha256'],noise_edges=frozen['noise_edges'],pairs=len(frame),cells=int(frame.cell.nunique()),
         seconds=time.perf_counter()-before,quick=bool(settings.quick),AUC_clean_weighting='paired rows (as v1)',
-        FA_counting='distinct clean tiles within cell',validation_threshold='pending task #4',
+        FA_counting='distinct clean tiles within cell',validation_threshold=calibration,
         overlap_standard={p:dict(distinct_hard_tiles=int(g.cover_id.nunique()),
             shared_distinct_tiles=len(set(g.cover_id)&standard_covers),shared_pairs=int(g.overlap_standard.sum()))
             for p,g in frame.groupby('panel',sort=True)})

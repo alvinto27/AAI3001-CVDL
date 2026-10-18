@@ -14,7 +14,8 @@ import numpy as np
 import pandas as pd
 import torch
 
-from cvdl import standardtest as S
+from cvdl import standardtest as S, deployment as C
+from test_deployment import mock_resolution
 from cvdl.validation import canonical, digest, csv_text
 from scripts import evaluate_run as er
 from scripts.build_standard_test import publish
@@ -168,9 +169,11 @@ class StandardTestTests(unittest.TestCase):
         self.assertEqual(rates(test,threshold(validation,'pe')[0])['pe_at_cutoff'],1/6)
         self.assertNotIn('P_E', d.index)
         rows = S.diagnostic_rows(test); rows.insert(0,'panel','standard')
-        main = S.main_placeholder(rows)
-        self.assertTrue(main.P_E_at_validation_cutoff.isna().all())
-        self.assertTrue((main.threshold_origin == 'pending_validation_min_pe').all())
+        test['cover_id']=['a','b','c','a','b','c']
+        cal=dict(cutoff=.95,threshold_origin='post_hoc_256',threshold_id='one')
+        main=C.main_rows(test,rows,cal)
+        self.assertTrue((main.threshold_origin=='post_hoc_256').all())
+        self.assertEqual(main.iloc[0].P_E_at_validation_cutoff,1/6)
 
     def test_prepare_output_no_overwrite(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -185,26 +188,36 @@ class StandardTestTests(unittest.TestCase):
             record = run/'data_run_settings.json'; record.write_text('original')
             before = record.read_bytes()
             ckpt = run/'best-test.ckpt'; torch.save({'hyper_parameters':{},'state_dict':{}}, ckpt)
+            checkpoint_before=ckpt.read_bytes();score_order=[]
             settings = SimpleNamespace(root=ROOT, quick=True, eval_workers=0, device='cpu',batch_size=4,
                 rocm_conv1_fix=False,values={},train_tile_size=512,tile_size=512,train_grid='recorded',manifest_root=None,source='decode')
             def fake_score(network, ds, **kwargs):
+                score_order.append(set(ds.frame['split']))
                 clean = ds.frame.copy(); clean['label']=0; clean['prob_stego']=.2
                 stego = ds.frame.copy(); stego['label']=1; stego['prob_stego']=.8
                 return pd.concat([clean,stego],ignore_index=True)
             with patch('cvdl.models.model_from_hparams',return_value=torch.nn.Identity()), \
                  patch('lsb_torch.Corpus',return_value=SimpleNamespace(by_id={})), \
                  patch.object(S,'StandardTestPairs',side_effect=lambda corpus,f:SimpleNamespace(frame=f)), \
-                 patch('cvdl.hardtest.score',side_effect=fake_score):
+                 patch('cvdl.hardtest.score',side_effect=fake_score), \
+                 patch.object(S,'MatchedValidationPairs',side_effect=lambda corpus,f:SimpleNamespace(frame=f)), \
+                 patch.object(C,'resolve',return_value=mock_resolution()):
                 result = S.run(settings,ckpt,run,higher_k=True,hard=False)
                 out = Path(result['output'])
                 self.assertEqual(result['hard_test']['status'],'disabled')
                 self.assertEqual(len(list((out/'panels').glob('*/predictions.csv'))),4)
                 self.assertEqual(len(list((out/'higher-k').glob('*/predictions.csv'))),4)
                 self.assertNotIn('P_E',pd.read_csv(out/'diagnostic_summary.csv').columns)
-                self.assertTrue(pd.read_csv(out/'main_summary.csv').cutoff.isna().all())
+                self.assertTrue((pd.read_csv(out/'main_summary.csv').cutoff==.8).all())
+                self.assertEqual(pd.read_csv(out/'main_summary.csv').threshold_id.nunique(),1)
+                self.assertEqual(pd.read_csv(out/'higher-k/main_summary.csv').threshold_id.nunique(),1)
+                self.assertEqual(json.loads((out/'validation/calibration.json').read_text())['cutoff'],.8)
                 with self.assertRaisesRegex(ValueError,'refusing to overwrite'): S.run(settings,ckpt,run,higher_k=True,hard=False)
                 with self.assertRaisesRegex(ValueError,'must be under'): S.run(settings,ckpt,run,output=run,hard=False)
             self.assertEqual(record.read_bytes(),before)
+            self.assertEqual(ckpt.read_bytes(),checkpoint_before)
+            self.assertEqual(score_order[0],{'val'})
+            self.assertTrue(all(s!={'val'} for s in score_order[1:]))
             self.assertEqual(list(run.glob('test_predictions.csv')),[])
 
     @unittest.skipUnless((ROOT/'Datasets/originals/raise/NEF').is_dir(), 'real source photos not present')
