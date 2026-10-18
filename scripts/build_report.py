@@ -25,7 +25,18 @@ def generate(root,run,evaluation_id=None,*,reference_run=None,reference_evaluati
     cells=[c for c in nb.cells if 'parameters' in c.metadata.get('tags',[])]
     if len(cells)!=1:raise ValueError('template must have one parameters cell')
     cells[0].source='\n'.join(f'{k} = {v!r}' for k,v in params.items())
-    nb.metadata['report']=dict(parameters=params,template='notebooks/templates/report.ipynb',saved_outputs_only=True)
+    def identity(item):
+        if item is None:return None
+        return dict(evaluation_id=item.path.name,threshold_id=item.calibration['threshold_id'],
+            calibration_recipe_id=item.calibration['recipe_id'],checkpoint_sha256=item.calibration['checkpoint_sha256'],
+            standard_recipe_sha256=item.meta['recipe_sha256'],hard_recipe_sha256=item.meta.get('hard_recipe_sha256'),
+            validation_score_sha256=item.calibration['score_csv_sha256'])
+    nb.metadata['report']=dict(parameters=params,template='notebooks/templates/report.ipynb',saved_outputs_only=True,
+        primary=identity(primary),reference=identity(reference),presentation_revision=1)
+    for cell in nb.cells:
+        if cell.cell_type=='code':
+            cell.metadata.update(jupyter=dict(source_hidden=True,outputs_hidden=False),hide_input=True)
+            cell.metadata['tags']=list(dict.fromkeys([*cell.metadata.get('tags',[]),'hide-input']))
     env={**os.environ,'CUDA_VISIBLE_DEVICES':'','HIP_VISIBLE_DEVICES':'','PYTHONDONTWRITEBYTECODE':'1',
          'MPLBACKEND':'Agg','OMP_NUM_THREADS':'1','OPENBLAS_NUM_THREADS':'1','MKL_NUM_THREADS':'1'}
     NotebookClient(nb,timeout=180,kernel_name='python3',resources={'metadata':{'path':str(root)}}).execute(env=env)

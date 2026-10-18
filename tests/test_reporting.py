@@ -12,6 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 import pandas as pd
 from cvdl.reporting import SavedReport,evaluation_path,compatible
+from cvdl.report_charts import display_frame,deduplicate,training_card
 from scripts.build_report import generate
 
 EID='1'*20
@@ -28,16 +29,17 @@ def fixture(root,name='model',eid=EID):
     pd.DataFrame(dict(epoch=[0,1],step=[0,1],lr=[.001,.0001])).to_csv(train/'lr_trace.csv',index=False)
     (train/'training_curves.png').write_bytes(PNG)
     val=p/'validation';val.mkdir();(val/'predictions.csv').write_text('label,prob_stego\n0,0.2\n1,0.8\n')
-    cal=dict(deployment=True,threshold_id='frozen',cutoff=.45,threshold_origin='post_hoc_256',recipe_id='cal',
-             checkpoint_sha256='checkpoint',pairs=18000,score_csv_sha256=hashlib.sha256((val/'predictions.csv').read_bytes()).hexdigest())
+    cal=dict(deployment=True,threshold_id='f'*20,cutoff=.450123456789,threshold_origin='post_hoc_256',recipe_id='a'*20,
+             checkpoint_sha256='b'*64,pairs=18000,score_csv_sha256=hashlib.sha256((val/'predictions.csv').read_bytes()).hexdigest())
     (val/'calibration.json').write_text(json.dumps(cal))
-    refs=pd.DataFrame([dict(source='raise',cutoff=.6,threshold_origin='if_source_known_reference')]);refs.to_csv(val/'source_reference_thresholds.csv',index=False)
+    refs=pd.DataFrame([dict(panel='standard',source='raise',k='all',cutoff=.6,threshold_origin='if_source_known_reference',FA=.08,miss=.16,P_E_at_validation_cutoff=.12,AUC=.91)]);refs.to_csv(val/'source_reference_thresholds.csv',index=False)
     refs.to_csv(p/'source_reference_summary.csv',index=False)
     main=[];diag=[];hard=[]
     for panel in ('standard','alaska-seen','alaska-unseen','lsdir'):
-        row=dict(panel=panel,category='overall',value='all',pairs=2,images=4,photos=1,AUC=.9,threshold_id='frozen',cutoff=.45,
+        row=dict(panel=panel,category='overall',value='all',pairs=2,images=4,photos=1,AUC=.9123456,threshold_id=cal['threshold_id'],cutoff=cal['cutoff'],
                  threshold_origin='post_hoc_256',FA=.1,miss=.2,P_E_at_validation_cutoff=.15)
         main.append(row);diag.append(dict(panel=panel,category='overall',value='all',test_min_P_E=.1,P_E_at_0_5=.2,AUC=.9))
+        if panel=='standard':main.extend({**row,'category':'source','value':source,'pairs':1,'images':2} for source in ('raise','div2k'))
         out=p/'panels'/panel;out.mkdir(parents=True)
         pd.DataFrame(dict(label=[0,1,0,1],prob_stego=[.1,.8,.2,.3],requested_bpp=[.05,.05,.5,.5],k=[1,1,2,2],split='test',source_photo='photo')).to_csv(out/'predictions.csv',index=False)
         for k in (1,2):
@@ -47,7 +49,7 @@ def fixture(root,name='model',eid=EID):
     pd.DataFrame(main).to_csv(p/'main_summary.csv',index=False);pd.DataFrame(diag).to_csv(p/'diagnostic_summary.csv',index=False)
     (p/'hard-test').mkdir();pd.DataFrame(hard).to_csv(p/'hard-test/hard_cells.csv',index=False)
     meta=dict(suite='standard-256-v1',evaluation_id=eid,quick=False,validation_threshold=dict(status='complete'),
-              hard_enabled=True,hard_recipe_sha256='same-hard',recipe_sha256='same-standard',higher_k=False)
+              hard_enabled=True,hard_recipe_sha256='d'*64,recipe_sha256='c'*64,higher_k=False)
     (p/'evaluation_settings.json').write_text(json.dumps(meta))
     (p/'summary.json').write_text(json.dumps(dict(evaluation_id=eid,validation_threshold=cal,hard_test=dict(status='complete'))))
     return run,p
@@ -61,9 +63,10 @@ class ReportingTests(unittest.TestCase):
     def test_headline_values_exact_saved_csv_and_honest_training_label(self):
         r=SavedReport(self.root,'model',EID)
         pd.testing.assert_frame_equal(r.headline, pd.read_csv(self.path/'main_summary.csv',float_precision='round_trip'))
-        self.assertIn('capped, 512px',r.training_label);self.assertIn('NOT the new',r.training_label)
+        self.assertIn('RAISE, ALASKA and LSDIR, size-limited per source, 512px',r.training_label);self.assertNotIn('capped',r.training_label);self.assertIn('not the later',r.training_label)
         (self.run/'checkpoints/model/run_settings.json').write_text(json.dumps({'values':dict(checkpoint_validation='train_matched',train_tile_size=256,validation_recipe='own')}))
-        self.assertIn('train-matched, 256px',SavedReport(self.root,'model',EID).training_label)
+        self.assertIn('matched to training, 256px',SavedReport(self.root,'model',EID).training_label)
+        self.assertNotIn('own',SavedReport(self.root,'model',EID).training_label)
 
     def test_missing_pending_and_unfinished_hard_refused(self):
         p=self.path/'summary.json';saved=p.read_text();p.unlink()
@@ -111,8 +114,8 @@ class ReportingTests(unittest.TestCase):
         nb=json.loads(target.read_text());outputs=[o for c in nb['cells'] for o in c.get('outputs',[])]
         self.assertFalse(any(o['output_type']=='error' for o in outputs))
         self.assertGreaterEqual(sum('image/png' in o.get('data',{}) for o in outputs),7)
-        self.assertTrue(any('external network disabled' in ''.join(o.get('text',[])) for o in outputs))
-        self.assertTrue(any('No reference model supplied' in ''.join(o.get('text',[])) for o in outputs))
+        self.check_presentation(nb)
+        self.assertTrue(any('No reference model supplied' in str(o.get('data',{})) for o in outputs))
         self.assertEqual(before,{p:hashlib.sha256(p.read_bytes()).hexdigest() for p in before})
         with self.assertRaisesRegex(ValueError,'author notes'):generate(self.root,'model',EID)
 
@@ -123,5 +126,89 @@ class ReportingTests(unittest.TestCase):
         target=generate(self.root,'model',EID,reference_run='reference',reference_evaluation_id='2'*20)
         nb=json.loads(target.read_text());self.assertEqual(nb['metadata']['report']['parameters']['REFERENCE_RUN'],'reference')
         self.assertFalse(any(o['output_type']=='error' for c in nb['cells'] for o in c.get('outputs',[])))
+        self.check_presentation(nb,reference=True)
+
+    def check_presentation(self,nb,reference=False):
+        visible=[]
+        for cell in nb['cells']:
+            if cell['cell_type']=='markdown':visible.append(''.join(cell['source']))
+            else:
+                self.assertTrue(cell['metadata']['jupyter']['source_hidden'])
+                self.assertFalse(cell['metadata']['jupyter']['outputs_hidden'])
+                for output in cell.get('outputs',[]):
+                    visible.append(''.join(output.get('text',[])))
+                    visible.extend(''.join(value) for key,value in output.get('data',{}).items() if key!='image/png')
+        visible='\n'.join(visible)
+        for secret in (EID,'2'*20,'f'*20,'a'*20,'b'*64,'c'*64,'d'*64,str(self.root),'.450123456789'):
+            self.assertNotIn(secret,visible)
+        self.assertIn('<details>',visible);self.assertNotIn('threshold_id',visible)
+        meta=nb['metadata']['report'];self.assertEqual(meta['primary']['evaluation_id'],EID)
+        self.assertEqual(meta['primary']['threshold_id'],'f'*20);self.assertEqual(meta['primary']['calibration_recipe_id'],'a'*20)
+        self.assertEqual(meta['primary']['checkpoint_sha256'],'b'*64)
+        if reference:self.assertEqual(meta['reference']['evaluation_id'],'2'*20)
+        headings=[c for c in nb['cells'] if c['cell_type']=='markdown' and ''.join(c['source']).startswith('## ')]
+        self.assertEqual(len(headings),10)
+        self.assertTrue(all('**Look at:**' in ''.join(c['source']) for c in headings))
+
+    def test_display_rounding_matches_saved_csv(self):
+        r=SavedReport(self.root,'model',EID);raw=pd.read_csv(self.path/'main_summary.csv',float_precision='round_trip')
+        shown=display_frame(r.headline)
+        for column,label in [('FA','False alarms %'),('miss','Misses %'),('P_E_at_validation_cutoff','Overall error %')]:
+            self.assertEqual(list(shown[label]),[f'{100*x:.1f}%' for x in raw[column]])
+        self.assertEqual(list(shown.AUC),[f'{x:.3f}' for x in raw.AUC])
+        self.assertEqual(set(shown['Validation cut-off']),{'0.450'})
+        self.assertNotIn('recipe',str(training_card(r)).lower())
+
+    def test_single_source_rows_not_duplicated_standard_breakdown_retained(self):
+        r=SavedReport(self.root,'model',EID);f=r.main.query('category == "overall"').copy()
+        for panel,source in [('standard','raise'),('standard','div2k'),('alaska-seen','alaska'),('lsdir','lsdir')]:
+            row=f.query('panel == @panel').iloc[0].copy();row['category']='source';row['value']=source
+            f=pd.concat([f,pd.DataFrame([row])],ignore_index=True)
+        result=deduplicate(f)
+        self.assertEqual(len(result),6)
+        self.assertEqual(len(result.query('panel == "standard"')),3)
+        self.assertEqual(len(result.query('panel == "alaska-seen"')),1)
+        row=f.query('panel == "alaska-seen"').iloc[0]
+        f=pd.concat([f,pd.DataFrame([{**row.to_dict(),'category':'k','value':'1'},
+            {**row.to_dict(),'category':'source/k','value':'alaska/1'}])],ignore_index=True)
+        self.assertEqual(len(deduplicate(f).query('panel == "alaska-seen"')),2)
+
+    def test_chart_titles_labels_and_direction(self):
+        from cvdl import report_charts as P
+        import matplotlib.pyplot as plt
+        primary=SavedReport(self.root,'model',EID);fixture(self.root,'reference','2'*20)
+        reference=SavedReport(self.root,'reference','2'*20)
+        reference.main.loc[reference.main.panel=='standard','P_E_at_validation_cutoff']=.2
+        reference.headline=deduplicate(reference.main)
+        figures=[]
+        with patch.object(P,'show_figure',side_effect=figures.append):
+            P.training_plots(primary);P.panel_plot(primary);P.miss_plots(primary);P.hard_plots(primary);P.comparison_plot(primary,reference)
+        self.assertEqual(len(figures),9)
+        for fig in figures:
+            labels=[]
+            for ax in fig.axes:
+                if ax.get_label()=='<colorbar>':continue
+                self.assertTrue(ax.get_title() or fig._suptitle)
+                self.assertTrue(ax.get_xlabel());self.assertTrue(ax.get_ylabel())
+                labels.extend([ax.get_title(),ax.get_xlabel(),ax.get_ylabel(),*[t.get_text() for t in ax.get_xticklabels()]])
+            self.assertNotIn('_',' '.join(labels))
+        self.assertEqual(figures[-1].axes[0].patches[0].get_facecolor()[:3],tuple(int(v,16)/255 for v in ('27','83','48')))
+        heat=figures[3].axes[0].images[0].get_cmap()
+        self.assertGreater(sum(heat(0.)[:3]),sum(heat(1.)[:3]))
+        for fig in figures:plt.close(fig)
+
+    def test_tiny_change_not_labelled_zero_points_worse(self):
+        from cvdl.report_charts import change_label
+        self.assertEqual(change_label(.04),'<0.1 points worse')
+        self.assertEqual(change_label(-.04),'<0.1 points better')
+        self.assertEqual(change_label(0),'0.0 points unchanged')
+        self.assertEqual(change_label(1.94),'+1.9 points worse')
+
+    def test_recipe_and_hard_mismatch_checks_still_apply(self):
+        a=SavedReport(self.root,'model',EID);fixture(self.root,'reference','2'*20);b=SavedReport(self.root,'reference','2'*20)
+        b.meta['hard_recipe_sha256']='other'
+        with self.assertRaisesRegex(ValueError,'different hard'):compatible(a,b)
+        b.hard=None
+        with self.assertRaisesRegex(ValueError,'coverage differs'):compatible(a,b)
 
 if __name__=='__main__':unittest.main()
