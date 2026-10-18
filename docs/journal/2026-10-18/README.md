@@ -76,6 +76,8 @@ Recorded by the Orchestrator.
 
 - User: threshold design approved ([plan](../../active/plan-validation-threshold.md)): old checkpoints get a post-hoc 256 overlap-last calibration (option C): runs 2-10 share list `60da4391043e8ce48ff2` (18,000 pairs); wide-R2 gets its own RAISE+DIV2K list (18,000, shares from its training records). Rescore only the 10 documented models. Ties: smaller FA; unmapped runs fail, no fallback.
 
+- User on the demo reports: ids and hashes are not useful; tables are too dense and it is not clear what to look at. Approved to try a question-first layout ([plan](../../active/plan-report-readability.md)): headline numbers, one chart per question, full tables in a collapsed appendix, plain labels, ids hidden in metadata.
+
 ### Next
 
 - Evaluator `--validation-recipe` rescoring path: deferred (needed for rescoring old models on the new validation).
