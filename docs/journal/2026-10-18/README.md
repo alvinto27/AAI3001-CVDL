@@ -16,6 +16,9 @@ Recorded by the Orchestrator.
 - `srm-hard` notebook moved to train-matched validation (`a0e72cd`, Run_Supervisor): PC QUICK smoke pass (record has recipe `bf7ede374cab01f73f5d`, per-source val metrics); dry run PASS. Launched on the G4 at 04:38:54Z (first attempt, no STOCKOUT): `srm-hard-20261018T043854Z-8467`. Running.
 - Standard test at 256 built by Worker_2: `bd36403` (`cvdl/standardtest.py`, `scripts/build_standard_test.py`, `configs/test-256-v1.yaml`, 8 frozen lists, recipe `5045c1076ab3f540a61c`). `evaluate_run.py runs/<run>` now runs it by default; `--higher-k` adds k 5-8; `--test-suite legacy-512` keeps the old suite. Hard test reported as pending until #3. Verification: 306 tests pass; golden ALL EQUAL (GPU visible); builder `--check` byte-identical twice (2.4 s). Orchestrator check: counts 10,944 / 2,688 / 3,168 / 5,280, k exactly one quarter, every k x type cell equal (RAISE 101, DIV2K 13, ALASKA seen 28, unseen 33, LSDIR 55), every test photo used, no repeated tile, k 5-8 lists match row for row with k + 4.
 
+- Hard test at 256 built by Worker_2: `a56c275` (`cvdl/hardnoise.py`, `cvdl/hardtest256.py`, `scripts/measure_hard_noise_256.py`, `scripts/build_hard_test_256.py`, `data/hard-test/256-v1/`, recipe `d6d91a5a98dae856d1ae`). Noise scan: 9,219 photos, 206,811 tiles, 198.9 s on 8 CPU workers (pilot projected 203.7 s); RAM peak ~17 GB. Verification: 322 tests pass; golden ALL EQUAL (GPU visible); builder `--check` byte-identical twice; hard v1 `--check` still identical. Orchestrator check: 32 cells x 1,008, every noisy row above its source edge, every low row in bpp 0.05-0.15, test splits only, at most 1 use per tile in a cell.
+- `srm-hard` epoch-2 projection (Run_Supervisor): 18.3 steps/s (GPU-bound); warm epoch 207 s (train 183.7 s, validation 22.4 s for 21,600 pairs); total ~105-110 min vs timeout 165.
+
 ### Found
 
 - Validation pools at 256 overlap-last (val split only): RAISE 36,484 tiles (150 photos), DIV2K 5,720 (120), ALASKA 8,966 (1,000), LSDIR 30,584 (1,500).
@@ -39,6 +42,7 @@ Recorded by the Orchestrator.
   | SRM-e50 | ALASKA seen | 14.20 | 13.54 | 13.24 | 13.10 |
 
   Order SRM-e50 < SRM-30 < 256 overlap holds at every validation cut-off. The SRM-e50 gain over SRM-30 shrinks (standard: 0.10 points test-optimised, 0.06 at the capped cut-off, and reverses at the full-panel cut-off: 1.70 vs 1.69). Labels corrected in the tiling result, the 2026-10-17 handoff and journal, and status.
+- Hard-256 noise edges (all val-split 256 tiles, model-independent): RAISE 1.691, DIV2K 2.442, ALASKA 2.613, LSDIR 2.516 (v1 from one model: 1.691, 2.409, 2.600, 2.368). Noisy test pools: RAISE+DIV2K 10,507 / 41,088, ALASKA seen 3,475 / 15,313, unseen 3,278 / 18,070, LSDIR 12,980 / 50,586: no tile reuse needed (v1 needed ALASKA reuse).
 
 ### Decided
 
