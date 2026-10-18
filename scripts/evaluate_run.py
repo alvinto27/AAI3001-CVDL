@@ -370,7 +370,7 @@ def main():
     parser.add_argument('--temperature',action='store_true',
         help='add temperature scaling on the capped validation logits (new files only)')
     parser.add_argument('--tanh-saturation',action='store_true',help='add the tanh saturation measurement')
-    parser.add_argument('--hard',action='store_true',help='legacy-512: frozen hard v1; standard-256-v1 reports hard256 pending')
+    parser.add_argument('--hard',action='store_true',help='hard test (default with main): hard256 in the new suite, hard-v1 with legacy-512')
     parser.add_argument('--no-hard',action='store_true',help='do not run the hard test with the main stage')
     parser.add_argument('--tanh-pairs',type=int,default=2000,help='validation pairs (clean + stego) for the tanh measurement')
     parser.add_argument('--tanh-train-batches',type=int,default=0,help='also measure N training-mode batches (with augmentation)')
@@ -390,7 +390,7 @@ def main():
         # No legacy data construction, post_fit, calibration panels or training-record writes here.
         if (args.tables or args.padding_check or args.temperature or args.tanh_saturation or args.skip_main
                 or args.only not in (None, 'main') or args.label):
-            raise ValueError('these optional stages/labels require --test-suite legacy-512; new hard/threshold work is pending')
+            raise ValueError('these optional stages/labels require --test-suite legacy-512; use the default main stage for hard256; threshold work is pending')
         from cvdl import standardtest, runtime
         from cvdl.lit import select_best_checkpoint
         from scripts.pc_safety import check_workers, own_process_group
@@ -399,7 +399,7 @@ def main():
         check_workers(settings.eval_workers)
         own_process_group()
         runtime.configure(settings)
-        standardtest.run(settings,checkpoint,job_folder(folder),higher_k=args.higher_k,
+        standardtest.run(settings,checkpoint,job_folder(folder),higher_k=args.higher_k,hard=not args.no_hard,
             output=args.output,overwrite=args.overwrite,provenance=borrowing)
         return
     if args.higher_k:

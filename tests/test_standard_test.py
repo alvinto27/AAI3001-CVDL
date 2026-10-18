@@ -195,15 +195,15 @@ class StandardTestTests(unittest.TestCase):
                  patch('lsb_torch.Corpus',return_value=SimpleNamespace(by_id={})), \
                  patch.object(S,'StandardTestPairs',side_effect=lambda corpus,f:SimpleNamespace(frame=f)), \
                  patch('cvdl.hardtest.score',side_effect=fake_score):
-                result = S.run(settings,ckpt,run,higher_k=True)
+                result = S.run(settings,ckpt,run,higher_k=True,hard=False)
                 out = Path(result['output'])
-                self.assertEqual(result['hard_test']['status'],'pending')
+                self.assertEqual(result['hard_test']['status'],'disabled')
                 self.assertEqual(len(list((out/'panels').glob('*/predictions.csv'))),4)
                 self.assertEqual(len(list((out/'higher-k').glob('*/predictions.csv'))),4)
                 self.assertNotIn('P_E',pd.read_csv(out/'diagnostic_summary.csv').columns)
                 self.assertTrue(pd.read_csv(out/'main_summary.csv').cutoff.isna().all())
-                with self.assertRaisesRegex(ValueError,'refusing to overwrite'): S.run(settings,ckpt,run,higher_k=True)
-                with self.assertRaisesRegex(ValueError,'must be under'): S.run(settings,ckpt,run,output=run)
+                with self.assertRaisesRegex(ValueError,'refusing to overwrite'): S.run(settings,ckpt,run,higher_k=True,hard=False)
+                with self.assertRaisesRegex(ValueError,'must be under'): S.run(settings,ckpt,run,output=run,hard=False)
             self.assertEqual(record.read_bytes(),before)
             self.assertEqual(list(run.glob('test_predictions.csv')),[])
 
@@ -257,6 +257,11 @@ class StandardCLITests(unittest.TestCase):
         new, legacy = self.invoke([])
         new.assert_called_once(); legacy.assert_not_called()
         self.assertFalse(new.call_args.kwargs['higher_k'])
+        self.assertTrue(new.call_args.kwargs['hard'])
+
+    def test_no_hard_turns_off_new_hard_only(self):
+        new, legacy = self.invoke(['--no-hard'])
+        self.assertFalse(new.call_args.kwargs['hard']); legacy.assert_not_called()
 
     def test_higher_k_opt_in(self):
         new, legacy = self.invoke(['--higher-k'])

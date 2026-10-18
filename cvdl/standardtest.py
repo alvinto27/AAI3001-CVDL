@@ -259,7 +259,7 @@ def prepare_output(path, *, overwrite=False):
     return path
 
 
-def run(settings, checkpoint, run_folder, *, higher_k=False, output=None, overwrite=False, provenance=None):
+def run(settings, checkpoint, run_folder, *, higher_k=False, hard=True, output=None, overwrite=False, provenance=None):
     """New-suite branch: test only; never execute legacy post_fit or modify training records."""
     import torch
     from lsb_torch import Corpus, RunSettings
@@ -272,6 +272,12 @@ def run(settings, checkpoint, run_folder, *, higher_k=False, output=None, overwr
     frames, recipe, frozen = load_frozen(settings.root, higher_k=higher_k)
     checkpoint = Path(checkpoint)
     checkpoint_sha = digest(checkpoint.read_bytes())
+    hard_frame = hard_frozen = None
+    if hard:
+        from . import hardtest256
+        hard_frame, _, hard_frozen = hardtest256.load_frozen(settings.root)
+        if settings.quick:
+            hard_frame = hard_frame.groupby('cell', sort=False).head(8).reset_index(drop=True)
     selected = {}
     for name, frame in frames.items():
         if settings.quick:
@@ -280,7 +286,9 @@ def run(settings, checkpoint, run_folder, *, higher_k=False, output=None, overwr
     identity = dict(suite=SUITE, recipe_sha256=frozen['recipe_sha256'], checkpoint_sha256=checkpoint_sha,
         selected_pairs_sha256={n: digest(csv_text(f).encode()) for n, f in selected.items()},
         higher_k=higher_k, quick=bool(settings.quick), device=str(settings.device), batch_size=settings.batch_size,
-        workers=settings.eval_workers, rocm_conv1_fix=bool(settings.rocm_conv1_fix))
+        workers=settings.eval_workers, rocm_conv1_fix=bool(settings.rocm_conv1_fix), hard_enabled=hard,
+        hard_recipe_sha256=hard_frozen['recipe_sha256'] if hard else None,
+        hard_selected_pairs_sha256=digest(csv_text(hard_frame).encode()) if hard else None)
     eid = digest(canonical(identity).encode())[:20]
     out = Path(output) if output is not None else Path(run_folder)/'evaluation'/SUITE/eid
     # Even explicit --output must never target a training/checkpoint record folder.
@@ -289,6 +297,11 @@ def run(settings, checkpoint, run_folder, *, higher_k=False, output=None, overwr
     allowed = run_folder/'evaluation'/SUITE
     if resolved == allowed or not resolved.is_relative_to(allowed):
         raise ValueError(f'new suite output must be under {allowed}')
+    prior = out/'evaluation_settings.json'
+    if prior.exists():
+        saved = json.loads(prior.read_text())
+        if any(saved.get(k) != v for k, v in identity.items()):
+            raise ValueError('evaluation identity differs; use a fresh output folder')
     out = prepare_output(out, overwrite=overwrite)
     checkpoint_data = torch.load(checkpoint, map_location='cpu', weights_only=False)
     hparams = checkpoint_data.get('hyper_parameters', {})
@@ -304,7 +317,7 @@ def run(settings, checkpoint, run_folder, *, higher_k=False, output=None, overwr
         values=plain(settings.values), provenance=provenance or {}, checkpoint=str(checkpoint),
         train_geometry=dict(tile_size=settings.train_tile_size or settings.tile_size, grid=settings.train_grid),
         test_geometry=dict(tile_size=256, grid='overlap_last'),
-        hard_test=dict(status='pending', reason='task #3: frozen hard test at 256 is not built'),
+        hard_test=dict(status='selected', recipe_sha256=hard_frozen['recipe_sha256']) if hard else dict(status='disabled'),
         validation_threshold=dict(status='pending', reason='task #4', main_file='main_summary.csv'),
         code_commit=code_commit(settings.root),
         runtime=dict(torch=str(torch.__version__), numpy=np.__version__, pillow=PIL.__version__))
@@ -331,6 +344,9 @@ def run(settings, checkpoint, run_folder, *, higher_k=False, output=None, overwr
             combined = pd.concat(tables, ignore_index=True)
             combined.to_csv(target/'diagnostic_summary.csv', index=False)
             main_placeholder(combined).to_csv(target/'main_summary.csv', index=False)
+    if hard:
+        meta['hard_test'] = hardtest256.run(settings, network, corpus, hard_frame, hard_frozen, out)
+        (out/'evaluation_settings.json').write_text(json.dumps(meta, indent=2)+'\n')
     result = dict(evaluation_id=eid, output=str(out), suite=SUITE, quick=bool(settings.quick), timings=timings,
                   total_seconds=time.perf_counter()-start, hard_test=meta['hard_test'], validation_threshold=meta['validation_threshold'])
     (out/'summary.json').write_text(json.dumps(result, indent=2)+'\n')
