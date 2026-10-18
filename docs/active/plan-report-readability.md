@@ -27,6 +27,8 @@ Each section starts with **the question it answers** and a **"Look at: ..."** li
 ## Presentation rules
 
 - **Hidden:** hashes, evaluation / threshold / recipe ids, file paths, full-precision cut-off, setup and guard code. Keep the ids in the notebook metadata (not shown) so the generator can still check that two models used the same tests. The saved evaluation files keep everything.
+- **Every chart has a title** that states what it shows in plain words (example: "Misses by k: srm-hard vs SRM-30").
+- **Chart labels easy to read:** plain axis names with units ("Misses (%)", "Embedding strength k"), no code names or underscores, readable font size, no overlapping tick labels, a legend only when there is more than one series, values printed on bars where that helps.
 - **Code cells collapsed;** show outputs only.
 - **Plain labels:** "Threshold set on its own validation" (`train_matched`), "Threshold set after training" (`post_hoc_256`), "False alarms %", "Misses %", "Overall error %", "ALASKA (cameras seen in training)". Define each term (false alarm, miss, overall error, AUC, k, bpp) the first time it appears.
 - **No duplicate rows:** a single-source panel shows one row, not "overall" and "source".
