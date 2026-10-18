@@ -23,7 +23,7 @@ Current path: `cvdl/settings.py:162-181` (`tile_size`, `train_tile_size`, `check
 | 1 | **Size = 10% of the training pairs per epoch**, derived from the run's settings. Quotas follow the training source mix exactly. Validation scales when training pairs per epoch change. The builder records its rounding rule in the recipe. |
 | 2 | **Pool = the existing frozen `val` photo split only.** No split changes. Unique tiles, no repeats. If a quota exceeds a source pool, the builder **fails** with a clear error (no reuse, no cap). |
 | 3 | **No augmentation.** k, bpp (incl. `k_weights` / `bpp_mixture`) and stego-type draws follow the training config. |
-| 4 | **DIV2K threshold-calibration panel is out of scope.** DIV2K is not trained, so it is not in train-matched validation. It belonged to the per-source threshold task (#4); since 2026-10-18 per-source thresholds are reference only, so a DIV2K panel is needed only for a DIV2K reference cut-off. |
+| 4 | **DIV2K threshold-calibration panel is out of scope.** DIV2K is not trained, so it is not in train-matched validation. It belonged to the per-source threshold task (#4); since 2026-10-18 per-source thresholds are reference only, and the user dropped the DIV2K reference cut-off: no DIV2K validation panel. |
 
 Validation is for checkpoint selection, overfitting curves, and (later) per-source thresholds. The standard test stays one fixed design for all models (work list #2).
 

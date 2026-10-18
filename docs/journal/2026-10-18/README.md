@@ -31,9 +31,11 @@ Recorded by the Orchestrator.
 - DIV2K threshold-calibration panel moves to the per-source threshold task (#4).
 - User: delete leftovers (old `runs/.scratch/` worktrees except `srm-hard-launch`, speed/profile/BF16/map-demo runs, `g4-prime-1`, `bt2-job`, `early-pc`; `g4-v4-r1b` and `g4-v4-r2` only if no record links them).
 - User: side job A (resolve the threshold label) after B.
-- User: **thresholds** (replaces the 2026-10-17 "per-source thresholds are the main report"). Deployment cannot know the source, so it can use only one threshold. Main report = **one threshold at min P_E on the run's validation**, frozen and applied to every test panel. Per source: FA and miss at that one threshold, and AUC. Per-source thresholds stay only as a labelled reference in the report notebook ("if the source were known"). A DIV2K validation panel is needed only for a DIV2K reference cut-off (open).
+- User: **thresholds** (replaces the 2026-10-17 "per-source thresholds are the main report"). Deployment cannot know the source, so it can use only one threshold. Main report = **one threshold at min P_E on the run's validation**, frozen and applied to every test panel. Per source: FA and miss at that one threshold, and AUC. Per-source thresholds stay only as a labelled reference in the report notebook ("if the source were known"). No DIV2K reference cut-off (user: skip DIV2K; no DIV2K validation panel).
 
 - Cleanup done by Worker_1: 7 old worktrees and the speed, profile, BF16 and map-demo outputs deleted; `runs/` 2.4 GB -> 2.0 GB (409 MiB freed). Kept because tracked files use them: `g4-prime-1` and `g4-v4-r2` (golden compare), `g4-v4-r1b` (findings, archived plans), `early-pc` (V1/V3 results).
+
+- User: report notebook template (#5) after tasks 2-4, not before.
 
 ### Next
 
