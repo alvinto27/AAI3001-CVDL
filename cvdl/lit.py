@@ -73,7 +73,7 @@ class SteganalysisModule(L.LightningModule):
         accuracy = (logits.argmax(dim=1) == targets).float().mean()
         self.validation_scores.append(logits.softmax(dim=1)[:, 1].detach().cpu())
         self.validation_labels.append(targets.detach().cpu())
-        if self.validation_data is not None and self.validation_data.checkpoint_validation == "capped":
+        if self.validation_data is not None and self.validation_data.checkpoint_validation in {"capped", "train_matched"}:
             batch_sources = self.validation_data.val.frame.iloc[batch[2].tolist()]["source"].to_numpy()
             self.validation_sources.append(np.concatenate((batch_sources, batch_sources)))
             self.validation_losses.append(F.cross_entropy(logits, targets, reduction="none").detach().cpu())
@@ -91,10 +91,12 @@ class SteganalysisModule(L.LightningModule):
         self.log("val_md", float((stego_scores < 0.5).mean()), prog_bar=True)
         # Lightning's two-batch sanity pass sees only the first source in full validation.
         # Keep combined sanity metrics, but require every source only in real epochs.
-        if self.validation_data is not None and self.validation_data.checkpoint_validation == "capped" and not self.trainer.sanity_checking:
+        if self.validation_data is not None and self.validation_data.checkpoint_validation in {"capped", "train_matched"} and not self.trainer.sanity_checking:
             sources = np.concatenate(self.validation_sources)
             losses = torch.cat(self.validation_losses).numpy()
-            for name in ("raise", "alaska", "lsdir"):
+            names = (tuple(self.validation_data.corpus.settings.sources)
+                     if self.validation_data.checkpoint_validation == 'train_matched' else ("raise", "alaska", "lsdir"))
+            for name in names:
                 selected = sources == name
                 if not selected.any():
                     raise ValueError(f"capped validation has no {name} examples")

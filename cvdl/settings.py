@@ -175,7 +175,8 @@ SCHEMA = MappingProxyType({
     'tile_size': Definition('int', integer, 512, '256/512', 'Square tile size.', lambda v:v in {256,512}, 'V3_TILE_SIZE'),
     'run_seed': Definition('int', integer, 0, '>=0', 'Keyed data seed.', lambda v:v>=0, 'V3_RUN_SEED'),
     'train_photo_fraction': Definition('float', number, lambda c:.005 if c['quick'] else 1., '(0,1]', 'Train photo fraction.', lambda v:0<v<=1, 'V3_TRAIN_PHOTO_FRACTION'),
-    'checkpoint_validation': Definition('str', str, lambda c:'capped' if c['source_mix'] else 'standard', 'standard/combined/capped', 'Checkpoint validation selection.', lambda v:v in {'standard','combined','capped'}, 'V3_CHECKPOINT_VAL'),
+    'checkpoint_validation': Definition('str', str, lambda c:'capped' if c['source_mix'] else 'standard', 'standard/combined/capped/train_matched', 'Checkpoint validation selection.', lambda v:v in {'standard','combined','capped','train_matched'}, 'V3_CHECKPOINT_VAL'),
+    'validation_recipe': Definition('str?', optional_string, None, '20 lowercase hex characters; train_matched only', 'Frozen train-matched validation recipe id.', lambda v:v is None or bool(re.fullmatch(r'[0-9a-f]{20}',v))),
     'val_cap_raise': Definition('int', integer, 5000, '>0', 'Capped RAISE validation pairs.', lambda v:v>0, 'V3_VAL_CAP_RAISE'),
     'val_cap_lsdir': Definition('int', integer, 1500, '>0', 'Capped LSDIR validation pairs.', lambda v:v>0, 'V3_VAL_CAP_LSDIR'),
     'eval_profile': Definition('str', str, 'overlap_full_mix', 'overlap_full_mix/legacy_v6', 'Fixed evaluation grid.', lambda v:v in {'overlap_full_mix','legacy_v6'}, 'V3_EVAL_PROFILE', 'EVAL_PROFILE'),
@@ -489,6 +490,14 @@ def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_v
         raise ValueError('train_tile_size differs from tile_size only with an explicit train_grid')
     if c['train_grid']!='recorded' and c['data']!='otf':
         raise ValueError('train_grid requires OTF data')
+    if c['checkpoint_validation']=='train_matched':
+        if not c['validation_recipe'] or not c['source_mix'] or c['train_grid']!='overlap_last' or c['data']!='otf':
+            raise ValueError('train_matched needs validation_recipe, source_mix, overlap_last and OTF data')
+    elif c['validation_recipe'] is not None:
+        raise ValueError('validation_recipe requires checkpoint_validation=train_matched')
+    else:
+        # An absent opt-in must not add keys to legacy settings/provenance records.
+        c.pop('validation_recipe'); origins_all.pop('validation_recipe')
     result = Settings(freeze(c),freeze(origins_all),profile.name,freeze(history))
     result.to_run_settings()  # shared source/mix/cache constraints; no photo reads
     if result.speed_matrix:

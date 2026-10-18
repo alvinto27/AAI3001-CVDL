@@ -98,9 +98,10 @@ class TrainingCurves(L.Callback):
 class PerEpochScalars(L.Callback):
     """Use separate train/val runs so matching tags get different colours."""
 
-    def __init__(self, log_root, timing, *, capped_validation=False):
+    def __init__(self, log_root, timing, *, capped_validation=False, validation_sources=None):
         self.timing = timing
         self.capped_validation = capped_validation
+        self.validation_sources = validation_sources
         from torch.utils.tensorboard import SummaryWriter
         self.train_writer = SummaryWriter(str(Path(log_root) / "train"))
         self.val_writer = SummaryWriter(str(Path(log_root) / "val"))
@@ -145,8 +146,8 @@ class PerEpochScalars(L.Callback):
         for tag, key in [("loss", "val_loss"), ("acc", "val_acc"), ("pe", "val_pe"),
                          ("auc", "val_auc"), ("fa", "val_fa"), ("md", "val_md")]:
             self.val_writer.add_scalar(tag, float(trainer.callback_metrics[key]), step)
-        if self.capped_validation:
-            for name in ("raise", "alaska", "lsdir"):
+        if self.capped_validation or self.validation_sources is not None:
+            for name in self.validation_sources if self.validation_sources is not None else ("raise", "alaska", "lsdir"):
                 for tag in ("pe", "loss"):
                     key = f"val_{tag}_{name}"
                     self.val_writer.add_scalar(f"{tag}/{name}", float(trainer.callback_metrics[key]), step)

@@ -39,6 +39,11 @@ class RecipeTests(unittest.TestCase):
             self.assertEqual(settings.run_name,expected['run_name'])
             legacy=load(environ=expected['env_settings'],_profile=machine_profile('g4'))
             for key,spec in SCHEMA.items():
+                if key == 'validation_recipe':
+                    # Unset opt-ins must stay absent from both legacy records.
+                    self.assertNotIn(key, settings.values)
+                    self.assertNotIn(key, legacy.values)
+                    continue
                 if not spec.machine:
                     self.assertEqual(settings.values[key],legacy.values[key],f'{name}: {key}')
             self.assertEqual(repo_relative_paths(jsonable(settings_dict(settings)),ROOT),

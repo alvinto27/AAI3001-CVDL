@@ -63,19 +63,26 @@ def fixed_subset(dataset,count,seed=0):
 
 class NotebookData:
     def __init__(self,root,settings,*,quick=False,profile="overlap_full_mix",eval_pairs=16,
-                 checkpoint_validation="standard",val_cap_raise=5000,val_cap_lsdir=1500,train_grid='recorded',train_tile=None):
+                 checkpoint_validation="standard",val_cap_raise=5000,val_cap_lsdir=1500,train_grid='recorded',train_tile=None,
+                 validation_recipe=None):
         self.corpus=Corpus(root,settings,train_grid=train_grid,train_tile=train_tile)
         self.train=TrainingImages(self.corpus)
         chosen={r["photo_id"] for r in self.corpus.selected}
         self.fixed_train=FixedPairs(self.corpus,"train",profile,photo_ids=chosen)
-        if checkpoint_validation not in {"standard","combined","capped"}:
-            raise ValueError("checkpoint_validation must be standard, combined, or capped")
+        if checkpoint_validation not in {"standard","combined","capped","train_matched"}:
+            raise ValueError("checkpoint_validation must be standard, combined, capped, or train_matched")
+        if validation_recipe is not None and checkpoint_validation != 'train_matched':
+            raise ValueError('validation_recipe requires train_matched')
         if checkpoint_validation=="capped" and not {"raise","alaska","lsdir"}<=set(settings.sources):
             raise ValueError("capped validation needs RAISE, ALASKA, and LSDIR")
         if profile!="overlap_full_mix" and set(settings.sources)&{"alaska","lsdir"}:
             raise ValueError("new-source panels require overlap_full_mix; legacy_v6 is RAISE only")
         self.checkpoint_validation=checkpoint_validation
-        if checkpoint_validation=="capped":
+        if checkpoint_validation=='train_matched':
+            from cvdl.validation import load_frozen, MatchedValidationPairs
+            frame, recipe, validation_summary, full_csv = load_frozen(root, settings, train_grid, train_tile, validation_recipe)
+            self.val=MatchedValidationPairs(self.corpus, frame)
+        elif checkpoint_validation=="capped":
             self.val=capped_validation(FixedPairs(self.corpus,"val",profile,
                                                     sources=("raise","alaska","lsdir")),
                                        val_cap_raise,val_cap_lsdir)
@@ -91,7 +98,7 @@ class NotebookData:
                     self.extra_pairs[f"{source}-{split}"]=FixedPairs(self.corpus,split,profile,sources=(source,))
         if quick:
             self.val=(source_balanced_subset(self.val,eval_pairs,0)
-                      if checkpoint_validation=="capped" else fixed_subset(self.val,eval_pairs,0))
+                      if checkpoint_validation in {"capped","train_matched"} else fixed_subset(self.val,eval_pairs,0))
             self.test=fixed_subset(self.test,eval_pairs,1)
             self.extra_pairs={name:fixed_subset(dataset,eval_pairs,2+i)
                               for i,(name,dataset) in enumerate(self.extra_pairs.items())}
@@ -105,6 +112,15 @@ class NotebookData:
             self.record.update(val_cap_raise=val_cap_raise,val_cap_lsdir=val_cap_lsdir,
                                validation_pair_counts=self.val.frame["source"].value_counts().to_dict(),
                                validation_pairs_sha256=hashlib.sha256(self.validation_pair_csv.encode()).hexdigest())
+        if checkpoint_validation=='train_matched':
+            from cvdl.validation import csv_text
+            self.validation_pair_csv=full_csv if not quick else csv_text(self.val.frame)
+            self.record['validation_recipe']=dict(id=validation_recipe,
+                recipe_sha256=validation_summary['recipe_sha256'],
+                pairs_sha256=validation_summary['pairs_sha256'],
+                selected_pairs_sha256=hashlib.sha256(self.validation_pair_csv.encode()).hexdigest(),
+                pairs=len(self.val),source_counts=self.val.frame['source'].value_counts().to_dict(),
+                quick=quick)
         self.pairs=pd.concat([self.fixed_train.frame,self.val.frame,self.test.frame],ignore_index=True)
 
     def loaders(self,batch_size,workers,pin_memory,prefetch=None,*,eval_workers=4,prefetch_images=128,

@@ -1,6 +1,6 @@
 # Plan: train-matched validation (work list #1)
 
-Status: **approved for implementation** (user, 2026-10-18). Not built yet. Design by Worker_1 (2026-10-18); user decisions below override the design where they differ.
+Status: **implemented, opt-in** (2026-10-18). Existing notebooks and legacy validation are unchanged. Design by Worker_1 (2026-10-18); user decisions below override the design where they differ.
 
 Source decision: [2026-10-17 handoff](handoff-2026-10-17.md), section 2, "Validation": validation follows the run's training set.
 
@@ -61,6 +61,58 @@ Photo split (unchanged): RAISE 701/150/149, DIV2K 680/120/100, LSDIR 7,000/1,500
 - **Evaluator:** uses the run's saved validation by default. An explicit `--validation-recipe ID` rescoring path is optional in this task (only if small); it records original vs requested recipe and writes to a fresh output folder.
 - **Compatibility:** legacy branches add no record keys, files or RNG draws. `refactor_golden.py compare` stays ALL EQUAL without recapture. Old capped hash `6bb3c8ef...` unchanged.
 
+## Implementation and use
+
+The builder is [`scripts/build_validation.py`](../../scripts/build_validation.py).
+It reads literal notebook settings without executing the notebook. It resolves the
+full training recipe, not the PC QUICK subset. It does not read image pixels.
+The runtime and replay adapter are in [`cvdl/validation.py`](../../cvdl/validation.py).
+
+| Data recipe | Frozen id | Pairs | ALASKA / LSDIR / RAISE |
+| --- | --- | ---: | --- |
+| SRM, SRM-e50, 256 overlap KV | [`60da4391043e8ce48ff2`](../../data/val/60da4391043e8ce48ff2/) | 18,000 | 7,200 / 3,600 / 7,200 |
+| SRM-hard | [`bf7ede374cab01f73f5d`](../../data/val/bf7ede374cab01f73f5d/) | 21,600 | 7,200 / 7,200 / 7,200 |
+
+Rounding: round the total `training_pairs / 10` to the nearest integer, with
+half rounded up. Multiply this total by each normalized source weight. Take
+the integer parts, then assign the remaining pairs to the largest fractional
+remainders. Break ties by source name. Thus the total is exact and each source
+quota differs by less than one pair from its ideal share. All approved source
+shares are exact. `recipe.json` records this rule and the full training pair count.
+
+To verify both committed lists on the PC:
+
+```sh
+podman exec -w /work aai3001 python scripts/build_validation.py --notebook notebooks/experiments/srm.ipynb --check
+podman exec -w /work aai3001 python scripts/build_validation.py --notebook notebooks/experiments/srm-hard.ipynb --check
+```
+
+Without `--check`, the builder creates a missing recipe directory. It refuses
+to replace an existing directory with different bytes. Runtime never builds or
+writes these files. A missing or mismatched recipe stops data construction.
+The full CSV stores the settings draw, embedding seed and coordinates for replay.
+`summary.json` stores file hashes, input-pool counts and realized histograms.
+
+For a **new** training notebook, keep its training data settings and add:
+
+```python
+checkpoint_validation='train_matched',
+validation_recipe='bf7ede374cab01f73f5d',  # only with the SRM-hard data recipe
+```
+
+Do not use an id for a different training recipe. Model, LR, epoch count, worker
+count and training seed do not change the id. Changes to embedding settings,
+source mix, training pair count, tile geometry or frozen source records do.
+The existing `tile_size=512` legacy test setting stays unchanged; validation
+uses `train_tile_size=256` through the separate adapter. No validation augmentation
+is applied. QUICK records both the full-list hash and its deterministic
+source-balanced subset hash.
+
+The evaluator reads `validation_recipe` from saved run settings by default.
+The explicit `--validation-recipe` rescoring option is **deferred**. Per-source
+threshold tables still use their legacy calibration panels; changing those
+panels is work list #4, not part of this implementation. No DIV2K panel was built.
+
 ## Out of scope
 
 - Editing existing notebooks (incl. `srm-hard.ipynb`; that is work list #7).
@@ -68,6 +120,13 @@ Photo split (unchanged): RAISE 701/150/149, DIV2K 680/120/100, LSDIR 7,000/1,500
 - Any G4 or training run.
 
 ## Verification
+
+Implementation checks on 2026-10-18: **286 tests passed**; the normal golden
+compare printed **ALL EQUAL** without recapture. Both builders passed `--check`
+twice. Six real pairs per recipe replayed with identical bytes through 0-worker
+and 2-worker loaders. The old 8,035-pair capped validation hash is unchanged.
+Initial metadata build times were 1.093 s (SRM) and 1.896 s (SRM-hard); these
+are not inference or validation-pass timings.
 
 - `podman exec -w /work aai3001 python -m unittest discover -s tests` passes (270 before).
 - `podman exec -w /work aai3001 python scripts/refactor_golden.py compare` prints ALL EQUAL.

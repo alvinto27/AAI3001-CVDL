@@ -43,7 +43,8 @@ def create_data(s):
             profile=s.eval_profile, eval_pairs=s.quick_eval_pairs,
             checkpoint_validation=s.checkpoint_validation,
             val_cap_raise=s.val_cap_raise, val_cap_lsdir=s.val_cap_lsdir, train_grid=s.train_grid,
-            train_tile=s.train_tile_size)
+            train_tile=s.train_tile_size,
+            **({'validation_recipe':s.validation_recipe} if s.checkpoint_validation=='train_matched' else {}))
         otf.record.update(compile_mode=s.compile, prime_next_epoch=s.prime_next_epoch)
         return otf, data.otf_pair_tables(otf)
     labels = data.load_labels(labels_path=s.labels_path)
@@ -144,7 +145,7 @@ def create_training(s, otf_data, loaders):
     if s.data == "otf":
         otf_data.save_record(checkpoint_dir / "data_run_settings.json")
         otf_data.corpus.save_training_plan(checkpoint_dir)
-        if otf_data.checkpoint_validation == "capped":
+        if otf_data.checkpoint_validation in {"capped", "train_matched"}:
             validation_file = checkpoint_dir / "validation_pairs.csv"
             if validation_file.exists() and validation_file.read_text() != otf_data.validation_pair_csv:
                 raise ValueError("validation pair IDs changed in an existing run")
@@ -173,7 +174,11 @@ def create_training(s, otf_data, loaders):
             layout_marker.write_text(layout_text)
     epoch_timing_callback = cb.EpochTiming(checkpoint_dir / "epoch_timing.csv")
     curves_callback = cb.TrainingCurves(csv_logger, checkpoint_dir, epoch_timing_callback)
-    per_epoch_callback = cb.PerEpochScalars(checkpoint_dir / "logs" / "tb", epoch_timing_callback, capped_validation=otf_data is not None and otf_data.checkpoint_validation == "capped") if len(run_loggers) > 1 else None
+    matched_sources = ({'validation_sources':tuple(otf_data.corpus.settings.sources)}
+                       if otf_data is not None and otf_data.checkpoint_validation == 'train_matched' else {})
+    per_epoch_callback = cb.PerEpochScalars(checkpoint_dir / "logs" / "tb", epoch_timing_callback,
+        capped_validation=otf_data is not None and otf_data.checkpoint_validation == "capped",
+        **matched_sources) if len(run_loggers) > 1 else None
     checkpoint_callback = cb.TimedModelCheckpoint(
         timing=epoch_timing_callback,
         dirpath=str(checkpoint_dir),
