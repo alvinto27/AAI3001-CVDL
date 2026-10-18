@@ -61,6 +61,8 @@ Recorded by the Orchestrator.
 
 - User: hard test at 256 approved as designed by Worker_2 ([plan](../../active/plan-hard-test-256.md)): noise edges from all validation tiles per source (incl. DIV2K, noise only), candidates from all test tiles, overlap with standard-256 allowed, 8-worker CPU noise scan after a timing pilot.
 
+- User: threshold design approved ([plan](../../active/plan-validation-threshold.md)): old checkpoints get a post-hoc 256 overlap-last calibration (option C): runs 2-10 share list `60da4391043e8ce48ff2` (18,000 pairs); wide-R2 gets its own RAISE+DIV2K list (18,000, shares from its training records). Rescore only the 10 documented models. Ties: smaller FA; unmapped runs fail, no fallback.
+
 ### Next
 
 - Evaluator `--validation-recipe` rescoring path: deferred (needed for rescoring old models on the new validation).
