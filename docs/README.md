@@ -4,6 +4,7 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Researc
 
 ## Current references (`active/` means kept for use, not permission to run)
 - [2026-10-17 session handoff — read first next session](active/handoff-2026-10-17.md)
+- [Hard test at 256 — approved design (work list #3)](active/plan-hard-test-256.md)
 - [Standard test at 256 — approved design (work list #2)](active/plan-standard-test-256.md)
 - [Train-matched validation — frozen recipes and use (work list #1)](active/plan-train-matched-validation.md)
 - [Training tiling — rules and PC implementation gates](active/plan-training-tiling.md)

@@ -55,6 +55,8 @@ Recorded by the Orchestrator.
 - User: launch `srm-hard` now (after its notebook uses the new validation and checks pass), supervised by Run_Supervisor; Worker_2 works on task #2 in parallel.
 - User: standard test at 256 approved as designed by Worker_2 ([plan](../../active/plan-standard-test-256.md)): new suite is the default with no flag; counts in multiples of 96 (10,944 / 2,688 / 3,168 / 5,280); photo-balanced tile selection; k 5-8 opt-in on the same tiles (k + 4).
 
+- User: hard test at 256 approved as designed by Worker_2 ([plan](../../active/plan-hard-test-256.md)): noise edges from all validation tiles per source (incl. DIV2K, noise only), candidates from all test tiles, overlap with standard-256 allowed, 8-worker CPU noise scan after a timing pilot.
+
 ### Next
 
 - Evaluator `--validation-recipe` rescoring path: deferred (needed for rescoring old models on the new validation).
