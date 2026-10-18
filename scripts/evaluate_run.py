@@ -360,6 +360,9 @@ def optional_stages(folder, stages, *, settings_from, out, padding_pairs, tanh, 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_folder',type=Path)
+    parser.add_argument('--test-suite', choices=('standard-256-v1','legacy-512'), default='standard-256-v1',
+        help='default: frozen 256 standard suite; legacy-512 preserves the original suite and optional stages')
+    parser.add_argument('--higher-k', action='store_true', help='new suite only: add matched-tile k 5-8 panels')
     parser.add_argument('--tables',action='store_true',help='only rebuild the per-source cutoff tables (pc-comparison) from the saved prediction files; no GPU')
     parser.add_argument('--padding-check',action='store_true',help='add the padding check (runs after the main evaluation unless --skip-main/--only)')
     parser.add_argument('--padding-pairs',type=int,default=2000,
@@ -367,7 +370,7 @@ def main():
     parser.add_argument('--temperature',action='store_true',
         help='add temperature scaling on the capped validation logits (new files only)')
     parser.add_argument('--tanh-saturation',action='store_true',help='add the tanh saturation measurement')
-    parser.add_argument('--hard',action='store_true',help='the frozen hard test (runs by default with the main stage; alone it works on a finished run)')
+    parser.add_argument('--hard',action='store_true',help='legacy-512: frozen hard v1; standard-256-v1 reports hard256 pending')
     parser.add_argument('--no-hard',action='store_true',help='do not run the hard test with the main stage')
     parser.add_argument('--tanh-pairs',type=int,default=2000,help='validation pairs (clean + stego) for the tanh measurement')
     parser.add_argument('--tanh-train-batches',type=int,default=0,help='also measure N training-mode batches (with augmentation)')
@@ -376,13 +379,31 @@ def main():
     parser.add_argument('--overwrite',action='store_true',help='allow a selected stage to overwrite its existing output files')
     parser.add_argument('--label',help='label for the pc-comparison tables (default: experiment name without dashes)')
     parser.add_argument('--settings-from',type=Path,help='all inference stages: borrow data settings, retain and check the evaluated checkpoint model')
-    parser.add_argument('--output',type=Path,help='folder for the check outputs (default: the checkpoint folder)')
+    parser.add_argument('--output',type=Path,help='new suite: folder under runs/<run>/evaluation/standard-256-v1/; legacy: check-output folder')
     parser.add_argument('--set',dest='eval_overrides',action='append',default=[],metavar='KEY=VALUE',
         help='repeatable evaluation override: rocm_conv1_fix, eval_batch_size (or batch_size), eval_workers only')
     args=parser.parse_args()
     evaluation_override_values(args.eval_overrides)  # Refuse identity/model changes before any work.
     override_options={'eval_overrides':tuple(args.eval_overrides)} if args.eval_overrides else {}
     folder=checkpoint_folder(args.run_folder)
+    if args.test_suite == 'standard-256-v1':
+        # No legacy data construction, post_fit, calibration panels or training-record writes here.
+        if (args.tables or args.padding_check or args.temperature or args.tanh_saturation or args.skip_main
+                or args.only not in (None, 'main') or args.label):
+            raise ValueError('these optional stages/labels require --test-suite legacy-512; new hard/threshold work is pending')
+        from cvdl import standardtest, runtime
+        from cvdl.lit import select_best_checkpoint
+        from scripts.pc_safety import check_workers, own_process_group
+        checkpoint = Path(select_best_checkpoint('',folder))
+        settings, borrowing, snapshot = settings_for_evaluation(folder,checkpoint,args.settings_from,**override_options)
+        check_workers(settings.eval_workers)
+        own_process_group()
+        runtime.configure(settings)
+        standardtest.run(settings,checkpoint,job_folder(folder),higher_k=args.higher_k,
+            output=args.output,overwrite=args.overwrite,provenance=borrowing)
+        return
+    if args.higher_k:
+        raise ValueError('--higher-k requires the standard-256-v1 suite')
     if args.only:
         stages=[x.strip() for x in args.only.split(',') if x.strip()]
         if not stages or any(x not in STAGES for x in stages):raise ValueError(f'--only takes: {",".join(STAGES)}')

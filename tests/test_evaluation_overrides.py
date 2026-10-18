@@ -80,7 +80,7 @@ class EvaluationOverrideTests(unittest.TestCase):
         folder.assert_not_called()
 
     def test_cli_routes_same_overrides_to_main_and_temperature(self):
-        argv=['evaluate_run.py',str(self.folder),'--only','main,padding,tanh,temperature']
+        argv=['evaluate_run.py',str(self.folder),'--test-suite','legacy-512','--only','main,padding,tanh,temperature']
         for arg in self.arguments:argv+=['--set',arg]
         with patch.object(sys,'argv',argv),patch.object(er,'evaluate') as main,patch.object(er,'calibrate') as temperature:
             er.main()
@@ -88,7 +88,7 @@ class EvaluationOverrideTests(unittest.TestCase):
         self.assertEqual(temperature.call_args.kwargs['eval_overrides'],self.arguments)
 
     def test_cli_routes_same_overrides_to_optional_stages(self):
-        argv=['evaluate_run.py',str(self.folder),'--only','padding,tanh','--set','eval_batch_size=32']
+        argv=['evaluate_run.py',str(self.folder),'--test-suite','legacy-512','--only','padding,tanh','--set','eval_batch_size=32']
         with patch.object(sys,'argv',argv),patch.object(er,'optional_stages') as optional:
             er.main()
         self.assertEqual(optional.call_args.kwargs['eval_overrides'],('eval_batch_size=32',))

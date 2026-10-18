@@ -162,7 +162,7 @@ class StageWiringTests(unittest.TestCase):
                  patch.object(er,'evaluate',side_effect=lambda *a,**k:calls.append(('main',k))), \
                  patch.object(er,'optional_stages',side_effect=lambda f,stages,**k:calls.append(('optional',sorted(stages)))), \
                  patch.object(er,'calibrate',side_effect=lambda *a,**k:calls.append(('temperature',))), \
-                 patch.object(sys,'argv',['evaluate_run.py',d,*argv]):
+                 patch.object(sys,'argv',['evaluate_run.py',d,'--test-suite','legacy-512',*argv]):
                 er.main()
             return calls
 

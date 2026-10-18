@@ -123,7 +123,7 @@ class BorrowingTests(unittest.TestCase):
 
     def test_cli_forwards_settings_from_to_main(self):
         import sys
-        with patch.object(sys,'argv',['evaluate_run.py',str(self.target),'--only','main','--settings-from',str(self.source)]), \
+        with patch.object(sys,'argv',['evaluate_run.py',str(self.target),'--test-suite','legacy-512','--only','main','--settings-from',str(self.source)]), \
              patch.object(er,'evaluate') as run:
             er.main()
         self.assertEqual(run.call_args.kwargs['settings_from'],self.source)

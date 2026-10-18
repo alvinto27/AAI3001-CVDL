@@ -1,0 +1,13 @@
+seed: 1
+input: unused
+output: unused
+variants_per_cover: 1
+bit_mode: [lowest, plane]
+k: [1, 2, 3, 4]
+method: [replace, match]
+placement: [contiguous, stride, random]
+stride: [2, 16]
+payload: [random_bytes, letters]
+start: random
+size:
+  bpp: [0.05, 0.5]
