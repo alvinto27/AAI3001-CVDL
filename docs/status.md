@@ -1,6 +1,6 @@
 # Project status — 2026-10-17
 
-**Start here:** The research hold is lifted only for the approved experiments in the [run queue](active/run-queue.md). The training tiling experiment is complete ([result](results/result-training-tiling.md)): overlap is best, and 256 training tiles improve all arms. SRM front end (256 overlap recipe) is the best model: SRM-30 standard P_E 1.67%, SRM-e50 (50 epochs) 1.57%. **Train-matched validation is built (`131492b`, 2026-10-18; [plan](active/plan-train-matched-validation.md)): 10% of training pairs per epoch, frozen per recipe. Next: new 256 standard and hard tests, per-source thresholds, report notebook; `srm-hard` on hold until its notebook uses the new validation** (see the handoff and the [2026-10-18 journal](journal/2026-10-18/README.md)). Other plans stay on hold. Next session: read the [2026-10-17 handoff](active/handoff-2026-10-17.md) first. Use [findings](findings.md) for older runs and [journal days](journal/README.md) for dated records.
+**Start here:** The research hold is lifted only for the approved experiments in the [run queue](active/run-queue.md). The training tiling experiment is complete ([result](results/result-training-tiling.md)): overlap is best, and 256 training tiles improve all arms. SRM front end (256 overlap recipe) is the best model: SRM-30 standard P_E 1.67%, SRM-e50 (50 epochs) 1.57%. **Train-matched validation is built (`131492b`, 2026-10-18; [plan](active/plan-train-matched-validation.md)): 10% of training pairs per epoch, frozen per recipe. Next: new 256 standard and hard tests, one threshold at min P_E on validation as the main report (per-source thresholds reference only; user 2026-10-18), report notebook; `srm-hard` on hold until its notebook uses the new validation** (see the handoff and the [2026-10-18 journal](journal/2026-10-18/README.md)). Other plans stay on hold. Next session: read the [2026-10-17 handoff](active/handoff-2026-10-17.md) first. Use [findings](findings.md) for older runs and [journal days](journal/README.md) for dated records.
 
 ## Current state and items
 
@@ -16,7 +16,7 @@
 
 - **Next G4 run:** `srm-hard` (`795fd93`, `configs/train-hard-v1.yaml`): RAISE/ALASKA/LSDIR 72,000 pairs each per epoch, k=1 50%, half of bpp draws from 0.05-0.15; 30 epochs; ~112 min. **On hold** until the train-matched validation exists (user decision 2026-10-17 late: validation follows training).
 
-- **Evaluation redesign (user, 2026-10-17 late):** standard test 256 tiles, k 1-4, bpp 0.05-0.5, overlap-last for all sources; k 5-8 opt-in; hard test rebuilt at 256 (32 x 1,008); per-source thresholds as the main report; one report notebook per run. Details: [2026-10-17 handoff](active/handoff-2026-10-17.md), section 2.
+- **Evaluation redesign (user, 2026-10-17 late):** standard test 256 tiles, k 1-4, bpp 0.05-0.5, overlap-last for all sources; k 5-8 opt-in; hard test rebuilt at 256 (32 x 1,008); one threshold at min P_E on validation as the main report (changed 2026-10-18; per-source thresholds reference only); one report notebook per run. Details: [2026-10-17 handoff](active/handoff-2026-10-17.md), section 2.
 
 - **PC rules:** at most 12 real data workers; keep total RAM use under ~20 GB; kill whole process groups; after each run `pgrep -af spawn_main` empty and `/dev/shm` normal; workers ask before GPU or heavy CPU work.
 
