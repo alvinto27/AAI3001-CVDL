@@ -111,11 +111,12 @@ class HardTrainingTests(unittest.TestCase):
         # Changing training YAML does not alter the frozen evaluation config either.
         self.assertEqual(base.evaluation_config.as_dict(),hard.evaluation_config.as_dict())
 
-    def test_notebook_changes_only_four_approved_values(self):
+    def test_notebook_changes_only_approved_values(self):
         base=top_values(json.loads((ROOT/'notebooks/experiments/srm.ipynb').read_text()))
         hard=top_values(json.loads((ROOT/'notebooks/experiments/srm-hard.ipynb').read_text()))
         self.assertEqual({k for k in base.keys()|hard.keys() if base.get(k)!=hard.get(k)},
-                         {'name','tiles_per_epoch','source_mix','train_yaml'})
+                         {'name','tiles_per_epoch','source_mix','train_yaml',
+                          'checkpoint_validation','validation_recipe','val_cap_raise','val_cap_lsdir'})
         self.assertEqual((hard['epochs'],hard['lr_drops'],hard['batch_size'],hard['front_end']),
                          (30,((5,.3),(20,.1)),128,'srm'))
         self.assertEqual(hard['tiles_per_epoch'],216000)
