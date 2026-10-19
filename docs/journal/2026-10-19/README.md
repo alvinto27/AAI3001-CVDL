@@ -14,7 +14,8 @@ Recorded by the Orchestrator.
 
 ### Next
 
-- Worker_3: build revision 2 and regenerate both demo reports (CPU only). Pending.
-- Then revision 3 (data sample figure). Pending.
+- ~~Worker_3: build revision 2~~ done: `c1ca714` (Look-at lines removed; hints in charts; 358 tests).
+- ~~Then revision 3~~ done: `675c712` (data sample figure `docs/figures/report/data-sample.png`, built once by `scripts/build_data_figure.py` from 7 frozen test pairs; clean and stego pixels equal the evaluator's for all 7; `--check` byte-identical; 360 tests). Report work complete.
+- Next: diagnostic checks 1, 2, 2b ([plan](../../active/plan-diagnostic-checks.md)).
 - User: run the three checks (1 WS+SPA, 2 highest-cell pooling, 2b tanh saturation) before any experiment; [plan](../../active/plan-diagnostic-checks.md); decision rules confirmed by the user before any result. Order (user): finish the report work (revisions 2 and 3) first, then the checks.
 - Ideas board items: waiting for the user's choice ([ideas board](../../active/ideas-board.md)).

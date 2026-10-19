@@ -1,6 +1,6 @@
 # Plan: report notebook readability (work list #5, revision 1)
 
-Status: **built** in `fa17f25` (2026-10-18; Worker_2, finished by Worker_3). Approved to try (user, 2026-10-18); waiting for the user's review. Revises the first template (`716b2cd`, guide [report-notebook.md](report-notebook.md)). The user will review the result and may change it.
+Status: revisions 2 (`c1ca714`) and 3 (`675c712`) built 2026-10-19. Revision 1 **built** in `fa17f25` (2026-10-18; Worker_2, finished by Worker_3). Approved to try (user, 2026-10-18); waiting for the user's review. Revises the first template (`716b2cd`, guide [report-notebook.md](report-notebook.md)). The user will review the result and may change it.
 
 ## Problem (user feedback on the demo reports)
 
