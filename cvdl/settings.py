@@ -80,7 +80,7 @@ def drops(x):
     if x is None:
         return None
     pairs = [p.split(':') for p in x.split(',')] if isinstance(x, str) else x
-    if not pairs or any(len(p) != 2 for p in pairs):
+    if any(len(p) != 2 for p in pairs):
         raise ValueError('expected epoch:factor pairs')
     return tuple((integer(a), number(b)) for a, b in pairs)
 
@@ -158,6 +158,11 @@ SCHEMA = MappingProxyType({
     'warmup_epochs': Definition('int', integer, 1, '0..epochs', 'Warmup duration.', lambda v:v>=0, 'V3_WARMUP_EPOCHS', 'WARMUP_EPOCHS'),
     'grad_clip': Definition('float', number, 1., '>=0; 0=off', 'Gradient norm clipping.', lambda v:v>=0, 'V3_GRAD_CLIP', 'GRAD_CLIP'),
     'lr_drops': Definition('tuple?', drops, lambda c:((c['epochs']//2+1,.1),), 'None=automatic; increasing epoch:factor; factor (0,1]', 'LR drop plan.', env='V3_LR_DROPS', legacy_global='LR_DROPS'),
+    'init_checkpoint': Definition('path?', optional_string, None, 'path or None', 'Weights-only start checkpoint; resume stays separate.'),
+    'init_checkpoint_sha256': Definition('str?', optional_string, None, '64 lowercase hex characters', 'Required start-file SHA-256.', lambda v:v is None or bool(re.fullmatch(r'[0-9a-f]{64}',v))),
+    'embedding_schedule': Definition('str?', optional_string, None, 'None/low_bpp/original', 'Approved three-stage embedding schedule.', lambda v:v in {None,'low_bpp','original'}),
+    'embedding_stage_epochs': Definition('int', integer, 5, '>0', 'Epochs in each of three embedding stages.', lambda v:v>0),
+    'evaluation_checkpoint': Definition('str', str, 'best', 'best/last', 'Checkpoint used for deployment evaluation.', lambda v:v in {'best','last'}),
     'train_yaml': Definition('path?', optional_string, None, 'path or None; OTF only', 'Train embedding settings.', env='V3_TRAIN_YAML', legacy_global='TRAIN_YAML'),
     'train_grid': Definition('str', str, 'recorded', 'recorded/overlap_last/centre_trim/centre_pad', 'Training-only tiling rule.', lambda v:v in {'recorded','overlap_last','centre_trim','centre_pad'}),
     'train_tile_size': Definition('int?', lambda x:None if x is None else integer(x), None, 'None (=tile_size) or 256/512; needs explicit train_grid', 'Training tile size; evaluation keeps tile_size.', lambda v:v is None or v in {256,512}),
@@ -498,6 +503,19 @@ def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_v
     else:
         # An absent opt-in must not add keys to legacy settings/provenance records.
         c.pop('validation_recipe'); origins_all.pop('validation_recipe')
+    if bool(c['init_checkpoint']) != bool(c['init_checkpoint_sha256']):
+        raise ValueError('init_checkpoint and required SHA-256 must be supplied together')
+    if c['embedding_schedule'] is not None:
+        if (c['data']!='otf' or not c['source_mix'] or c['paired_batches'] or
+                c['batch_size']%8 or c['tiles_per_epoch']%4 or not c['train_yaml'] or
+                c['epochs']!=3*c['embedding_stage_epochs'] or not c['init_checkpoint']):
+            raise ValueError('embedding schedule needs OTF source mix, unpaired batch divisible by8, tiles divisible by4, train_yaml, weights start, and three complete stages')
+    # Opt-ins must not add keys to historical effective settings or run records.
+    absent=[]
+    if c['init_checkpoint'] is None:absent+=['init_checkpoint','init_checkpoint_sha256']
+    if c['embedding_schedule'] is None:absent+=['embedding_schedule','embedding_stage_epochs']
+    if c['evaluation_checkpoint']=='best':absent+=['evaluation_checkpoint']
+    for name in absent:c.pop(name);origins_all.pop(name)
     result = Settings(freeze(c),freeze(origins_all),profile.name,freeze(history))
     result.to_run_settings()  # shared source/mix/cache constraints; no photo reads
     if result.speed_matrix:

@@ -216,7 +216,7 @@ def default_label(folder):
 def evaluate(folder, *, padding_check=False, padding_pairs=2000, tanh=None, output=None, label=None, settings_from=None, eval_overrides=(), hard=False):
     from cvdl import runtime, data, post_fit
     from cvdl.settings import plain
-    from cvdl.lit import select_best_checkpoint
+    from cvdl.lit import select_evaluation_checkpoint as select_best_checkpoint
     folder=checkpoint_folder(folder)
     checkpoint=Path(select_best_checkpoint('',folder))
     settings,borrowing,snapshot=settings_for_evaluation(folder,checkpoint,settings_from,eval_overrides=eval_overrides)
@@ -290,7 +290,7 @@ def calibrate(folder, *, settings_from=None, output=None, eval_overrides=()):
     import pandas as pd
     from cvdl import runtime, data
     from cvdl.calibration import fit_temperature, summarise, sigmoid
-    from cvdl.lit import SteganalysisModule, select_best_checkpoint
+    from cvdl.lit import SteganalysisModule, select_evaluation_checkpoint as select_best_checkpoint
     folder=checkpoint_folder(folder)
     checkpoint=Path(select_best_checkpoint('',folder))
     settings,borrowing,snapshot=settings_for_evaluation(folder,checkpoint,settings_from,eval_overrides=eval_overrides)
@@ -370,7 +370,7 @@ def optional_stages(folder, stages, *, settings_from, out, padding_pairs, tanh, 
     """Run padding / tanh on a finished run: saved best checkpoint and saved prediction files, no main evaluation."""
     import pandas as pd
     from cvdl import runtime
-    from cvdl.lit import SteganalysisModule, select_best_checkpoint
+    from cvdl.lit import SteganalysisModule, select_evaluation_checkpoint as select_best_checkpoint
     checkpoint=Path(select_best_checkpoint('',folder))
     settings,borrowing,snapshot=settings_for_evaluation(folder,checkpoint,settings_from,eval_overrides=eval_overrides)
     record_evaluation_overrides(out,settings,eval_overrides)
@@ -430,7 +430,7 @@ def main():
                 or args.only not in (None, 'main') or args.label):
             raise ValueError('these optional stages/labels require --test-suite legacy-512; use the default main stage for hard256; threshold work is pending')
         from cvdl import standardtest, runtime
-        from cvdl.lit import select_best_checkpoint
+        from cvdl.lit import select_evaluation_checkpoint as select_best_checkpoint
         from scripts.pc_safety import check_workers, own_process_group
         checkpoint = Path(select_best_checkpoint('',folder))
         settings, borrowing, snapshot = settings_for_evaluation(folder,checkpoint,args.settings_from,**override_options)

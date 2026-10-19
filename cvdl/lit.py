@@ -119,6 +119,24 @@ class SteganalysisModule(L.LightningModule):
         return {"optimizer": optimizer, "lr_scheduler": {"scheduler": scheduler, "interval": "step"}}
 
 
+def select_evaluation_checkpoint(callback_path, run_folder):
+    """Own run-record policy wins; historical runs still select best."""
+    import json
+    folder=Path(run_folder);record=folder/'run_settings.json'
+    values=json.loads(record.read_text()).get('values',{}) if record.exists() else {}
+    policy=values.get('evaluation_checkpoint','best')
+    if policy=='best':return select_best_checkpoint(callback_path,folder)
+    if policy!='last':raise ValueError('invalid saved evaluation checkpoint policy')
+    path=folder/'last.ckpt'
+    if not path.is_file():raise FileNotFoundError('last evaluation checkpoint missing')
+    saved=torch.load(path,map_location='cpu',weights_only=False)
+    if saved['epoch'] not in {values['epochs']-1,values['epochs']}:
+        raise ValueError('last checkpoint does not complete the recorded training epochs')
+    if saved['global_step']!=values['epochs']*saved['hyper_parameters']['steps_per_epoch']:
+        raise ValueError('last checkpoint step count does not complete training')
+    return str(path)
+
+
 def select_best_checkpoint(callback_path, run_folder):
     import re
     if callback_path and Path(callback_path).is_file():

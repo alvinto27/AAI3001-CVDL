@@ -45,6 +45,11 @@ def create_data(s):
             val_cap_raise=s.val_cap_raise, val_cap_lsdir=s.val_cap_lsdir, train_grid=s.train_grid,
             train_tile=s.train_tile_size,
             **({'validation_recipe':s.validation_recipe} if s.checkpoint_validation=='train_matched' else {}))
+        if getattr(s,'embedding_schedule',None) is not None:
+            from .curriculum import CurriculumImages
+            otf.train=CurriculumImages(otf.corpus,s.embedding_schedule,s.embedding_stage_epochs)
+            otf.record['embedding_schedule']=dict(mode=s.embedding_schedule,stage_epochs=s.embedding_stage_epochs,
+                original_fraction=.25 if s.embedding_schedule=='low_bpp' else 1.,assignment='exact per epoch before worker sharding; counts reflect consumed stegos')
         otf.record.update(compile_mode=s.compile, prime_next_epoch=s.prime_next_epoch)
         return otf, data.otf_pair_tables(otf)
     labels = data.load_labels(labels_path=s.labels_path)
@@ -119,7 +124,7 @@ def finish_training(s, bundle, loaders):
     bundle.curves_callback.redraw(bundle.trainer, 'final')
     print(f"CHECKPOINT CHECK last epoch={saved['epoch']}, global_step={saved['global_step']}")
     print(f'Best checkpoint: {best}')
-    return best
+    return str(checkpoint.last_model_path) if getattr(s,'evaluation_checkpoint','best')=='last' else best
 
 
 def create_training(s, otf_data, loaders):
@@ -127,6 +132,12 @@ def create_training(s, otf_data, loaders):
     train_loader, val_loader = loaders.train, loaders.val
     checkpoint_dir = Path(s.output_root) / s.run_directory_name
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    starting=getattr(s,'init_checkpoint',None) is not None
+    resuming=False; prior_model={}
+    if starting:
+        from .curriculum import check_start
+        resuming=check_start(s,checkpoint_dir)
+        if resuming:prior_model=json.loads((checkpoint_dir/'model_run_settings.json').read_text())
     model_run_settings = {"compile_mode": s.compile,
                           "compile_target": "net" if s.compile == "default" else None,
                           "compile_dynamic": False if s.compile == "default" else None,
@@ -193,7 +204,7 @@ def create_training(s, otf_data, loaders):
         gradient_clip_val=s.grad_clip or None, gradient_clip_algorithm="norm" if s.grad_clip else None,
         accelerator="gpu" if torch.device(s.device).type == "cuda" else "cpu",
         devices=1,
-        callbacks=[epoch_timing_callback, curves_callback, checkpoint_callback, cb.V4LRTrace(checkpoint_dir / "lr_trace.csv", len(train_loader), s.epochs, s.warmup_epochs, s.lr_drops, epoch_timing_callback)] + ([per_epoch_callback] if per_epoch_callback else []) + ([cb.OTF_Epoch(otf_data, train_loader, epoch_timing_callback, prime_next_epoch=s.prime_next_epoch)] if s.data == "otf" else []) + ([cb.QuietHeadlessProgress()] if s.headless else []),
+        callbacks=[epoch_timing_callback, curves_callback, checkpoint_callback, cb.V4LRTrace(checkpoint_dir / "lr_trace.csv", len(train_loader), s.epochs, s.warmup_epochs, s.lr_drops, epoch_timing_callback)] + ([per_epoch_callback] if per_epoch_callback else []) + ([cb.OTF_Epoch(otf_data, train_loader, epoch_timing_callback, prime_next_epoch=s.prime_next_epoch)] if s.data == "otf" else []) + ([cb.QuietHeadlessProgress()] if s.headless else []) + curriculum_callbacks(s,checkpoint_dir),
         logger=run_loggers,
         default_root_dir=str(Path(s.output_root)),
         log_every_n_steps=50,
@@ -203,12 +214,17 @@ def create_training(s, otf_data, loaders):
     training_started = time.perf_counter()
     assert trainer.checkpoint_callbacks == [checkpoint_callback], "only one best-and-last checkpoint callback is allowed"
     lightning_model = SteganalysisModule(clip_t=s.clip_t, norm=s.norm, validation_data=otf_data, conv1_factory=conv1_factory(s), lr=s.lr, max_epochs=s.epochs, paired_batches=s.paired_batches, steps_per_epoch=len(train_loader), warmup_epochs=s.warmup_epochs, grad_clip=s.grad_clip, lr_drops=s.lr_drops, batch_size=s.batch_size, precision=s.precision, model=s.model, width=s.width, front_end=s.front_end)
+    if starting:
+        from .curriculum import initialize
+        initialization=initialize(s,lightning_model,checkpoint_dir,resuming)
+        model_run_settings['initialization_checkpoint_sha256']=initialization['checkpoint_sha256']
+        model_run_settings['evaluation_checkpoint']=getattr(s,'evaluation_checkpoint','best')
     if s.name:
         import hashlib
         digest=hashlib.sha256()
         for name,tensor in lightning_model.net.state_dict().items():
             digest.update(name.encode());digest.update(tensor.detach().cpu().contiguous().numpy().tobytes())
-        model_run_settings['initial_weights_sha256']=digest.hexdigest()
+        model_run_settings['initial_weights_sha256']=prior_model['initial_weights_sha256'] if resuming else digest.hexdigest()
         (checkpoint_dir/'model_run_settings.json').write_text(json.dumps(model_run_settings,indent=2)+'\n')
     if s.compile == "default":
         # In place, not torch.compile(net): no _orig_mod prefix in checkpoints.
@@ -217,3 +233,9 @@ def create_training(s, otf_data, loaders):
     s.write(checkpoint_dir)
     return SimpleNamespace(trainer=trainer, lightning_model=lightning_model, checkpoint_dir=checkpoint_dir,
         checkpoint_callback=checkpoint_callback, curves_callback=curves_callback)
+
+
+def curriculum_callbacks(s,folder):
+    if getattr(s,'embedding_schedule',None) is None:return []
+    from .curriculum import CurriculumCounts
+    return [CurriculumCounts(folder/'embedding_epoch_counts.jsonl',s.embedding_schedule,s.embedding_stage_epochs)]
