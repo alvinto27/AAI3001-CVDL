@@ -16,4 +16,5 @@ Recorded by the Orchestrator.
 
 - Worker_3: build revision 2 and regenerate both demo reports (CPU only). Pending.
 - Then revision 3 (data sample figure). Pending.
+- User: run the three checks (1 WS+SPA, 2 highest-cell pooling, 2b tanh saturation) before any experiment; [plan](../../active/plan-diagnostic-checks.md); decision rules proposed, to confirm.
 - Ideas board items: waiting for the user's choice ([ideas board](../../active/ideas-board.md)).
