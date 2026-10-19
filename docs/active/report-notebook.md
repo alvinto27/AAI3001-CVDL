@@ -29,7 +29,8 @@ replaces the target only after all cells pass.
 
 ## Read the report
 
-Each section starts with a question and a **Look at:** line. Charts come first;
+Each section starts with a question. Chart hints (dashed lines, colours,
+shading) are in the chart legend or in a short note under the chart. Charts come first;
 full tables are in the collapsed appendix. The report does not generate conclusions.
 
 | Section | Contents |

@@ -148,7 +148,7 @@ class ReportingTests(unittest.TestCase):
         if reference:self.assertEqual(meta['reference']['evaluation_id'],'2'*20)
         headings=[c for c in nb['cells'] if c['cell_type']=='markdown' and ''.join(c['source']).startswith('## ')]
         self.assertEqual(len(headings),10)
-        self.assertTrue(all('**Look at:**' in ''.join(c['source']) for c in headings))
+        self.assertFalse(any('Look at' in ''.join(c['source']) for c in nb['cells']))
 
     def test_display_rounding_matches_saved_csv(self):
         r=SavedReport(self.root,'model',EID);raw=pd.read_csv(self.path/'main_summary.csv',float_precision='round_trip')

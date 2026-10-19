@@ -180,7 +180,8 @@ def miss_plots(report):
         for (i,j),v in np.ndenumerate(g.to_numpy()):
             if np.isfinite(v):ax.text(j,i,f'{v:.1%}',ha='center',va='center',color='white' if v>.6 else 'black',fontsize=10)
     for ax in list(axes.flat)[len(panels):]:ax.set_visible(False)
-    fig.suptitle('Missed hidden messages by strength and size — darker means more misses')
+    fig.suptitle('Missed hidden messages by strength and size')
+    fig.text(.5,-.025,'Darker = more misses.',ha='center',fontsize=11)
     fig.colorbar(im,ax=list(axes.flat),label='Misses (%)',ticks=[0,.25,.5,.75,1],format=lambda x,pos:f'{100*x:.0f}')
     show_figure(fig);return tables
 
@@ -225,6 +226,9 @@ def comparison_plot(report,reference):
         ax.text(v+(.04*limit if v>=0 else -.04*limit),i,label,ha='left' if v>=0 else 'right',va='center',fontsize=11)
     ax.axvline(0,color='black',lw=1);ax.set_yticks(y,[textwrap.fill(PANELS[p],25) for p in g.panel]);ax.invert_yaxis()
     ax.set(xlim=(-1.8*limit,1.8*limit),xlabel='Change in overall error (percentage points)',ylabel='Test panel',title='Change in overall error compared with the reference')
+    from matplotlib.patches import Patch
+    ax.legend(handles=[Patch(color='#278348',label='Better (lower error)'),Patch(color='#be3838',label='Worse (higher error)')],
+        loc='upper center',bbox_to_anchor=(.5,-.16),ncol=2,frameon=False)
     fig.tight_layout();show_figure(fig)
     text(f'**This model:** {ORIGINS[report.calibration["threshold_origin"]]}. **Reference:** {ORIGINS[reference.calibration["threshold_origin"]]}. Each keeps its own saved cut-off.')
 
