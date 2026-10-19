@@ -1,6 +1,6 @@
 # Plan: three diagnostic checks (ideas board 1, 2, 2b)
 
-Status: **approved to run** (user, 2026-10-19: "do the 3 tests first"). The decision rules below are **proposed by the Orchestrator and must be confirmed by the user before the first result is read.** Run order: 1, then 2, then 2b. Board: [ideas board](ideas-board.md).
+Status: **approved to run** (user, 2026-10-19: "do the 3 tests first"). The decision rules below are **proposed by the Orchestrator and must be confirmed by the user before the first result is read.** Run order: 1, then 2, then 2b, **after the report work** (revisions 2 and 3; user, 2026-10-19). Board: [ideas board](ideas-board.md).
 
 Purpose: get answers that can **strike experiments off the board** before any G4 spend.
 
