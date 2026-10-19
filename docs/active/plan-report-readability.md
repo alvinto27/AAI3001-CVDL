@@ -28,6 +28,13 @@ Each section starts with **the question it answers** and a **"Look at: ..."** li
 
 - ~~Each section has a "Look at: ..." line.~~ **Removed (user: the lines are obnoxious; most repeat what the chart shows).** The question heading stays. Useful hints move into the chart itself as a legend entry or a short note under the chart: dashed lines = learning-rate drops; dashed line at 50% = coin flip; darker = more misses; green = better, red = worse.
 
+## Revision 3: data sample figure (user, 2026-10-19)
+
+- New first section **"What does the data look like?"**, before section 0. One figure, **built once** by a small script and saved as a tracked image; every report embeds the same image (reports still read saved files only).
+- Content, from **real tiles in the frozen test lists** with their recorded embedding settings: (1) one test photo per source (RAISE, DIV2K, ALASKA, LSDIR) with the 256 px tile grid drawn on top; (2) one clean tile and its stego version side by side; (3) amplified change maps for k=1 low bpp: contiguous, random, stride; (4) the same for one noisy ALASKA tile.
+- Plain titles and labels; say that the change map is amplified and the stego tile looks identical to the clean one.
+- **Not now:** where the model looks (cell scores on the tile). User: add it later together with cell-level training ([ideas board](ideas-board.md) item 3).
+
 ## Presentation rules
 
 - **Hidden:** hashes, evaluation / threshold / recipe ids, file paths, full-precision cut-off, setup and guard code. Keep the ids in the notebook metadata (not shown) so the generator can still check that two models used the same tests. The saved evaluation files keep everything.
