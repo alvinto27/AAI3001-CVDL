@@ -1,6 +1,6 @@
 # Plan: three diagnostic checks (ideas board 1, 2, 2b)
 
-Status: **approved to run** (user, 2026-10-19: "do the 3 tests first"). The decision rules below are **proposed by the Orchestrator and must be confirmed by the user before the first result is read.** Run order: 1, then 2, then 2b, **after the report work** (revisions 2 and 3; user, 2026-10-19). Board: [ideas board](ideas-board.md).
+Status: **approved to run** (user, 2026-10-19: "do the 3 tests first"). The decision rules below were **confirmed by the user on 2026-10-19, before any result**; do not change them after seeing results. Run order: 1, then 2, then 2b, **after the report work** (revisions 2 and 3; user, 2026-10-19). Board: [ideas board](ideas-board.md).
 
 Purpose: get answers that can **strike experiments off the board** before any G4 spend.
 
@@ -46,7 +46,7 @@ Question: does SRM's first tanh flatten the weak signal on noisy tiles?
 
 Cost: GPU inference, ~15 min; extend `cvdl/saturation.py` to per-tile output.
 
-## Proposed decision rules (to confirm with the user)
+## Decision rules (confirmed by the user, 2026-10-19)
 
 | Check | Result | Effect on the board |
 | --- | --- | --- |
