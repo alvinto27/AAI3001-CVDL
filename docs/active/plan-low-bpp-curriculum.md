@@ -1,6 +1,22 @@
 # Plan: low-bpp curriculum from SRM-e50 (ideas board #9)
 
-Status: **approved by the user 2026-10-19**: choices C1-C6 as recommended (including the C4 control run), and the success rule below, confirmed before any result. Code: Worker_3.
+Status: **done 2026-10-19: rule not met; small real gain recorded; #9 closed (see Result).** Approved by the user 2026-10-19: choices C1-C6 as recommended (including the C4 control run), and the success rule below, confirmed before any result. Code: Worker_3.
+
+## Result (2026-10-19; user chose option B)
+
+Runs: curriculum `srm-low-bpp-curriculum-20261019T051356Z-9566` (eval `e9ef059bb12c9076a226`), control `srm-low-bpp-control-20261019T060708Z-9736` (eval `af6e9879061fd441462f`). Decision evidence: `04415c0` (`scripts/curriculum_decision.py`), outputs `runs/verification/curriculum-decision-2026-10-19/`.
+
+| Measure | SRM-e50 | Curriculum | Control |
+| --- | ---: | ---: | ---: |
+| Pooled hard k=1 low AUC [95%] | .745 [.735, .755] | .763 [.753, .773] | .744 [.733, .754] |
+| Standard-256 P_E at own cut-off | 2.54% | 3.10% | 2.65% |
+| Standard-256 AUC | .9964 | .9964 | .9964 |
+
+Paired differences (same photo draws): curriculum - SRM-e50 +.018 [+.013, +.023]; curriculum - control +.020 [+.015, +.024]; control - SRM-e50 -.001 [-.005, +.002]. The gain is present in every placement and panel. Standard guard: +0.56 points [+0.28, +0.84] (limit +0.5).
+
+**Literal rule: not met** (model intervals overlap; standard guard exceeded). The curriculum model is not adopted. **Recorded finding (user, option B; the rule's "Otherwise" wording is not accurate here):** the curriculum gives a small real gain on k=1 low bpp (+0.02 AUC, caused by the curriculum: the control gained nothing) at +0.56 points standard P_E. Training order helps a little but is not the main limit (ALASKA seen k=1 low stays at .70). #9 closed. No follow-up run.
+
+Lesson: to compare models on the same test, use paired-difference intervals, not "model intervals do not overlap" (shared photo sampling makes non-overlap far too strict).
 
 ## Question
 
