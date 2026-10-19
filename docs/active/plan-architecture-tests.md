@@ -13,7 +13,7 @@ User decisions 2026-10-19: keep the **fixed SRM front end** (no learned first la
 
 SRM front end (30 fixed filters per colour channel, 90 channels) -> conv1 5x5 -> **pool** -> conv2 5x5 -> pool -> conv3 1x1 -> pool -> conv4 1x1 -> pool -> conv5 1x1 -> pool -> mean -> classifier. Five 2x2 average pools (256 -> 8). Only conv1 and conv2 look at neighbours.
 
-## GBRAS-Net (Reinel, Brayan, Alejandro, Alejandro, Mauricio, Alejandro, "GBRAS-Net: A Convolutional Neural Network Architecture for Spatial Image Steganalysis", IEEE Access 2021; code: github.com/BioAITeam/Steganalysis)
+## GBRAS-Net (Tabares-Soto et al., "GBRAS-Net: A Convolutional Neural Network Architecture for Spatial Image Steganalysis", IEEE Access 2021; code: github.com/BioAITeam/Steganalysis)
 
 - Preprocessing: the 30 SRM filters, fixed. Body: depthwise and separable convolutions with skip connections; about 166k parameters.
 - Grayscale in the paper. Our adaptation: our existing SRM front end (30 filters per colour channel, 90 channels) feeds the GBRAS-Net body; only the body's first layer input width changes. Recorded as an adaptation.
