@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch.nn import functional as F
 import lightning as L
-from .models import XuNet, XuNetWide
+from .models import XuNet, XuNetWide, model_from_hparams
 from .metrics import probability_error, auc_numpy
 
 
@@ -29,8 +29,7 @@ class SteganalysisModule(L.LightningModule):
         # front_end is saved only when it is not the default, so KV checkpoints keep their old hyper_parameters.
         self.save_hyperparameters(ignore=["validation_data", "conv1_factory", *(["front_end"] if front_end == "kv" else [])])
         self.validation_data = validation_data
-        self.net = (XuNetWide(clip_t=clip_t, norm=norm, width=width, front_end=front_end) if model == "xunet_wide"
-                    else XuNet(clip_t=clip_t, norm=norm, front_end=front_end))
+        self.net = model_from_hparams(dict(model=model, clip_t=clip_t, norm=norm, width=width, front_end=front_end))
         if conv1_factory is not None:
             self.net.conv1 = conv1_factory(self.net.conv1)
         self.validation_scores = []

@@ -162,6 +162,31 @@ class XuNetWide(XuNet):
         return x
 
 
+class XuNetWideDelayed(XuNetWide):
+    """Arm A: SRM XuNetWide with only the first two pool calls removed.
+
+    Conv1/conv2 stay at full resolution; conv3/4/5 retain their pools, and
+    conv6/7, the mean and classifier are unchanged. State keys and shapes
+    exactly match XuNetWide with the same width and front end.
+    """
+    def __init__(self, clip_t=3.0, norm='none', width=4, front_end='srm'):
+        if front_end != 'srm':
+            raise ValueError('delayed-pooling arm requires the SRM front end')
+        super().__init__(clip_t=clip_t, norm=norm, width=width, front_end=front_end)
+
+    def features(self, x):
+        x = self.kv(x)
+        if self.clip_t is not None:
+            x = torch.clamp(x, -self.clip_t, self.clip_t)
+        x = torch.tanh(self.bn1(torch.abs(self.conv1(x))))
+        x = torch.tanh(self.bn2(self.conv2(x)))
+        for name in (3, 4, 5):
+            x = self.pool(F.relu(getattr(self, f'bn{name}')(getattr(self, f'conv{name}')(x))))
+        for name in (6, 7):
+            x = F.relu(getattr(self, f'bn{name}')(getattr(self, f'conv{name}')(x)))
+        return x
+
+
 def model_from_hparams(hparams):
     model = hparams.get('model', 'xunet')
     clip_t, norm = hparams.get('clip_t', 3.0), hparams.get('norm', 'group')
@@ -170,6 +195,8 @@ def model_from_hparams(hparams):
         return XuNet(clip_t=clip_t, norm=norm, front_end=front_end)
     if model == 'xunet_wide':
         return XuNetWide(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
+    if model == 'xunet_wide_delayed':
+        return XuNetWideDelayed(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
     raise ValueError(f'unsupported checkpoint model: {model}')
 
 

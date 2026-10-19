@@ -83,8 +83,8 @@ def create_loaders(s, otf, tables):
 def model_checks(s, clean_batch, stego_batch):
     """Count parameters and check frozen KV weights, preserving both allocations."""
     def model():
-        return (models.XuNetWide(clip_t=s.clip_t, norm=s.norm, width=s.width, front_end=s.front_end)
-                if s.model == 'xunet_wide' else models.XuNet(clip_t=s.clip_t, norm=s.norm, front_end=s.front_end))
+        return models.model_from_hparams(dict(model=s.model, clip_t=s.clip_t, norm=s.norm,
+                                             width=s.width, front_end=s.front_end))
     counted = model()
     print(f'Total parameters: {sum(p.numel() for p in counted.parameters()):,}')
     print(f'Output shape for one batch: {tuple(counted(clean_batch[:1]).shape)}')
