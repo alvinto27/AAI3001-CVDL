@@ -29,7 +29,7 @@ Reference method: SRNet trained low payloads by starting from a higher-payload m
 | # | Choice | Recommendation | Why |
 | --- | --- | --- | --- |
 | C1 | **Stages** | 3 stages of 5 epochs: bpp 0.05-0.35, then 0.05-0.25, then 0.05-0.15; k=1 weight 1, then 2, then 3 (k 2-4 weight 1 each) | Gradual steps, like SRNet; ends at the hard target |
-| C2 | **Keep some of the original mix** | 25% of each batch from SRM-e50's original embedding mix in every stage | Stops the model forgetting high bpp and k 2-4 (the standard panel must not get worse) |
+| C2 | **Keep some of the original mix** | ~~25% of each batch~~ exactly 25% of the stego tiles **per epoch** (seeded positions, so about 25% per batch on average) from SRM-e50's original embedding mix in every stage. Changed by the Orchestrator 2026-10-19 during the build, before any result: the existing loader does not build class-balanced batches, so an exact per-batch quota would need changes to the default loader path | Stops the model forgetting high bpp and k 2-4 (the standard panel must not get worse) |
 | C3 | **Learning rate** | 3e-5 (one tenth of the original), warm-up 1 epoch, no drops | Fine-tuning needs a small LR; a large one erases what it knows |
 | C4 | **Control run** | Yes: the same 15 epochs and LR, but with the original embedding mix only ("plain continue") | Without it, a gain could come from 15 more epochs, not from the curriculum. This is the `srm-hard` lesson: change one thing at a time |
 | C5 | **Checkpoint choice** | Use the last epoch, not the best one | The best-on-validation epoch would favour the early, easy stages; validation (`60da...`) has the standard mix, not the low-bpp target |
