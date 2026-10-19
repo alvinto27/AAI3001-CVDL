@@ -63,6 +63,10 @@ Decision scope fixed before any result (Orchestrator, 2026-10-19). The decision 
 - Both parts must hold.
 - Quarters (fixed before results): equal-count rank quarters, stable sort by the measured value (share, or `tile_kv_std` for noise quarters), tie-break by `pair_id` (`cover_id` for distinct clean tiles); never by label or score. Report boundary ties. Quarter membership stays fixed inside the photo bootstrap (photos resampled jointly, quarters not re-cut).
 
+**Check 2b result (2026-10-19, Worker_3, `d3ae6b8`; outputs `runs/verification/diagnostics-2026-10-19/check2b/`):** first-tanh prefix only; pixel and join parity exact. Noise part holds: SRM-e50 Spearman 0.547 [0.525, 0.568] over 18,689 distinct clean target tiles; mean saturated share by noise quarter 23.9 / 31.3 / 34.9 / 39.0% (overlap-256: 0.2 / 0.9 / 1.7 / 2.2%). Miss part fails: pooled most-saturated quarter minus least = -13.6 points [-18.2, -8.6] (needed >= +10). **Decision row applied: "Otherwise" -> strike the tanh fix.**
+
+Orchestrator follow-up from the saved files (no new inference): the miss measure at a fixed cut-off is confounded by score bias. On ALASKA the most-saturated quarter also has 71.4% clean-partner FA (least: 13.1%), so its low misses come from flagging nearly everything. A bias-free measure, the share of pairs where the stego tile scores above its own clean tile, falls with saturation (ALASKA 90.5 / 71.8 / 60.5 / 53.2%; LSDIR 97.5 / 95.0 / 90.9 / 80.1%). But overlap-256, which barely saturates, falls the same way (ALASKA 88.9 / 73.7 / 60.8 / 56.7%; LSDIR 97.9 / 95.6 / 92.5 / 80.8%). So the drop follows tile noise, not tanh saturation, and the strike stands for a better reason. Lesson: future rules should use a paired or AUC measure, not misses at a fixed cut-off.
+
 ## Decision rules (confirmed by the user, 2026-10-19)
 
 | Check | Result | Effect on the board |

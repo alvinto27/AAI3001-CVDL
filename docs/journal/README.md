@@ -22,4 +22,4 @@ The dated entries were moved from the former single journal file without deletin
   One evaluation tool (`evaluate_run.py`), temperature and padding checks, loader profile, SRM run on the G4.
 - [2026-10-18](2026-10-18/README.md) — Project survey; train-matched validation built (`131492b`; 10% of training pairs per epoch).
   Leftover cleanup and the threshold-label check approved. Then: standard and hard 256 tests, one validation threshold, `srm-hard` run, all 11 models rescored, report notebook, ideas board.
-- [2026-10-19](2026-10-19/README.md) — Report revisions 2 and 3; diagnostic check 1 (classic detectors find a signal SRM-e50 misses: raise #12) and check 2 (no pooling gain: lower #3).
+- [2026-10-19](2026-10-19/README.md) — Report revisions 2 and 3; diagnostic check 1 (classic detectors find a signal SRM-e50 misses: raise #12) check 2 (no pooling gain: lower #3) and check 2b (tanh fix struck).
