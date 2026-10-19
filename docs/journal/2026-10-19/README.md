@@ -6,6 +6,7 @@ Recorded by the Orchestrator.
 
 - User reviewed the readable demo reports (`fa17f25`): much clearer.
 - User question: train and validation curves almost overlap; is validation unseen? Orchestrator check on saved records: `srm-hard` training photos (`data_run_settings.json` `train_photo_selection`, same as `train_grid_plan.jsonl`: RAISE 701 / ALASKA 13,500 / LSDIR 7,000) share **0** photos with its validation list (150 / 1,000 / 1,485). All standard-256 and hard-256 pair lists (RAISE 149, DIV2K 100, ALASKA 3,700, LSDIR 2,500 photos) share 0 photos with training and validation. SRM-30 training vs list `60da...`: 0 shared. (`data/hard-test/256-v1/noise-val.csv` holds val tiles by design: noise edges only.) Close curves are expected: stego is re-embedded every epoch (no memorisation of stego), ~216,000 pairs per epoch, validation matches the training mix. srm-hard epoch 29: train loss 0.319 / acc 83.8%, val 0.330 / 83.2%. Not checked: near-duplicate photos across splits (for example RAISE bursts).
+- Check 1 (WS + SPA) done by Worker_3: `ed52419` (`cvdl/classic_lsb.py`, `scripts/check1_classic.py`, tests; translations of the Binghamton `ws.m` / `sp.m` reference code). Positive control WS 0.994 / SPA 0.984 (SRM-e50 0.997, same 416 pairs). WS interval wholly above SRM-e50 in 10 of 12 noisy ALASKA k=1 replacement cells (SPA 9); largest gap on scattered low-bpp ALASKA (random: WS 0.814 vs SRM-e50 0.608). Matching controls at chance for WS/SPA; SRM-e50 equal on replacement and matching, so it does not use the replacement fingerprint. Validation thresholds do not transfer to noisy tiles (WS test FA up to 38.7%). 368 tests pass; golden ALL EQUAL. Details: [plan, check 1 result](../../active/plan-diagnostic-checks.md).
 
 ### Decided
 
@@ -16,6 +17,6 @@ Recorded by the Orchestrator.
 
 - ~~Worker_3: build revision 2~~ done: `c1ca714` (Look-at lines removed; hints in charts; 358 tests).
 - ~~Then revision 3~~ done: `675c712` (data sample figure `docs/figures/report/data-sample.png`, built once by `scripts/build_data_figure.py` from 7 frozen test pairs; clean and stego pixels equal the evaluator's for all 7; `--check` byte-identical; 360 tests). Report work complete.
-- Next: diagnostic checks 1, 2, 2b ([plan](../../active/plan-diagnostic-checks.md)).
+- Board: #12 raised (decision rule). Next: checks 2 and 2b (from diagnostic checks 1, 2, 2b ([plan](../../active/plan-diagnostic-checks.md)).
 - User: run the three checks (1 WS+SPA, 2 highest-cell pooling, 2b tanh saturation) before any experiment; [plan](../../active/plan-diagnostic-checks.md); decision rules confirmed by the user before any result. Order (user): finish the report work (revisions 2 and 3) first, then the checks.
 - Ideas board items: waiting for the user's choice ([ideas board](../../active/ideas-board.md)).

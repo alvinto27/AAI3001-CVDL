@@ -16,6 +16,8 @@ Purpose: get answers that can **strike experiments off the board** before any G4
 
 ## Check 1: classic detectors (WS + SPA)
 
+**Result (2026-10-19, Worker_3, `ed52419`; outputs `runs/verification/diagnostics-2026-10-19/check1/`):** positive control passed (416 pairs: WS AUC 0.994, SPA 0.984; SRM-e50 0.997 on the same pairs). In 10 of 12 noisy / low+noisy ALASKA k=1 replacement cells the WS 95% interval lies wholly above SRM-e50 (SPA: 9). Examples, ALASKA seen, random placement: low 0.814 [0.774, 0.855] vs SRM-e50 0.608 [0.583, 0.637]; noisy 0.680 [0.646, 0.721] vs 0.563 [0.538, 0.589]; low+noisy 0.575 [0.559, 0.597] vs 0.510 [0.498, 0.525]. Contiguous is a tie on ALASKA low (0.769 vs 0.777) and SRM-e50 is better on LSDIR low contiguous (0.894 vs 0.753). Matching controls: WS 0.489-0.519, SPA 0.479-0.513 (no signal, as expected); SRM-e50 scores replacement and matching about equally. **Decision row applied: "raise #12; keep #9".** Caveat: validation 5%-FA thresholds do not transfer to noisy test tiles (actual test FA WS up to 38.7%, SRM-e50 up to 19.6%), so a better AUC is not yet a better operating point.
+
 Question: does a known LSB-replacement statistic find signal on noisy ALASKA where SRM-e50 fails?
 
 1. Detectors: Weighted Stego (WS) and Sample Pair Analysis (SPA), each on R, G and B separately, plus one combined score fixed before any result (mean of the three channel estimates).
