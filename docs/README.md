@@ -1,6 +1,6 @@
 # Documentation — start here
 
-This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Research is on hold except the approved runs in the [run queue](active/run-queue.md).** Read [status](status.md) before acting, [findings](findings.md) for run comparisons, and the [dated journal](journal/README.md) for the original records.
+This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Nothing runs without a user decision**; approved G4 runs are in the [run queue](active/run-queue.md), ideas on the [ideas board](active/ideas-board.md). Read [status](status.md) before acting, [findings](findings.md) for older run comparisons (512-era; see its note), and the [dated journal](journal/README.md) for the original records.
 
 ## Current references (`active/` means kept for use, not permission to run)
 - [2026-10-19 session handoff — read first next session](active/handoff-2026-10-19.md)
@@ -10,15 +10,15 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Researc
 - [Three diagnostic checks (ideas 1, 2, 2b) — done 2026-10-19: #12 raised, #3 lowered, tanh fix struck](active/plan-diagnostic-checks.md)
 - [Architecture tests: delayed pooling and GBRAS-Net (idea 10) — approved 2026-10-19; arm A no gain, arm G waits for the user](active/plan-architecture-tests.md)
 - [Low-bpp curriculum from SRM-e50 (idea 9) — done 2026-10-19: small real gain, rule not met, not adopted](active/plan-low-bpp-curriculum.md)
-- [Ideas board — checks and experiments to review with the user (none approved)](active/ideas-board.md)
-- [Report notebook readability — revision 1, approved to try](active/plan-report-readability.md)
-- [One deployment threshold from validation — approved design (work list #4)](active/plan-validation-threshold.md)
-- [Hard test at 256 — approved design (work list #3)](active/plan-hard-test-256.md)
-- [Standard test at 256 — approved design (work list #2)](active/plan-standard-test-256.md)
+- [Ideas board — checks and experiments; each needs a user decision](active/ideas-board.md)
+- [Report notebook readability — revisions 1-3 built](active/plan-report-readability.md)
+- [One deployment threshold from validation — built `68e4f0b` (work list #4)](active/plan-validation-threshold.md)
+- [Hard test at 256 — built `a56c275` (work list #3)](active/plan-hard-test-256.md)
+- [Standard test at 256 — built `bd36403` (work list #2)](active/plan-standard-test-256.md)
 - [Train-matched validation — frozen recipes and use (work list #1)](active/plan-train-matched-validation.md)
 - [Training tiling — rules and PC implementation gates](active/plan-training-tiling.md)
-- [Tiling at 256 — three prepared arms and a 256 test panel design](active/plan-tiling-256.md)
-- [G4 run queue — approved, running and finished runs](active/run-queue.md)
+- [Tiling at 256 — three arms (runs 4-6, done) and the first 256 test panel design](active/plan-tiling-256.md)
+- [G4 run queue — all runs and their state](active/run-queue.md)
 - [Per-cell design — not approved, on hold](active/plan-per-cell-training.md)
 - [G4 batch-runner guide](active/g4-batch-runner.md)
 - [Pi host state](active/pi-host-changes.md)

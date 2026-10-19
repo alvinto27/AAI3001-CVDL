@@ -1,6 +1,8 @@
 # Findings across runs and checks
 
-Read [status](status.md) before doing more work: **all research is on hold**. This is a cross-run index, not a new experiment. `P_E` below is the best-threshold error on the named test; clean false alarm (FA) and k1 miss use the **fixed 0.5 threshold** unless stated otherwise. `—` means the cited record did not give a comparable value or cost. The early prebuilt RAISE test has **7,433 pairs**; the later standard OTF RAISE/DIV2K test has **10,956 pairs**. Do not compare their P_E as if they were the same panel. Small one-seed differences are not proof of a general gain. Rates and costs are cited in the linked result or [dated journal](journal/README.md).
+> **Note (2026-10-19):** this ledger covers runs up to 2026-10-17 on the **old 512 tests** (threshold 0.5 or best threshold). It is not updated for the standard-256 / hard-256 suite. Current numbers: [2026-10-18 journal](journal/2026-10-18/README.md) (all 11 models rescored), [2026-10-19 journal](journal/2026-10-19/README.md), the [run queue](active/run-queue.md) and the result sections of the active plans. A rewrite is pending (A4, with the results write-up A3).
+
+Read [status](status.md) before doing more work. This is a cross-run index, not a new experiment. `P_E` below is the best-threshold error on the named test; clean false alarm (FA) and k1 miss use the **fixed 0.5 threshold** unless stated otherwise. `—` means the cited record did not give a comparable value or cost. The early prebuilt RAISE test has **7,433 pairs**; the later standard OTF RAISE/DIV2K test has **10,956 pairs**. Do not compare their P_E as if they were the same panel. Small one-seed differences are not proof of a general gain. Rates and costs are cited in the linked result or [dated journal](journal/README.md).
 
 ## Training-run ledger
 

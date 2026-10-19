@@ -1,47 +1,34 @@
 # Project status — 2026-10-19
 
-**Start here:** Read the [2026-10-19 handoff](active/handoff-2026-10-19.md) and the [2026-10-19 journal](journal/2026-10-19/README.md). Evaluation redesign is done (standard-256 and hard-256 tests, one frozen deployment threshold from validation, report notebook); all 11 documented models are rescored. Diagnostic checks 1, 2 and 2b are done ([plan](active/plan-diagnostic-checks.md)): #12 raised, #3 lowered, tanh fix struck. Low-bpp curriculum (#9) done: rule not met; small real gain (+0.02 k=1 low AUC) at +0.56 points standard P_E; not adopted ([plan, result](active/plan-low-bpp-curriculum.md)). Architecture arm A (delayed pooling) done: **no gain, clearly worse** (pooled hard k=1 low AUC -.060 vs SRM-30; 2.3x compute; [plan, result](active/plan-architecture-tests.md)). Arm G (GBRAS-Net) waits for the user's 90-to-30 adapter choice. PC pilot mode `pilot=true` added (`aec69d0`). **Next: the user picks from the [ideas board](active/ideas-board.md).** Best model: SRM-e50 (standard-256 P_E 2.54% at its validation cut-off). Ideas: [ideas board](active/ideas-board.md). The items below date from 2026-10-17 and are partly stale (cleanup pending).
+**Start here:** Read the [2026-10-19 handoff](active/handoff-2026-10-19.md) and the [2026-10-19 journal](journal/2026-10-19/README.md). Evaluation redesign is done (standard-256 and hard-256 tests, one frozen deployment threshold from validation, report notebook); all 11 documented models are rescored. Diagnostic checks 1, 2 and 2b are done ([plan](active/plan-diagnostic-checks.md)): #12 raised, #3 lowered, tanh fix struck. Low-bpp curriculum (#9) done: rule not met; small real gain (+0.02 k=1 low AUC) at +0.56 points standard P_E; not adopted ([plan, result](active/plan-low-bpp-curriculum.md)). Architecture arm A (delayed pooling) done: **no gain, clearly worse** (pooled hard k=1 low AUC -.060 vs SRM-30; 2.3x compute; [plan, result](active/plan-architecture-tests.md)). Arm G (GBRAS-Net) waits for the user's 90-to-30 adapter choice. PC pilot mode `pilot=true` added (`aec69d0`). **Next: the user decides arm G (GBRAS-Net) or stops the architecture tests; then the [ideas board](active/ideas-board.md).** Best model: SRM-e50 (standard-256 P_E 2.54% at its validation cut-off). Ideas: [ideas board](active/ideas-board.md).
 
-## Current state and items
+## Current state
 
-- **G4 disk uses the new data layout since 2026-10-16 06:04Z** (checkout `9798b56`, free disk 116 GB). Commits before `76f6257` no longer match the G4 disk.
+| Area | State (2026-10-19, end of session) |
+| --- | --- |
+| Best model | SRM-e50 (`srm-e50-20261017T111310Z-0214`, eval `35afd1c7938bae78968c`): standard-256 P_E 2.54%; ALASKA seen / unseen / LSDIR 19.42 / 16.30 / 9.39% at its validation cut-off |
+| Evaluation | `scripts/evaluate_run.py`; default = standard-256-v1 suite + hard-256 test (`data/test/standard-256-v1/`, `data/hard-test/256-v1/`); one frozen threshold at min P_E on the run's validation; option C mapping for old models (`configs/evaluation-calibration-v1.json`). `--test-suite legacy-512` keeps the old suite. Report notebook: `scripts/build_report.py` ([guide](active/report-notebook.md)). All 11 models plus runs 10-12 are scored on it. |
+| Validation | New runs use train-matched validation (10% of training pairs; frozen recipe, for example `60da...`) ([plan](active/plan-train-matched-validation.md)) |
+| Experiments done 2026-10-19 | Checks 1, 2, 2b ([plan](active/plan-diagnostic-checks.md)); #9 curriculum, closed ([plan](active/plan-low-bpp-curriculum.md)); #10 arm A delayed pooling, no gain ([plan](active/plan-architecture-tests.md)) |
+| Open user decision | #10 arm G (GBRAS-Net adapter G1 / G2 / G3, or stop); see the [handoff](active/handoff-2026-10-19.md) |
+| Ideas | [Ideas board](active/ideas-board.md); nothing starts without a user decision |
+| G4 runs | [Run queue](active/run-queue.md): 12 runs, all evaluated. One run per boot; normal limit `--timeout-min 165 --max-run-minutes 180`. **The GCE max run duration is still 300 min** (raised for run 12; the user may set it back to 180). G4 resume after preemption is not built: a preempted run restarts with a new job ID ([run guide](active/g4-batch-runner.md)). |
+| PC pilots | `--set pilot=true` for PC smoke runs (4,096 draws per epoch, fixed 256-pair slice of the real validation list); refused on the G4 and by the evaluator ([how-to](active/g4-batch-runner.md)) |
+| Hardware | G4 `rtx6000pro` TERMINATED (last boot: run 12, 10:07-13:45Z 2026-10-19). Pi online, `/srv` 473 GB free; 2 GiB zram, no swap file ([Pi record](active/pi-host-changes.md)). PC container `aai3001` idle. |
+| Branches | `yx` pushed. `main` stays at PR #2 until `yx` is merged as a whole (pending, C1; expect add/add conflicts from PR #1). |
+| Layout | Run outputs in git-ignored `runs/<run>/` (best + `last.ckpt`); photos in `Datasets/originals/{raise,div2k,alaska,lsdir}` on the PC and the G4; shared code in `cvdl/` ([plan](active/plan-cvdl-package.md)); experiment notebooks in `notebooks/experiments/`; tests in `tests/` (424 pass). Golden check: `python -B scripts/refactor_golden.py compare` ([record](active/refactor-golden.md)). |
+| PC rules | At most 12 real data workers; total RAM under ~20 GB; kill whole process groups; after each run `pgrep -af spawn_main` empty and `/dev/shm` normal; workers ask before GPU or heavy CPU work. |
+| Deferred | Per-cell training: design only ([plan](active/plan-per-cell-training.md), out of date; board #3). Prebuilt writer ([design](archive/plan-otf-generator.md)); noisy covers ([parked](archive/plan-noisy-covers.md)); G4 GPU generator ([shelved](archive/plan-gpu-generator.md)). |
 
-- **Layout (2026-10-16):** all run outputs in git-ignored `runs/<run>/` (best + `last.ckpt` only, one `run.log`); photos in `Datasets/originals/{raise,div2k,alaska,lsdir}` on the PC and the G4; `V3_SOURCE` defaults to `decode` (the cache is deleted; rebuild it to use `cache`). See `runs/README.md` and `Datasets/README.md`.
+## Pending items (waiting for the user)
 
-- **G4 run queue:** [`active/run-queue.md`](active/run-queue.md) lists every approved run and its state. Check it before and after each launch.
-
-- **Evaluation (2026-10-17, to be replaced by the redesign below):** one tool, `scripts/evaluate_run.py`. **Default = standard suite (main stage) + hard test v1.** `--padding-check`, `--temperature`, `--tanh-saturation` run only on request. `--set` accepts machine settings only. The evaluator never writes into a run's training record. See the [2026-10-17 journal](journal/2026-10-17/README.md).
-
-- **Hard test v1 (`d74d716`):** `data/hard-test/v1/`, frozen. 4 panels (RAISE+DIV2K, ALASKA seen, ALASKA unseen, LSDIR) x k 1 and 2 x {all bpp, low bpp 0.05-0.15, noisiest quarter, low bpp and noisy} = 32 cells x 1,008 pairs. Test-split photos only; noise edges from validation only. Reported next to the unchanged standard test. Rebuild check: `scripts/build_hard_test.py --run runs/srm-20261017T052857Z-4521 --noise runs/srm-20261017T052857Z-4521/post-training/breakdown/clean_tile_noise.csv --check`.
-
-- **Next G4 run:** `srm-hard` (`795fd93`, `configs/train-hard-v1.yaml`): RAISE/ALASKA/LSDIR 72,000 pairs each per epoch, k=1 50%, half of bpp draws from 0.05-0.15; 30 epochs; ~112 min. **On hold** until the train-matched validation exists (user decision 2026-10-17 late: validation follows training).
-
-- **Evaluation redesign (user, 2026-10-17 late):** standard test 256 tiles, k 1-4, bpp 0.05-0.5, overlap-last for all sources; k 5-8 opt-in; hard test rebuilt at 256 (32 x 1,008); one threshold at min P_E on validation as the main report (changed 2026-10-18; per-source thresholds reference only); one report notebook per run. Details: [2026-10-17 handoff](active/handoff-2026-10-17.md), section 2.
-
-- **PC rules:** at most 12 real data workers; keep total RAM use under ~20 GB; kill whole process groups; after each run `pgrep -af spawn_main` empty and `/dev/shm` normal; workers ask before GPU or heavy CPU work.
-
-- **Notebook refactor (done):** shared code moves into the `cvdl/` package (`active/plan-cvdl-package.md`). Notebook 04 is frozen as the v3 baseline; new work starts from 05. Phases 0-5 done (`bc7eba2`..`8c1c0dc`): models, metrics, data, training, settings, evaluation; notebook 05 is 10 short cells with experiment settings in its top cell (`settings = load(...)`). New experiment = copy notebook 05, fill the top cell. G4: `scripts/g4/submit.sh run --notebook PATH --timeout-min N [--dry-run]` (pre-flight on the PC; see `active/g4-batch-runner.md`). G4 smoke passed (tiling arm 1). Check after each phase: `python scripts/refactor_golden.py compare` (CPU, exact; `active/refactor-golden.md`).
-
-- **Code tidy-up (2026-10-16):** one-off checks moved to `scripts/archive/`, Mode 2 (full-photo/MIL) dropped and archived in `LSB-Dataset-Generator/archive/`, notebooks 01 and 03 in `notebooks/archive/`, all tests in `tests/`. See `scripts/archive/README.md`.
-
-- **Completed:** ALASKA/LSDIR source records and mixed sampler; final verified masters; G4 mixed run and [result](results/result-newdata-1.md); PC threshold/noise check B and [result](results/result-check-b.md). The frozen standard test and RAISE/DIV2K records remain in use.
-- **On hold:** A, per-cell training (design only, no code or model run); C, capacity/longer training/BF16; seed repeats, front-end changes, and other free checks. No follow-up is authorized by the plans.
-- **Deferred records:** prebuilt writer, OTF plan step 17: [historical design](archive/plan-otf-generator.md), OTF implemented but writer deferred. Noisy covers: [parked by the user](archive/plan-noisy-covers.md). G4 GPU LSB generator: [shelved design](archive/plan-gpu-generator.md), not built. G4 resume after Spot preemption: postponed until C (longer training); today a preempted G4 run restarts with a fresh job ID (see [run guide](active/g4-batch-runner.md)). One boot is limited to 180 min since 2026-10-17 (`--timeout-min 165 --max-run-minutes 180` for long runs).
-- **Hardware and delivery:** the G4 is **stopped** (last boot: SRM-e50, 11:13-13:48Z on 2026-10-17). `main` stays at PR #2 until `yx` is merged as a whole (expect add/add conflicts from PR #1). The Pi is online. Its USB-SSD swap file was removed; **2 GiB zram only** remains. See the [Pi record](active/pi-host-changes.md) and [2026-10-16 journal](journal/2026-10-16/README.md). Do not start the VM to resend a result.
-
-## User decisions still pending
-
-These rows carry the pending decisions from the archived [research checklist](archive/research-checklist.md). They are **not** authorizations to act. The checklist's ALASKA option-B row is historical: the later source record and mixed run already use the selected option B; confirm any further selection request with the user before changing records.
-
-| Decision | Owner | Current record |
-| --- | --- | --- |
-| ALASKA train-only models: six or two (option B) | User | Checklist marked Pending; Orchestrator recommended option B. Final selection used option B; do not reopen it without a new decision. |
-| BF16 for G4 | User | Pending; speed matrix complete, batch 32 retained. |
-| Fair control R0 | User | **Dropped** (2026-10-16): no normalisation is kept for detection and maps; the GroupNorm cost is not needed. |
-| Seed repeats | User / Orchestrator | Pending; one seed is not enough for small differences. |
-| Front-end upgrade | User / Orchestrator | Pending after the wide and new-source results. |
-
-The old checkpoint-selection validation decision is **done**: the mixed run used the fixed 8,035-pair capped list, not the earlier checklist estimate. Free checks still listed as pending in that checklist are noise-versus-miss, denoise-and-compare, tanh saturation, and a filter linear probe. Check B completed a noise-versus-error analysis; do not relabel the other checks as done or start them while work is on hold.
+| Item | Record |
+| --- | --- |
+| #10 arm G or stop | [Architecture plan](active/plan-architecture-tests.md), [handoff](active/handoff-2026-10-19.md) |
+| Seed repeats | Board #5. Declined for the architecture tests (2026-10-19); still open in general. |
+| BF16 / front-end upgrade / longer training | Board #6, on hold. Front-end ladder (fixed SRM first, learned filters only with evidence): [architecture plan](active/plan-architecture-tests.md). |
+| A2 report notebooks for all models; A3 results write-up; A4 `findings.md` rewrite; C1 merge `yx` into `main`; C2 G4 spend record | [Handoff](active/handoff-2026-10-19.md), section 4 |
+| ~~ALASKA train-only models: six or two~~ | Settled: option B used. ~~Fair control R0~~: dropped 2026-10-16. |
 
 ## Key commits and records
 
@@ -64,5 +51,10 @@ The old checkpoint-selection validation decision is **done**: the mixed run used
 | `7567501`, `d721e06` | Evaluator: no training-record writes; restricted `--set`. |
 | `795fd93` | Opt-in `k_weights` / `bpp_mixture`; `srm-hard` notebook. |
 | `d74d716` | Hard test v1 (270 tests). |
+| `131492b`, `bd36403`, `a56c275`, `68e4f0b` | Train-matched validation; standard-256 suite; hard-256 test; one deployment threshold. |
+| `716b2cd`, `fa17f25`, `c1ca714`, `675c712` | Report notebook and revisions 1-3. |
+| `ed52419`, `9563540`, `d3ae6b8` | Diagnostic checks 1, 2, 2b. |
+| `c501603`, `04415c0` | Low-bpp curriculum code and decision evidence (runs 10-11). |
+| `1bb7e20`, `aec69d0`, `9dfaa27` | Arm A delayed pooling; PC pilot mode; arm A decision evidence (run 12). |
 
-The [documentation index](README.md) lists each current, result, and historical record. The [run guide](active/g4-batch-runner.md) is reference material only while work is on hold.
+The [documentation index](README.md) lists each current, result, and historical record. The [run guide](active/g4-batch-runner.md) has the G4 launch routine.

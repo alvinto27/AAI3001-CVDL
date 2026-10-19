@@ -62,8 +62,8 @@ Arm A result (2026-10-19, eval `9915836bfe1b229e5259`, evidence `9dfaa27`, `runs
 
 ## Work needed (after approval)
 
-1. Code (worker): arm A and the GBRAS-Net body as opt-in model options, with citations. Default models unchanged; golden ALL EQUAL. Evaluator support for both (cell maps if possible).
-2. PC pilot per arm: memory, steps per second, and a few hundred steps to show the loss falls. Predict the G4 time per epoch.
-3. User decides D3/D4 from the pilot, then G4 runs (one per boot), evaluation, and the decision table.
+1. Code (worker): arm A and the GBRAS-Net body as opt-in model options, with citations. Default models unchanged; golden ALL EQUAL. Evaluator support for both (cell maps if possible). **Arm A done (`1bb7e20`). Arm G waits for the adapter choice.**
+2. PC pilot per arm: memory, steps per second, and a few hundred steps to show the loss falls. Predict the G4 time per epoch. **Arm A done** (the pilot over-predicted the time, 267 vs 216 min, because its driver synchronised every step; use `pilot=true`, `aec69d0`, for arm G).
+3. User decides D3/D4 from the pilot, then G4 runs (one per boot), evaluation, and the decision table. **Arm A done** (batch 128, 30 epochs, 300-min boot; run 12; `scripts/architecture_decision.py`, `9dfaa27`).
 
-Cost (estimates, before the pilot): A about $3-4; G about $2-4 (small model).
+Cost (estimates, before the pilot): A about $3-4 (actual about $6, 216 min); G about $2-4 (small model).

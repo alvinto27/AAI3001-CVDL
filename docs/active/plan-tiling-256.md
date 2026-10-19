@@ -1,6 +1,6 @@
 # Tiling at 256 pixels: three arms and a 256 test panel (design)
 
-Status: three 256 arms **prepared, not launched**. The 256 test panel is **design only**.
+Status: ~~three 256 arms prepared, not launched~~ **done**: runs 4-6 (2026-10-17), [result](../results/result-training-tiling.md). ~~The 256 test panel is design only~~ superseded by the built [standard-256 suite](plan-standard-test-256.md) and [hard-256 test](plan-hard-test-256.md).
 Parent record: [training tiling](plan-training-tiling.md).
 
 ## What changed in code
