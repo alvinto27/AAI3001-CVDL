@@ -35,6 +35,10 @@ Question: does averaging the 8 x 8 cell evidence dilute packed (contiguous) payl
 
 1. For SRM-e50, compute the per-cell logits that the tile score already averages (as `scripts/map_demo.py` does). Tile scores: **mean** (must reproduce the saved scores within GPU noise; this is the parity check), **max**, **top-4 mean**.
    Definition fixed before any result (Orchestrator, 2026-10-19): rank cells by the stego-minus-clean logit margin, take the top cell (max) or top 4 cells, average their paired logits, then softmax. Mean pooling is unchanged.
+   Decision-rule scope fixed before any result (Orchestrator, 2026-10-19):
+   - "Cuts contiguous low-bpp misses by >= 10 points" = the **pooled** miss over the three target panels (ALASKA seen, ALASKA unseen, LSDIR; hard `low` cells, k=1, contiguous, replacement and matching together) falls by >= 10 points vs mean pooling, **and** no single target panel gets worse.
+   - "No worse noisy-clean FA" = the **pooled** clean FA over the hard `noisy` and `low_noisy` cells of the three target panels (k=1 and k=2, distinct clean tiles) is not higher than mean pooling's. Report every cell; flag any single cell that rises by more than 5 points.
+   - "Validation P_E equal or better" = the pooling's validation P_E at its own validation threshold is <= mean pooling's.
 2. For each pooling: one threshold at min P_E on the validation list (as today), then the standard-256 and hard-256 tests.
 3. Report contiguous / random / stride misses at k=1 low bpp per panel, noisy-clean false alarms, and overall P_E.
 
