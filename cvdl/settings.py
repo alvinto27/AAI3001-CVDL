@@ -162,6 +162,7 @@ SCHEMA = MappingProxyType({
     'init_checkpoint_sha256': Definition('str?', optional_string, None, '64 lowercase hex characters', 'Required start-file SHA-256.', lambda v:v is None or bool(re.fullmatch(r'[0-9a-f]{64}',v))),
     'embedding_schedule': Definition('str?', optional_string, None, 'None/low_bpp/original', 'Approved three-stage embedding schedule.', lambda v:v in {None,'low_bpp','original'}),
     'embedding_stage_epochs': Definition('int', integer, 5, '>0', 'Epochs in each of three embedding stages.', lambda v:v>0),
+    'pilot': Definition('bool', boolean, False, 'PC only; train_matched OTF smoke', 'Cap actual train draws and slice the verified real validation list.'),
     'evaluation_checkpoint': Definition('str', str, 'best', 'best/last', 'Checkpoint used for deployment evaluation.', lambda v:v in {'best','last'}),
     'train_yaml': Definition('path?', optional_string, None, 'path or None; OTF only', 'Train embedding settings.', env='V3_TRAIN_YAML', legacy_global='TRAIN_YAML'),
     'train_grid': Definition('str', str, 'recorded', 'recorded/overlap_last/centre_trim/centre_pad', 'Training-only tiling rule.', lambda v:v in {'recorded','overlap_last','centre_trim','centre_pad'}),
@@ -504,6 +505,11 @@ def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_v
     else:
         # An absent opt-in must not add keys to legacy settings/provenance records.
         c.pop('validation_recipe'); origins_all.pop('validation_recipe')
+    if c['pilot']:
+        if profile.name!='pc':
+            raise ValueError('pilot mode is PC-only; G4 preflight and runner refuse pilots')
+        if c['data']!='otf' or c['checkpoint_validation']!='train_matched' or c['post_fit_eval']!='none':
+            raise ValueError('pilot mode needs OTF, train_matched validation and post_fit_eval=none')
     if c['model']=='xunet_wide_delayed' and c['front_end']!='srm':
         raise ValueError('delayed-pooling arm requires the SRM front end')
     if bool(c['init_checkpoint']) != bool(c['init_checkpoint_sha256']):
@@ -515,6 +521,7 @@ def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_v
             raise ValueError('embedding schedule needs OTF source mix, unpaired batch divisible by8, tiles divisible by4, train_yaml, weights start, and three complete stages')
     # Opt-ins must not add keys to historical effective settings or run records.
     absent=[]
+    if not c['pilot']:absent+=['pilot']
     if c['init_checkpoint'] is None:absent+=['init_checkpoint','init_checkpoint_sha256']
     if c['embedding_schedule'] is None:absent+=['embedding_schedule','embedding_stage_epochs']
     if c['evaluation_checkpoint']=='best':absent+=['evaluation_checkpoint']

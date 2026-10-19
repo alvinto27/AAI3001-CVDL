@@ -60,7 +60,10 @@ def evaluation_path(run,eid=None):
 
 class SavedReport:
     def __init__(self,root,run,eid=None):
-        self.run=run_path(root,run);self.path=evaluation_path(self.run,eid)
+        self.run=run_path(root,run)
+        from .pilot import refuse_run
+        refuse_run(self.run)
+        self.path=evaluation_path(self.run,eid)
         def js(relative):
             p=self.path/relative
             if not p.is_file():raise ValueError(f'missing or pending output: {p}')

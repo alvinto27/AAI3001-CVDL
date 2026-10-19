@@ -39,12 +39,16 @@ def conv1_factory(settings):
 def create_data(s):
     """Build frozen split tables; do not advance a loader or model RNG here."""
     if s.data == 'otf':
-        otf = data.build_otf_data(s.root, s.to_run_settings(), quick=s.quick,
+        pilot = getattr(s, 'pilot', False)
+        otf = data.build_otf_data(s.root, s.to_run_settings(), quick=False if pilot else s.quick,
             profile=s.eval_profile, eval_pairs=s.quick_eval_pairs,
             checkpoint_validation=s.checkpoint_validation,
             val_cap_raise=s.val_cap_raise, val_cap_lsdir=s.val_cap_lsdir, train_grid=s.train_grid,
             train_tile=s.train_tile_size,
             **({'validation_recipe':s.validation_recipe} if s.checkpoint_validation=='train_matched' else {}))
+        if pilot:
+            from .pilot import apply
+            apply(otf, s)
         if getattr(s,'embedding_schedule',None) is not None:
             from .curriculum import CurriculumImages
             otf.train=CurriculumImages(otf.corpus,s.embedding_schedule,s.embedding_stage_epochs)

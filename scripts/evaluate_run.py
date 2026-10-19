@@ -16,8 +16,11 @@ sys.path.insert(0,str(ROOT))
 
 
 def checkpoint_folder(path):
+    from cvdl.pilot import refuse_run
+    refuse_run(path)
     paths=sorted({p.parent for p in Path(path).resolve().rglob('best-*.ckpt')})
     if len(paths)!=1:raise ValueError('run folder must contain exactly one checkpoint directory')
+    refuse_run(paths[0])
     return paths[0]
 
 
@@ -103,6 +106,8 @@ def legacy_data_record(folder):
 
 
 def settings_for_run(folder, *, eval_overrides=()):
+    from cvdl.pilot import refuse_run
+    refuse_run(folder)
     from cvdl.settings import SCHEMA, automatic_profile, load
     profile=automatic_profile()
     if profile.name!='pc':raise ValueError('evaluate_run is PC-only; G4 jobs only train')

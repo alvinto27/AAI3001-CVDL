@@ -60,7 +60,9 @@ def preflight(notebook_path, commit, *, root=ROOT, speed_env=None):
     notebook = validate_notebook(notebook_path,commit=commit,root=root)
     values = top_values(notebook) if speed_env is None else {}
     from cvdl.settings import machine_profile, plain, validate_notebook_name
-    if speed_env is None:validate_notebook_name(notebook_path,values)
+    if speed_env is None:
+        validate_notebook_name(notebook_path,values)
+        refuse_pilot(values)
     archive = subprocess.check_output(['git','archive',commit],cwd=root)
     with tempfile.TemporaryDirectory(prefix='cvdl-preflight-') as temp:
         snapshot = Path(temp)
@@ -101,6 +103,13 @@ print(json.dumps(dict(values=plain(settings.values), sources=plain(settings.prov
     return report
 
 
+def refuse_pilot(values):
+    """PC pilot recipes cannot pass submission or VM job-env validation."""
+    from cvdl.settings import boolean
+    if boolean(values.get('pilot', False)):
+        raise ValueError('pilot mode is PC-only; G4 preflight and runner refuse pilots')
+
+
 def validate_job_env(path, job_id, *, root=ROOT, commit='HEAD'):
     from scripts.run_notebook import settings_file
     env = settings_file(Path(path), [])
@@ -113,7 +122,9 @@ def validate_job_env(path, job_id, *, root=ROOT, commit='HEAD'):
     document = validate_notebook(notebook,commit=commit,root=root)
     if env.get('V3_SPEED_MATRIX') != 'on':
         from cvdl.settings import validate_notebook_name
-        validate_notebook_name(notebook,top_values(document))
+        values = top_values(document)
+        validate_notebook_name(notebook,values)
+        refuse_pilot(values)
     return notebook
 
 

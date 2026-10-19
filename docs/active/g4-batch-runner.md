@@ -401,6 +401,31 @@ headless job writes its working checkpoints in
 `last.ckpt` to resume, plus one best validation-P_E checkpoint for
 evaluation. It does not save every epoch. `run.log` is the only full text copy of notebook output. `executed.ipynb` keeps figures and pointers to that log. The G4 service console retains short job and step/rate reports, not another copy of the notebook output. On a PC, use the explicit notebook 05 runner `--resume` option only for an interrupted run with matching settings and `last.ckpt`. On G4, a Spot preemption requires a new job ID and a fresh run; the service refuses an existing job ID and never resumes its folder. Notebook 04 behavior is unchanged.
 
+## PC pilot of a train-matched notebook
+
+Use `pilot=true` only on the PC. It caps actual training draws at 4,096 per
+epoch and selects a fixed 256-pair slice (seed 20261019) from the run's full,
+verified train-matched validation list. The full recipe guard runs first with
+the declared training budget; no frozen file is changed or rebuilt. The slice
+keeps the real validation geometry (256 px for recipe `60da4391043e8ce48ff2`).
+QUICK does not resample this slice.
+
+This command runs 256 training steps in two epochs at batch 64. The short
+schedule, batch and machine options are explicit overrides, not pilot defaults:
+
+```sh
+podman exec -d -w /work aai3001 bash -c 'python -B scripts/run_notebook.py --notebook notebooks/experiments/srm-delayed.ipynb --env-file /dev/null --output runs/.scratch/pilot-srm-delayed --set pilot=true --set epochs=2 --set batch_size=64 --set lr_drops=2:1 --set rocm_conv1_fix=off --set workers=4 --set eval_workers=4 > logs/pilot-srm-delayed.log 2>&1; echo $? > logs/pilot-srm-delayed.rc'
+```
+
+Use a new empty output folder. Check the `.rc` file and log after the run.
+`run_settings.json` records `pilot=true`; `data_run_settings.json` records the
+declared and effective training budgets, full-list hash, slice hash, seed and
+pair IDs. The output folder also holds the exact slice in `validation_pairs.csv`.
+G4 preflight and the G4 runner refuse pilot mode. The evaluator and report
+builder also refuse pilot runs. Do not use pilot scores as experiment results.
+Delete the pilot output folder and its log/rc files after you record the smoke
+check. Without `pilot=true`, all existing settings and guards stay unchanged.
+
 ## PC-only checks
 
 `job.sh --test --metadata-file FILE` (the bootstrap, which then runs

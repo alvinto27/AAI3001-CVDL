@@ -40,7 +40,7 @@ class RecipeTests(unittest.TestCase):
             legacy=load(environ=expected['env_settings'],_profile=machine_profile('g4'))
             for key,spec in SCHEMA.items():
                 if key in {'validation_recipe','init_checkpoint','init_checkpoint_sha256',
-                           'embedding_schedule','embedding_stage_epochs','evaluation_checkpoint'}:
+                           'embedding_schedule','embedding_stage_epochs','evaluation_checkpoint','pilot'}:
                     # Unset opt-ins must stay absent from both legacy records.
                     self.assertNotIn(key, settings.values)
                     self.assertNotIn(key, legacy.values)
