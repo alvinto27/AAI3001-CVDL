@@ -3,11 +3,12 @@
 This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Research is on hold except the approved runs in the [run queue](active/run-queue.md).** Read [status](status.md) before acting, [findings](findings.md) for run comparisons, and the [dated journal](journal/README.md) for the original records.
 
 ## Current references (`active/` means kept for use, not permission to run)
-- [2026-10-17 session handoff — read first next session](active/handoff-2026-10-17.md)
+- [2026-10-19 session handoff — read first next session](active/handoff-2026-10-19.md)
+- [2026-10-17 session handoff (general key documents, G4 launch routine)](active/handoff-2026-10-17.md)
 - [Wide-R2 legacy settings migration — saved evidence and limits](active/legacy-wide-r2-migration.md)
 - [Saved-output report notebook — CPU generator and use (work list #5)](active/report-notebook.md)
 - [Three diagnostic checks (ideas 1, 2, 2b) — done 2026-10-19: #12 raised, #3 lowered, tanh fix struck](active/plan-diagnostic-checks.md)
-- [Architecture tests: delayed pooling and GBRAS-Net (idea 10) — approved 2026-10-19; code in progress](active/plan-architecture-tests.md)
+- [Architecture tests: delayed pooling and GBRAS-Net (idea 10) — approved 2026-10-19; arm A no gain, arm G waits for the user](active/plan-architecture-tests.md)
 - [Low-bpp curriculum from SRM-e50 (idea 9) — done 2026-10-19: small real gain, rule not met, not adopted](active/plan-low-bpp-curriculum.md)
 - [Ideas board — checks and experiments to review with the user (none approved)](active/ideas-board.md)
 - [Report notebook readability — revision 1, approved to try](active/plan-report-readability.md)
