@@ -1,6 +1,6 @@
 # Plan: low-bpp curriculum from SRM-e50 (ideas board #9)
 
-Status: **draft, waiting for the user's choices** (2026-10-19). No code or runs yet.
+Status: **approved by the user 2026-10-19**: choices C1-C6 as recommended (including the C4 control run), and the success rule below, confirmed before any result. Code: Worker_3.
 
 ## Question
 
@@ -37,7 +37,7 @@ Reference method: SRNet trained low payloads by starting from a higher-payload m
 
 Cost with C4: 2 G4 runs of about 50 min each, about $1.5 each, about $3 total. Without C4: about $1.5.
 
-## Success rule (to confirm before any result)
+## Success rule (confirmed by the user 2026-10-19, before any result)
 
 Lesson from check 2b: use AUC (threshold-free), not misses at one cut-off.
 
