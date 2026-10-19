@@ -21,4 +21,5 @@ The dated entries were moved from the former single journal file without deletin
 - [2026-10-17](2026-10-17/README.md) — Training tiling complete (6 arms; [result](../results/result-training-tiling.md)): overlap best, 256 tiles better.
   One evaluation tool (`evaluate_run.py`), temperature and padding checks, loader profile, SRM run on the G4.
 - [2026-10-18](2026-10-18/README.md) — Project survey; train-matched validation built (`131492b`; 10% of training pairs per epoch).
-  Leftover cleanup and the threshold-label check approved.
+  Leftover cleanup and the threshold-label check approved. Then: standard and hard 256 tests, one validation threshold, `srm-hard` run, all 11 models rescored, report notebook, ideas board.
+- [2026-10-19](2026-10-19/README.md) — Report review: remove the "Look at" lines (revision 2).

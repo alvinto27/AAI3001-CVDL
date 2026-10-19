@@ -24,6 +24,10 @@ Each section starts with **the question it answers** and a **"Look at: ..."** li
 | 8 | Author notes | Placeholders; no generated claims | none |
 | - | Appendix | All full tables, collapsed; for lookup | - |
 
+## Revision 2 (user, 2026-10-19)
+
+- ~~Each section has a "Look at: ..." line.~~ **Removed (user: the lines are obnoxious; most repeat what the chart shows).** The question heading stays. Useful hints move into the chart itself as a legend entry or a short note under the chart: dashed lines = learning-rate drops; dashed line at 50% = coin flip; darker = more misses; green = better, red = worse.
+
 ## Presentation rules
 
 - **Hidden:** hashes, evaluation / threshold / recipe ids, file paths, full-precision cut-off, setup and guard code. Keep the ids in the notebook metadata (not shown) so the generator can still check that two models used the same tests. The saved evaluation files keep everything.
