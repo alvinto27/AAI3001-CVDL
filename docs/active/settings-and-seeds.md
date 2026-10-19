@@ -5,6 +5,17 @@ settings/seed module. `lsb_batch.py` imports its original private helper names
 and exception class, so existing callers keep those names. No loader or
 embedding optimisation is implemented here.
 
+## Tile size settings (note, 2026-10-19)
+
+Two settings have similar names:
+
+| Setting | Typical value | Meaning |
+| --- | --- | --- |
+| `tile_size` | 512 | Size of the source photo records and of the older (`capped`) validation and evaluation tiles. Historical; the same in every run since the 512 era. Do not rename it: run records and the golden compare depend on it. |
+| `train_tile_size` / `train_grid` tile size | 256 | The tiles the model trains on (all 256 runs, including SRM-30 and SRM-e50). The train-matched validation lists (for example `60da...`) and the standard-256 / hard-256 tests are also 256. |
+
+So a run with `tile_size` 512 can train and validate at 256. Only the old `capped` validation uses 512 tiles.
+
 ## Legacy compatibility
 
 The choice, stride, byte conversion, capacity, and legacy size helpers retain
