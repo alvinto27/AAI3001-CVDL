@@ -30,6 +30,7 @@ Recorded by the Orchestrator.
 - User (option A, after the float32 first pass, before any decision): re-score all three poolings on the float64 logit margin. First pass kept as superseded.
 - Check 2b scope (Orchestrator, before results): SRM-e50 decides, overlap-256 is contrast. Spearman of the saturated share vs `tile_kv_std` with interval above 0, and the noisiest quarter more saturated. Within noisy target cells, the most-saturated quarter is missed >= 10 points more. Equal-count rank quarters, tie-break by id, quarters fixed in the bootstrap.
 - Board: #12 raised (check 1); #3 lowered, not struck (check 2); #13 added (save the logit margin in the evaluation; low priority).
+- User: run #9 (low-bpp curriculum) first. #12 is harder than it looks: the CNN output and the WS / SPA scores need a tuned combination. Orchestrator had recommended #12 (direct evidence from check 1). Draft: [low-bpp curriculum plan](../../active/plan-low-bpp-curriculum.md).
 - User: add a data sample figure as the first report section (revision 3): built once from real frozen test tiles (photos with the tile grid, clean vs stego tile, amplified change maps for contiguous / random / stride at k=1 low bpp, one noisy ALASKA tile). "Where the model looks" waits for cell-level training.
 
 ### Next
