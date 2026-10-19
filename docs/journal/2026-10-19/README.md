@@ -55,7 +55,16 @@ Recorded by the Orchestrator.
 ### Next
 
 - ~~Run 12 finishes about 13:50Z; evaluate; decision table~~ done: no gain.
-- User: choose the GBRAS-Net 90-to-30 adapter (Orchestrator recommends a learned 1x1 adapter, then GBRAS as published). GBRAS is built from the authors' code only (paper PDF not reachable). Then build, PC pilot (`pilot=true`), G4 run.
+- **Pending, user decision after arm A (open):**
+
+  | Option | What | Cost |
+  | --- | --- | --- |
+  | G1 (Orchestrator recommends, if the tests continue) | GBRAS-Net with a learned 1x1 adapter 90 -> 30, then GBRAS as published | About 1 day of code and PC pilot (`pilot=true`); one G4 run, about $2-4 |
+  | G2 | Widen the early GBRAS blocks to 90 channels | More layers changed; no longer GBRAS as published |
+  | G3 | Average the R/G/B SRM responses into 30 fixed channels | Loses cross-colour information; close to grayscale |
+  | Stop | End the architecture tests; keep SRM-30 / SRM-e50; move to the write-up or another board item | None |
+
+  Arm A failing does not predict arm G: they change different things (pooling position vs the whole body). GBRAS-Net also pools early, but it is a different published design for weak signals. GBRAS is built from the authors' code only (`0b40ab0`; paper PDF not reachable). Our SRM front end and clamp stay unchanged.
 - GCE max run duration is still 300 min after run 12 (user setting). Normal runs use `--timeout-min 165`; the user may set it back to 180.
 
 - ~~Worker_3: build revision 2~~ done: `c1ca714` (Look-at lines removed; hints in charts; 358 tests).
