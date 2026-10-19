@@ -34,7 +34,7 @@ Evidence for each item: [2026-10-18 journal](../journal/2026-10-18/README.md) (n
 
 | # | Idea | Why | State |
 | ---: | --- | --- | --- |
-| 13 | **Save the logit margin in the evaluation** (next to `prob_stego`) and use it for AUC and thresholds | float32 softmax saturates: 26% of SRM-e50 validation scores are exactly 1.0, so ties distort AUC (main threshold 0.45 is not affected) | To review (found in check 2, 2026-10-19) |
+| 13 | **Save the logit margin in the evaluation** (next to `prob_stego`) and use it for AUC and thresholds | float32 softmax saturates: 26% of SRM-e50 validation scores are exactly 1.0. With mean pooling these are almost all stego (52.6% of stego, 0.0% of clean exactly 1.0; clean >= 0.999: 0.1%), so clean-vs-stego ties are rare and AUC and the 0.45 threshold are barely affected. It matters for max/top-k pooling, where clean tiles can saturate too. Low priority for the main evaluation | To review (found in check 2, 2026-10-19) |
 
 ## Report topics (no work)
 
