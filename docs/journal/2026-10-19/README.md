@@ -28,6 +28,8 @@ Recorded by the Orchestrator.
 - **Curriculum (#9):** a small real gain on k=1 low bpp (+0.02 AUC), caused by the curriculum, since 15 plain epochs gave nothing. It costs +0.56 points standard P_E (the threshold moves; AUC is unchanged). Training order helps a little but is not the main limit.
 - **Rule design lesson (second today):** "model intervals do not overlap" is far too strict when the models are scored on the same tiles; use paired-difference intervals.
 - Overconfidence question (user): a threshold depends only on score order, so extreme probabilities matter only when the model is confidently wrong. Mean pooling is not. Check 2 shows single cells are confidently wrong on noisy clean cells. Cell-level training (#3) is the fix if that becomes the goal.
+- **Run 12 (delayed pooling) on G4, live epoch times:** epoch 0 413 s training + 29 s validation; warm epochs 399 s + 27 s (about 7.1 min). Predicted total about 215 min (fits the 285-min timeout), about 2.3x SRM-30 per epoch (not the 2.9x of the PC pilot). GPU 100% busy, 24.8 GB of 96 GB at batch 128. Delayed pooling costs more than twice the compute of SRM-30; any gain must be weighed against that.
+- **PC pilot timing lesson:** the arm A pilot driver synchronised the GPU every step and measured 0.70 steps/s; the new pilot mode measured 1.74 steps/s for the same model and batch. The cause of the full 2.5x was not isolated. Do not add per-step synchronising callbacks to timing pilots.
 
 ### Decided
 
@@ -48,6 +50,10 @@ Recorded by the Orchestrator.
 - User: add a data sample figure as the first report section (revision 3): built once from real frozen test tiles (photos with the tile grid, clean vs stego tile, amplified change maps for contiguous / random / stride at k=1 low bpp, one noisy ALASKA tile). "Where the model looks" waits for cell-level training.
 
 ### Next
+
+- Run 12 finishes about 13:50Z (Run_Supervisor watches and reports). Then: copy and SHA check, evaluate (standard-256, hard-256), decision table vs SRM-30 with the plan's rule (paired bootstrap).
+- User: choose the GBRAS-Net 90-to-30 adapter (Orchestrator recommends a learned 1x1 adapter, then GBRAS as published). GBRAS is built from the authors' code only (paper PDF not reachable). Then build, PC pilot (`pilot=true`), G4 run.
+- GCE max run duration is still 300 min after run 12 (user setting). Normal runs use `--timeout-min 165`; the user may set it back to 180.
 
 - ~~Worker_3: build revision 2~~ done: `c1ca714` (Look-at lines removed; hints in charts; 358 tests).
 - ~~Then revision 3~~ done: `675c712` (data sample figure `docs/figures/report/data-sample.png`, built once by `scripts/build_data_figure.py` from 7 frozen test pairs; clean and stego pixels equal the evaluator's for all 7; `--check` byte-identical; 360 tests). Report work complete.
