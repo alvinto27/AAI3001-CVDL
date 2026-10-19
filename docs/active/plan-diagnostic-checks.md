@@ -34,6 +34,7 @@ Cost: CPU, ~1-2 h.
 Question: does averaging the 8 x 8 cell evidence dilute packed (contiguous) payloads?
 
 1. For SRM-e50, compute the per-cell logits that the tile score already averages (as `scripts/map_demo.py` does). Tile scores: **mean** (must reproduce the saved scores within GPU noise; this is the parity check), **max**, **top-4 mean**.
+   Definition fixed before any result (Orchestrator, 2026-10-19): rank cells by the stego-minus-clean logit margin, take the top cell (max) or top 4 cells, average their paired logits, then softmax. Mean pooling is unchanged.
 2. For each pooling: one threshold at min P_E on the validation list (as today), then the standard-256 and hard-256 tests.
 3. Report contiguous / random / stride misses at k=1 low bpp per panel, noisy-clean false alarms, and overall P_E.
 
