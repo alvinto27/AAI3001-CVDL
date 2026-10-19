@@ -59,6 +59,8 @@ class ReportingTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name)
         self.run,self.path=fixture(self.root)
+        image=self.root/'docs/figures/report/data-sample.png';image.parent.mkdir(parents=True)
+        shutil.copy(ROOT/'docs/figures/report/data-sample.png',image)
 
     def test_headline_values_exact_saved_csv_and_honest_training_label(self):
         r=SavedReport(self.root,'model',EID)
@@ -147,7 +149,12 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(meta['primary']['checkpoint_sha256'],'b'*64)
         if reference:self.assertEqual(meta['reference']['evaluation_id'],'2'*20)
         headings=[c for c in nb['cells'] if c['cell_type']=='markdown' and ''.join(c['source']).startswith('## ')]
-        self.assertEqual(len(headings),10)
+        self.assertEqual(len(headings),11)
+        self.assertIn('## What does the data look like?', ''.join(headings[0]['source']))
+        saved=(ROOT/'docs/figures/report/data-sample.png').read_bytes()
+        images=[base64.b64decode(''.join(o['data']['image/png'])) for c in nb['cells'] for o in c.get('outputs',[])
+                if 'image/png' in o.get('data',{})]
+        self.assertIn(saved,images)
         self.assertFalse(any('Look at' in ''.join(c['source']) for c in nb['cells']))
 
     def test_display_rounding_matches_saved_csv(self):

@@ -27,6 +27,20 @@ The generator refuses an existing report. Use `--overwrite` only to replace all
 author notes with a fresh template. It executes the new report in memory and
 replaces the target only after all cells pass.
 
+## Shared data illustration
+
+The report embeds [the saved data figure](../figures/report/data-sample.png). It does
+not open datasets or generate pixels. To rebuild the image on CPU, run
+`python -B scripts/build_data_figure.py`; use `--check` to rebuild without writing
+and compare the PNG bytes. The script pins seven pair ids from the frozen standard
+and hard-test lists. It replays saved embedding arguments and seed keys, checks
+both clean and message pixels against the evaluator's `StandardTestPairs` output,
+and draws the recorded overlap-last grid. No settings are drawn again and no model
+is loaded. A shared 256-colour palette keeps the saved PNG small; pixel equality
+is checked before rendering. Rebuild with the same image and plotting software
+versions for byte-identical output. The real-data rebuild test skips when the
+frozen datasets are not installed.
+
 ## Read the report
 
 Each section starts with a question. Chart hints (dashed lines, colours,
@@ -35,6 +49,7 @@ full tables are in the collapsed appendix. The report does not generate conclusi
 
 | Section | Contents |
 | --- | --- |
+| What does the data look like? | Shared saved figure: four source photos with tile grids, clean/message tiles, amplified change maps for three placements, and a noisy ALASKA example. |
 | 0. How good is this model, in short? | Four test-panel error rates, each with a plain "about 1 in N wrong" line, and standard-test AUC; definitions of false alarms, misses, overall error and AUC. |
 | 1. What was trained? | A short training card and listed differences from an optional reference. |
 | 2. Did training go well? | Training and original-validation loss and accuracy; learning-rate drops marked. |
