@@ -1,6 +1,6 @@
 # Plan: architecture tests — delayed pooling and GBRAS-Net (ideas board #10)
 
-Status: **approved by the user 2026-10-19**: arms A and G, choices D3-D6 as recommended, decision rule below (confirmed before any result). A 2-GPU VM and the seed repeat were considered and declined (user). Code: Worker_4.
+Status: **approved by the user 2026-10-19**: arms A and G, choices D3-D6 as recommended, decision rule below (confirmed before any result). A 2-GPU VM and the seed repeat were considered and declined (user). Code: Worker_4. **Arm A done: no gain (see Results). Arm G waits for the user's adapter choice.**
 
 ## Questions
 
@@ -11,12 +11,12 @@ User decisions 2026-10-19: keep the **fixed SRM front end** (no learned first la
 
 ## Today's model (SRM-30, `srm-20261017T052857Z-4521`)
 
-SRM front end (30 fixed filters per colour channel, 90 channels) -> conv1 5x5 -> **pool** -> conv2 5x5 -> pool -> conv3 1x1 -> pool -> conv4 1x1 -> pool -> conv5 1x1 -> pool -> mean -> classifier. Five 2x2 average pools (256 -> 8). Only conv1 and conv2 look at neighbours.
+~~SRM front end (30 fixed filters per colour channel, 90 channels) -> conv1 5x5 -> **pool** -> conv2 5x5 -> pool -> conv3 1x1 -> pool -> conv4 1x1 -> pool -> conv5 1x1 -> pool -> mean -> classifier. Five 2x2 average pools (256 -> 8). Only conv1 and conv2 look at neighbours.~~ Corrected 2026-10-19: SRM-30 is `XuNetWide` (width 4, no normalisation): conv1 5x5 -> pool -> conv2 5x5 -> pool -> conv3 1x1 -> pool -> conv4 1x1 -> pool -> conv5 1x1 -> pool -> conv6 1x1 -> conv7 1x1 -> mean -> classifier. Arm A keeps conv6 and conv7.
 
 ## GBRAS-Net (Tabares-Soto et al., "GBRAS-Net: A Convolutional Neural Network Architecture for Spatial Image Steganalysis", IEEE Access 2021; code: github.com/BioAITeam/Steganalysis)
 
 - Preprocessing: the 30 SRM filters, fixed. Body: depthwise and separable convolutions with skip connections; about 166k parameters.
-- Grayscale in the paper. Our adaptation: our existing SRM front end (30 filters per colour channel, 90 channels) feeds the GBRAS-Net body; only the body's first layer input width changes. Recorded as an adaptation.
+~~- Grayscale in the paper. Our adaptation: our existing SRM front end (30 filters per colour channel, 90 channels) feeds the GBRAS-Net body; only the body's first layer input width changes. Recorded as an adaptation.~~ Not possible as written (Worker_4, from the authors' code at `0b40ab0`): the first GBRAS block adds a 30-channel skip from its input; 90 channels do not match. **User choice pending:** (1) a learned 1x1 adapter 90 -> 30, then GBRAS as published (Orchestrator recommends); (2) widen the early GBRAS blocks to 90; (3) average R/G/B responses into 30 fixed channels. Our SRM front end and clamp stay unchanged (no GBRAS 3*tanh). Built from the authors' code only; the paper PDF was not reachable.
 - The worker builds the body from the paper and the public code, with a citation and a layer-by-layer check against the code. No guessed layers.
 
 ## Arms
@@ -48,6 +48,10 @@ Main measure: pooled AUC over the hard-256 k=1 `low` cells of ALASKA seen + ALAS
 | Otherwise | No gain from this change |
 
 Also reported (not deciding): AUC per panel and placement (scattered vs contiguous is the key context for A); P_E / FA / miss at each model's own threshold; training time.
+
+## Results
+
+Arm A result (2026-10-19, eval `9915836bfe1b229e5259`, evidence `9dfaa27`, `runs/verification/architecture-decision-2026-10-19/`): **no gain; clearly worse.** Pooled hard k=1 low AUC SRM-30 .739 -> delayed .679, paired difference -.060 [-.067, -.054]; standard AUC guard -.0023 [-.0030, -.0016] (wholly below 0). All three literal checks false. Worse in every panel (ALASKA seen -.055, unseen -.046, LSDIR -.067) and every placement (contiguous -.074, random -.047, stride -.057). P_E standard / ALASKA seen / unseen / LSDIR: SRM-30 3.07 / 20.03 / 17.31 / 9.63%, delayed 3.43 / 23.12 / 19.90 / 11.91%. Training 216 min vs 93 min. Caveat (not able to explain a drop this size): one seed; SRM-30 selected its checkpoint on `capped`, arm A on `60da...`. Conclusion: early pooling in this XuNet does not hide the weak signal; it helps.
 
 ## Later steps (only with evidence; user 2026-10-19)
 

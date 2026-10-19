@@ -16,6 +16,8 @@ Recorded by the Orchestrator.
 - Architecture arm A (delayed pooling) code: `1bb7e20` (Worker_4; `xunet_wide_delayed`, only the first two pools removed; 410 tests; golden ALL EQUAL). PC pilot predicted ~267 min on G4, later marked unreliable (the pilot driver synchronised the GPU every step; a later pilot ran 2.5x faster). User raised the GCE max run to 300 min; run 12 launched by Run_Supervisor (`srm-delayed-20261019T100714Z-3282`, VM start 10:07:33Z, timeout 285).
 - PC pilot mode: `aec69d0` (Worker_4; `--set pilot=true`: 4,096 training draws per epoch and a fixed 256-pair seeded slice of the real train-matched list, after the unchanged frozen-list guard; refused by the G4 preflight, the VM job check, the G4 settings loader, the evaluator and the report builder; how-to in `docs/active/g4-batch-runner.md`; 416 tests; golden ALL EQUAL).
 
+- Run 12 done (VM 10:07:37-13:45:43Z, 216 min, exit 0, delivered). Worker_4 copied it (checkpoint SHAs Pi = PC; best epoch 26 `17c787c6...`), evaluated it (`9915836bfe1b229e5259`, cut-off .4535, validation P_E .1221 / AUC .9558), checked that every tile and label matches SRM-30's evaluation, and built the decision evidence (`9dfaa27`: `scripts/architecture_decision.py`, `tests/test_architecture_decision.py`; 424 tests).
+
 ### Found
 
 - **Check 1:** LSB replacement leaves a detectable fingerprint that SRM-e50 does not use. WS separates replacement stego from clean on noisy ALASKA (AUC 0.66-0.69) where SRM-e50 is at 0.54-0.60. SRM-e50 scores replacement and matching about the same. The earlier phrase "noisy ALASKA is at chance" holds for SRM-e50, not for the replacement signal itself.
@@ -30,6 +32,7 @@ Recorded by the Orchestrator.
 - Overconfidence question (user): a threshold depends only on score order, so extreme probabilities matter only when the model is confidently wrong. Mean pooling is not. Check 2 shows single cells are confidently wrong on noisy clean cells. Cell-level training (#3) is the fix if that becomes the goal.
 - **Run 12 (delayed pooling) on G4, live epoch times:** epoch 0 413 s training + 29 s validation; warm epochs 399 s + 27 s (about 7.1 min). Predicted total about 215 min (fits the 285-min timeout), about 2.3x SRM-30 per epoch (not the 2.9x of the PC pilot). GPU 100% busy, 24.8 GB of 96 GB at batch 128. Delayed pooling costs more than twice the compute of SRM-30; any gain must be weighed against that.
 - **PC pilot timing lesson:** the arm A pilot driver synchronised the GPU every step and measured 0.70 steps/s; the new pilot mode measured 1.74 steps/s for the same model and batch. The cause of the full 2.5x was not isolated. Do not add per-step synchronising callbacks to timing pilots.
+- **Arm A (delayed pooling), no gain, clearly worse:** pooled hard k=1 low AUC SRM-30 .739 -> delayed .679, paired difference -.060 [-.067, -.054]; standard AUC guard -.0023 [-.0030, -.0016] (wholly below 0). All three literal checks false. Worse in every panel (ALASKA seen -.055, unseen -.046, LSDIR -.067) and every placement (contiguous -.074, random -.047, stride -.057). P_E standard / ALASKA seen / unseen / LSDIR: SRM-30 3.07 / 20.03 / 17.31 / 9.63%, delayed 3.43 / 23.12 / 19.90 / 11.91%. Training 216 min vs 93 min. Caveat (not able to explain a drop this size): one seed; SRM-30 selected its checkpoint on `capped`, arm A on `60da...`. Conclusion: early pooling in this XuNet does not hide the weak signal; it helps.
 
 ### Decided
 
@@ -51,7 +54,7 @@ Recorded by the Orchestrator.
 
 ### Next
 
-- Run 12 finishes about 13:50Z (Run_Supervisor watches and reports). Then: copy and SHA check, evaluate (standard-256, hard-256), decision table vs SRM-30 with the plan's rule (paired bootstrap).
+- ~~Run 12 finishes about 13:50Z; evaluate; decision table~~ done: no gain.
 - User: choose the GBRAS-Net 90-to-30 adapter (Orchestrator recommends a learned 1x1 adapter, then GBRAS as published). GBRAS is built from the authors' code only (paper PDF not reachable). Then build, PC pilot (`pilot=true`), G4 run.
 - GCE max run duration is still 300 min after run 12 (user setting). Normal runs use `--timeout-min 165`; the user may set it back to 180.
 
