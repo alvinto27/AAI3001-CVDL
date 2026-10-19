@@ -39,6 +39,7 @@ Question: does averaging the 8 x 8 cell evidence dilute packed (contiguous) payl
    - "Cuts contiguous low-bpp misses by >= 10 points" = the **pooled** miss over the three target panels (ALASKA seen, ALASKA unseen, LSDIR; hard `low` cells, k=1, contiguous, replacement and matching together) falls by >= 10 points vs mean pooling, **and** no single target panel gets worse.
    - "No worse noisy-clean FA" = the **pooled** clean FA over the hard `noisy` and `low_noisy` cells of the three target panels (k=1 and k=2, distinct clean tiles) is not higher than mean pooling's. Report every cell; flag any single cell that rises by more than 5 points.
    - "Validation P_E equal or better" = the pooling's validation P_E at its own validation threshold is <= mean pooling's.
+   **Amendment (user, 2026-10-19, after the first pass and before any decision):** float32 softmax saturated (validation scores exactly 1.0: mean 26%, max 70%, top-4 58%), so the min-P_E threshold could not separate tied scores. All three poolings are re-scored on the float64 stego-minus-clean **logit margin** (same order as the softmax, no saturation ties). Rules unchanged. The first-pass numbers stay recorded as superseded.
 2. For each pooling: one threshold at min P_E on the validation list (as today), then the standard-256 and hard-256 tests.
 3. Report contiguous / random / stride misses at k=1 low bpp per panel, noisy-clean false alarms, and overall P_E.
 

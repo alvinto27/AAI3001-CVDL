@@ -30,6 +30,12 @@ Evidence for each item: [2026-10-18 journal](../journal/2026-10-18/README.md) (n
 | 12 | **CNN + statistical features** (**raised** by check 1, 2026-10-19): add classic replacement statistics as inputs, or a separate fusion classifier | Only if item 1 finds signal the CNN misses | Depends on item 1 | Code + 1 G4 run | Waits for item 1 |
 | 6 | Front-end upgrade / BF16 / longer training | Older pending items | Hold until items 1 and 5 are settled | - | On hold |
 
+## Evaluation fixes
+
+| # | Idea | Why | State |
+| ---: | --- | --- | --- |
+| 13 | **Save the logit margin in the evaluation** (next to `prob_stego`) and use it for AUC and thresholds | float32 softmax saturates: 26% of SRM-e50 validation scores are exactly 1.0, so ties distort AUC (main threshold 0.45 is not affected) | To review (found in check 2, 2026-10-19) |
+
 ## Report topics (no work)
 
 | # | Topic | Evidence |
