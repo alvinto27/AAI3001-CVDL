@@ -56,6 +56,12 @@ Question: does SRM's first tanh flatten the weak signal on noisy tiles?
 
 Cost: GPU inference, ~15 min; extend `cvdl/saturation.py` to per-tile output.
 
+Decision scope fixed before any result (Orchestrator, 2026-10-19). The decision uses SRM-e50 only; overlap-256 is contrast.
+- Saturated share = per tile, the fraction of first-tanh inputs with |x| > 3 (the existing `cvdl/saturation.py` definition).
+- "Rises with noise" = over all distinct hard-256 clean tiles of the three target panels (ALASKA seen, ALASKA unseen, LSDIR), Spearman correlation of saturated share with `tile_kv_std` is positive with a photo-bootstrap 95% interval above 0, **and** the noisiest quarter of these tiles (by `tile_kv_std`) has a higher mean saturated share than the least noisy quarter.
+- "Most saturated quarter missed >= 10 points more" = within each hard `noisy` and `low_noisy` cell of the three target panels (k=1 and k=2, stego tiles), split stego tiles into quarters by their own saturated share; pool over cells; miss at SRM-e50's frozen validation cut-off (saved `prob_stego`, cut-off 0.45057889819145203). Top quarter miss minus bottom quarter miss >= 10 points. Report the paired photo-bootstrap 95% interval; flag it as borderline if the interval contains 10.
+- Both parts must hold.
+
 ## Decision rules (confirmed by the user, 2026-10-19)
 
 | Check | Result | Effect on the board |
