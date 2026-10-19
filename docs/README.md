@@ -4,7 +4,6 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Nothing
 
 ## Current references (`active/` means kept for use, not permission to run)
 - [2026-10-19 session handoff — read first next session](active/handoff-2026-10-19.md)
-- [2026-10-17 session handoff (general key documents, G4 launch routine)](active/handoff-2026-10-17.md)
 - [Wide-R2 legacy settings migration — saved evidence and limits](active/legacy-wide-r2-migration.md)
 - [Saved-output report notebook — CPU generator and use (work list #5)](active/report-notebook.md)
 - [Three diagnostic checks (ideas 1, 2, 2b) — done 2026-10-19: #12 raised, #3 lowered, tanh fix struck](active/plan-diagnostic-checks.md)
@@ -56,6 +55,7 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Nothing
 - [Notebook diagnostics verification](archive/notebook-diagnostics-verification.md)
 - [Notebook compile verification](archive/notebook-compile-verification.md)
 - [RAISE 512 rebuild record](archive/rebuild-raise512-run1.md)
+- [2026-10-17 session handoff](archive/handoff-2026-10-17.md) (work list done; superseded by the 2026-10-19 handoff)
 - [2026-10-15 session handoff](archive/handoff-2026-10-15.md)
 - [Superseded research checklist](archive/research-checklist.md)
 

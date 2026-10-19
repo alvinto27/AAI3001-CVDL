@@ -2,7 +2,7 @@
 
 Status: **built** in `a56c275` (2026-10-18, Worker_2): recipe `d6d91a5a98dae856d1ae`, `data/hard-test/256-v1/`. Runs by default in the standard-256 suite. Noise edges (validation Q3): RAISE 1.691, DIV2K 2.442, ALASKA 2.613, LSDIR 2.516. Noisy test pools: RAISE+DIV2K 10,507, ALASKA seen 3,475, unseen 3,278, LSDIR 12,980; every cell uses 1,008 unique tiles (no reuse). Pending: validation-threshold columns (#4). Design by Worker_2 (2026-10-18).
 
-Source decision: [2026-10-17 handoff](handoff-2026-10-17.md) section 2 ("Hard test") and section 6 (v1 details). Hard test v1 (`data/hard-test/v1/`, `cvdl/hardtest.py`) stays unchanged for `--test-suite legacy-512`.
+Source decision: [2026-10-17 handoff](../archive/handoff-2026-10-17.md) section 2 ("Hard test") and section 6 (v1 details). Hard test v1 (`data/hard-test/v1/`, `cvdl/hardtest.py`) stays unchanged for `--test-suite legacy-512`.
 
 ## Kept from v1
 

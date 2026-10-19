@@ -2,7 +2,7 @@
 
 Status: **implemented, opt-in** (2026-10-18). Existing notebooks and legacy validation are unchanged. Design by Worker_1 (2026-10-18); user decisions below override the design where they differ.
 
-Source decision: [2026-10-17 handoff](handoff-2026-10-17.md), section 2, "Validation": validation follows the run's training set.
+Source decision: [2026-10-17 handoff](../archive/handoff-2026-10-17.md), section 2, "Validation": validation follows the run's training set.
 
 ## Problem
 
