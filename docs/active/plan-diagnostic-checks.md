@@ -45,6 +45,8 @@ Question: does averaging the 8 x 8 cell evidence dilute packed (contiguous) payl
 
 Cost: GPU inference, ~15 min per model; small code change. Optional second model: SRM-30.
 
+**Check 2 result (2026-10-19, Worker_3, `9563540`; outputs `runs/verification/diagnostics-2026-10-19/check2/`):** float64 logit-margin scores (amended). Mean pooling parity with the evaluator: max abs 3.5e-7. Mean / max / top-4: validation P_E 10.29 / 16.09 / 14.68%; target contiguous k=1 low misses 46.5 / 59.6 / 62.2% (max and top-4 worse in all three target panels); pooled noisy-clean FA 22.5 / 0.8 / 0.4%. Threshold-free AUC: target contiguous .839 / .771 / .781; target random .682 / .638 / .660; standard .996 / .973 / .979; ALASKA seen .903 / .810 / .821 (mean best everywhere, intervals separate). **Decision row applied: "No such gain" -> lower #3 (not strike).** Reading: mean pooling is not what holds back packed payloads; single untrained cell scores are unreliable on noisy clean cells. Superseded float32 first pass kept in `check2/superseded-float32/`.
+
 ## Check 2b: tanh saturation vs noise
 
 Question: does SRM's first tanh flatten the weak signal on noisy tiles?
