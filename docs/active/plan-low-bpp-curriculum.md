@@ -47,6 +47,11 @@ Lesson from check 2b: use AUC (threshold-free), not misses at one cut-off.
 | Above SRM-e50 but not above the control | The gain comes from extra training, not from the curriculum |
 | Otherwise | No gain; the k=1 low-bpp limit is not a training-order problem |
 
+Measurement details fixed before the decision table (Orchestrator, 2026-10-19, after the per-panel evaluations were seen, before any pooled number or interval):
+- Pooled AUC = one AUC over all pairs of the hard-256 k=1 `low` cells of ALASKA seen, ALASKA unseen and LSDIR (replacement and matching, all placements), from each evaluation's saved `hard_predictions.csv` (no new inference).
+- 95% intervals: 2,000 photo-cluster bootstrap replicates, seed 20261019, the same photo draws for all three models. "Above" = intervals do not overlap (the rule). Paired differences with intervals are reported as context.
+- Standard guard: the point difference in standard-256 P_E at each model's own validation cut-off (curriculum minus SRM-e50); its interval is context. Already known from the evaluations: 3.10 - 2.54 = +0.56 points, so the guard fails literally. The Orchestrator flags this to the user and does not override it.
+
 Also reported (not deciding): AUC per panel and placement; ALASKA FA and misses at the frozen threshold; the noisy cells.
 
 ## Work needed (after approval)
