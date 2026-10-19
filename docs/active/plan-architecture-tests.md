@@ -1,6 +1,6 @@
 # Plan: architecture tests — delayed pooling and GBRAS-Net (ideas board #10)
 
-Status: **draft, waiting for the user's choices** (2026-10-19). No code or runs yet.
+Status: **approved by the user 2026-10-19**: arms A and G, choices D3-D6 as recommended, decision rule below (confirmed before any result). A 2-GPU VM and the seed repeat were considered and declined (user). Code: Worker_4.
 
 ## Questions
 
@@ -37,7 +37,7 @@ Both use the SRM-30 recipe: 30 epochs, AdamW LR 3e-4, warm-up 1, 180,000 tiles p
 | D5 | Checkpoint used | Best on validation (as SRM-30) | Same as the baseline |
 | D6 | Minimum gain (no seed repeat) | +0.03 pooled AUC | Without a seed repeat we do not know the size of chance; demand a gain bigger than the curriculum's +0.02 |
 
-## Decision rule (to confirm before any result)
+## Decision rule (confirmed by the user 2026-10-19, before any result)
 
 Main measure: pooled AUC over the hard-256 k=1 `low` cells of ALASKA seen + ALASKA unseen + LSDIR (as in the curriculum test). Guard: standard-256 AUC. Paired differences vs SRM-30 (eval `11a82bf812e573c7c62d`) on the same tiles: 2,000 photo-cluster bootstrap replicates, seed 20261019, the same draws for all models.
 

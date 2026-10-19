@@ -7,7 +7,7 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Researc
 - [Wide-R2 legacy settings migration — saved evidence and limits](active/legacy-wide-r2-migration.md)
 - [Saved-output report notebook — CPU generator and use (work list #5)](active/report-notebook.md)
 - [Three diagnostic checks (ideas 1, 2, 2b) — done 2026-10-19: #12 raised, #3 lowered, tanh fix struck](active/plan-diagnostic-checks.md)
-- [Architecture tests: delayed pooling and GBRAS-Net (idea 10) — draft, waiting for the user's choices](active/plan-architecture-tests.md)
+- [Architecture tests: delayed pooling and GBRAS-Net (idea 10) — approved 2026-10-19; code in progress](active/plan-architecture-tests.md)
 - [Low-bpp curriculum from SRM-e50 (idea 9) — done 2026-10-19: small real gain, rule not met, not adopted](active/plan-low-bpp-curriculum.md)
 - [Ideas board — checks and experiments to review with the user (none approved)](active/ideas-board.md)
 - [Report notebook readability — revision 1, approved to try](active/plan-report-readability.md)

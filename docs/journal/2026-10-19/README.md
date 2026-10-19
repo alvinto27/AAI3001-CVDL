@@ -40,6 +40,7 @@ Recorded by the Orchestrator.
 - User: #12 on hold (kept on the board). Hand-built replacement statistics feel close to cheating for a CNN project. A related idea (a lowest-bit input plane for the CNN) was mentioned but not added.
 - User: prepare two architecture tests, delayed pooling and SRNet (#10). Note: SRNet learns its front end and uses no SRM filters. Draft: [architecture tests plan](../../active/plan-architecture-tests.md), with a seed repeat of SRM-30 as a chance baseline.
 - User: architecture tests use the fixed SRM front end only (no learned first layer for now; ladder recorded in the plan). Arms: delayed pooling and GBRAS-Net (30 fixed SRM filters + depthwise/separable body). SRNet and the seed repeat (Base 2) dropped.
+- User: architecture plan approved (arms A delayed pooling and G GBRAS-Net; D3-D6 as recommended; minimum gain +0.03 pooled AUC). A 2-GPU G4 (`g4-standard-96`, spot $3.26/h in us-central1, availability high in zone c) and a seed repeat were considered and declined.
 - User (option B): curriculum rule not met, model not adopted; record the small real gain with accurate wording (the rule's "not a training-order problem" text is wrong here). #9 closed, no follow-up run.
 - User: add a data sample figure as the first report section (revision 3): built once from real frozen test tiles (photos with the tile grid, clean vs stego tile, amplified change maps for contiguous / random / stride at k=1 low bpp, one noisy ALASKA tile). "Where the model looks" waits for cell-level training.
 
