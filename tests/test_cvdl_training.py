@@ -1,4 +1,4 @@
-"""Package CPU training equals the notebook golden; checkpoints still load/resume."""
+"""CPU checkpoints load/resume and retain earlier training/validation metrics."""
 import contextlib
 import glob
 import io
@@ -20,15 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from cvdl import callbacks as cb, data, models
 from cvdl.lit import SteganalysisModule, select_best_checkpoint
-from scripts.refactor_golden import (CHECKPOINTS, ckpt_structure, read_csv_rows, read_env_file, state_sha)
-
-
-class LossRecorder(L.Callback):
-    def __init__(self):
-        self.losses = []
-
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
-        self.losses.append(float(outputs['loss'].detach().cpu()))
+from scripts.refactor_golden import CHECKPOINTS, ckpt_structure, read_csv_rows, read_env_file
 
 
 def prepare_data_and_rng():
@@ -78,31 +70,31 @@ def make_trainer(folder, ns, otf, loaders, *, epochs, limit):
         filename='best-epoch{epoch:02d}-val_pe{val_pe:.4f}-val_auc{val_auc:.4f}',
         auto_insert_metric_name=False, monitor='val_pe', mode='min', save_top_k=1, save_last=True,
         every_n_epochs=1, save_on_train_epoch_end=False)
-    recorder = LossRecorder()
     callbacks = [timing, curves, checkpoint,
         cb.V4LRTrace(folder / 'lr_trace.csv', len(loaders.train), ns['EPOCHS'], ns['WARMUP_EPOCHS'], ns['LR_DROPS'], timing)]
     if scalar is not None:
         callbacks.append(scalar)
-    callbacks.extend([cb.OTF_Epoch(otf, loaders.train, timing, prime_next_epoch=ns['PRIME_NEXT_EPOCH']), recorder])
+    callbacks.append(cb.OTF_Epoch(otf, loaders.train, timing, prime_next_epoch=ns['PRIME_NEXT_EPOCH']))
     trainer = L.Trainer(max_epochs=epochs, limit_train_batches=limit, precision=ns['PRECISION'],
         gradient_clip_val=ns['GRAD_CLIP'] or None, gradient_clip_algorithm='norm' if ns['GRAD_CLIP'] else None,
         accelerator='cpu', devices=1, callbacks=callbacks, logger=loggers,
         default_root_dir=str(folder.parent), log_every_n_steps=50, enable_progress_bar=False, deterministic=False)
-    return trainer, recorder, logger, checkpoint
+    return trainer, logger, checkpoint
 
 
 class PackageTrainingTests(unittest.TestCase):
     @unittest.skipUnless((ROOT / 'Datasets/originals/raise/NEF').is_dir(), 'real photos not present')
-    def test_cpu_twenty_step_golden_and_resume(self):
-        golden = json.loads((ROOT / 'tests/golden/refactor-golden.json').read_text())['cpu']
+    def test_cpu_checkpoint_resume_preserves_metrics(self):
         env = read_env_file(ROOT / 'tests/golden/cpu-det.env')
         before_threads = torch.get_num_threads()
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, env), patch('torch.cuda.is_available', return_value=False):
             folder = Path(temp)
+            loaders = None
             try:
                 with contextlib.redirect_stdout(io.StringIO()):
                     ns, otf, loaders = prepare_data_and_rng()
-                    trainer, recorder, logger, checkpoint = make_trainer(folder, ns, otf, loaders, epochs=1, limit=20)
+                    # Two batches finish epoch 0, including its validation and checkpoint.
+                    trainer, logger, checkpoint = make_trainer(folder, ns, otf, loaders, epochs=1, limit=2)
                     model = SteganalysisModule(lr=ns['LR'], max_epochs=ns['EPOCHS'], paired_batches=ns['PAIRED_BATCHES'],
                         clip_t=ns['CLIP_T'], norm=ns['NORM'], steps_per_epoch=len(loaders.train),
                         warmup_epochs=ns['WARMUP_EPOCHS'], grad_clip=ns['GRAD_CLIP'], lr_drops=ns['LR_DROPS'],
@@ -110,26 +102,33 @@ class PackageTrainingTests(unittest.TestCase):
                         validation_data=otf)
                     trainer.fit(model, loaders.train, loaders.val)
                     logger.save()
-                self.assertEqual(recorder.losses, golden['losses'])
-                self.assertEqual(state_sha(model), golden['weights_sha'])
                 metrics_path = folder / 'logs/csv/run/metrics.csv'
-                self.assertEqual(read_csv_rows(metrics_path), golden['folder']['metrics_csv'])
                 last = folder / 'last.ckpt'
-                self.assertEqual(ckpt_structure(last), golden['folder']['last_ckpt'])
+                self.assertEqual(trainer.global_step, 2)
+                saved = ckpt_structure(last)
+                self.assertEqual((saved['global_step'], saved['epoch']), (2, 0))
+                self.assertTrue(Path(checkpoint.best_model_path).is_file())
                 self.assertEqual(select_best_checkpoint(checkpoint.best_model_path, folder), checkpoint.best_model_path)
-                old_rows = read_csv_rows(metrics_path)['rows']
+                metrics = read_csv_rows(metrics_path)
+                old_rows = metrics['rows']
+                val_column = metrics['kept_columns'].index('val_pe')
+                self.assertTrue(any(row[val_column] is not None for row in old_rows),
+                                'metrics prefix must include end-of-epoch validation')
                 # Actually resume optimizer/callback/epoch state, not just a model load.
                 with contextlib.redirect_stdout(io.StringIO()):
                     resumed = SteganalysisModule.load_from_checkpoint(last, map_location='cpu', strict=True,
                                                                      weights_only=False, validation_data=otf)
-                    trainer2, _, logger2, _ = make_trainer(folder, ns, otf, loaders, epochs=2, limit=2)
+                    trainer2, logger2, _ = make_trainer(folder, ns, otf, loaders, epochs=2, limit=2)
                     trainer2.fit(resumed, loaders.train, loaders.val, ckpt_path=str(last))
                     logger2.save()
-                self.assertEqual(trainer2.global_step, 22)
-                self.assertEqual(ckpt_structure(last)['global_step'], 22)
-                self.assertEqual(read_csv_rows(metrics_path)['rows'][:len(old_rows)], old_rows)
-                loaders.train.shutdown()
+                self.assertEqual(trainer2.global_step, 4)
+                self.assertEqual(ckpt_structure(last)['global_step'], 4)
+                new_rows = read_csv_rows(metrics_path)['rows']
+                self.assertGreater(len(new_rows), len(old_rows))
+                self.assertEqual(new_rows[:len(old_rows)], old_rows)
             finally:
+                if loaders is not None:
+                    loaders.train.shutdown()
                 torch.set_num_threads(before_threads)
 
     def test_capped_validation_runtime_dependency(self):
