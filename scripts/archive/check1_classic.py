@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 import sys
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 RUN = ROOT/'runs/srm-e50-20261017T111310Z-0214'
 EVAL = RUN/'evaluation/standard-256-v1/35afd1c7938bae78968c'
 OUT = ROOT/'runs/verification/diagnostics-2026-10-19/check1'
@@ -39,7 +39,7 @@ def snapshot():
 def score_photo(task):
     import numpy as np
     import pandas as pd
-    from cvdl.classic_lsb import scores
+    from cvdl.archive.classic_lsb import scores
     from cvdl.standardtest import StandardTestPairs
     from lsb_torch import Corpus, RunSettings
     from lsb_train_grid import crop

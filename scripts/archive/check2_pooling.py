@@ -17,7 +17,7 @@ from pathlib import Path
 import sys
 import time
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 RUN = ROOT/'runs/srm-e50-20261017T111310Z-0214'
 EVAL = RUN/'evaluation/standard-256-v1/35afd1c7938bae78968c'
 OUT = ROOT/'runs/verification/diagnostics-2026-10-19/check2'
@@ -34,8 +34,8 @@ def score(network, dataset, saved_path, name, workers):
     from torch.nn import functional as F
     from torch.utils.data import DataLoader
     from lsb_torch import PhotoPairTasks, initialize_worker, prefetch_for_images
-    from cvdl.cell_pooling import pooled_probabilities, pooled_logits64
-    from scripts.check1_classic import attach_saved
+    from cvdl.archive.cell_pooling import pooled_probabilities, pooled_logits64
+    from scripts.archive.check1_classic import attach_saved
     tasks = PhotoPairTasks(dataset)
     kwargs = dict(batch_size=None, num_workers=workers, pin_memory=True, worker_init_fn=initialize_worker)
     if workers: kwargs.update(multiprocessing_context='spawn', prefetch_factor=prefetch_for_images(tasks.max_images, 128))
@@ -184,7 +184,7 @@ def margin_ties(frame, mode):
 
 def context_auc(hard, panel_rows, replicates=2000):
     """Threshold-free context only; not part of the registered decision."""
-    from scripts.check1_classic import auc_intervals
+    from scripts.archive.check1_classic import auc_intervals
     result = []
     for placement in ('contiguous', 'random'):
         frame = hard[hard.panel.isin(TARGETS) & (hard.k == 1) & (hard.condition == 'low') &
@@ -206,7 +206,7 @@ def summarize():
     import numpy as np
     import pandas as pd
     from cvdl.metrics import threshold
-    from scripts.check1_classic import auc_intervals
+    from scripts.archive.check1_classic import auc_intervals
     parity = json.loads((OUT/'parity.json').read_text())
     if len(parity) != 6 or not all(p['pass'] for p in parity): raise ValueError('incomplete/failed parity')
     validation = pd.read_csv(OUT/'validation-scores.csv', float_precision='round_trip')
@@ -360,7 +360,7 @@ def main():
     sys.path.insert(0,str(ROOT))
     os.environ.update(PYTHONDONTWRITEBYTECODE='1', OMP_NUM_THREADS='1', OPENBLAS_NUM_THREADS='1', MKL_NUM_THREADS='1')
     if args.phase == 'summarize': os.environ.update(CUDA_VISIBLE_DEVICES='',HIP_VISIBLE_DEVICES='')
-    from scripts.check1_classic import snapshot
+    from scripts.archive.check1_classic import snapshot
     OUT.mkdir(parents=True, exist_ok=True)
     before = snapshot(); (OUT/f'{args.phase}-inputs-before.json').write_text(json.dumps(before,indent=2)+'\n')
     started = time.perf_counter()

@@ -37,13 +37,14 @@ class PathPolicyTests(unittest.TestCase):
                 self.assertTrue(lines[0].startswith('TESTS: ' + tests))
                 self.assertTrue(lines[1].startswith('GOLDEN: ' + golden))
 
-    def test_code_read_docs_and_nontext_docs_stay_fast(self):
+    def test_code_read_docs_and_nontext_docs_keep_required_levels(self):
         for path in ('docs/active/plan-architecture-tests.md', *policy.DOCUMENTATION_INPUTS,
                      'docs/figures/other.png', 'docs/guide.txt',
                      'docs/code.py', 'docs/guide.MD', 'scripts/README.md'):
             with self.subTest(path=path):
                 lines = policy.decisions(['docs/guide.md', path])
-                self.assertTrue(lines[0].startswith('TESTS: FAST'))
+                level = 'FULL' if path == 'docs/figures/report/data-sample.png' else 'FAST'
+                self.assertTrue(lines[0].startswith('TESTS: ' + level))
                 self.assertTrue(lines[1].startswith('GOLDEN: NOT REQUIRED'))
 
     def test_no_changes_need_no_tests(self):
@@ -53,18 +54,32 @@ class PathPolicyTests(unittest.TestCase):
         self.assertTrue(lines[1].startswith('GOLDEN: NOT REQUIRED'))
         self.assertEqual(lines[2], policy.REMINDER)
 
-    def test_full_loader_dependencies(self):
+    def test_full_loader_and_frozen_figure_dependencies(self):
         for path in ('LSB-Dataset-Generator/lsb_torch.py', 'tests/test_lsb_torch.py',
                      'tests/test_lsb_source.py', 'configs/raise512-run1.yaml',
-                     'configs/test-bpp1.yaml'):
+                     'configs/test-bpp1.yaml', 'tests/test_data_figure.py',
+                     'scripts/build_data_figure.py', 'docs/figures/report/data-sample.png',
+                     'cvdl/standardtest.py', 'cvdl/validation.py', 'cvdl/__init__.py',
+                     'data/raise/photo_manifest.csv', 'data/div2k/photo_manifest.csv',
+                     'data/alaska/photo_manifest.csv', 'data/lsdir/photo_manifest.csv',
+                     'data/test/standard-256-v1/pairs-standard.csv',
+                     'data/hard-test/256-v1/summary.json'):
             with self.subTest(path=path):
                 self.assertIsNotNone(policy.path_reasons(path)[0])
+                self.assertTrue(policy.decisions(['docs/guide.md', path])[0].startswith('TESTS: FULL'))
 
     def test_known_areas_are_fast(self):
         for path in ('cvdl/models.py', 'scripts/test_cpu.py', 'notebooks/new-experiment.ipynb',
                      'configs/new-experiment.yaml', 'data/new-test/pairs.csv',
                      'tests/test_cpu_levels.py', 'docs/runbook.md', 'README.md',
-                     'AGENTS.md', 'CHANGELOG.md'):
+                     'AGENTS.md', 'CHANGELOG.md', 'scripts/required_test_level.py',
+                     'cvdl/metrics.py', 'tests/test_cvdl_metrics.py',
+                     'tests/test_notebook_compile.py', 'tests/test_notebook_diagnostics.py',
+                     'notebooks/04_baseline_kv_xunet_v3.ipynb',
+                     'docs/figures/report/data-sample.png.backup',
+                     'data/test/standard-256-v1-other/pairs.csv',
+                     'data/hard-test/256-v1-other/pairs.csv',
+                     'data/raise/photo_manifest.csv.backup'):
             with self.subTest(path=path):
                 self.assertIsNone(policy.path_reasons(path)[0])
 
@@ -185,25 +200,36 @@ class GitChangeTests(unittest.TestCase):
 
 
 class RunnerSelectionTests(unittest.TestCase):
-    def case(self, module):
-        return type('Example', (unittest.TestCase,), {
+    def case(self, module, name='Example'):
+        return type(name, (unittest.TestCase,), {
             '__module__': module,
             'setUpClass': classmethod(lambda cls: (_ for _ in ()).throw(AssertionError('fixture ran'))),
             'test_example': lambda self: None,
         })
 
-    def test_fast_skips_only_exact_module_with_visible_reason_and_no_fixture(self):
+    def test_fast_skips_only_exact_module_or_class_with_visible_reason_and_no_fixture(self):
         full = self.case('test_lsb_torch')
+        replay = self.case('test_data_figure', 'DataFigureReplayTests')
         small = type('Small', (unittest.TestCase,), {
             '__module__': 'test_lsb_torch_other', 'test_example': lambda self: None})
-        suite = unittest.TestSuite([unittest.TestSuite([full('test_example')]), small('test_example')])
+        smoke = type('DataFigureTests', (unittest.TestCase,), {
+            '__module__': 'test_data_figure', 'test_example': lambda self: None})
+        lookalike = type('DataFigureReplayTests', (unittest.TestCase,), {
+            '__module__': 'test_data_figure_other', 'test_example': lambda self: None})
+        suite = unittest.TestSuite([unittest.TestSuite([full('test_example'), replay('test_example')]),
+                                   small('test_example'), smoke('test_example'), lookalike('test_example')])
         with runner.select_level(suite, 'fast'):
             result = unittest.TextTestRunner(stream=io.StringIO(), verbosity=2).run(suite)
         self.assertTrue(result.wasSuccessful())
-        self.assertEqual(result.testsRun, 2)
-        self.assertEqual(len(result.skipped), 1)
-        self.assertEqual(result.skipped[0][1], runner.SKIP_REASON)
-        self.assertNotIn('__unittest_skip__', full.__dict__)
+        self.assertEqual(result.testsRun, 5)
+        self.assertEqual([reason for _, reason in result.skipped],
+                         [runner.SKIP_REASON, runner.FIGURE_SKIP_REASON])
+        for cls in (full, replay, small, smoke, lookalike):
+            self.assertNotIn('__unittest_skip__', cls.__dict__)
+            self.assertNotIn('__unittest_skip_why__', cls.__dict__)
+        with runner.select_level(unittest.TestSuite([full('test_example'), replay('test_example')]), 'full'):
+            self.assertFalse(getattr(full, '__unittest_skip__', False))
+            self.assertFalse(getattr(replay, '__unittest_skip__', False))
 
     def test_full_is_default_and_does_not_add_skips(self):
         with patch.object(runner.unittest.defaultTestLoader, 'discover', return_value=unittest.TestSuite()), \
@@ -219,16 +245,21 @@ class RunnerSelectionTests(unittest.TestCase):
             self.assertTrue(sys.dont_write_bytecode)
 
     def test_existing_skip_attributes_restore_even_after_error(self):
-        cls = self.case('test_lsb_torch')
-        cls.__unittest_skip__ = True
-        cls.__unittest_skip_why__ = 'original'
-        suite = unittest.TestSuite([cls('test_example')])
-        with self.assertRaises(RuntimeError):
-            with runner.select_level(suite, 'fast'):
-                self.assertEqual(cls.__unittest_skip_why__, runner.SKIP_REASON)
-                raise RuntimeError('abort')
-        self.assertTrue(cls.__unittest_skip__)
-        self.assertEqual(cls.__unittest_skip_why__, 'original')
+        for module, name, reason in (('test_lsb_torch', 'Example', runner.SKIP_REASON),
+                                     ('test_data_figure', 'DataFigureReplayTests', runner.FIGURE_SKIP_REASON)):
+            with self.subTest(module=module, name=name):
+                cls = self.case(module, name)
+                cls.__unittest_skip__ = True
+                cls.__unittest_skip_why__ = 'original'
+                suite = unittest.TestSuite([cls('test_example')])
+                with self.assertRaises(RuntimeError):
+                    with runner.select_level(suite, 'fast'):
+                        self.assertEqual(cls.__unittest_skip_why__, reason)
+                        raise RuntimeError('abort')
+                self.assertTrue(cls.__unittest_skip__)
+                self.assertEqual(cls.__unittest_skip_why__, 'original')
+                with runner.select_level(suite, 'full'):
+                    self.assertEqual(cls.__unittest_skip_why__, 'original')
 
     def test_invalid_level_is_rejected(self):
         with self.assertRaises(ValueError):

@@ -38,8 +38,8 @@ class TanhSaturationTests(unittest.TestCase):
 if __name__=='__main__':unittest.main()
 
 
-class StageSelectionTests(unittest.TestCase):
-    """evaluate_run.py stage selection and no-overwrite rule (all work mocked)."""
+class StageSelectionHelper:
+    """Shared mocked evaluator helper; no discovered tests."""
     def run_main(self,argv,folder,existing=()):
         import sys, tempfile
         from pathlib import Path
@@ -56,6 +56,9 @@ class StageSelectionTests(unittest.TestCase):
             er.main()
         return calls
 
+
+class StageSelectionTests(StageSelectionHelper, unittest.TestCase):
+    """evaluate_run.py stage selection and no-overwrite rule (all work mocked)."""
     def test_only_and_skip_main_never_run_main(self):
         import tempfile
         with tempfile.TemporaryDirectory() as d:
@@ -96,7 +99,7 @@ class StageSelectionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'nothing'):self.run_main(['--skip-main'],d)
 
 
-class TablesStageTests(StageSelectionTests):
+class TablesStageTests(StageSelectionHelper, unittest.TestCase):
     def test_tables_stage_and_main_refuse_existing_tables(self):
         import tempfile
         with tempfile.TemporaryDirectory() as d:

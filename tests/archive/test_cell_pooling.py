@@ -1,6 +1,12 @@
 import unittest
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
 import torch
-from cvdl.cell_pooling import pool_logits, pooled_probabilities, pooled_logits64
+from cvdl.archive.cell_pooling import pool_logits, pooled_probabilities, pooled_logits64
 
 
 class CellPoolingTests(unittest.TestCase):
@@ -51,14 +57,14 @@ class CellPoolingTests(unittest.TestCase):
 
     def test_exact_margin_tie_counts(self):
         import pandas as pd
-        from scripts.check2_pooling import margin_ties
+        from scripts.archive.check2_pooling import margin_ties
         frame = pd.DataFrame(dict(label=[0,0,1,1,0], mean=[1.,1.,1.,2.,3.]))
         self.assertEqual(margin_ties(frame, 'mean'), dict(images=5, unique_margins=3,
             tied_groups=1, images_in_tied_groups=3, duplicate_excess=2, clean_stego_tied_groups=1))
 
     def test_paired_photo_bootstrap_error_changes(self):
         import pandas as pd
-        from scripts.check2_pooling import paired_change
+        from scripts.archive.check2_pooling import paired_change
         frame = pd.DataFrame(dict(source_photo=['a','a','b','b'], label=[0,1,0,1],
             mean=[.1,.2,.6,.9], max=[.1,.8,.1,.9], top4=[.1,.2,.6,.9]))
         cutoff = dict(mean=.5, max=.5, top4=.5)
@@ -69,7 +75,7 @@ class CellPoolingTests(unittest.TestCase):
 
     def test_fixed_cutoff_miss_and_false_alarm_changes(self):
         import pandas as pd
-        from scripts.check2_pooling import paired_change
+        from scripts.archive.check2_pooling import paired_change
         frame = pd.DataFrame(dict(source_photo=['a','b'], label=[1,1], mean=[.1,.2], max=[.8,.9]))
         cutoff = dict(mean=.5, max=.5)
         misses = paired_change(frame, 'miss', cutoff, ('mean','max'), replicates=10)
@@ -79,7 +85,7 @@ class CellPoolingTests(unittest.TestCase):
 
     def test_context_auc_uses_exact_registered_low_cells_and_both_labels(self):
         import pandas as pd
-        from scripts.check2_pooling import context_auc, TARGETS, MODES
+        from scripts.archive.check2_pooling import context_auc, TARGETS, MODES
         rows = []
         for panel in (*TARGETS, 'standard'):
             for placement in ('contiguous','random','stride'):

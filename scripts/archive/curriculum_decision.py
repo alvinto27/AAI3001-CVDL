@@ -10,7 +10,7 @@ import json
 import os
 import sys
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 SEED = 20261019
 REPLICATES = 2000

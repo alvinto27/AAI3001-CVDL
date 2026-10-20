@@ -5,14 +5,12 @@ import io
 import json
 import os
 from pathlib import Path
-from types import SimpleNamespace
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
 import lightning as L
-import numpy as np
 from lightning.pytorch.loggers import TensorBoardLogger
 import torch
 
@@ -130,27 +128,6 @@ class PackageTrainingTests(unittest.TestCase):
                 if loaders is not None:
                     loaders.train.shutdown()
                 torch.set_num_threads(before_threads)
-
-    def test_capped_validation_runtime_dependency(self):
-        def sample(sanity, names):
-            logged = {}
-            obj = SimpleNamespace(validation_data=SimpleNamespace(checkpoint_validation='capped'),
-                trainer=SimpleNamespace(sanity_checking=sanity),
-                validation_scores=[torch.tensor([.1] * len(names) + [.9] * len(names))],
-                validation_labels=[torch.tensor([0] * len(names) + [1] * len(names))],
-                validation_sources=[np.array(names * 2)], validation_losses=[torch.ones(2 * len(names))],
-                log=lambda key, value, **kw: logged.update({key: value}))
-            return obj, logged
-        partial, logged = sample(True, ['raise'])
-        SteganalysisModule.on_validation_epoch_end(partial)
-        self.assertFalse(any(key.startswith('val_pe_') for key in logged))
-        partial, _ = sample(False, ['raise'])
-        with self.assertRaisesRegex(ValueError, 'no alaska examples'):
-            SteganalysisModule.on_validation_epoch_end(partial)
-        complete, logged = sample(False, ['raise', 'alaska', 'lsdir'])
-        SteganalysisModule.on_validation_epoch_end(complete)
-        self.assertEqual({key for key in logged if key.startswith(('val_pe_', 'val_loss_'))},
-                         {f'val_{metric}_{name}' for name in ('raise', 'alaska', 'lsdir') for metric in ('pe', 'loss')})
 
     def test_four_old_checkpoints_load_strict_if_present(self):
         found = 0

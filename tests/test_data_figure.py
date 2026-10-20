@@ -14,6 +14,8 @@ class DataFigureTests(unittest.TestCase):
         self.assertTrue(data.startswith(b'\x89PNG\r\n\x1a\n'))
         self.assertLess(len(data), 500_000)
 
+
+class DataFigureReplayTests(unittest.TestCase):
     @unittest.skipUnless((ROOT/'data/hard-test/256-v1/pairs-alaska-seen.csv').is_file(),
                          'real frozen datasets are not installed')
     def test_real_pairs_equal_evaluator_and_png_rebuild_is_identical(self):

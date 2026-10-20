@@ -1,6 +1,12 @@
 import unittest
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
 import numpy as np
-from cvdl.classic_lsb import weighted_stego, sample_pairs, scores
+from cvdl.archive.classic_lsb import weighted_stego, sample_pairs, scores
 
 
 class ClassicLSBTests(unittest.TestCase):
@@ -40,7 +46,7 @@ class ClassicLSBTests(unittest.TestCase):
             self.assertEqual(result[name], np.mean([result[f'{name}_{c}'] for c in 'rgb']))
 
     def test_validation_threshold_is_conservative_with_ties(self):
-        from scripts.check1_classic import validation_cutoff
+        from scripts.archive.check1_classic import validation_cutoff
         clean = np.array([0]*90+[1]*10, dtype=float)
         cutoff = validation_cutoff(clean, .05)
         self.assertLessEqual(np.mean(clean >= cutoff), .05)
@@ -49,7 +55,7 @@ class ClassicLSBTests(unittest.TestCase):
 
     def test_photo_bootstrap_is_deterministic_and_keeps_pairs_together(self):
         import pandas as pd
-        from scripts.check1_classic import auc_intervals
+        from scripts.archive.check1_classic import auc_intervals
         frame = pd.DataFrame(dict(source_photo=['a','a','b','b','c','c'], label=[0,1]*3,
                                   ws=[0,1,0,1,0,1]))
         first = auc_intervals(frame, ['ws'], replicates=25)
@@ -60,7 +66,7 @@ class ClassicLSBTests(unittest.TestCase):
         import pandas as pd
         import tempfile
         from pathlib import Path
-        from scripts.check1_classic import attach_saved
+        from scripts.archive.check1_classic import attach_saved
         frame = pd.DataFrame(dict(pair_id=['a','a'], label=[0,1], source_photo=['photo']*2))
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/'saved.csv'
@@ -70,7 +76,7 @@ class ClassicLSBTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'do not match'): attach_saved(frame, path)
 
     def test_descriptive_roc_keeps_ties_and_matches_auc(self):
-        from scripts.check1_classic import descriptive_roc
+        from scripts.archive.check1_classic import descriptive_roc
         from cvdl.metrics import auc_numpy
         labels = np.array([0,1,0,1]); values = np.array([.1,.5,.5,.9])
         fa, miss = descriptive_roc(labels, values)

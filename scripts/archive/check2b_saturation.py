@@ -14,7 +14,7 @@ from pathlib import Path
 import sys
 import time
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT/'runs/verification/diagnostics-2026-10-19/check2b'
 TARGETS = ('alaska-seen','alaska-unseen','lsdir')
 SEED = 20261019
@@ -25,7 +25,7 @@ MODELS = {
 
 
 def snapshot():
-    from scripts.check1_classic import snapshot as first_snapshot
+    from scripts.archive.check1_classic import snapshot as first_snapshot
     result = first_snapshot()
     other = ROOT/'runs'/MODELS['overlap-256'][0]
     for p in sorted(other.rglob('*')):
@@ -67,7 +67,7 @@ def infer(workers):
     from cvdl.standardtest import StandardTestPairs
     from cvdl.models import model_from_hparams
     from cvdl.lit import select_best_checkpoint
-    from cvdl.tile_saturation import first_tanh_inputs, tile_saturated_share
+    from cvdl.archive.tile_saturation import first_tanh_inputs, tile_saturated_share
     from lsb_torch import Corpus, RunSettings, PhotoPairTasks, initialize_worker, prefetch_for_images
     torch.set_num_threads(1); torch.manual_seed(0); np.random.seed(0)
     torch.backends.cudnn.benchmark = False

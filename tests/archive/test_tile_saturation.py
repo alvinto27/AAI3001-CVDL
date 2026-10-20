@@ -1,13 +1,18 @@
 import unittest
+from pathlib import Path
+import sys
 from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 
 import numpy as np
 import pandas as pd
 import torch
 from cvdl.models import XuNet, XuNetWide
 from cvdl.saturation import Stats
-from cvdl.tile_saturation import first_tanh_inputs, tile_saturated_share, first_tanh_share
-from scripts.check2b_saturation import (rank_quarters, spearman, correlation_interval,
+from cvdl.archive.tile_saturation import first_tanh_inputs, tile_saturated_share, first_tanh_share
+from scripts.archive.check2b_saturation import (rank_quarters, spearman, correlation_interval,
                                       pooled_quarter_difference, join_saved)
 
 
@@ -91,12 +96,12 @@ class TileSaturationTests(unittest.TestCase):
     def test_report_handles_undefined_correlation(self):
         import tempfile
         from pathlib import Path
-        from scripts.check2b_saturation import write_report
+        from scripts.archive.check2b_saturation import write_report
         result=dict(cutoff=.5,correlation=dict(rho=None,low=None,high=None,
             distinct_clean_tiles=4,photos=2),pooled_miss_difference=dict(difference=0.,low=0.,high=0.,
             bottom_miss=.5,top_miss=.5,bottom_n=4,top_n=4,borderline_10_points=False))
         with tempfile.TemporaryDirectory() as tmp:
-            with patch('scripts.check2b_saturation.OUT',Path(tmp)):
+            with patch('scripts.archive.check2b_saturation.OUT',Path(tmp)):
                 write_report({'constant':result},[],[],[])
                 self.assertIn('Spearman: undefined undefined',(Path(tmp)/'report.md').read_text())
 

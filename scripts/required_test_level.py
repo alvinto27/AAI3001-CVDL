@@ -13,6 +13,14 @@ KNOWN_AREAS = ('cvdl/', 'scripts/', 'notebooks/', 'configs/', 'data/', 'tests/',
 KNOWN_FILES = frozenset({'README.md', 'AGENTS.md', 'CHANGELOG.md', 'pyproject.toml', 'uv.lock'})
 FULL_FILES = frozenset({'tests/test_lsb_torch.py', 'tests/test_lsb_source.py',
                         'configs/raise512-run1.yaml', 'configs/test-bpp1.yaml'})
+FIGURE_FULL_FILES = frozenset({
+    'tests/test_data_figure.py', 'scripts/build_data_figure.py',
+    'docs/figures/report/data-sample.png', 'cvdl/standardtest.py',
+    'cvdl/validation.py', 'cvdl/__init__.py',
+    'data/raise/photo_manifest.csv', 'data/div2k/photo_manifest.csv',
+    'data/alaska/photo_manifest.csv', 'data/lsdir/photo_manifest.csv',
+})
+FIGURE_FULL_PREFIXES = ('data/test/standard-256-v1/', 'data/hard-test/256-v1/')
 DEPENDENCY_FILES = frozenset({'pyproject.toml', 'uv.lock'})
 # Keep code-read documentation in FAST, even when the file is Markdown.
 # architecture_decision hashes its plan; reporting/figure checks read the PNG.
@@ -66,6 +74,8 @@ def path_reasons(path):
         full = 'exhaustive loader dependency'
     elif path in FULL_FILES:
         full = 'exhaustive loader test or fixture dependency'
+    elif path in FIGURE_FULL_FILES or path.startswith(FIGURE_FULL_PREFIXES):
+        full = 'frozen figure replay dependency'
     golden = None
     if dependency_path(path):
         golden = 'runtime dependencies or container build'

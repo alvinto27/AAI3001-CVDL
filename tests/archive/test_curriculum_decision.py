@@ -2,11 +2,15 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import sys
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 
 import numpy as np
 import pandas as pd
 from cvdl.metrics import auc_numpy
-from scripts.curriculum_decision import join_predictions, intervals, NAMES
+from scripts.archive.curriculum_decision import join_predictions, intervals, NAMES
 
 
 class DecisionTests(unittest.TestCase):
