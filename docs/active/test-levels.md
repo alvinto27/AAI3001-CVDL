@@ -34,6 +34,7 @@ podman exec -w /work aai3001 python -B scripts/refactor_golden.py compare       
 | Full tests | `LSB-Dataset-Generator/**`; `tests/test_lsb_torch.py`; `tests/test_lsb_source.py`; `configs/raise512-run1.yaml`; `configs/test-bpp1.yaml`; `pyproject.toml`; `uv.lock`; `Containerfile*`; `Dockerfile*`; any path outside the known areas |
 | Golden compare | `cvdl/**`; `LSB-Dataset-Generator/**`; `tests/golden/**`; the golden script and the files it reads or runs (list in `GOLDEN_FILES` in the helper); dependency and container files; any path outside the known areas |
 | Fast tests | Every code change that needs neither of the above |
+| No tests (`TESTS: NONE`, added `c7b5176`) | Only Markdown docs changed (`docs/**/*.md`, root `README.md`, `AGENTS.md`, `CHANGELOG.md`), or nothing changed. Exceptions (code reads them, so FAST): `docs/active/plan-architecture-tests.md` (`scripts/architecture_decision.py` hashes it) and `docs/figures/report/data-sample.png` (figure and report tests) |
 
 **Always, regardless of the helper:** full tests and the golden compare once before every G4 launch, on the launch commit.
 
@@ -48,7 +49,12 @@ Replay on past commits: `9dfaa27` (decision script) gives FAST + golden NOT REQU
 | Fast | 413 | 28 | 160.6 s |
 | Full | 441 | 0 | 495.4 s |
 
-## Next (user approved, not built)
+## Follow-up changes (2026-10-20, user approved)
 
-- **B:** shrink the 36-case packed-loader test in the fast level to cases that cover each edge case; keep all 36 cases in the full level.
-- **C:** remove the repeated 20-step comparison from `test_cvdl_training` (the golden `cpu` stage owns it); keep its resume check.
+| Item | State |
+| --- | --- |
+| **C:** `test_cvdl_training` without the repeated 20-step golden comparison | Done `a1ae22c`. It now trains 2 steps (with validation and a real best checkpoint), then resumes 2 steps and checks step 4 and the kept metrics rows. The exact 20-step check stays in the golden `cpu` stage. Gain only about 5 s (33.5 s to 28.7 s): most of the time is real-photo setup and validation, not the 20 steps. Loader shutdown moved into `finally` |
+| **B (shrink the 36-case packed-loader test)** | **Not done (B3, user).** A already skips it in the fast level. The workers start and stop on purpose: training workers shut down after fit (freed about 10 GB of PC RAM, 2026-10-14), evaluation workers are released after each pass, and they start with `spawn` (each worker loads PyTorch again). Each case needs its own worker count, so workers cannot be shared across cases, and `fork` would test a path that real runs do not use |
+| Helper `TESTS: NONE` for Markdown-only changes | Done `c7b5176` (21 helper tests) |
+
+Fast level after these changes: 417 run, 28 skipped, 155.9 s wall.
