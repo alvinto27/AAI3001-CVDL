@@ -14,6 +14,13 @@ KNOWN_FILES = frozenset({'README.md', 'AGENTS.md', 'CHANGELOG.md', 'pyproject.to
 FULL_FILES = frozenset({'tests/test_lsb_torch.py', 'tests/test_lsb_source.py',
                         'configs/raise512-run1.yaml', 'configs/test-bpp1.yaml'})
 DEPENDENCY_FILES = frozenset({'pyproject.toml', 'uv.lock'})
+# Keep code-read documentation in FAST, even when the file is Markdown.
+# architecture_decision hashes its plan; reporting/figure checks read the PNG.
+DOCUMENTATION_INPUTS = frozenset({
+    'docs/active/plan-architecture-tests.md',
+    'docs/figures/report/data-sample.png',
+})
+ROOT_MARKDOWN = frozenset({'README.md', 'AGENTS.md', 'CHANGELOG.md'})
 # Explicit inputs to the current golden recipes, not all experiment configs/data.
 GOLDEN_FILES = frozenset({
     'scripts/refactor_golden.py', 'scripts/run_notebook.py', 'scripts/speed_matrix.py',
@@ -108,16 +115,26 @@ def changed_paths(repo, base):
     return sorted(paths)
 
 
+def documentation_text(path):
+    return (path not in DOCUMENTATION_INPUTS
+            and (path in ROOT_MARKDOWN or (path.startswith('docs/') and path.endswith('.md'))))
+
+
 def decisions(paths):
+    paths = sorted(set(paths))
     full, golden = [], []
-    for path in sorted(set(paths)):
+    for path in paths:
         test_reason, golden_reason = path_reasons(path)
         if test_reason:
             full.append(f'{path!r}: {test_reason}')
         if golden_reason:
             golden.append(f'{path!r}: {golden_reason}')
     # Include the inspected paths even when none matched a required-check rule.
-    inspected = ', '.join(repr(path) for path in sorted(set(paths))) or '(no changed paths)'
+    inspected = ', '.join(repr(path) for path in paths) or '(no changed paths)'
+    if all(documentation_text(path) for path in paths):
+        return ['TESTS: NONE — documentation text only; inspected: ' + inspected,
+                'GOLDEN: NOT REQUIRED — no golden dependency changed; inspected: ' + inspected,
+                REMINDER]
     return [
         'TESTS: FULL — ' + '; '.join(full) if full else
         'TESTS: FAST — no full-only dependency changed; inspected: ' + inspected,

@@ -16,6 +16,43 @@ from scripts import test_cpu as runner
 
 
 class PathPolicyTests(unittest.TestCase):
+    def test_documentation_only_and_root_markdown_need_no_tests(self):
+        paths = ['docs/README.md', 'docs/nested/guide.md', 'README.md', 'AGENTS.md', 'CHANGELOG.md']
+        lines = policy.decisions(paths)
+        self.assertTrue(lines[0].startswith('TESTS: NONE'))
+        self.assertTrue(lines[1].startswith('GOLDEN: NOT REQUIRED'))
+        self.assertEqual(lines[2], policy.REMINDER)
+        for path in paths:
+            self.assertIn(repr(path), lines[0])
+
+    def test_docs_plus_code_keeps_fast_full_and_golden_rules(self):
+        for path, tests, golden in [
+            ('scripts/test_cpu.py', 'FAST', 'NOT REQUIRED'),
+            ('cvdl/models.py', 'FAST', 'REQUIRED'),
+            ('LSB-Dataset-Generator/lsb_torch.py', 'FULL', 'REQUIRED'),
+            ('unknown.txt', 'FULL', 'REQUIRED'),
+        ]:
+            with self.subTest(path=path):
+                lines = policy.decisions(['docs/guide.md', path])
+                self.assertTrue(lines[0].startswith('TESTS: ' + tests))
+                self.assertTrue(lines[1].startswith('GOLDEN: ' + golden))
+
+    def test_code_read_docs_and_nontext_docs_stay_fast(self):
+        for path in ('docs/active/plan-architecture-tests.md', *policy.DOCUMENTATION_INPUTS,
+                     'docs/figures/other.png', 'docs/guide.txt',
+                     'docs/code.py', 'docs/guide.MD', 'scripts/README.md'):
+            with self.subTest(path=path):
+                lines = policy.decisions(['docs/guide.md', path])
+                self.assertTrue(lines[0].startswith('TESTS: FAST'))
+                self.assertTrue(lines[1].startswith('GOLDEN: NOT REQUIRED'))
+
+    def test_no_changes_need_no_tests(self):
+        lines = policy.decisions([])
+        self.assertTrue(lines[0].startswith('TESTS: NONE'))
+        self.assertIn('(no changed paths)', lines[0])
+        self.assertTrue(lines[1].startswith('GOLDEN: NOT REQUIRED'))
+        self.assertEqual(lines[2], policy.REMINDER)
+
     def test_full_loader_dependencies(self):
         for path in ('LSB-Dataset-Generator/lsb_torch.py', 'tests/test_lsb_torch.py',
                      'tests/test_lsb_source.py', 'configs/raise512-run1.yaml',
