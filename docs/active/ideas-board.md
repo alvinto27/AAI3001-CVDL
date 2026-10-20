@@ -1,6 +1,6 @@
 # Ideas board
 
-Status (2026-10-19): checks 1, 2, 2b, #9 and #10 arm A done; #10 arm G waits for the user; #12 on hold (user); the rest open. Nothing here starts without a user decision. Created 2026-10-18.
+Status (2026-10-20): checks 1, 2, 2b, #9 and #10 arm A done; #14 added (test gap); code of checks 1, 2, 2b archived 2026-10-20 (restore it with its tests before #12 or #3 reuses it); #10 arm G waits for the user; #12 on hold (user); the rest open. Nothing here starts without a user decision. Created 2026-10-18.
 
 Evidence for each item: [2026-10-18 journal](../journal/2026-10-18/README.md) (numbers on the new 256 suite, each model at its own validation cut-off).
 
@@ -34,6 +34,7 @@ Evidence for each item: [2026-10-18 journal](../journal/2026-10-18/README.md) (n
 | # | Idea | Why | State |
 | ---: | --- | --- | --- |
 | 13 | **Save the logit margin in the evaluation** (next to `prob_stego`) and use it for AUC and thresholds | float32 softmax saturates: 26% of SRM-e50 validation scores are exactly 1.0. With mean pooling these are almost all stego (52.6% of stego, 0.0% of clean exactly 1.0; clean >= 0.999: 0.1%), so clean-vs-stego ties are rare and AUC and the 0.45 threshold are barely affected. It matters for max/top-k pooling, where clean tiles can saturate too. Low priority for the main evaluation | To review (found in check 2, 2026-10-19) |
+| 14 | **Test the current compile guards** (added 2026-10-20 from the test audit): add direct tests, with mocked compile and backend calls, for the compile and cache checks in `cvdl/settings.py` and the in-place compile placement in `cvdl/runtime.py` | The G4 runs with `compile=default`, but only frozen notebook 04's compile snippets have tests (`tests/test_notebook_compile.py`); the current guards have none | To review (user: keep on the board for now) |
 
 ## Report topics (no work)
 

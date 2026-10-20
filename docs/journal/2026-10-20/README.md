@@ -11,6 +11,8 @@ Recorded by the Orchestrator. Team: Orchestrator, Worker, Run_Supervisor (new se
 - Worker built test levels: `891aefe` (`scripts/test_cpu.py`, `scripts/required_test_level.py`, `tests/test_cpu_levels.py`, 17 new tests). Fast 160.6 s (413 run, 28 skipped); full 495.4 s (441 run, 0 skipped). Audited golden compare ALL EQUAL (143 s): 37 tracked files opened, all matched by the helper rule. Orchestrator check: helper replay on past commits gives the expected decisions (`9dfaa27` FAST/no golden; `1bb7e20` FAST/golden; `863d9fb` FULL/golden); unreadable base gives FULL/REQUIRED; 17 new tests pass. Pushed.
 - Worker: C done `a1ae22c` (resume test without the repeated 20-step golden comparison; 33.5 s to 28.7 s). Orchestrator review: only the test file changed; resume, best checkpoint and metrics-prefix checks kept; loader shutdown in `finally`. User: keep. Pushed.
 - Worker: helper answer `TESTS: NONE` for Markdown-only changes, `c7b5176`. Code reads two doc files (`plan-architecture-tests.md` is hashed by `architecture_decision.py`; `data-sample.png` by figure and report tests); both stay FAST. 21 helper tests; fast level 417 run, 28 skipped, 155.9 s. Pushed.
+- Worker: read-only necessity audit of the 55 test modules (445 tests): most protect current or planned code, often error paths that the golden compare does not run. Proposed: archive 33 tests of finished one-off checks with their code, delete 5 duplicate executions, move 10 frozen-input checks to full (445 to 407 tests, fast about 156 to 148 s, estimate). Evidence in the git-ignored `runs/.scratch/test-necessity-audit-2026-10-20/`.
+- Worker: test trim `4959099` (17 files): 5 duplicate executions deleted; checks 1, 2, 2b and the curriculum decision archived with their code; data-figure replay moved to full (M2 path rule). Golden ALL EQUAL (141.6 s); fast 378 run + 29 skipped, 147.5 s; full 407 run, 490.4 s. Orchestrator check: 407 discovered, no active import of archived code, no `__init__.py` in `tests/archive/` or `cvdl/archive/`. Pushed. Doc mentions of the moved files updated.
 
 ### Found
 
@@ -22,9 +24,10 @@ Recorded by the Orchestrator. Team: Orchestrator, Worker, Run_Supervisor (new se
 - User: build A (fast/full levels), B (shrink the 36-case loader test in the fast level, all cases kept in full) and C (drop the repeated 20-step check from `test_cvdl_training`, keep its resume check), in the order A, B, C.
 - User: path rule narrowed by the Orchestrator (full only for loader code and its test inputs, dependency files and unknown paths; fast otherwise).
 - User (after C): C kept, though the gain is only about 5 s. B3: leave the loader tests as they are. Add `TESTS: NONE` for Markdown-only changes.
+- User (test trim): delete the 5 duplicates; archive with their code the curriculum decision script and checks 1, 2, 2b (WS/SPA, cell pooling, tile saturation; restore with tests before #12 or #3 reuses them); move only the data-figure rebuild test to full (not the 9 small frozen-notebook tests). Retire the legacy-512 evaluation as a separate step. Compile-guard test gap: ideas board #14, for later.
 - User: golden compare only when the helper says REQUIRED (shared code or its exact inputs), plus always before a G4 launch. Old rule "full suite + golden before every push" replaced ([test levels](../../active/test-levels.md)).
 
 ### Next
 
 - ~~B, then C (Worker, one task at a time).~~ C done; B not done (B3, user): the loader workers start and stop on purpose (RAM fix 2026-10-14, `spawn` workers), so the cases cannot share workers.
-- Pending: arm G (G1) stays paused until the user resumes it.
+- **Paused (user, end of session).** Next when resumed: retire the legacy-512 evaluation (Worker plan first, shown to the user before any removal). Arm G (G1) stays paused. Ideas board #14 (compile-guard tests) waits.

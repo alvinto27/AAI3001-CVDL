@@ -31,7 +31,7 @@ podman exec -w /work aai3001 python -B scripts/refactor_golden.py compare       
 
 | Check | Required when a changed path matches |
 | --- | --- |
-| Full tests | `LSB-Dataset-Generator/**`; `tests/test_lsb_torch.py`; `tests/test_lsb_source.py`; `configs/raise512-run1.yaml`; `configs/test-bpp1.yaml`; `pyproject.toml`; `uv.lock`; `Containerfile*`; `Dockerfile*`; any path outside the known areas |
+| Full tests | `LSB-Dataset-Generator/**`; `tests/test_lsb_torch.py`; `tests/test_lsb_source.py`; `configs/raise512-run1.yaml`; `configs/test-bpp1.yaml`; the data-figure replay inputs (added `4959099`: `tests/test_data_figure.py`, `scripts/build_data_figure.py`, `docs/figures/report/data-sample.png`, `cvdl/standardtest.py`, `cvdl/validation.py`, `cvdl/__init__.py`, the four `data/<source>/photo_manifest.csv`, `data/test/standard-256-v1/`, `data/hard-test/256-v1/`); `pyproject.toml`; `uv.lock`; `Containerfile*`; `Dockerfile*`; any path outside the known areas |
 | Golden compare | `cvdl/**`; `LSB-Dataset-Generator/**`; `tests/golden/**`; the golden script and the files it reads or runs (list in `GOLDEN_FILES` in the helper); dependency and container files; any path outside the known areas |
 | Fast tests | Every code change that needs neither of the above |
 | No tests (`TESTS: NONE`, added `c7b5176`) | Only Markdown docs changed (`docs/**/*.md`, root `README.md`, `AGENTS.md`, `CHANGELOG.md`), or nothing changed. Exceptions (code reads them, so FAST): `docs/active/plan-architecture-tests.md` (`scripts/architecture_decision.py` hashes it) and `docs/figures/report/data-sample.png` (figure and report tests) |
@@ -58,3 +58,20 @@ Replay on past commits: `9dfaa27` (decision script) gives FAST + golden NOT REQU
 | Helper `TESTS: NONE` for Markdown-only changes | Done `c7b5176` (21 helper tests) |
 
 Fast level after these changes: 417 run, 28 skipped, 155.9 s wall.
+
+## Test trim (2026-10-20, `4959099`, user approved)
+
+A read-only audit of all 55 test modules (Worker; git-ignored evidence in `runs/.scratch/test-necessity-audit-2026-10-20/`) found that most tests protect current or planned code, often error paths that the golden compare does not run. Changes:
+
+| Change | Tests |
+| --- | --- |
+| Duplicates deleted: 4 inherited re-runs in `test_tanh_saturation`; `test_cvdl_training.test_capped_validation_runtime_dependency` (covered by `test_notebook_05_capped_sanity`) | -5 |
+| Archived with their code: checks 1, 2, 2b (`cvdl/archive/{classic_lsb,cell_pooling,tile_saturation}.py`, `scripts/archive/check1_classic.py`, `check2_pooling.py`, `check2b_saturation.py`) and `scripts/archive/curriculum_decision.py`; their tests in `tests/archive/` | -33 |
+| Moved to full: `test_data_figure.DataFigureReplayTests` (frozen 7-pair figure rebuild, 7.5 s) | 0 |
+
+Rules: `tests/archive/` has no `__init__.py`, so neither level discovers it. Active code must not import from `cvdl/archive/`. Before an idea reuses archived code (for example #12 with WS/SPA, or #3 with cell pooling), restore the code **with its tests** to the active folders.
+
+Measured after the trim: full 407 run, 0 skipped, 490.4 s; fast 378 run, 29 skipped, 147.5 s; golden ALL EQUAL.
+
+Not done (user): 9 small frozen-notebook and old-metric tests stay in fast (moving them saves about 0.1 s). Next (paused): retire the legacy-512 evaluation (`--test-suite legacy-512`), which keeps about 30 more tests alive; design first. Test gap: ideas board #14.
+

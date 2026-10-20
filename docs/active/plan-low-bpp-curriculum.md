@@ -4,7 +4,7 @@ Status: **done 2026-10-19: rule not met; small real gain recorded; #9 closed (se
 
 ## Result (2026-10-19; user chose option B)
 
-Runs: curriculum `srm-low-bpp-curriculum-20261019T051356Z-9566` (eval `e9ef059bb12c9076a226`), control `srm-low-bpp-control-20261019T060708Z-9736` (eval `af6e9879061fd441462f`). Decision evidence: `04415c0` (`scripts/curriculum_decision.py`), outputs `runs/verification/curriculum-decision-2026-10-19/`.
+Runs: curriculum `srm-low-bpp-curriculum-20261019T051356Z-9566` (eval `e9ef059bb12c9076a226`), control `srm-low-bpp-control-20261019T060708Z-9736` (eval `af6e9879061fd441462f`). Decision evidence: `04415c0` (`scripts/curriculum_decision.py`; archived 2026-10-20 to `scripts/archive/curriculum_decision.py`), outputs `runs/verification/curriculum-decision-2026-10-19/`.
 
 | Measure | SRM-e50 | Curriculum | Control |
 | --- | ---: | ---: | ---: |
