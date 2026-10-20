@@ -378,6 +378,8 @@ A recorded ID never runs twice. Use a new ID for a new attempt.
 1. For a new machine only, complete the maintenance setup/upload/cache/speed
    steps above. Existing G4 bootstrap and disk-layout setup are already done.
 2. Commit/push the intended notebook and code; fetch `origin/yx` on the PC.
+   On that commit, full tests (`scripts/test_cpu.py`) and the golden compare
+   must pass ([test levels](test-levels.md)).
 3. Run the exact notebook + SHA command with `--dry-run`. Review effective
    settings, RUN_NAME, job ID, timeout and the two-line metadata env.
 4. Only after explicit user approval, repeat without `--dry-run`.

@@ -24,3 +24,4 @@ The dated entries were moved from the former single journal file without deletin
   Leftover cleanup and the threshold-label check approved. Then: standard and hard 256 tests, one validation threshold, `srm-hard` run, all 11 models rescored, report notebook, ideas board.
 - [2026-10-19](2026-10-19/README.md) — Report revisions 2 and 3; diagnostic check 1 (classic detectors find a signal SRM-e50 misses: raise #12) check 2 (no pooling gain: lower #3) check 2b (tanh fix struck); low-bpp curriculum runs 10-11 (small real gain, rule not met, #9 closed).
   Architecture arm A, delayed pooling (run 12): no gain, clearly worse (-0.060 pooled k=1 low AUC). PC pilot mode. Arm G (GBRAS-Net) waits for the user.
+- [2026-10-20](2026-10-20/README.md) — Review of pre-run checks: suite profiled (one loader test = 42% of 8.2 min); fast/full test levels and a changed-path helper built (`891aefe`); golden compare only when shared code changes, always before a G4 launch. Arm G paused.

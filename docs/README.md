@@ -4,6 +4,7 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Nothing
 
 ## Current references (`active/` means kept for use, not permission to run)
 - [2026-10-19 session handoff — read first next session](active/handoff-2026-10-19.md)
+- [Test levels and the changed-path rule — fast/full tests, when the golden compare runs (built `891aefe`, 2026-10-20)](active/test-levels.md)
 - [Wide-R2 legacy settings migration — saved evidence and limits](active/legacy-wide-r2-migration.md)
 - [Saved-output report notebook — CPU generator and use (work list #5)](active/report-notebook.md)
 - [Three diagnostic checks (ideas 1, 2, 2b) — done 2026-10-19: #12 raised, #3 lowered, tanh fix struck](active/plan-diagnostic-checks.md)
