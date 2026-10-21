@@ -19,6 +19,8 @@
 ### Decided
 
 - User: retire legacy-512 as planned, with the Orchestrator's recommendations.
+- User: the golden record is not absolute. New [golden policy](../../active/refactor-golden.md#policy-2026-10-21-user): ALL EQUAL for code moves; an intended behaviour change uses a controlled re-baseline (changed entries listed first, user approval, old/new hashes recorded).
+- User: switch off the 512 end-of-training test of notebook 05, `newdata-1` and `wide-1` for future G4 runs. Worker plan first (options: launch guard, override, notebook/default change with re-baseline, docs only).
 - User: work away from home by SSH from the laptop into this PC, not by copying the environment.
 
 ### Next

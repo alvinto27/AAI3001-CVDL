@@ -38,6 +38,8 @@ podman exec -w /work aai3001 python -B scripts/refactor_golden.py compare       
 
 **Always, regardless of the helper:** full tests and the golden compare once before every G4 launch, on the launch commit.
 
+When the golden may change (intended behaviour change only): see the [golden policy](refactor-golden.md#policy-2026-10-21-user).
+
 Evidence for the golden list: an audited golden compare on 2026-10-20 (ALL EQUAL, 143 s) recorded every file it opened. 37 tracked files; all are matched by the helper's rule. It did not open `data/train-grids/`, `split.csv`, `selection*.csv`, `provenance.csv`, `legacy_tile_manifest.csv` or `run1_*.csv.gz`. The helper also keeps GPU-only and fallback paths found by reading the code.
 
 Replay on past commits: `9dfaa27` (decision script) gives FAST + golden NOT REQUIRED; `1bb7e20` (arm A, `cvdl/`) gives FAST + golden REQUIRED; `863d9fb` (packed loader) gives FULL + golden REQUIRED.

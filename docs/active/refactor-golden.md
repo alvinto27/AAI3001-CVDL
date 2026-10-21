@@ -9,6 +9,19 @@ Notebook 04 is frozen. The pre-package notebook 05 is frozen, with outputs
 cleared, in [the parity archive](../../notebooks/archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb).
 The current notebook 05 is the thin package caller.
 
+## Policy (2026-10-21, user)
+
+The golden proves that a code move or cleanup changed nothing. It is not absolute. ~~Never recapture or weaken the golden.~~ Replaced by two cases:
+
+| Case | Rule |
+| --- | --- |
+| Code move, cleanup, refactor (no intended behaviour change) | The unchanged compare must print **ALL EQUAL**. No recapture, no allow-list change, no partial compare. |
+| **Intended behaviour change** (for example a changed default) | **Controlled re-baseline**, all steps required: (1) the unchanged compare prints ALL EQUAL on the code before the change; (2) before the change, write down exactly which golden entries will change and why; (3) make the change; (4) the compare differs **only** in those entries; (5) the user approves the list and the result; (6) recapture, in a separate commit, with a record here: date, reason, the changed entries, and the old and new SHA-256 of `tests/golden/refactor-golden.json`. |
+
+Any difference that is not on the list stops the work: find the cause, do not recapture. The earlier "intended difference" sections below (phase 4a, 4c) are the same idea as an allow-list.
+
+Known limit: the golden covers mostly the old 512 path (notebook 05, the old standard-test identity, the `newdata-1` / `wide-1` settings). The current paths (256 evaluation, experiment notebooks, SRM models, deployment threshold) are covered by unit tests, not by the golden.
+
 ## Run
 
 ```sh
