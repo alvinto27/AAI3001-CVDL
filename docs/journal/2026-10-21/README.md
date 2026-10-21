@@ -25,11 +25,12 @@
 - User: the golden record is not absolute. New [golden policy](../../archive/refactor-golden.md#policy-2026-10-21-user): ALL EQUAL for code moves; an intended behaviour change uses a controlled re-baseline (changed entries listed first, user approval, old/new hashes recorded).
 - User: switch off the 512 end-of-training test of notebook 05, `newdata-1` and `wide-1` for future G4 runs. Worker plan first (options: launch guard, override, notebook/default change with re-baseline, docs only).
 - User (later the same day): the golden is not needed; no strict before/after check either. Retire the golden (archive, kept as history); replace it with a short tracked list of constant settings and one fast unit test (a changed constant is edited in the same commit). One combined task, plan first; the user picks the constants. Pending.
+- User (end of day): **change of goals.** Stop adding model tests (arm G and the rest on hold); finish the basic deliverables. Next work: cell-level training (#3). Worker writes a refreshed plan for the current stack (256 tiles, SRM baseline, train-matched validation, 256 suite); the old plan is out of date.
 - User: work away from home by SSH from the laptop into this PC, not by copying the environment.
 
 ### Next
 
-- Pending: the user decides when to resume arm G (G1).
+- ~~Pending: the user decides when to resume arm G (G1).~~ Arm G on hold (user); cell-level training plan in progress.
 - Pending (optional): back up RAISE, DIV2K and the PC evaluations to the Pi; `loginctl enable-linger` so a logout does not stop herdr and the container.
 - ~~Pending: switching off the 512 end-of-training evaluation in notebook 05 / `newdata-1` / `wide-1` is a separate decision.~~ Done `7921d58`.
 - ~~Next: golden retirement + constants list (one task, plan first; the user picks the constants).~~ Done `72f51b5`.
