@@ -173,6 +173,8 @@ Cell measurements:
 2. Valid-negative cell FA and positive-cell recall at a **cell-only** cutoff chosen on validation for at most 5% valid-negative FA (include clean partners and valid unchanged stego cells; use an explicit deterministic tie rule). Freeze separately for each map type. This cutoff is diagnostic, not the deployment tile cutoff.
 3. Occupancy/sparsity, eligible cells/photos, and scattered-random results. Nearly all-positive random maps are explicitly not a spatial-localization test.
 
+**Clarification fixed 2026-10-21 by the Orchestrator, before any run-13 result existed:** the primary localization metric for the AUC mark is the **mean per-eligible-stego-tile AUC** (positives vs valid negatives within the same tile). The pooled eligible-stego-cell AUC is reported as secondary. Clean-image cells enter only the cell cutoff and FA, never the localization AUC.
+
 Proposed evidence that the auxiliary target was learned: held-out localized auxiliary AUC **≥.75**, its photo-bootstrap lower bound **>.5**, and test valid-negative FA **≤7%** at that validation cell cutoff. Report auxiliary-minus-CAM AUC on the same cells with a paired interval; a better auxiliary map is an observation, not assumed in advance.
 
 Result labels:
