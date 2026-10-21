@@ -11,9 +11,9 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from cvdl import post_fit
+from cvdl.archive import post_fit
 from lsb_notebook import NotebookData
-from scripts import evaluate_run
+from scripts.archive import evaluate_legacy_512 as evaluate_run
 
 
 class PostFitRecordTests(unittest.TestCase):
@@ -52,14 +52,14 @@ class PostFitRecordTests(unittest.TestCase):
         predictions=pd.DataFrame({'label':[0,1],'prob_stego':[.1,.9]})
         with ExitStack() as stack:
             for target,kwargs in [
-                ('cvdl.post_fit.SteganalysisModule.load_from_checkpoint',{'return_value':model}),
-                ('cvdl.post_fit.evaluation.predict_pairs',{'return_value':predictions}),
-                ('cvdl.post_fit.evaluation.per_setting_table',{'return_value':pd.DataFrame()}),
-                ('cvdl.post_fit.evaluation.extra_panels',{'return_value':{}}),
-                ('cvdl.post_fit.evaluation.breakdown',{'return_value':None}),
-                ('cvdl.post_fit.FixedPairs',{'return_value':object()}),
-                ('cvdl.post_fit.diagnostics.diagnostic_pairs',{'side_effect':self.selected}),
-                ('cvdl.post_fit.diagnostics.batch_dependence',{'return_value':{'loss':.25}}),
+                ('cvdl.archive.post_fit.SteganalysisModule.load_from_checkpoint',{'return_value':model}),
+                ('cvdl.archive.post_fit.evaluation.predict_pairs',{'return_value':predictions}),
+                ('cvdl.archive.post_fit.evaluation.per_setting_table',{'return_value':pd.DataFrame()}),
+                ('cvdl.archive.post_fit.evaluation.extra_panels',{'return_value':{}}),
+                ('cvdl.archive.post_fit.evaluation.breakdown',{'return_value':None}),
+                ('cvdl.archive.post_fit.FixedPairs',{'return_value':object()}),
+                ('cvdl.archive.post_fit.diagnostics.diagnostic_pairs',{'side_effect':self.selected}),
+                ('cvdl.archive.post_fit.diagnostics.batch_dependence',{'return_value':{'loss':.25}}),
             ]:stack.enter_context(patch(target,**kwargs))
             stack.enter_context(redirect_stdout(io.StringIO()))
             if full:
@@ -68,14 +68,14 @@ class PostFitRecordTests(unittest.TestCase):
                 def read_diagnostics(*args,**kwargs):
                     self.later_stage_record=json.loads((self.folder/'evaluation_data_run_settings.json').read_text())
                 for target,kwargs in [
-                    ('scripts.evaluate_run.settings_for_evaluation',{'return_value':(self.settings,{},None)}),
+                    ('scripts.archive.evaluate_legacy_512.settings_for_evaluation',{'return_value':(self.settings,{},None)}),
                     ('cvdl.lit.select_best_checkpoint',{'return_value':str(self.checkpoint)}),
                     ('cvdl.runtime.configure',{}),
                     ('cvdl.runtime.create_data',{'return_value':(self.otf,None)}),
                     ('cvdl.data.build_otf_loaders',{'return_value':self.loaders}),
-                    ('cvdl.panels.write_validation',{'side_effect':read_diagnostics}),
-                    ('cvdl.panels.write_standard_validation',{}),
-                    ('cvdl.panels.tables',{}),
+                    ('cvdl.archive.panels.write_validation',{'side_effect':read_diagnostics}),
+                    ('cvdl.archive.panels.write_standard_validation',{}),
+                    ('cvdl.archive.panels.tables',{}),
                 ]:stack.enter_context(patch(target,**kwargs))
                 return evaluate_run.evaluate(self.folder)
             return post_fit.run(self.settings,self.otf,None,self.loaders,self.checkpoint,self.folder)

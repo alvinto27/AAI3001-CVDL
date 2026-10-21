@@ -6,8 +6,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from cvdl import padding
-from cvdl.padding import (CaseTasks, case_shape, check, geometry, pair_table, select_cases)
+from cvdl.archive import padding
+from cvdl.archive.padding import (CaseTasks, case_shape, check, geometry, pair_table, select_cases)
 from lsb_train_grid import pad_crop
 
 

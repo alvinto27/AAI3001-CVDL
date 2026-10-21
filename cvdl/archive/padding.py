@@ -9,7 +9,7 @@ import torch
 from lsb_engine import embed_fast
 from lsb_settings import draw_otf_settings, otf_seed_sequence
 from lsb_train_grid import pad_crop
-from .metrics import metrics, rates, threshold
+from cvdl.metrics import metrics, rates, threshold
 
 VERSION='padding-check-v1'
 

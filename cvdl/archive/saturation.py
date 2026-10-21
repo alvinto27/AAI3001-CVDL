@@ -96,7 +96,7 @@ def write_csv(path,result):
 def run(settings,otf,network,output,*,pairs=2000,seed=0,train_batches=0,validation_sha256=None):
     """Fixed validation tile list (unaugmented, eval mode); optionally training-mode batches with augmentation."""
     from lsb_torch import PairSubset, OrderedPairLoader
-    from . import data
+    from cvdl import data
     output=Path(output);output.mkdir(parents=True,exist_ok=True)
     identity=hashlib.sha256(otf.validation_pair_csv.encode()).hexdigest()
     if validation_sha256 and identity!=validation_sha256:

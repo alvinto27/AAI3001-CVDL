@@ -2,7 +2,7 @@
 import unittest
 import numpy as np
 import pandas as pd
-from cvdl.calibration import ece, fit_temperature, nll, sigmoid, summarise, tie_share
+from cvdl.archive.calibration import ece, fit_temperature, nll, sigmoid, summarise, tie_share
 
 
 class CalibrationTests(unittest.TestCase):

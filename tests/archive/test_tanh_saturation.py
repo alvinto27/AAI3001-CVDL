@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 import torch
 from cvdl.models import XuNetWide
-from cvdl.saturation import measure, fixed_pairs, Stats
+from cvdl.archive.saturation import measure, fixed_pairs, Stats
 
 
 class TanhSaturationTests(unittest.TestCase):
@@ -44,7 +44,7 @@ class StageSelectionHelper:
         import sys, tempfile
         from pathlib import Path
         from unittest.mock import patch
-        import scripts.evaluate_run as er
+        import scripts.archive.evaluate_legacy_512 as er
         for name in existing:
             path=Path(folder)/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('x')
         calls=[]
@@ -104,14 +104,14 @@ class TablesStageTests(StageSelectionHelper, unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as d:
             # default label comes from the folder name; build the same name here
-            import scripts.evaluate_run as er
+            import scripts.archive.evaluate_legacy_512 as er
             from pathlib import Path
             label=er.default_label(Path(d))
             files=[f'pc-comparison/{label}.json']
             with self.assertRaisesRegex(ValueError,'refusing to overwrite'):self.run_main(['--only','tables'],d,existing=files)
             with self.assertRaisesRegex(ValueError,'refusing to overwrite'):self.run_main([],d,existing=files)
             from unittest.mock import patch
-            with patch('cvdl.panels.tables') as tables:
+            with patch('cvdl.archive.panels.tables') as tables:
                 self.run_main(['--only','tables','--overwrite'],d,existing=files)
             self.assertEqual(tables.call_count,1)
         with tempfile.TemporaryDirectory() as d:
@@ -122,6 +122,6 @@ class TablesStageTests(StageSelectionHelper, unittest.TestCase):
 
     def test_default_label(self):
         from pathlib import Path
-        import scripts.evaluate_run as er
+        import scripts.archive.evaluate_legacy_512 as er
         label=er.default_label(Path('/x/tiling-overlap-256-20261017T022212Z-9778/checkpoints/tiling-overlap-256-20261017T022212Z-9778'))
         self.assertEqual(label,'tilingoverlap256')

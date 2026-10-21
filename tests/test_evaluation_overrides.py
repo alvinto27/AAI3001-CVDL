@@ -32,11 +32,8 @@ class EvaluationOverrideTests(unittest.TestCase):
         self.assertEqual((settings.rocm_conv1_fix,settings.batch_size,settings.eval_workers),(False,32,0))
         self.assertEqual(len(context['evaluation_overrides']),3)
         self.assertTrue(all(r['source']=='CLI --set (evaluation only)' for r in context['evaluation_overrides']))
-        out=self.root/'output';er.record_evaluation_overrides(out,settings,self.arguments)
-        record=json.loads((out/'evaluation_settings.json').read_text())
-        self.assertEqual(record['evaluation_overrides'],context['evaluation_overrides'])
-        self.assertEqual(record['values']['batch_size'],32)
-        self.assertIn('override',record['sources']['batch_size'])
+        self.assertEqual(plain(settings.values)['batch_size'],32)
+        self.assertIn('override',plain(settings.provenance)['batch_size'])
         self.assertEqual(self.saved.read_bytes(),self.original)
         self.assertIsNone(snapshot)
 
@@ -53,7 +50,7 @@ class EvaluationOverrideTests(unittest.TestCase):
         self.assertEqual(plain(before.values),plain(after.values))
         self.assertEqual(plain(before.provenance),plain(after.provenance))
         self.assertEqual(context,{})
-        er.record_evaluation_overrides(self.root/'absent',after,())
+        self.assertIsNone(snapshot)
         self.assertFalse((self.root/'absent').exists())
         self.assertEqual(self.saved.read_bytes(),self.original)
 
@@ -63,15 +60,6 @@ class EvaluationOverrideTests(unittest.TestCase):
         self.assertEqual(settings.batch_size,32)
         self.assertEqual([r['value'] for r in context['evaluation_overrides']],[16,32])
 
-    def test_override_record_is_idempotent_and_refuses_changed_inputs(self):
-        settings,_,_=self.resolve(self.arguments);out=self.root/'output'
-        er.record_evaluation_overrides(out,settings,self.arguments)
-        old=(out/'evaluation_settings.json').read_bytes()
-        er.record_evaluation_overrides(out,settings,self.arguments)
-        with self.assertRaisesRegex(ValueError,'evaluation overrides differ'):
-            er.record_evaluation_overrides(out,settings,('eval_batch_size=16',))
-        self.assertEqual((out/'evaluation_settings.json').read_bytes(),old)
-
     def test_forbidden_cli_key_refused_before_folder_or_gpu_work(self):
         with patch.object(sys,'argv',['evaluate_run.py','missing','--set','front_end=srm']), \
              patch.object(er,'checkpoint_folder') as folder:
@@ -79,19 +67,31 @@ class EvaluationOverrideTests(unittest.TestCase):
                 er.main()
         folder.assert_not_called()
 
-    def test_cli_routes_same_overrides_to_main_and_temperature(self):
-        argv=['evaluate_run.py',str(self.folder),'--test-suite','legacy-512','--only','main,padding,tanh,temperature']
+    def test_cli_routes_same_overrides_to_standard256(self):
+        settings,context,_=self.resolve(self.arguments)
+        argv=['evaluate_run.py',str(self.folder),'--only','main','--hard']
         for arg in self.arguments:argv+=['--set',arg]
-        with patch.object(sys,'argv',argv),patch.object(er,'evaluate') as main,patch.object(er,'calibrate') as temperature:
+        with patch.object(sys,'argv',argv), \
+             patch('cvdl.lit.select_best_checkpoint',return_value=str(self.folder/'best-test.ckpt')), \
+             patch.object(er,'settings_for_evaluation',return_value=(settings,context,None)) as resolve, \
+             patch('cvdl.runtime.configure'),patch('scripts.pc_safety.check_workers'), \
+             patch('scripts.pc_safety.own_process_group'),patch('cvdl.standardtest.run') as run:
             er.main()
-        self.assertEqual(main.call_args.kwargs['eval_overrides'],self.arguments)
-        self.assertEqual(temperature.call_args.kwargs['eval_overrides'],self.arguments)
+        self.assertEqual(resolve.call_args.kwargs['eval_overrides'],self.arguments)
+        self.assertEqual(run.call_args.kwargs['provenance'],context)
+        self.assertTrue(run.call_args.kwargs['hard'])
+        self.assertEqual(self.saved.read_bytes(),self.original)
 
-    def test_cli_routes_same_overrides_to_optional_stages(self):
-        argv=['evaluate_run.py',str(self.folder),'--test-suite','legacy-512','--only','padding,tanh','--set','eval_batch_size=32']
-        with patch.object(sys,'argv',argv),patch.object(er,'optional_stages') as optional:
-            er.main()
-        self.assertEqual(optional.call_args.kwargs['eval_overrides'],('eval_batch_size=32',))
+    def test_cli_refuses_retired_stages_before_folder_or_gpu_work(self):
+        import contextlib,io
+        for stages in ('padding,tanh','main,temperature','tables','hard'):
+            argv=['evaluate_run.py','missing','--only',stages,'--set','eval_batch_size=32']
+            with self.subTest(stages=stages),patch.object(sys,'argv',argv), \
+                 patch.object(er,'checkpoint_folder') as folder,patch('cvdl.runtime.configure') as gpu, \
+                 contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as error:er.main()
+                self.assertEqual(error.exception.code,2)
+                folder.assert_not_called();gpu.assert_not_called()
 
     def test_borrowing_keeps_source_snapshot_original_and_records_overrides(self):
         import torch

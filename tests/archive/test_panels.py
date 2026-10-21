@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from cvdl import panels
+from cvdl.archive import panels
 from cvdl.metrics import rates, threshold
 
 
@@ -32,7 +32,7 @@ class PanelTests(unittest.TestCase):
             (root/directory).mkdir(parents=True, exist_ok=True)
             frame.to_csv(root/directory/'test_predictions.csv', index=False)
         capped = pd.concat([predictions('raise', 30, 8), predictions('alaska', 10, 9)], ignore_index=True)
-        panels.write_validation(root, capped, root=Path(__file__).resolve().parents[1])
+        panels.write_validation(root, capped, root=Path(__file__).resolve().parents[2])
         return root, standard
 
     def test_validation_outputs(self):
@@ -91,7 +91,7 @@ class CliTests(unittest.TestCase):
     def test_check_b_cli_equals_build(self):
         import sys
         from unittest.mock import patch
-        import scripts.check_b_thresholds as cb
+        import scripts.archive.check_b_thresholds as cb
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             files = {s: root/f'{s}.csv' for s in cb.SOURCES}

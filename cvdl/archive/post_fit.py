@@ -1,9 +1,9 @@
 """The shared notebook's post-fit sequence, reusable on the PC after download."""
 from pathlib import Path
 import json
-from . import data, evaluation, diagnostics
-from .lit import SteganalysisModule
-from .metrics import metrics
+from cvdl import data, evaluation, diagnostics
+from cvdl.lit import SteganalysisModule
+from cvdl.metrics import metrics
 from lsb_torch import FixedPairs
 
 

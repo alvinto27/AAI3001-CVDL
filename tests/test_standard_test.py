@@ -190,7 +190,7 @@ class StandardTestTests(unittest.TestCase):
             ckpt = run/'best-test.ckpt'; torch.save({'hyper_parameters':{},'state_dict':{}}, ckpt)
             checkpoint_before=ckpt.read_bytes();score_order=[]
             settings = SimpleNamespace(root=ROOT, quick=True, eval_workers=0, device='cpu',batch_size=4,
-                rocm_conv1_fix=False,values={},train_tile_size=512,tile_size=512,train_grid='recorded',manifest_root=None,source='decode')
+                rocm_conv1_fix=False,values={'batch_size':4,'eval_workers':0},train_tile_size=512,tile_size=512,train_grid='recorded',manifest_root=None,source='decode')
             def fake_score(network, ds, **kwargs):
                 score_order.append(set(ds.frame['split']))
                 clean = ds.frame.copy(); clean['label']=0; clean['prob_stego']=.2
@@ -202,8 +202,14 @@ class StandardTestTests(unittest.TestCase):
                  patch('cvdl.hardtest.score',side_effect=fake_score), \
                  patch.object(S,'MatchedValidationPairs',side_effect=lambda corpus,f:SimpleNamespace(frame=f)), \
                  patch.object(C,'resolve',return_value=mock_resolution()):
-                result = S.run(settings,ckpt,run,higher_k=True,hard=False)
+                provenance={'evaluation_overrides':[{'key':'batch_size','value':4,'source':'CLI --set (evaluation only)'}],
+                    'borrowed_run_settings_sha256':'donor-snapshot-sha'}
+                result = S.run(settings,ckpt,run,higher_k=True,hard=False,provenance=provenance)
                 out = Path(result['output'])
+                metadata=json.loads((out/'evaluation_settings.json').read_text())
+                self.assertEqual(metadata['values'],settings.values)
+                self.assertEqual(metadata['provenance'],provenance)
+                self.assertEqual(metadata['checkpoint_sha256'],hashlib.sha256(checkpoint_before).hexdigest())
                 self.assertEqual(result['hard_test']['status'],'disabled')
                 self.assertEqual(len(list((out/'panels').glob('*/predictions.csv'))),4)
                 self.assertEqual(len(list((out/'higher-k').glob('*/predictions.csv'))),4)
@@ -261,34 +267,49 @@ class StandardCLITests(unittest.TestCase):
              patch('cvdl.lit.select_best_checkpoint',return_value='/run/checkpoints/name/best.ckpt'), \
              patch.object(er,'settings_for_evaluation',return_value=(settings,{},None)), \
              patch('cvdl.runtime.configure'), patch('scripts.pc_safety.own_process_group'), \
-             patch('scripts.pc_safety.check_workers'), patch.object(S,'run') as new, \
-             patch.object(er,'evaluate') as legacy:
+             patch('scripts.pc_safety.check_workers'), patch.object(S,'run') as new:
             er.main()
-            return new, legacy
+            return new
 
     def test_new_suite_is_default_without_flag(self):
-        new, legacy = self.invoke([])
-        new.assert_called_once(); legacy.assert_not_called()
+        new = self.invoke([])
+        new.assert_called_once()
         self.assertFalse(new.call_args.kwargs['higher_k'])
         self.assertTrue(new.call_args.kwargs['hard'])
 
     def test_no_hard_turns_off_new_hard_only(self):
-        new, legacy = self.invoke(['--no-hard'])
-        self.assertFalse(new.call_args.kwargs['hard']); legacy.assert_not_called()
+        new = self.invoke(['--hard','--no-hard'])
+        self.assertFalse(new.call_args.kwargs['hard'])
 
     def test_higher_k_opt_in(self):
-        new, legacy = self.invoke(['--higher-k'])
-        self.assertTrue(new.call_args.kwargs['higher_k']); legacy.assert_not_called()
+        new = self.invoke(['--test-suite','standard-256-v1','--only','main','--hard','--higher-k'])
+        self.assertTrue(new.call_args.kwargs['higher_k'])
+        self.assertTrue(new.call_args.kwargs['hard'])
 
-    def test_explicit_legacy_retains_default_hard(self):
-        new, legacy = self.invoke(['--test-suite','legacy-512'])
-        new.assert_not_called(); legacy.assert_called_once()
-        self.assertTrue(legacy.call_args.kwargs['hard'])
+    def test_explicit_legacy_is_refused_before_any_work(self):
+        import contextlib,io
+        with patch.object(sys,'argv',['evaluate_run.py','missing','--test-suite','legacy-512']), \
+             patch.object(er,'checkpoint_folder') as folder,patch('cvdl.runtime.configure') as gpu, \
+             contextlib.redirect_stderr(io.StringIO()) as error:
+            with self.assertRaises(SystemExit) as exit:er.main()
+            self.assertEqual(exit.exception.code,2)
+            self.assertIn('legacy-512',error.getvalue())
+            folder.assert_not_called();gpu.assert_not_called()
 
     def test_new_never_silently_runs_legacy_stages(self):
-        for args in (['--only','hard'],['--temperature'],['--tables'],['--padding-check']):
-            with self.assertRaisesRegex(ValueError,'legacy-512'): self.invoke(args)
-        with self.assertRaisesRegex(ValueError,'requires'): self.invoke(['--test-suite','legacy-512','--higher-k'])
+        import contextlib,io
+        options=(['--only','hard'],['--only','main,tables'],['--only','padding'],['--only','temperature'],
+            ['--only','tanh'],['--only','tables'],['--temperature'],['--tables'],['--padding-check'],
+            ['--padding-pairs','1'],['--tanh-saturation'],['--tanh-pairs','1'],
+            ['--tanh-train-batches','1'],['--skip-main'],['--label','old'])
+        for args in options:
+            with self.subTest(args=args),patch.object(sys,'argv',['evaluate_run.py','missing',*args]), \
+                 patch.object(er,'checkpoint_folder') as folder,patch('cvdl.runtime.configure') as gpu, \
+                 contextlib.redirect_stderr(io.StringIO()) as error:
+                with self.assertRaises(SystemExit) as exit:er.main()
+                self.assertEqual(exit.exception.code,2)
+                self.assertIn('error:',error.getvalue())
+                folder.assert_not_called();gpu.assert_not_called()
 
 
 if __name__ == '__main__':

@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import torch
 from cvdl.models import XuNet, XuNetWide
-from cvdl.saturation import Stats
+from cvdl.archive.saturation import Stats
 from cvdl.archive.tile_saturation import first_tanh_inputs, tile_saturated_share, first_tanh_share
 from scripts.archive.check2b_saturation import (rank_quarters, spearman, correlation_interval,
                                       pooled_quarter_difference, join_saved)

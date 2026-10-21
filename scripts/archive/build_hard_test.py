@@ -1,8 +1,8 @@
 """Build (or check) the frozen hard test v1 pair lists under data/hard-test/v1/.
 
 CPU only, light (reads saved prediction CSVs and the saved clean-tile noise file; no photo decode, no model).
-  python scripts/build_hard_test.py --run RUN --noise CSV            # write lists + summary
-  python scripts/build_hard_test.py --run RUN --noise CSV --check    # rebuild in memory, compare to the files
+  python scripts/archive/build_hard_test.py --run RUN --noise CSV            # write lists + summary
+  python scripts/archive/build_hard_test.py --run RUN --noise CSV --check    # rebuild in memory, compare to the files
 Inputs identify the standard clean test tiles (the frozen panels' clean rows) and the clean-tile KV noise.
 """
 from __future__ import annotations
@@ -15,9 +15,9 @@ import sys
 
 import pandas as pd
 
-ROOT=Path(__file__).resolve().parents[1]
+ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
-from cvdl import hardtest as H
+from cvdl.archive import hardtest_v1 as H
 
 OUT=ROOT/'data/hard-test/v1'
 

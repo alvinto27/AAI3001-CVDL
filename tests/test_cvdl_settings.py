@@ -17,7 +17,7 @@ from cvdl.settings import (ROOT, SCHEMA, MachineProfile, automatic_profile, load
                            extra_panel_limit, plain)
 from scripts.refactor_golden import jsonable, settings_dict
 from scripts.run_notebook import settings_file
-from scripts.eval_checkpoint import panel_dataset
+from cvdl.evaluation import panel_dataset
 
 
 def profile(device='cpu'):
@@ -198,10 +198,11 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(extra_panel_limit(environ={'QUICK':'true'}),16)
         self.assertIs(panel_dataset(dataset,quick=False),dataset)
         with patch.dict('os.environ',{'QUICK':'true'}):
-            small=panel_dataset(dataset)
-            self.assertEqual(len(small),16)
-            self.assertEqual(small.indices,panel_dataset(dataset).indices)
+            # Package API is explicit and must not inherit the legacy CLI environment.
             self.assertIs(panel_dataset(dataset,quick=False),dataset)
+            small=panel_dataset(dataset,quick=True)
+            self.assertEqual(len(small),16)
+            self.assertEqual(small.indices,panel_dataset(dataset,quick=True).indices)
 
 
 if __name__=='__main__':

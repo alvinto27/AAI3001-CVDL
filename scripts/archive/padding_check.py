@@ -9,7 +9,7 @@ from pathlib import Path
 import sys
 import time
 
-ROOT=Path(__file__).resolve().parents[1]
+ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 sys.path.insert(0,str(ROOT/'scripts'))
 
@@ -26,7 +26,7 @@ def main():
     from evaluate_run import checkpoint_folder, settings_for_run
     from cvdl import runtime
     from cvdl.lit import SteganalysisModule, select_best_checkpoint
-    from cvdl.padding import check
+    from cvdl.archive.padding import check
     folder=checkpoint_folder(args.run_folder);settings=settings_for_run(folder)
     checkpoint=Path(select_best_checkpoint('',folder))
     runtime.configure(settings)

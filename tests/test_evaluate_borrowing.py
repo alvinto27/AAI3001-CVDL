@@ -3,11 +3,9 @@ import hashlib
 import json
 from pathlib import Path
 import tempfile
-from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-import pandas as pd
 import torch
 from cvdl.settings import machine_profile
 from scripts import evaluate_run as er
@@ -91,42 +89,35 @@ class BorrowingTests(unittest.TestCase):
             self.assertEqual(er.settings_for_evaluation(self.target,self.checkpoint),('original',{},None))
         saved.assert_called_once_with(self.target);load.assert_not_called()
 
-    def test_shared_borrowing_outputs_are_idempotent_but_never_silently_replaced(self):
-        _,meta,snapshot=self.resolve();out=Path(self.temp.name)/'out'
-        er.write_borrowing(out,meta,snapshot);er.write_borrowing(out,meta,snapshot)
-        before=(out/'borrowed_run_settings.json').read_bytes()
-        with self.assertRaisesRegex(ValueError,'borrowed provenance differs'):
-            er.write_borrowing(out,meta,b'other donor')
-        self.assertEqual((out/'borrowed_run_settings.json').read_bytes(),before)
-        with self.assertRaisesRegex(ValueError,'refusing to overwrite'):
-            er.refuse_existing(['main'],out,out,False)
-
     def test_main_uses_target_checkpoint_and_donor_identity_and_writes_provenance(self):
         settings,meta,snapshot=self.resolve()
         (self.target/'validation_pairs.csv').write_text('original target validation\n')
         (self.source/'validation_pairs.csv').write_text('borrowed validation\n')
-        otf=SimpleNamespace(validation_pair_csv='borrowed validation\n')
-        model=SimpleNamespace(net=object());val=pd.DataFrame({'label':[0,1],'prob_stego':[.1,.9]})
-        with patch('cvdl.lit.select_best_checkpoint',return_value=str(self.checkpoint)), \
-             patch('cvdl.runtime.configure'),patch('cvdl.runtime.create_data',return_value=(otf,None)), \
-             patch('cvdl.data.build_otf_loaders',return_value='loaders'), \
-             patch('cvdl.post_fit.run',return_value=(model,{'val':val},{'ok':True})) as run, \
-             patch('cvdl.panels.write_validation'),patch('cvdl.panels.write_standard_validation'),patch('cvdl.panels.tables'):
-            self.assertEqual(er.evaluate(self.target,settings_from=self.source),{'ok':True})
-        self.assertEqual(run.call_args.args[4],self.checkpoint)
+        import sys
+        before={p:p.read_bytes() for folder in (self.target,self.source) for p in folder.iterdir()}
+        with patch.object(sys,'argv',['evaluate_run.py',str(self.target),'--settings-from',str(self.source)]), \
+             patch('cvdl.lit.select_best_checkpoint',return_value=str(self.checkpoint)), \
+             patch('cvdl.runtime.configure'),patch('scripts.pc_safety.check_workers'), \
+             patch('scripts.pc_safety.own_process_group'),patch('cvdl.standardtest.run') as run:
+            er.main()
+        self.assertEqual(run.call_args.args[1],self.checkpoint)
         self.assertEqual(run.call_args.args[0].batch_size,128)
-        self.assertEqual((self.target/'validation_pairs.csv').read_text(),'original target validation\n')
-        record=json.loads((self.target/'evaluation_settings.json').read_text())
-        self.assertEqual(record['borrowed_run_settings_sha256'],meta['borrowed_run_settings_sha256'])
-        self.assertEqual((self.target/'borrowed_run_settings.json').read_bytes(),snapshot)
-        self.assertEqual(record['checkpoint_sha256'],hashlib.sha256(self.checkpoint.read_bytes()).hexdigest())
+        self.assertEqual(run.call_args.kwargs['provenance']['borrowed_run_settings_sha256'],meta['borrowed_run_settings_sha256'])
+        self.assertEqual({p:p.read_bytes() for p in before},before)
+        self.assertFalse((self.target/'borrowed_run_settings.json').exists())
+        self.assertEqual(snapshot,(self.source/'run_settings.json').read_bytes())
 
     def test_cli_forwards_settings_from_to_main(self):
         import sys
-        with patch.object(sys,'argv',['evaluate_run.py',str(self.target),'--test-suite','legacy-512','--only','main','--settings-from',str(self.source)]), \
-             patch.object(er,'evaluate') as run:
+        settings,meta,snapshot=self.resolve()
+        with patch.object(sys,'argv',['evaluate_run.py',str(self.target),'--only','main','--settings-from',str(self.source)]), \
+             patch('cvdl.lit.select_best_checkpoint',return_value=str(self.checkpoint)), \
+             patch.object(er,'settings_for_evaluation',return_value=(settings,meta,snapshot)) as resolve, \
+             patch('cvdl.runtime.configure'),patch('scripts.pc_safety.check_workers'), \
+             patch('scripts.pc_safety.own_process_group'),patch('cvdl.standardtest.run') as run:
             er.main()
-        self.assertEqual(run.call_args.kwargs['settings_from'],self.source)
+        resolve.assert_called_once_with(self.target,self.checkpoint,self.source)
+        self.assertEqual(run.call_args.kwargs['provenance'],meta)
 
 
 if __name__=='__main__':unittest.main()

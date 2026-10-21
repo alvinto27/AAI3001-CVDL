@@ -1,7 +1,7 @@
 """Temperature scaling of the two-class logit difference. Pure numpy; existing outputs are never changed."""
 import numpy as np
 import pandas as pd
-from .metrics import threshold, rates
+from cvdl.metrics import threshold, rates
 
 TIE_EPS=1e-6
 
