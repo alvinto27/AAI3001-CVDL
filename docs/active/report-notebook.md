@@ -18,6 +18,8 @@ Use `--reference-run runs/<other-run> --reference-evaluation-id <id>` for an
 optional reference. Both runs must use the same frozen standard and hard test
 recipes. Each model keeps its own saved validation cut-off.
 
+For a run with cell outputs, add `--cell-dir <cell_eval output>` and, for the control map's cut-off row, `--cell-reference-dir <control cell_eval output>` (`5981ab2`). The report then has a "Where in the tile? (cell heatmap)" section with the saved figure and tables. Without these options the report does not change. Run 13 example: `--cell-dir runs/verification/cell-run13-2026-10-21/cells --cell-reference-dir runs/verification/cell-control-2026-10-21`.
+
 If there is one evaluation folder, the generator can select it without an id.
 If there are zero or multiple folders, it stops and lists the available ids.
 It refuses missing, pending, QUICK, or mismatched calibration results.
