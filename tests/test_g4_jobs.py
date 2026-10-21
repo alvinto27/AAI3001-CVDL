@@ -28,7 +28,7 @@ def git(root,*args):
 
 
 class RecipeTests(unittest.TestCase):
-    def test_two_notebooks_equal_golden_except_two_named_machine_globals(self):
+    def test_two_notebooks_keep_recipe_except_post_fit_and_two_machine_globals(self):
         golden=json.loads((ROOT/'tests/golden/refactor-golden.json').read_text())['settings']
         base=json.loads((ROOT/'notebooks/05_xunet_v4_nonorm.ipynb').read_text())
         for name in ('newdata-1','wide-1'):
@@ -45,7 +45,9 @@ class RecipeTests(unittest.TestCase):
                     self.assertNotIn(key, settings.values)
                     self.assertNotIn(key, legacy.values)
                     continue
-                if not spec.machine:
+                if key=='post_fit_eval':
+                    self.assertEqual((settings.values[key],legacy.values[key]),('none','full'),name)
+                elif not spec.machine:
                     self.assertEqual(settings.values[key],legacy.values[key],f'{name}: {key}')
             self.assertEqual(repo_relative_paths(jsonable(settings_dict(settings)),ROOT),
                              repo_relative_paths(expected['run_settings'],'/work'))

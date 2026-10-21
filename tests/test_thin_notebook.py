@@ -33,7 +33,8 @@ class ThinNotebookTests(unittest.TestCase):
         self.assertLess(sum(len(''.join(c['source'])) for c in new),5000)
         self.assertTrue(all(c['outputs']==[] and c['execution_count'] is None for c in old+new))
         source='\n'.join(''.join(c['source']) for c in new)
-        self.assertIn('settings = load()',source)
+        from scripts.g4.preflight import top_values
+        self.assertEqual(top_values(after),{'post_fit_eval':'none'})
         self.assertNotIn('os.environ',source)
         self.assertFalse(any(isinstance(n,(ast.FunctionDef,ast.ClassDef)) for n in ast.walk(ast.parse(source))))
         self.assertTrue(after['metadata']['cvdl_package'])

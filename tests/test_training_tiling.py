@@ -130,11 +130,11 @@ class TrainingGridTests(unittest.TestCase):
                 self.assertEqual(values['tiles_per_epoch']*256**2,45000*512**2)
                 self.assertEqual(values['batch_size']*256**2,32*512**2)
                 ignored|={'train_tile_size','batch_size','tiles_per_epoch'}
-                recipe={k:v for k,v in recipe.items() if k not in ignored}
             else:
                 self.assertNotIn('train_tile_size',values)
                 self.assertEqual((values['batch_size'],values['tiles_per_epoch']),(32,45000))
-            self.assertEqual({k:v for k,v in values.items() if k not in ignored},recipe)
+            self.assertEqual({k:v for k,v in values.items() if k not in ignored},
+                             {k:v for k,v in recipe.items() if k not in ignored})
             self.assertEqual(nb['cells'][2:],base['cells'][2:])
             resolved=load(environ={},_profile=profile(),**values)
             self.assertEqual(resolved.run_name,path.stem)
@@ -216,12 +216,21 @@ class TrainingGridTests(unittest.TestCase):
 
     def test_none_executes_no_post_fit_work(self):
         from types import SimpleNamespace
-        nb=json.loads((ROOT/'notebooks/experiments/tiling-pad.ipynb').read_text())
-        codes=[c for c in nb['cells'] if c['cell_type']=='code']
-        namespace={'settings':SimpleNamespace(post_fit_eval='none')}
-        for cell in codes[-4:]:exec(''.join(cell['source']),namespace)
-        self.assertNotIn('best_model',namespace)
-        self.assertNotIn('predictions',namespace)
+        from cvdl.settings import machine_profile
+        paths=('notebooks/05_xunet_v4_nonorm.ipynb','notebooks/newdata-1.ipynb',
+               'notebooks/wide-1.ipynb','notebooks/experiments/tiling-pad.ipynb')
+        for path in paths:
+            with self.subTest(notebook=path):
+                nb=json.loads((ROOT/path).read_text())
+                values=top_values(nb)
+                self.assertEqual(values['post_fit_eval'],'none')
+                settings=load(environ={},_profile=machine_profile('g4',root=ROOT,device='cpu'),**values)
+                self.assertEqual(settings.post_fit_eval,'none')
+                codes=[c for c in nb['cells'] if c['cell_type']=='code']
+                namespace={'settings':SimpleNamespace(post_fit_eval='none')}
+                # No model/evaluation symbols are provided: any unguarded work fails.
+                for cell in codes[-4:]:exec(''.join(cell['source']),namespace)
+                self.assertEqual(set(namespace)-{'__builtins__'},{'settings'})
 
     def test_eval_frames_do_not_follow_training_grid(self):
         from lsb_torch import FixedPairs
