@@ -51,7 +51,8 @@ def create_data(s):
             apply(otf, s)
         if getattr(s,'embedding_schedule',None) is not None:
             from .curriculum import CurriculumImages
-            otf.train=CurriculumImages(otf.corpus,s.embedding_schedule,s.embedding_stage_epochs)
+            otf.train=CurriculumImages(otf.corpus,s.embedding_schedule,s.embedding_stage_epochs,
+                **({'cell_supervision':s.cell_supervision} if getattr(s,'cell_supervision','off')!='off' else {}))
             otf.record['embedding_schedule']=dict(mode=s.embedding_schedule,stage_epochs=s.embedding_stage_epochs,
                 original_fraction=.25 if s.embedding_schedule=='low_bpp' else 1.,assignment='exact per epoch before worker sharding; counts reflect consumed stegos')
         otf.record.update(compile_mode=s.compile, prime_next_epoch=s.prime_next_epoch)
@@ -88,7 +89,8 @@ def model_checks(s, clean_batch, stego_batch):
     """Count parameters and check frozen KV weights, preserving both allocations."""
     def model():
         return models.model_from_hparams(dict(model=s.model, clip_t=s.clip_t, norm=s.norm,
-                                             width=s.width, front_end=s.front_end))
+                                             width=s.width, front_end=s.front_end,
+                                             **({'cell_supervision':s.cell_supervision} if getattr(s,'cell_supervision','off')!='off' else {})))
     counted = model()
     print(f'Total parameters: {sum(p.numel() for p in counted.parameters()):,}')
     print(f'Output shape for one batch: {tuple(counted(clean_batch[:1]).shape)}')
@@ -217,7 +219,8 @@ def create_training(s, otf_data, loaders):
     )
     training_started = time.perf_counter()
     assert trainer.checkpoint_callbacks == [checkpoint_callback], "only one best-and-last checkpoint callback is allowed"
-    lightning_model = SteganalysisModule(clip_t=s.clip_t, norm=s.norm, validation_data=otf_data, conv1_factory=conv1_factory(s), lr=s.lr, max_epochs=s.epochs, paired_batches=s.paired_batches, steps_per_epoch=len(train_loader), warmup_epochs=s.warmup_epochs, grad_clip=s.grad_clip, lr_drops=s.lr_drops, batch_size=s.batch_size, precision=s.precision, model=s.model, width=s.width, front_end=s.front_end)
+    lightning_model = SteganalysisModule(clip_t=s.clip_t, norm=s.norm, validation_data=otf_data, conv1_factory=conv1_factory(s), lr=s.lr, max_epochs=s.epochs, paired_batches=s.paired_batches, steps_per_epoch=len(train_loader), warmup_epochs=s.warmup_epochs, grad_clip=s.grad_clip, lr_drops=s.lr_drops, batch_size=s.batch_size, precision=s.precision, model=s.model, width=s.width, front_end=s.front_end,
+        **(dict(cell_supervision=s.cell_supervision,cell_loss_weight=s.cell_loss_weight) if getattr(s,'cell_supervision','off')!='off' else {}))
     if starting:
         from .curriculum import initialize
         initialization=initialize(s,lightning_model,checkpoint_dir,resuming)
@@ -227,6 +230,7 @@ def create_training(s, otf_data, loaders):
         import hashlib
         digest=hashlib.sha256()
         for name,tensor in lightning_model.net.state_dict().items():
+            if getattr(s,'cell_supervision','off')!='off' and name in {'cell_head.weight','cell_head.bias'}:continue
             digest.update(name.encode());digest.update(tensor.detach().cpu().contiguous().numpy().tobytes())
         model_run_settings['initial_weights_sha256']=prior_model['initial_weights_sha256'] if resuming else digest.hexdigest()
         (checkpoint_dir/'model_run_settings.json').write_text(json.dumps(model_run_settings,indent=2)+'\n')

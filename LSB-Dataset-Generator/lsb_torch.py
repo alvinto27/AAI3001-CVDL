@@ -111,18 +111,25 @@ def _rng(seed, epoch, domain):
     return np.random.default_rng(np.random.SeedSequence([seed,epoch,domain]))
 
 
-def image_tensor(array, entropy, label, augment, dtype=torch.float32):
+def image_tensor(array, entropy, label, augment, dtype=torch.float32, *, cell_targets=None):
     """CHW 0..255, same keyed flip/flip/rot90 operations at either dtype."""
     image = torch.from_numpy(array).permute(2,0,1).to(dtype=dtype)
+    if cell_targets is not None:
+        cells = [torch.from_numpy(np.asarray(a).astype(np.int64)) for a in cell_targets]
     if augment:
         words=np.random.SeedSequence(list(entropy)+[0x415547,label]).generate_state(2)
         generator=torch.Generator().manual_seed(int(words[0]) | (int(words[1])<<32))
         if bool(torch.rand((),generator=generator)<0.5):
             image=torch.flip(image,dims=(-1,))
+            if cell_targets is not None: cells=[torch.flip(a,(-1,)) for a in cells]
         if bool(torch.rand((),generator=generator)<0.5):
             image=torch.flip(image,dims=(-2,))
+            if cell_targets is not None: cells=[torch.flip(a,(-2,)) for a in cells]
         turns=int(torch.randint(0,4,(),generator=generator).item())
         image=torch.rot90(image,turns,dims=(-2,-1))
+        if cell_targets is not None: cells=[torch.rot90(a,turns,(-2,-1)) for a in cells]
+    if cell_targets is not None:
+        return image.contiguous(), tuple(a.contiguous() for a in cells)
     return image.contiguous()
 
 

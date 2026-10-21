@@ -162,6 +162,8 @@ SCHEMA = MappingProxyType({
     'init_checkpoint_sha256': Definition('str?', optional_string, None, '64 lowercase hex characters', 'Required start-file SHA-256.', lambda v:v is None or bool(re.fullmatch(r'[0-9a-f]{64}',v))),
     'embedding_schedule': Definition('str?', optional_string, None, 'None/low_bpp/original', 'Approved three-stage embedding schedule.', lambda v:v in {None,'low_bpp','original'}),
     'embedding_stage_epochs': Definition('int', integer, 5, '>0', 'Epochs in each of three embedding stages.', lambda v:v>0),
+    'cell_supervision': Definition('str', str, 'off', 'off/changed_cells_v1', 'Opt-in changed-cell auxiliary target.', lambda v:v in {'off','changed_cells_v1'}),
+    'cell_loss_weight': Definition('float', number, .2, '>0', 'Auxiliary cell BCE weight.', lambda v:v>0),
     'pilot': Definition('bool', boolean, False, 'PC only; train_matched OTF smoke', 'Cap actual train draws and slice the verified real validation list.'),
     'evaluation_checkpoint': Definition('str', str, 'best', 'best/last', 'Checkpoint used for deployment evaluation.', lambda v:v in {'best','last'}),
     'train_yaml': Definition('path?', optional_string, None, 'path or None; OTF only', 'Train embedding settings.', env='V3_TRAIN_YAML', legacy_global='TRAIN_YAML'),
@@ -519,8 +521,16 @@ def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_v
                 c['batch_size']%8 or c['tiles_per_epoch']%4 or not c['train_yaml'] or
                 c['epochs']!=3*c['embedding_stage_epochs'] or not c['init_checkpoint']):
             raise ValueError('embedding schedule needs OTF source mix, unpaired batch divisible by8, tiles divisible by4, train_yaml, weights start, and three complete stages')
+    if c['cell_supervision']!='off':
+        if (c['embedding_schedule']!='original' or c['train_tile_size']!=256 or c['train_grid']!='overlap_last' or
+                c['model']!='xunet_wide' or c['width']!=4 or c['front_end']!='srm' or c['norm']!='none' or
+                c['checkpoint_validation']!='train_matched' or c['validation_recipe']!='60da4391043e8ce48ff2'):
+            raise ValueError('cell supervision needs original schedule, SRM wide-w4 norm none, 256 overlap_last and validation 60da')
+    elif 'cell_loss_weight' in supplied:
+        raise ValueError('cell_loss_weight needs enabled cell supervision')
     # Opt-ins must not add keys to historical effective settings or run records.
     absent=[]
+    if c['cell_supervision']=='off':absent+=['cell_supervision','cell_loss_weight']
     if not c['pilot']:absent+=['pilot']
     if c['init_checkpoint'] is None:absent+=['init_checkpoint','init_checkpoint_sha256']
     if c['embedding_schedule'] is None:absent+=['embedding_schedule','embedding_stage_epochs']

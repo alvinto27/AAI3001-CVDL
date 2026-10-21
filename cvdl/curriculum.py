@@ -38,8 +38,13 @@ def original_positions(count, seed, epoch, mode):
 
 
 class CurriculumImages(TrainingImages):
-    def __init__(self,corpus,mode,stage_epochs):
+    def __init__(self,corpus,mode,stage_epochs,*,cell_supervision='off'):
         super().__init__(corpus)
+        if cell_supervision not in ('off','changed_cells_v1'):
+            raise ValueError('unknown cell supervision')
+        if cell_supervision != 'off' and (mode != 'original' or corpus.train_tile != 256 or corpus.settings.paired_batches or corpus.settings.source_mix is None):
+            raise ValueError('cell targets need original schedule, 256 mixed-source unpaired training')
+        self.cell_supervision=cell_supervision
         from lsb_batch import read_config
         if corpus.config.as_dict()!=read_config(corpus.root/'configs/train-k1to4.yaml').as_dict():
             raise ValueError('curriculum base must match train-k1to4.yaml exactly')
@@ -68,16 +73,28 @@ class CurriculumImages(TrainingImages):
                 spec=TileSpec(self.corpus.training_grid(record),self.corpus.train_tile,row,col)
                 seed=OTFSeed(settings.run_seed,'train',epoch,variant,settings.fixed_variants)
                 clean,_=make_sample(photo,record,spec,self.corpus.config,seed,'clean')
-                stego,meta=make_sample(photo,record,spec,chosen,seed,'stego')
+                result=make_sample(photo,record,spec,chosen,seed,'stego',
+                    **({'return_cell_targets':True} if self.cell_supervision!='off' else {}))
+                stego,meta=result[:2]
                 pair_id=(self.corpus.offsets[record['photo_id']]+(row*len(xs)+col)*settings.variants_per_tile+variant-1)
                 # Metadata is carried through shuffle/packing to the callback;
                 # only actually consumed stegos enter the epoch counts.
                 tag=(pair_id*2,int(original))
-                yield clean,0,tag,meta['embedding_seed_key']
-                yield stego,1,(tag[0]+1,tag[1]),meta['embedding_seed_key']
+                if self.cell_supervision!='off':
+                    yield clean,0,tag+(np.zeros((8,8),dtype=np.uint16),np.ones((8,8),dtype=bool)),meta['embedding_seed_key']
+                    yield stego,1,(tag[0]+1,tag[1],*result[2]),meta['embedding_seed_key']
+                else:
+                    yield clean,0,tag,meta['embedding_seed_key']
+                    yield stego,1,(tag[0]+1,tag[1]),meta['embedding_seed_key']
             del photo
 
     def _output(self,item):
+        if self.cell_supervision!='off':
+            from lsb_torch import image_tensor
+            image,label,tag,entropy=item
+            image,cells=image_tensor(image,entropy,label,self.corpus.settings.augment,
+                getattr(torch,self.corpus.settings.tensor_dtype),cell_targets=tag[2:])
+            return image,label,torch.cat((torch.tensor(tag[:2],dtype=torch.long),*(a.flatten() for a in cells)))
         image,label,tag=super()._output(item)
         return image,label,torch.tensor(tag,dtype=torch.long)
 
@@ -134,9 +151,13 @@ def weights_only(module,path,expected_sha):
             raise ValueError('initial checkpoint architecture setting mismatch: '+key)
     state={key.removeprefix('net.'):value for key,value in saved['state_dict'].items()}
     target=module.net.state_dict()
-    if state.keys()!=target.keys() or any(state[k].shape!=target[k].shape for k in state):
+    head_keys={'cell_head.weight','cell_head.bias'} if current.get('cell_supervision','off')=='changed_cells_v1' else set()
+    if (set(target)-set(state)!=head_keys or set(state)-set(target) or
+            any(state[k].shape!=target[k].shape for k in state)):
         raise ValueError('initial checkpoint state architecture mismatch')
-    module.net.load_state_dict(state,strict=True)
+    # Only this explicitly declared new head stays initialized. All other keys
+    # have been checked; the final copy remains strict (also for feature off).
+    module.net.load_state_dict({**state,**{k:target[k] for k in head_keys}},strict=True)
     return dict(checkpoint=str(path),checkpoint_sha256=actual,weights_only=True,
                 optimizer_restored=False,scheduler_restored=False,source_epoch=int(saved.get('epoch',-1)))
 

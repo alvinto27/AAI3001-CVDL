@@ -41,7 +41,8 @@ class RecipeTests(unittest.TestCase):
             self.assertEqual(settings.run_name,legacy.run_name)
             for key,spec in SCHEMA.items():
                 if key in {'validation_recipe','init_checkpoint','init_checkpoint_sha256',
-                           'embedding_schedule','embedding_stage_epochs','evaluation_checkpoint','pilot'}:
+                           'embedding_schedule','embedding_stage_epochs','evaluation_checkpoint','pilot',
+                           'cell_supervision','cell_loss_weight'}:
                     # Unset opt-ins must stay absent from both legacy records.
                     self.assertNotIn(key, settings.values)
                     self.assertNotIn(key, legacy.values)

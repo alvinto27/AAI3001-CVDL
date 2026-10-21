@@ -37,14 +37,18 @@ class OTFSeed:
 
 
 def make_sample(photo: np.ndarray, record: Mapping, tile: TileSpec,
-                config, seed: LegacySeed | OTFSeed, kind: str) -> tuple[np.ndarray, dict]:
+                config, seed: LegacySeed | OTFSeed, kind: str, *, return_cell_targets=False):
     """Return an owned RGB8 sample and JSON-safe provenance/settings metadata.
 
     Clean samples draw no settings and have settings/embedding=None. Both seed
     keys identify the paired sample, even for clean. Effective entropy is used,
     so ignored evaluation run_seed/epoch do not change bytes OR metadata.
-    Source views are never mutated; stego keeps no mask or changed-index array.
+    Source views are never mutated; default stego retains no mask or indices.
+    Opt-in return_cell_targets adds (8x8 counts, valid-negative bits) as a third
+    return item, never in metadata; the transient changed indices are discarded.
     """
+    if return_cell_targets and tile.tile_size != 256:
+        raise ValueError('cell targets require tile_size=256')
     if kind not in ("clean", "stego"):
         raise ValueError("kind must be clean or stego")
     from lsb_train_grid import POLICIES, crop, pad_crop
@@ -86,13 +90,22 @@ def make_sample(photo: np.ndarray, record: Mapping, tile: TileSpec,
         metadata.update(real_shape=list(view.pixels.shape[:2]), real_pixels=int(view.pixels.shape[0]*view.pixels.shape[1]), pad=list(pad))
     if kind == "clean":
         pixels = view.pixels.copy()
-        return (pad_crop(pixels,pad) if pad is not None else pixels), metadata
+        result = ((pad_crop(pixels,pad) if pad is not None else pixels), metadata)
+        if return_cell_targets:
+            from lsb_cells import changed_cell_targets
+            return (*result, changed_cell_targets([], pixels.shape, pad))
+        return result
     kwargs, drawn = draw(config, view.pixels, np.random.default_rng(sequences[0]))
     metadata["settings"] = {**{k: v for k, v in kwargs.items() if k != "rng"}, **drawn}
     kwargs["rng"] = np.random.default_rng(sequences[1])
-    pixels, embedded, _ = embed_fast(view.pixels, **kwargs)
+    pixels, embedded, changed = embed_fast(view.pixels, **kwargs,
+        **({'return_changed_units': True} if return_cell_targets else {}))
     metadata["embedding"] = embedded
-    return (pad_crop(pixels,pad) if pad is not None else pixels), metadata
+    result = ((pad_crop(pixels,pad) if pad is not None else pixels), metadata)
+    if return_cell_targets:
+        from lsb_cells import changed_cell_targets
+        return (*result, changed_cell_targets(changed, pixels.shape, pad))
+    return result
 
 
 def replay_legacy(photo: np.ndarray, record: Mapping, legacy_row: Mapping,

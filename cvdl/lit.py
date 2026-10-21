@@ -22,14 +22,20 @@ def v4_lr_factor(step: int, steps_per_epoch: int, max_epochs: int, warmup_epochs
 class SteganalysisModule(L.LightningModule):
     """Lightning wrapper for paired or unpaired image batches."""
 
-    def __init__(self, lr: float = 3e-4, max_epochs: int = 20, weight_decay: float = 1e-4, paired_batches: bool = False, clip_t=3.0, norm="none", steps_per_epoch: int = 1, warmup_epochs: int = 1, grad_clip: float = 1.0, lr_drops=None, batch_size: int = 32, precision: str = "32", model: str = "xunet", width: int = 4, front_end: str = "kv", *, validation_data=None, conv1_factory=None):
+    def __init__(self, lr: float = 3e-4, max_epochs: int = 20, weight_decay: float = 1e-4, paired_batches: bool = False, clip_t=3.0, norm="none", steps_per_epoch: int = 1, warmup_epochs: int = 1, grad_clip: float = 1.0, lr_drops=None, batch_size: int = 32, precision: str = "32", model: str = "xunet", width: int = 4, front_end: str = "kv", *, validation_data=None, conv1_factory=None, cell_supervision='off', cell_loss_weight=0.2):
         super().__init__()
         if lr_drops is None:
             lr_drops = ((max_epochs // 2 + 1, 0.1),)
         # front_end is saved only when it is not the default, so KV checkpoints keep their old hyper_parameters.
-        self.save_hyperparameters(ignore=["validation_data", "conv1_factory", *(["front_end"] if front_end == "kv" else [])])
+        if cell_supervision not in ('off','changed_cells_v1') or not np.isfinite(cell_loss_weight) or cell_loss_weight <= 0:
+            raise ValueError('invalid cell supervision/loss weight')
+        if cell_supervision!='off' and paired_batches:
+            raise ValueError('cell training requires unpaired batches')
+        self.save_hyperparameters(ignore=["validation_data", "conv1_factory", *(["front_end"] if front_end == "kv" else []),
+            *(['cell_supervision','cell_loss_weight'] if cell_supervision=='off' else [])])
         self.validation_data = validation_data
-        self.net = model_from_hparams(dict(model=model, clip_t=clip_t, norm=norm, width=width, front_end=front_end))
+        self.net = model_from_hparams(dict(model=model, clip_t=clip_t, norm=norm, width=width, front_end=front_end,
+            **(dict(cell_supervision=cell_supervision) if cell_supervision!='off' else {})))
         if conv1_factory is not None:
             self.net.conv1 = conv1_factory(self.net.conv1)
         self.validation_scores = []
@@ -53,8 +59,18 @@ class SteganalysisModule(L.LightningModule):
         return self.net(images.float()), targets
 
     def training_step(self, batch, batch_idx):
-        logits, targets = self.training_logits_targets(batch)
-        loss = F.cross_entropy(logits, targets)
+        if self.hparams.get('cell_supervision','off')!='off':
+            from .cell_training import cell_loss
+            images,targets,tags=batch
+            logits,aux=self.net(images.float(),return_aux=True)
+            tile_ce=F.cross_entropy(logits,targets)
+            auxiliary,stats=cell_loss(aux,tags)
+            loss=tile_ce+self.hparams.cell_loss_weight*auxiliary
+            for name,value in dict(tile_ce=tile_ce,cell_loss=auxiliary,**stats).items():
+                self.log('train_'+name,value,on_step=False,on_epoch=True,batch_size=targets.numel())
+        else:
+            logits, targets = self.training_logits_targets(batch)
+            loss = F.cross_entropy(logits, targets)
         accuracy = (logits.argmax(dim=1) == targets).float().mean()
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=targets.numel())
         self.log("train_acc", accuracy, on_step=False, on_epoch=True, prog_bar=True, batch_size=targets.numel())

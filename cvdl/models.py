@@ -128,8 +128,10 @@ class XuNet(nn.Module):
         x = self.pool(F.relu(self.bn5(self.conv5(x))))
         return x
 
-    def forward(self, x):
+    def forward(self, x, *, return_aux=False):
         x = self.features(x)
+        if return_aux:
+            return self.classifier(x.mean(dim=(-2, -1))), self.cell_head(x)
         x = x.mean(dim=(-2, -1))
         return self.classifier(x)
 
@@ -192,11 +194,21 @@ def model_from_hparams(hparams):
     clip_t, norm = hparams.get('clip_t', 3.0), hparams.get('norm', 'group')
     front_end = hparams.get('front_end', 'kv')
     if model == 'xunet':
-        return XuNet(clip_t=clip_t, norm=norm, front_end=front_end)
-    if model == 'xunet_wide':
-        return XuNetWide(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
-    if model == 'xunet_wide_delayed':
-        return XuNetWideDelayed(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
-    raise ValueError(f'unsupported checkpoint model: {model}')
+        network = XuNet(clip_t=clip_t, norm=norm, front_end=front_end)
+    elif model == 'xunet_wide':
+        network = XuNetWide(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
+    elif model == 'xunet_wide_delayed':
+        network = XuNetWideDelayed(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
+    else:
+        raise ValueError(f'unsupported checkpoint model: {model}')
+    supervision = hparams.get('cell_supervision', 'off')
+    if supervision != 'off':
+        if (supervision != 'changed_cells_v1' or model != 'xunet_wide' or
+                front_end != 'srm' or int(hparams.get('width',4)) != 4 or norm != 'none'):
+            raise ValueError('cell head requires changed_cells_v1 with SRM wide-w4, norm none')
+        # The new head must not perturb the historical backbone/training RNG.
+        with torch.random.fork_rng(devices=[]):
+            network.cell_head = nn.Conv2d(network.classifier.in_features, 1, 1)
+    return network
 
 
