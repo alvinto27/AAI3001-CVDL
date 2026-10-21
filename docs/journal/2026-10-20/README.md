@@ -30,4 +30,4 @@ Recorded by the Orchestrator. Team: Orchestrator, Worker, Run_Supervisor (new se
 ### Next
 
 - ~~B, then C (Worker, one task at a time).~~ C done; B not done (B3, user): the loader workers start and stop on purpose (RAM fix 2026-10-14, `spawn` workers), so the cases cannot share workers.
-- **Paused (user, end of session).** Next when resumed: retire the legacy-512 evaluation (Worker plan first, shown to the user before any removal). Arm G (G1) stays paused. Ideas board #14 (compile-guard tests) waits.
+- **Paused (user, end of session).** ~~Next when resumed: retire the legacy-512 evaluation~~ (done 2026-10-21, `3c3dc39`) (Worker plan first, shown to the user before any removal). Arm G (G1) stays paused. Ideas board #14 (compile-guard tests) waits.

@@ -43,7 +43,7 @@ Roster source: `runs/verification/post-training-model-comparison-20261017.csv` r
 - **Reference:** `source_reference_thresholds.csv` and a separate reference summary labelled `if_source_known_reference`: one min-P_E threshold per source present in the validation list, **except DIV2K**. ALASKA's reference is shared by seen and unseen. No mixed RAISE+DIV2K reference.
 - **Diagnostics** keep their names: `test_min_P_E`, `test_min_cutoff`, `*_at_0_5`. Never promoted to main.
 - QUICK uses a pinned subset with its own identity, marked non-deployment; never cached as the full calibration.
-- `--test-suite legacy-512` unchanged.
+- ~~`--test-suite legacy-512` unchanged.~~ Retired 2026-10-21 ([legacy-512 retirement](legacy-512-retirement.md)).
 - The report notebook (#5) reads only these saved files.
 
 ## Out of scope

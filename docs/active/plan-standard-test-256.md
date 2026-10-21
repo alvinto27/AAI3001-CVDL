@@ -14,7 +14,7 @@ Today's standard test and source panels use 512 tiles and k 1-8 (`configs/raise5
 | ---: | --- |
 | 1 | 256 x 256 tiles, **overlap-last grid for all sources**, k 1-4, bpp U(0.05, 0.5), stego types equal. bpp-1 panel dropped. |
 | 2 | **Same frozen test for every model.** Never derived from a training recipe or notebook. |
-| 3 | **New suite is the default** of `scripts/evaluate_run.py`: no flag needed. The old suite stays only behind an explicit `--test-suite legacy-512`. |
+| 3 | **New suite is the default** of `scripts/evaluate_run.py`: no flag needed. ~~The old suite stays only behind an explicit `--test-suite legacy-512`.~~ Retired 2026-10-21 ([legacy-512 retirement](legacy-512-retirement.md)). |
 | 4 | **Pair counts are multiples of 96** (4 k x 24 stego-type combinations), exactly balanced within each source and k. |
 | 5 | **Photo-balanced tile selection** within each source (one unused tile per photo per round), so large photos do not dominate. |
 | 6 | **k 5-8 check is opt-in** (`--higher-k`): the same tiles and slot settings with k mapped 1->5, 2->6, 3->7, 4->8; a separate report, not in the main score. |
@@ -43,8 +43,8 @@ Per panel: k 1-4 each one quarter. Within each source and k, the 24 combinations
 - **Selection:** independent keyed streams for photo/tile order, slot shuffle and draws. No dependence on run seed, model, epoch or workers. Record camera counts and realised per-photo quotas.
 - **Geometry:** explicit 256 overlap-last replay adapter, patterned on `MatchedValidationPairs` (`cvdl/validation.py`). Do not loosen the legacy `RunSettings` 256 restriction (`lsb_torch.py:62-63`) and do not reuse `HardPairs` unchanged (it hardcodes 512).
 - **Old models:** scored on the same 256 tiles with their own weights (the model pools spatially before the classifier, `cvdl/models.py:131-134`). Report the train/test geometry for each model.
-- **Evaluator:** `evaluate_run.py runs/<run>` runs the new suite by default; `--higher-k` adds the k 5-8 panels; `--test-suite legacy-512` runs today's suite unchanged. The new branch is separate from the legacy `post_fit.run`. Output goes to `runs/<run>/evaluation/standard-256-v1/<evaluation-id>/` (settings with checkpoint SHA and list hashes, per-panel predictions with full rows, summaries, timings; higher-k in its own subfolder). Refuse to overwrite without `--overwrite`. Never write training records.
-- **Hard test:** until task #3 rebuilds it at 256, the default suite reports the hard test as pending. It never mixes the 256 standard test with the 512 hard test silently. `--test-suite legacy-512` keeps hard v1.
+- **Evaluator:** `evaluate_run.py runs/<run>` runs the new suite by default; `--higher-k` adds the k 5-8 panels; ~~`--test-suite legacy-512` runs today's suite unchanged.~~ (retired 2026-10-21, [legacy-512 retirement](legacy-512-retirement.md)) The new branch is separate from the legacy `post_fit.run`. Output goes to `runs/<run>/evaluation/standard-256-v1/<evaluation-id>/` (settings with checkpoint SHA and list hashes, per-panel predictions with full rows, summaries, timings; higher-k in its own subfolder). Refuse to overwrite without `--overwrite`. Never write training records.
+- **Hard test:** until task #3 rebuilds it at 256, the default suite reports the hard test as pending. It never mixes the 256 standard test with the 512 hard test silently. ~~`--test-suite legacy-512` keeps hard v1.~~ (retired 2026-10-21)
 - **Metric names:** no bare `P_E` in new outputs. Diagnostics: `test_min_P_E` (and its cut-off), `FA_at_0_5`, `miss_at_0_5`, `P_E_at_0_5`, AUC, counts, per source and per k. Main columns (`threshold_origin=validation_min_pe`, cut-off, FA, miss, `P_E_at_validation_cutoff`) come with task #4; leave a clear place for them.
 
 ## Out of scope

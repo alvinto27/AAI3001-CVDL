@@ -54,7 +54,7 @@ Question: does SRM's first tanh flatten the weak signal on noisy tiles?
 1. For SRM-e50 and one KV model (overlap-256, for contrast): per tile, the share of tanh1 inputs beyond +/-3, on the hard-256 tiles (clean and stego).
 2. Relate it to the tile noise value (`tile_kv_std`) and, within each noisy cell, to misses (saturated-share quartiles vs miss rate).
 
-Cost: GPU inference, ~15 min; extend `cvdl/saturation.py` to per-tile output.
+Cost: GPU inference, ~15 min; extend `cvdl/saturation.py` (archived 2026-10-21 to `cvdl/archive/saturation.py`) to per-tile output.
 
 Decision scope fixed before any result (Orchestrator, 2026-10-19). The decision uses SRM-e50 only; overlap-256 is contrast.
 - Saturated share = per tile, the fraction of first-tanh inputs with |x| > 3 (the existing `cvdl/saturation.py` definition).

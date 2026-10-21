@@ -38,7 +38,7 @@ States: `queued` (approved, waiting) · `preparing` (code or notebook not ready)
 | tanh saturation | done (`0e05dcb`) | opt-in stage; only SRM tanh1 saturates (20.8% / 26.4%) |
 | 256 loader speed | done (`863d9fb`, `efde4df`) | `pack_blocks=16` default; batches identical; G4 gain not measured (SRM GPU-bound) |
 | SRM weakness breakdown | done | `runs/srm-20261017T052857Z-4521/post-training/breakdown/` |
-| Hard test v1 | done (`d74d716`) | `data/hard-test/v1/`; default evaluation stage |
+| Hard test v1 | done (`d74d716`) | `data/hard-test/v1/`; ~~default evaluation stage~~ retired 2026-10-21 with the legacy-512 evaluation ([legacy-512 retirement](legacy-512-retirement.md)) |
 | `srm-hard` notebook | done (`795fd93`, updated `a0e72cd`) | run 9, done |
 | Standard-256 / hard-256 / threshold / rescoring / report notebook | done (`bd36403`, `a56c275`, `68e4f0b`, `dd9867a`, `716b2cd`) | all runs scored |
 | Diagnostic checks 1, 2, 2b | done (`ed52419`, `9563540`, `d3ae6b8`) | [plan](plan-diagnostic-checks.md) |

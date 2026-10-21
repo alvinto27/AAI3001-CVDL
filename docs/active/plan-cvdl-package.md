@@ -170,7 +170,7 @@ breakdowns with four heatmaps. `cvdl.metrics.global_summary` preserves notebook
 02's threshold scan, including its first tied minimum and infinite endpoints;
 this differs from the validation-cutoff tie rule. Other metric formulas remain
 in `cvdl.metrics`. The checkpoint scorer is moved, not copied:
-`scripts/eval_checkpoint.py` is its CLI and legacy env-aware boundary. Package
+`scripts/eval_checkpoint.py` is its CLI and legacy env-aware boundary (archived 2026-10-21 to `scripts/archive/eval_checkpoint.py`; [legacy-512 retirement](legacy-512-retirement.md)). Package
 calls receive root, device, QUICK and panel selection as arguments and do not
 read env values. QUICK still caps extra panels at 16 pairs with seed 1.
 

@@ -73,5 +73,5 @@ Rules: `tests/archive/` has no `__init__.py`, so neither level discovers it. Act
 
 Measured after the trim: full 407 run, 0 skipped, 490.4 s; fast 378 run, 29 skipped, 147.5 s; golden ALL EQUAL.
 
-Not done (user): 9 small frozen-notebook and old-metric tests stay in fast (moving them saves about 0.1 s). Next (paused): retire the legacy-512 evaluation (`--test-suite legacy-512`), which keeps about 30 more tests alive; design first. Test gap: ideas board #14.
+Not done (user): 9 small frozen-notebook and old-metric tests stay in fast (moving them saves about 0.1 s). ~~Next (paused): retire the legacy-512 evaluation (`--test-suite legacy-512`), which keeps about 30 more tests alive; design first.~~ Done 2026-10-21 (`3c3dc39`, [legacy-512 retirement](legacy-512-retirement.md)): 407 to 370 tests; fast 341 run + 29 skipped, 142.4 s; full 473.8 s. Test gap: ideas board #14.
 

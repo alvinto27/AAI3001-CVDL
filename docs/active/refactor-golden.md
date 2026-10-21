@@ -83,7 +83,7 @@ The historical golden JSON is unchanged. At the final GPU smoke, retain the
 standard-test file/count/identity/key checks; do not require full-size extra
 panel predictions. No GPU run was needed for phase 4a's cap test.
 
-Standalone `eval_checkpoint.py` remains full when QUICK is absent. `--quick`
+Standalone `eval_checkpoint.py` (archived 2026-10-21 to `scripts/archive/`; the golden does not import it) remains full when QUICK is absent. `--quick`
 requests the cap; `--no-quick` disables an inherited QUICK value. Future thin
 notebooks must pass their resolved `settings.quick` to `evaluate()`.
 

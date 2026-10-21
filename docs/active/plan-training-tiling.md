@@ -215,7 +215,7 @@ Default full preserves old behaviour. After download, evaluate on the PC:
 
 ```sh
 podman exec -w /work aai3001 python scripts/evaluate_run.py runs/<downloaded-run>
-podman exec -w /work aai3001 python scripts/evaluate_run.py runs/<downloaded-run> --padding-check
+podman exec -w /work aai3001 python scripts/evaluate_run.py runs/<downloaded-run> --padding-check   # retired 2026-10-21, see legacy-512-retirement.md
 ```
 
 The evaluator accepts the outer job folder or checkpoint folder, selects its
