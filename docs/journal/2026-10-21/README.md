@@ -14,6 +14,9 @@
 - Worker: `731a27c` cell-level training code (opt-in, default off): changed-cell labels from the embedding mask, aligned with flips/rotations, carried in the batch tag; 1x1 cell head (257 weights); CE + 0.2 x cell BCE; warm start from SRM-e50 with only the head keys missing; strict reload; notebook `notebooks/experiments/srm-cell-aux.ipynb` (same settings as `srm-low-bpp-control` plus the two cell flags); `configs/cell-diagnostic-v1.json` (192 validation / 256 test pairs, 3 figure tiles, chosen before training). 8 new tests pass (compiled forward/backward on CPU included); 368 tests: fast 149.5 s, full 485.9 s. Pushed. Next: PC pilot (GPU).
 - Worker: PC pilot (GPU, `pilot=true`, 3 epochs, compile on). Batch 32 ran out of GPU memory in the PC-only ROCm conv1 workaround; batch 16 passed (peak 5.05 GiB). Warm start: only the head keys missing. Cell labels: contiguous 18.5% of cells changed, stride 60.6%, random 100%. Matched control pilot (no cell head): tile CE rose in both (cell 0.237/0.262/0.276, control 0.236/0.253/0.273), so the rise is warm-start dynamics; pilot validation P_E cell 11.5/10.5/10.9% vs control 11.1/10.7/11.5%, AUC .957/.959/.960 vs .960/.958/.956 (pilot slice only); step-time ratio 0.994. A driver-only reload assertion bug (512 preview vs 256 head) was found; strict reload and outputs equal. Orchestrator: pilot passed the fixed criteria.
 - Run_Supervisor: run 13 launched (user: launch without further approval if the pilot passes): `srm-cell-aux-20261021T054704Z-6997`, commit `56aa917`, 05:47:04Z, no stockout; dry-run settings all as planned.
+- Run_Supervisor: run 13 delivered (47.5 min notebook, 15 epochs, VM terminated, Pi = PC SHA-256).
+- Worker: `ac72092` cell evaluation tools (`scripts/cell_eval.py`, `scripts/compare_cell_tiles.py`, `cvdl/cell_metrics.py`; 373 tests). Control CAM smoke: primary within-tile AUC .793 [.757, .828], so the CAM alone already passes the 0.75 mark. Orchestrator fixed the primary metric (mean within-tile AUC) before run-13 results (`11cee37`).
+- Worker: run 13 evaluated, `ea32a4be0e2ce3597fbd` (eval batch 32 like the control; batch 128 ran out of GPU memory). See Found.
 
 ### Found
 
@@ -21,6 +24,7 @@
 - Notebook 05, `newdata-1` and `wide-1` still run the 512 test at the end of training by default (`post_fit_eval=full`); all 12 experiment notebooks set `none`. Not changed.
 - Two shared parts had to stay active: `cvdl.panels.code_commit` and the hard-test score, Wilson interval and design constants (the 256 path uses them).
 - RAISE, DIV2K, the PC evaluations and `runs/verification/` exist only on this PC (the Pi has ALASKA, LSDIR and the G4 outputs).
+- Run 13 (cell-level training) vs control run 11, same start and recipe. Tile: standard P_E 2.97% vs 2.65% (+0.32 pts, guard <= +0.25 missed); AUC .9962 vs .9964; hard k1-low-contiguous AUC +.005 [+.0004, +.0097] (real but below the +.02 bonus); noisy-clean FA 18.9% vs 20.7%. Cell map, primary within-tile AUC: trained head .863 [.836, .890], run-13 CAM .806, control CAM .793; head - control CAM +.070 [+.053, +.088]; head - own CAM +.057 [+.042, +.075]. Largest head gain on ALASKA (seen .817 vs CAM .720; unseen .822 vs .747) and LSDIR (.840 vs .788); RAISE was already .96-.97. Recall at the validation cell cutoff (5% FA) about 16% for every map: better ranking within tiles, not more cells found at a strict cutoff. Old rule: AUC .863 >= .75 and test cell FA 3.8% <= 7% pass. Tighter rule proposed (beat control CAM, interval > 0): also passes. Standard guard: fails.
 
 ### Decided
 
