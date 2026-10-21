@@ -17,6 +17,7 @@
 - Run_Supervisor: run 13 delivered (47.5 min notebook, 15 epochs, VM terminated, Pi = PC SHA-256).
 - Worker: `ac72092` cell evaluation tools (`scripts/cell_eval.py`, `scripts/compare_cell_tiles.py`, `cvdl/cell_metrics.py`; 373 tests). Control CAM smoke: primary within-tile AUC .793 [.757, .828], so the CAM alone already passes the 0.75 mark. Orchestrator fixed the primary metric (mean within-tile AUC) before run-13 results (`11cee37`).
 - Worker: run 13 evaluated, `ea32a4be0e2ce3597fbd` (eval batch 32 like the control; batch 128 ran out of GPU memory). See Found.
+- Worker: `5981ab2` optional cell section in the report generator (`--cell-dir`, `--cell-reference-dir`); run 13 report built. `8c05e03` `scripts/photo_heatmap.py` (whole-photo cell maps; shared evaluator loading extracted, FULL 378 pass, constants pass). Orchestrator: `docs/findings.md` rewritten for 256 (`e82c9ce`).
 
 ### Found
 
@@ -25,6 +26,7 @@
 - Two shared parts had to stay active: `cvdl.panels.code_commit` and the hard-test score, Wilson interval and design constants (the 256 path uses them).
 - RAISE, DIV2K, the PC evaluations and `runs/verification/` exist only on this PC (the Pi has ALASKA, LSDIR and the G4 outputs).
 - Run 13 (cell-level training) vs control run 11, same start and recipe. Tile: standard P_E 2.97% vs 2.65% (+0.32 pts, guard <= +0.25 missed); AUC .9962 vs .9964; hard k1-low-contiguous AUC +.005 [+.0004, +.0097] (real but below the +.02 bonus); noisy-clean FA 18.9% vs 20.7%. Cell map, primary within-tile AUC: trained head .863 [.836, .890], run-13 CAM .806, control CAM .793; head - control CAM +.070 [+.053, +.088]; head - own CAM +.057 [+.042, +.075]. Largest head gain on ALASKA (seen .817 vs CAM .720; unseen .822 vs .747) and LSDIR (.840 vs .788); RAISE was already .96-.97. Recall at the validation cell cutoff (5% FA) about 16% for every map: better ranking within tiles, not more cells found at a strict cutoff. Old rule: AUC .863 >= .75 and test cell FA 3.8% <= 7% pass. Tighter rule proposed (beat control CAM, interval > 0): also passes. Standard guard: fails.
+- Whole-photo heatmaps, run 13 (6 test photos chosen by seed 20261021 before inference; 0.10 bpp; `runs/verification/photo-heatmaps-run13-2026-10-21/`). Contiguous band found by the trained head in 5 of 6 photos for k=1 (changed-cell recall 0.96, 1.00, 0.98, 1.00, 0.58; noisy ALASKA 05418: 0.00 at k=1, 0.38 at k=2); the head band is cleaner than the CAM band (CAM marks 2-4x more cells on clean photos). Random placement: recall 2-17% (no location to find, as expected). **Photo decision with "any tile above the tile cut-off": 5 of 6 clean photos flagged** (the tile cut-off allows about 3.7% false alarms per tile; a photo has 6-260 tiles). A photo-level rule needs its own calibration (deployment work, not done). False cells on clean photos (head): 2.0% of cells on RAISE, 2.7% DIV2K, 0.7-3.4% ALASKA/LSDIR.
 
 ### Decided
 
