@@ -3,6 +3,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import io
 import json
+import os
 import tempfile
 import threading
 import unittest
@@ -157,6 +158,20 @@ class PipelineHTTPTests(unittest.TestCase):
                 if status==200:self.assertEqual(response.headers['access-control-allow-origin'],origin)
                 else:self.assertNotIn('access-control-allow-origin',response.headers)
         with self.assertRaises(ValueError):create_app(allowed_origins=['*'])
+
+    def test_optional_deployment_thread_override(self):
+        from cvdl.pipeline.serve import main
+        # The deployment entrypoint must not replace native/OMP/MKL defaults.
+        with patch.dict(os.environ,{},clear=True),patch('uvicorn.run'),patch('torch.set_num_threads') as setter:
+            main([])
+            setter.assert_not_called()
+        with patch.dict(os.environ,{'CVDL_THREADS':'4'}),patch('uvicorn.run'),patch('torch.set_num_threads') as setter:
+            main([])
+            setter.assert_called_once_with(4)
+        for value in ('0','invalid'):
+            with patch.dict(os.environ,{'CVDL_THREADS':value}),patch('sys.stderr',new_callable=io.StringIO):
+                with self.assertRaises(SystemExit) as raised:main([])
+                self.assertEqual(raised.exception.code,2)
 
     def test_upload_spools_are_closed_after_response(self):
         original=tempfile.SpooledTemporaryFile;spools=[]

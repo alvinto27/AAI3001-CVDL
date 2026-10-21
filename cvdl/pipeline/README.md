@@ -23,7 +23,6 @@ python3.12 -m venv "$HOME/.venvs/cvdl-pipeline"
 . "$HOME/.venvs/cvdl-pipeline/bin/activate"
 python -m pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
 python -m pip install -r deploy/requirements-http.txt
-export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 python -m cvdl.pipeline.serve --host 127.0.0.1 --port 8000
 ```
 
@@ -134,6 +133,15 @@ python scripts/build_deploy_bundle.py --run "$RUN" --evaluation-id "$EVAL" \
 Headless models use `MAP=cam` with their **own CAM cutoff and fit**; otherwise `MAP=trained_head`. Cache defaults to GPU; `--device cpu` is available. Original full cache: ~25 min, hardware-dependent. Unsupported architectures/grids need implementation.
 
 ## Host settings and limits
+
+CPU threads use PyTorch's default or existing `OMP_NUM_THREADS`/`MKL_NUM_THREADS` settings; one analysis can use several cores. Optionally cap PyTorch with `CVDL_THREADS=4 python -m cvdl.pipeline.serve ...`, or add `-e CVDL_THREADS=4` before the container image name. This overrides PyTorch's environment-derived count. Lower it on a shared/CPU-limited host; do not start extra server workers to get more threads. Keep the **4 GiB container memory allowance**: more threads did not require a higher cap in this test.
+
+On this PC, three `/analyze` runs per validation photo gave these medians (CPU image, 4 GiB limit; default selected 8 threads). Results stayed within the tile-score parity tolerance, with identical verdicts. Other CPUs can differ.
+
+| Photo | 1 thread | 4 threads | Default (8) |
+| --- | ---: | ---: | ---: |
+| DIV2K, 2040×1152, 40 tiles | 3.806 s | 1.372 s | 0.958 s |
+| RAISE, 3280×4948, 260 tiles | 24.038 s | 9.022 s | 6.252 s |
 
 Use `--allow-origin http://localhost:3000` for the app's exact origin; repeat for more origins, or set comma-separated `CVDL_ALLOWED_ORIGINS`. Wildcards are refused. CORS is not authentication. For public hosting, add HTTPS, authentication, upload timeouts and rate limits at a reverse proxy; expose non-loopback ports only deliberately. Local Python defaults to `127.0.0.1`; `--host` changes it.
 

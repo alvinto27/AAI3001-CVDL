@@ -188,7 +188,14 @@ def main(argv=None):
     args=parser.parse_args(argv)
     import torch
     import uvicorn
-    torch.set_num_threads(1)
+    threads=os.environ.get('CVDL_THREADS')
+    if threads is not None:
+        try:
+            count=int(threads)
+            if count<1:raise ValueError
+        except ValueError:
+            parser.error('CVDL_THREADS must be a positive integer')
+        torch.set_num_threads(count)
     app=create_app(args.bundle,device=args.device,
         allowed_origins=args.allow_origin or [v for v in os.environ.get('CVDL_ALLOWED_ORIGINS','').split(',') if v])
     uvicorn.run(app,host=args.host,port=args.port,workers=1,access_log=False)
