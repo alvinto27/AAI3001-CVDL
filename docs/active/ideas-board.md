@@ -1,6 +1,6 @@
 # Ideas board
 
-Status (2026-10-21): **focus changed by the user: #3 cell-level training is the active work (plan being refreshed); #10 arm G and the other model tests are on hold** so that the basic deliverables get finished. ~~checks 1, 2, 2b, #9 and #10 arm A done; #14 added (test gap); code of checks 1, 2, 2b archived 2026-10-20 (restore it with its tests before #12 or #3 reuses it); #10 arm G waits for the user; #12 on hold (user); the rest open. Nothing here starts without a user decision. Created 2026-10-18.~~
+Status (2026-10-21): **focus changed by the user: #3 cell-level training is the active work ([approved plan](plan-cell-training-256.md), 2026-10-21); #10 arm G and the other model tests are on hold** so that the basic deliverables get finished. ~~checks 1, 2, 2b, #9 and #10 arm A done; #14 added (test gap); code of checks 1, 2, 2b archived 2026-10-20 (restore it with its tests before #12 or #3 reuses it); #10 arm G waits for the user; #12 on hold (user); the rest open. Nothing here starts without a user decision. Created 2026-10-18.~~
 
 Evidence for each item: [2026-10-18 journal](../journal/2026-10-18/README.md) (numbers on the new 256 suite, each model at its own validation cut-off).
 

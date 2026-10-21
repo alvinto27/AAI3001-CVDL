@@ -4,6 +4,7 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Nothing
 
 ## Current references (`active/` means kept for use, not permission to run)
 - [2026-10-19 session handoff — read first next session](active/handoff-2026-10-19.md)
+- [Cell-level training at 256 — approved plan, frozen pass marks, matched control `srm-low-bpp-control` (2026-10-21)](active/plan-cell-training-256.md)
 - [Legacy-512 evaluation retirement — what moved to archive, rescoring rule (`3c3dc39`, 2026-10-21)](active/legacy-512-retirement.md)
 - [Test levels and the changed-path rule — fast/full/none tests; golden retired 2026-10-21 (built `891aefe`, 2026-10-20)](active/test-levels.md)
 - [Wide-R2 legacy settings migration — saved evidence and limits](active/legacy-wide-r2-migration.md)
