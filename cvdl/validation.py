@@ -191,10 +191,7 @@ def load_frozen(root, settings, train_grid, train_tile, rid):
 from lsb_torch import FixedPairs
 
 
-def evaluation_tensor(image):
-    """Evaluator pixels: contiguous CHW RGB8, no resize, scaling or augmentation."""
-    import torch
-    return torch.from_numpy(np.ascontiguousarray(image)).permute(2,0,1).contiguous()
+from .pixels import evaluation_tensor  # compatibility export; one pixel boundary
 
 
 class MatchedValidationPairs(FixedPairs):
