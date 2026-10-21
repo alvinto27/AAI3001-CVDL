@@ -9,6 +9,8 @@
 - Orchestrator: review (370 tests discovered; no active import of archive code; `--test-suite legacy-512` refused by argparse), push, docs.
 - Laptop access (no repository change): the laptop (`fedora-laptop`, RTX 4060 8 GB) can SSH into this PC (`ssh fedora-desk`, key-only). Work from the laptop uses this PC through SSH and herdr; nothing is copied.
 
+- Worker: `7921d58`: `post_fit_eval="none"` in the first cell of notebook 05, `newdata-1` and `wide-1` (one line each) and 3 test files. 370 tests; fast 140.3 s, full 474.2 s. Default golden compare (information only) ALL EQUAL, 135.4 s; the optional GPU part was not run (it needs the 512 output files and will break). Pushed.
+
 ### Found
 
 - Golden compare ALL EQUAL (141.1 s). Fast level 341 run + 29 skipped, 142.4 s (was 147.5 s). Full level 370 run, 473.8 s (was 490.4 s).
@@ -28,4 +30,6 @@
 
 - Pending: the user decides when to resume arm G (G1).
 - Pending (optional): back up RAISE, DIV2K and the PC evaluations to the Pi; `loginctl enable-linger` so a logout does not stop herdr and the container.
-- Pending: switching off the 512 end-of-training evaluation in notebook 05 / `newdata-1` / `wide-1` is a separate decision.
+- ~~Pending: switching off the 512 end-of-training evaluation in notebook 05 / `newdata-1` / `wide-1` is a separate decision.~~ Done `7921d58`.
+- Next: golden retirement + constants list (one task, plan first; the user picks the constants).
+- Note: 8 of the 12 experiment notebooks (and the 3 baseline notebooks) have no train-matched 256 validation; a new run from them needs an approved calibration mapping.

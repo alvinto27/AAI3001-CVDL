@@ -34,4 +34,4 @@ Older docs, journals and result records keep the old paths as written. Use this 
 
 Helper: FAST, GOLDEN REQUIRED. Golden compare ALL EQUAL (141.1 s). Fast level 341 run + 29 skipped, 142.4 s. Full level 370 run, 473.8 s. Orchestrator review: 370 discovered; no active import of archive code; `--test-suite legacy-512` gives an argparse error.
 
-Not part of this step: switching off the 512 end-of-training evaluation in notebook 05, `newdata-1` and `wide-1` (a separate decision).
+~~Not part of this step: switching off the 512 end-of-training evaluation in notebook 05, `newdata-1` and `wide-1` (a separate decision).~~ Done 2026-10-21 (`7921d58`): those notebooks set `post_fit_eval="none"`; the global default stays `full`.

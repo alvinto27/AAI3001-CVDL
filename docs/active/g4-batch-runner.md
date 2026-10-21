@@ -330,6 +330,11 @@ exact experiment values, RunSettings, RUN_NAME and every comparable golden
 global. The only two named machine differences are asserted explicitly:
 `CHECKPOINT_ROOT` is `runs-out/`, not the old PC capture's `/work/runs`, and
 `ROCM_CONV1_FIX_ACTIVE` is false on CUDA G4, not true as in that ROCm capture.
+A third deliberate difference since `7921d58` (2026-10-21, user): notebook 05,
+`newdata-1` and `wide-1` set `post_fit_eval="none"`, so a run skips the old 512
+end-of-training test (the archived envs still resolve `full`). Evaluate on the PC
+with the 256 suite. These recipes have no train-matched 256 validation, so a new
+checkpoint needs an approved calibration mapping before the deployment threshold.
 The archived env files are read-only parity fixtures and cannot submit a
 notebook job. The historical golden JSON stays unchanged.
 
