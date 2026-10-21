@@ -1,0 +1,6 @@
+# Dedicated deployment environment, not the team's training environment.
+# For CPU deployment, install torch from https://download.pytorch.org/whl/cpu.
+# ==2.14.0 also accepts the matching +cpu/+CUDA/+ROCm local wheel version.
+torch==2.14.0
+numpy==2.5.3
+Pillow==12.3.0
