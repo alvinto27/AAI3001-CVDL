@@ -9,10 +9,12 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 
 
-def generate(root,run,evaluation_id=None,*,reference_run=None,reference_evaluation_id=None,overwrite=False):
+def generate(root,run,evaluation_id=None,*,reference_run=None,reference_evaluation_id=None,overwrite=False,
+             cell_dir=None,cell_reference_dir=None):
     from cvdl.reporting import SavedReport,compatible
     import nbformat
     from nbclient import NotebookClient
+    if cell_reference_dir and not cell_dir:raise ValueError('--cell-reference-dir requires --cell-dir')
     root=Path(root).resolve();primary=SavedReport(root,run,evaluation_id)
     if reference_evaluation_id and not reference_run:raise ValueError('--reference-evaluation-id requires --reference-run')
     reference=SavedReport(root,reference_run,reference_evaluation_id) if reference_run else None
@@ -22,6 +24,15 @@ def generate(root,run,evaluation_id=None,*,reference_run=None,reference_evaluati
     nb=nbformat.read(root/'notebooks/templates/report.ipynb',as_version=4)
     params=dict(ROOT_HINT=str(root),RUN=primary.run.name,EVALUATION_ID=primary.path.name,
                 REFERENCE_RUN=reference.run.name if reference else None,REFERENCE_EVALUATION_ID=reference.path.name if reference else None)
+    if cell_dir:
+        params.update(CELL_DIR=str((root/cell_dir).resolve()),
+            CELL_REFERENCE_DIR=str((root/cell_reference_dir).resolve()) if cell_reference_dir else None)
+        index=next(i for i,c in enumerate(nb.cells) if c.cell_type=='markdown' and c.source.startswith('## 8. Author notes'))
+        nb.cells[index:index]=[
+            nbformat.v4.new_markdown_cell('## Where in the tile? (cell heatmap)'),
+            nbformat.v4.new_code_cell('from cvdl.report_cells import show_cell_report\n'
+                'show_cell_report(CELL_DIR, CELL_REFERENCE_DIR)\n'
+                "assert 'torch' not in sys.modules")]
     cells=[c for c in nb.cells if 'parameters' in c.metadata.get('tags',[])]
     if len(cells)!=1:raise ValueError('template must have one parameters cell')
     cells[0].source='\n'.join(f'{k} = {v!r}' for k,v in params.items())
@@ -52,8 +63,11 @@ def generate(root,run,evaluation_id=None,*,reference_run=None,reference_evaluati
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('run')
     parser.add_argument('--evaluation-id');parser.add_argument('--reference-run');parser.add_argument('--reference-evaluation-id')
+    parser.add_argument('--cell-dir',type=Path,help='saved cell diagnostic folder; adds the optional heatmap section')
+    parser.add_argument('--cell-reference-dir',type=Path,help='saved control cell folder for its cut-off/FA/recall')
     parser.add_argument('--overwrite',action='store_true');args=parser.parse_args()
     generate(ROOT,args.run,args.evaluation_id,reference_run=args.reference_run,
-             reference_evaluation_id=args.reference_evaluation_id,overwrite=args.overwrite)
+             reference_evaluation_id=args.reference_evaluation_id,overwrite=args.overwrite,
+             cell_dir=args.cell_dir,cell_reference_dir=args.cell_reference_dir)
 
 if __name__=='__main__':main()

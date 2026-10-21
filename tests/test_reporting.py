@@ -55,6 +55,27 @@ def fixture(root,name='model',eid=EID):
     return run,p
 
 
+def cell_fixture(root):
+    folder=root/'cell-output';(folder/'cells').mkdir(parents=True)
+    reference=root/'cell-reference';reference.mkdir()
+    def estimate(point):return dict(point=point,low=point-.05,high=point+.05)
+    def map_record(cutoff):return dict(cutoff=cutoff,validation_FA=.0499,test=[dict(panel='pooled',placement='all',FA=.038,recall=.16)])
+    primary=estimate(.8);cam=estimate(.7);control=estimate(.6)
+    differences=dict(within_stego_auc=estimate(.1))
+    localized=[dict(split='test',panel=p,placement='contiguous',maps=dict(aux=dict(within_stego_auc=primary),cam=dict(within_stego_auc=cam)),
+        aux_minus_cam=differences) for p in ('pooled','raise')]
+    summary=dict(localization=localized,maps=dict(aux=map_record(.123456),cam=map_record(1.23456)))
+    (folder/'cells/summary.json').write_text(json.dumps(summary));(folder/'cells/cells.png').write_bytes(PNG)
+    paired={p:dict(maps=dict(control_cam=dict(within_stego_auc=control)),run13_aux_minus_control_cam=dict(within_stego_auc=estimate(.2))) for p in ('pooled','raise')}
+    (folder/'aux-minus-control-cam.json').write_text(json.dumps(dict(panels=paired)))
+    (reference/'summary.json').write_text(json.dumps(dict(localization=[dict(split='test',panel='pooled',placement='contiguous',maps=dict(cam=dict(within_stego_auc=control)))],maps=dict(cam=map_record(2.34567)))))
+    tiles=dict(standard=dict(candidate=dict(P_E=.03),control=dict(P_E=.026),candidate_minus_control=.004),
+        hard_target=dict(candidate=estimate(.844),control=estimate(.839),candidate_minus_control=dict(point=.0051,low=.0004,high=.0097)),
+        noisy_clean=dict(candidate=.189,control=.207,candidate_minus_control=-.018))
+    (folder/'tile-comparison.json').write_text(json.dumps(tiles))
+    return folder,reference
+
+
 class ReportingTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name)
@@ -117,6 +138,8 @@ class ReportingTests(unittest.TestCase):
         self.assertFalse(any(o['output_type']=='error' for o in outputs))
         self.assertGreaterEqual(sum('image/png' in o.get('data',{}) for o in outputs),7)
         self.check_presentation(nb)
+        self.assertNotIn('CELL_DIR',nb['metadata']['report']['parameters'])
+        self.assertFalse(any('Where in the tile?' in ''.join(c['source']) for c in nb['cells']))
         self.assertTrue(any('No reference model supplied' in str(o.get('data',{})) for o in outputs))
         self.assertEqual(before,{p:hashlib.sha256(p.read_bytes()).hexdigest() for p in before})
         with self.assertRaisesRegex(ValueError,'author notes'):generate(self.root,'model',EID)
@@ -130,7 +153,37 @@ class ReportingTests(unittest.TestCase):
         self.assertFalse(any(o['output_type']=='error' for c in nb['cells'] for o in c.get('outputs',[])))
         self.check_presentation(nb,reference=True)
 
-    def check_presentation(self,nb,reference=False):
+    def test_cell_tables_saved_values_and_control_summary_check(self):
+        from cvdl.report_cells import cell_tables
+        folder,control=cell_fixture(self.root)
+        tables=cell_tables(folder,control)
+        self.assertEqual(tables['auc'].iloc[0]['This model: cell head'],'0.800 [0.750, 0.850]')
+        self.assertEqual(tables['rates']['Cell cut-off'].tolist(),['0.123','1.235','2.346'])
+        self.assertTrue(tables['rates']['Test recall'].eq('16.0%').all())
+        self.assertIn('about 16%',tables['recall_note'])
+        self.assertEqual(tables['tiles'].iloc[1]['Change'],'+0.0051 [+0.0004, +0.0097]')
+        self.assertEqual(len(cell_tables(folder)['rates']),2)
+        saved=json.loads((control/'summary.json').read_text());saved['localization'][0]['maps']['cam']['within_stego_auc']['point']=.9
+        (control/'summary.json').write_text(json.dumps(saved))
+        with self.assertRaisesRegex(ValueError,'control cell summary differs'):cell_tables(folder,control)
+
+    def test_generator_optional_cell_section_executes_saved_outputs_only(self):
+        template=self.root/'notebooks/templates';template.mkdir(parents=True)
+        shutil.copy(ROOT/'notebooks/templates/report.ipynb',template/'report.ipynb')
+        (self.root/'cvdl').symlink_to(ROOT/'cvdl',target_is_directory=True)
+        folder,control=cell_fixture(self.root)
+        before={p:p.read_bytes() for base in (folder,control) for p in base.rglob('*') if p.is_file()}
+        target=generate(self.root,'model',EID,cell_dir=folder,cell_reference_dir=control)
+        nb=json.loads(target.read_text());self.check_presentation(nb,cell_section=True)
+        self.assertFalse(any(o['output_type']=='error' for c in nb['cells'] for o in c.get('outputs',[])))
+        content='\n'.join(str(o.get('data',{}).get('text/html',''))+str(o.get('data',{}).get('text/markdown','')) for c in nb['cells'] for o in c.get('outputs',[]))
+        for value in ('0.800 [0.750, 0.850]','Control: CAM','about 16%','+0.0051 [+0.0004, +0.0097]'):
+            self.assertIn(value,content)
+        self.assertEqual(before,{p:p.read_bytes() for p in before})
+        with self.assertRaisesRegex(ValueError,'requires --cell-dir'):
+            generate(self.root,'model',EID,cell_reference_dir=control)
+
+    def check_presentation(self,nb,reference=False,cell_section=False):
         visible=[]
         for cell in nb['cells']:
             if cell['cell_type']=='markdown':visible.append(''.join(cell['source']))
@@ -149,7 +202,7 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(meta['primary']['checkpoint_sha256'],'b'*64)
         if reference:self.assertEqual(meta['reference']['evaluation_id'],'2'*20)
         headings=[c for c in nb['cells'] if c['cell_type']=='markdown' and ''.join(c['source']).startswith('## ')]
-        self.assertEqual(len(headings),11)
+        self.assertEqual(len(headings),12 if cell_section else 11)
         self.assertIn('## What does the data look like?', ''.join(headings[0]['source']))
         saved=(ROOT/'docs/figures/report/data-sample.png').read_bytes()
         images=[base64.b64decode(''.join(o['data']['image/png'])) for c in nb['cells'] for o in c.get('outputs',[])
