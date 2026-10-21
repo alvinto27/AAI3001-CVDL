@@ -11,7 +11,7 @@ Two settings have similar names:
 
 | Setting | Typical value | Meaning |
 | --- | --- | --- |
-| `tile_size` | 512 | Size of the source photo records and of the older (`capped`) validation and evaluation tiles. Historical; the same in every run since the 512 era. Do not rename it: run records and the golden compare depend on it. |
+| `tile_size` | 512 | Size of the source photo records and of the older (`capped`) validation and evaluation tiles. Historical; the same in every run since the 512 era. Do not rename it: run records depend on it ~~and the golden compare depend on it~~ (golden retired 2026-10-21). |
 | `train_tile_size` / `train_grid` tile size | 256 | The tiles the model trains on (all 256 runs, including SRM-30 and SRM-e50). The train-matched validation lists (for example `60da...`) and the standard-256 / hard-256 tests are also 256. |
 
 So a run with `tile_size` 512 can train and validate at 256. Only the old `capped` validation uses 512 tiles.
@@ -187,3 +187,21 @@ OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
 The scratch root must be new and outside the checkout. Remove its generated
 images/logs after verification. No full dataset embedding, speed work,
 training, GPU work, or cache creation is part of this step.
+
+## Comparison constants list
+
+Since 2026-10-21 (`72f51b5`, user approved), [`configs/comparison-constants-v1.json`](../../configs/comparison-constants-v1.json) lists the values that must stay the same so that runs stay comparable. One fast test, `tests/test_comparison_constants.py`, checks that the current code still resolves to them. It runs in both test levels.
+
+| Group | In the list |
+| --- | --- |
+| Seeds and stream codes | framework seed 0, data seed 0, evaluation seed 1, OTF key version, purpose, grid, carrier and stream codes |
+| Photo lists | the four `photo_manifest.csv` and four split file hashes |
+| Test suites | standard-256-v1 and hard-256-v1: versions, recipe identities, published list hashes, geometry, counts, embedding grid, hard cells and noise policy |
+| Validation | train-matched policy (version, rounding); the three named validation lists (`60da...`, `bf7e...`, `8328...`); the old capped validation caps and seeds |
+| Deployment | threshold policy and the calibration mapping file hash |
+| Defaults that notebooks do not set (default-only) | `tile_size` 512 / `train_tile_size` none / `train_grid` recorded; checkpoint-validation default; evaluated checkpoint `best`; model xunet/kv/4; clip_t3, no norm; LR, epochs, warmup and drops per profile; grad clip 1.0, paired batches off; augment on, 1 variant per tile, fixed variants off; train photo fraction 1.0 (G4) |
+
+Not in the list (experiments vary them on purpose, or they are machine settings): model choice per experiment, schedules, batch size, source mix, the training k/bpp recipe, the numeric threshold, `post_fit_eval`, workers, compile, precision, paths. The draw order, key field order and loader order stay guarded by their existing tests and by this page.
+
+**Rule:** to change a listed value, change the code and the list in the same commit, and record the reason and the effect on comparisons in the journal. The test checks settings and declared values only, not behaviour.
+

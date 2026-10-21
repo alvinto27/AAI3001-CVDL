@@ -5,7 +5,7 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Nothing
 ## Current references (`active/` means kept for use, not permission to run)
 - [2026-10-19 session handoff — read first next session](active/handoff-2026-10-19.md)
 - [Legacy-512 evaluation retirement — what moved to archive, rescoring rule (`3c3dc39`, 2026-10-21)](active/legacy-512-retirement.md)
-- [Test levels and the changed-path rule — fast/full tests, when the golden compare runs (built `891aefe`, 2026-10-20)](active/test-levels.md)
+- [Test levels and the changed-path rule — fast/full/none tests; golden retired 2026-10-21 (built `891aefe`, 2026-10-20)](active/test-levels.md)
 - [Wide-R2 legacy settings migration — saved evidence and limits](active/legacy-wide-r2-migration.md)
 - [Saved-output report notebook — CPU generator and use (work list #5)](active/report-notebook.md)
 - [Three diagnostic checks (ideas 1, 2, 2b) — done 2026-10-19: #12 raised, #3 lowered, tanh fix struck](active/plan-diagnostic-checks.md)
@@ -24,7 +24,6 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Nothing
 - [G4 batch-runner guide](active/g4-batch-runner.md)
 - [Pi host state](active/pi-host-changes.md)
 - [Settings and seed rules](active/settings-and-seeds.md)
-- [Notebook refactor before-values and checks](active/refactor-golden.md)
 - [Shared cvdl package and settings plan](active/plan-cvdl-package.md)
 - [Frozen RAISE/DIV2K records](active/frozen-source-records.md)
 - [ALASKA selection v2](active/alaska-selection-v2.md)
@@ -40,6 +39,8 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Nothing
 - [Training tiling: 6 arms](results/result-training-tiling.md)
 
 ## Historical records (`archive/`)
+
+- [Notebook refactor golden compare — retired 2026-10-21 (`72f51b5`); history only](archive/refactor-golden.md)
 - [OTF generator design; prebuilt writer deferred](archive/plan-otf-generator.md)
 - [GPU LSB generator; shelved](archive/plan-gpu-generator.md)
 - [G4 epoch-overhead analysis](archive/plan-epoch-overhead.md)

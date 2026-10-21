@@ -20,27 +20,28 @@ On 2026-10-20 the full CPU suite took 8.2 min (424 tests) and the golden compare
 podman exec -w /work aai3001 python -B scripts/required_test_level.py           # which checks this change needs
 podman exec -w /work aai3001 python -B scripts/test_cpu.py --level fast         # about 2.7 min
 podman exec -w /work aai3001 python -B scripts/test_cpu.py                      # full (default), about 8.3 min
-podman exec -w /work aai3001 python -B scripts/refactor_golden.py compare       # golden, GPU visible, about 2.5 min
 ```
 
 - `test_cpu.py` sets the CPU-only environment (no GPU, 1 thread) itself. The fast level skips the whole `test_lsb_torch` module with the visible reason `full level only: ...`. The full level runs every test.
 - A plain `python -B -m unittest discover -s tests` is unchanged and runs every test.
-- `required_test_level.py` is read-only (no fetch). It compares `merge-base(origin/yx, HEAD)` to HEAD, plus staged, unstaged and untracked files, and prints `TESTS: FAST|FULL` and `GOLDEN: REQUIRED|NOT REQUIRED` with the matched paths. If it cannot read the changes, it prints FULL and REQUIRED.
+- `required_test_level.py` is read-only (no fetch). It compares `merge-base(origin/yx, HEAD)` to HEAD, plus staged, unstaged and untracked files, ~~and prints `TESTS: FAST|FULL` and `GOLDEN: REQUIRED|NOT REQUIRED` with the matched paths. If it cannot read the changes, it prints FULL and REQUIRED.~~ Since `72f51b5` (2026-10-21) it prints two lines: `TESTS: NONE|FAST|FULL` with the matched paths, then `Before a G4 launch: always FULL tests.` If it cannot read the changes, it prints FULL.
 
 ## Rule
 
 | Check | Required when a changed path matches |
 | --- | --- |
 | Full tests | `LSB-Dataset-Generator/**`; `tests/test_lsb_torch.py`; `tests/test_lsb_source.py`; `configs/raise512-run1.yaml`; `configs/test-bpp1.yaml`; the data-figure replay inputs (added `4959099`: `tests/test_data_figure.py`, `scripts/build_data_figure.py`, `docs/figures/report/data-sample.png`, `cvdl/standardtest.py`, `cvdl/validation.py`, `cvdl/__init__.py`, the four `data/<source>/photo_manifest.csv`, `data/test/standard-256-v1/`, `data/hard-test/256-v1/`); `pyproject.toml`; `uv.lock`; `Containerfile*`; `Dockerfile*`; any path outside the known areas |
-| Golden compare | `cvdl/**`; `LSB-Dataset-Generator/**`; `tests/golden/**`; the golden script and the files it reads or runs (list in `GOLDEN_FILES` in the helper); dependency and container files; any path outside the known areas |
+| ~~Golden compare~~ | ~~`cvdl/**`; `LSB-Dataset-Generator/**`; `tests/golden/**`; the golden script and the files it reads or runs (list in `GOLDEN_FILES` in the helper); dependency and container files; any path outside the known areas~~ Retired 2026-10-21 (`72f51b5`, user) |
 | Fast tests | Every code change that needs neither of the above |
 | No tests (`TESTS: NONE`, added `c7b5176`) | Only Markdown docs changed (`docs/**/*.md`, root `README.md`, `AGENTS.md`, `CHANGELOG.md`), or nothing changed. Exceptions (code reads them, so FAST): `docs/active/plan-architecture-tests.md` (`scripts/architecture_decision.py` hashes it) and `docs/figures/report/data-sample.png` (figure and report tests) |
 
-**Always, regardless of the helper:** full tests and the golden compare once before every G4 launch, on the launch commit.
+~~**Always, regardless of the helper:** full tests and the golden compare once before every G4 launch, on the launch commit.~~
 
-When the golden may change (intended behaviour change only): see the [golden policy](refactor-golden.md#policy-2026-10-21-user).
+~~When the golden may change (intended behaviour change only): see the [golden policy](../archive/refactor-golden.md#policy-2026-10-21-user).~~
 
-Evidence for the golden list: an audited golden compare on 2026-10-20 (ALL EQUAL, 143 s) recorded every file it opened. 37 tracked files; all are matched by the helper's rule. It did not open `data/train-grids/`, `split.csv`, `selection*.csv`, `provenance.csv`, `legacy_tile_manifest.csv` or `run1_*.csv.gz`. The helper also keeps GPU-only and fallback paths found by reading the code.
+**Always, regardless of the helper (since 2026-10-21):** full tests once before every G4 launch, on the launch commit. The golden is retired; the [comparison constants test](settings-and-seeds.md#comparison-constants-list) runs in both levels.
+
+(History) Evidence for the golden list: an audited golden compare on 2026-10-20 (ALL EQUAL, 143 s) recorded every file it opened. 37 tracked files; all are matched by the helper's rule. It did not open `data/train-grids/`, `split.csv`, `selection*.csv`, `provenance.csv`, `legacy_tile_manifest.csv` or `run1_*.csv.gz`. The helper also keeps GPU-only and fallback paths found by reading the code.
 
 Replay on past commits: `9dfaa27` (decision script) gives FAST + golden NOT REQUIRED; `1bb7e20` (arm A, `cvdl/`) gives FAST + golden REQUIRED; `863d9fb` (packed loader) gives FULL + golden REQUIRED.
 
@@ -76,4 +77,10 @@ Rules: `tests/archive/` has no `__init__.py`, so neither level discovers it. Act
 Measured after the trim: full 407 run, 0 skipped, 490.4 s; fast 378 run, 29 skipped, 147.5 s; golden ALL EQUAL.
 
 Not done (user): 9 small frozen-notebook and old-metric tests stay in fast (moving them saves about 0.1 s). ~~Next (paused): retire the legacy-512 evaluation (`--test-suite legacy-512`), which keeps about 30 more tests alive; design first.~~ Done 2026-10-21 (`3c3dc39`, [legacy-512 retirement](legacy-512-retirement.md)): 407 to 370 tests; fast 341 run + 29 skipped, 142.4 s; full 473.8 s. Test gap: ideas board #14.
+
+## Golden retired, constants list added (2026-10-21, `72f51b5`, user)
+
+The user decided that strict before/after enforcement does not suit a project that changes on purpose. The golden script and records moved to `scripts/archive/` and `tests/archive/golden/` ([history](../archive/refactor-golden.md)); 11 golden-only tests were archived; tests that borrowed golden helpers now stand alone; the published SRM kernels moved to `tests/fixtures/`. One new test, `tests/test_comparison_constants.py`, checks the [comparison constants list](settings-and-seeds.md#comparison-constants-list) (0.014 s).
+
+Measured: full 360 run, 474.9 s; fast 331 run + 29 skipped, 141.6 s. No full-only rule depended on the golden, so the levels select the same tests as before.
 

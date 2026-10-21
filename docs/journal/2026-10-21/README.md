@@ -10,6 +10,7 @@
 - Laptop access (no repository change): the laptop (`fedora-laptop`, RTX 4060 8 GB) can SSH into this PC (`ssh fedora-desk`, key-only). Work from the laptop uses this PC through SSH and herdr; nothing is copied.
 
 - Worker: `7921d58`: `post_fit_eval="none"` in the first cell of notebook 05, `newdata-1` and `wide-1` (one line each) and 3 test files. 370 tests; fast 140.3 s, full 474.2 s. Default golden compare (information only) ALL EQUAL, 135.4 s; the optional GPU part was not run (it needs the 512 output files and will break). Pushed.
+- Worker: plan, then `72f51b5`: golden retired to `scripts/archive/` and `tests/archive/golden/`; 11 golden-only tests archived; 5 test files detached from golden helpers; published SRM kernels to `tests/fixtures/`; helper prints only `TESTS` and "Before a G4 launch: always FULL tests."; new `configs/comparison-constants-v1.json` (user picked all recommended rows plus the default-only guards) with one test (0.014 s). 360 tests; fast 141.6 s, full 474.9 s. No golden run. Orchestrator review: 360 discovered, no active golden reference, helper output checked. Pushed. Golden record moved to `docs/archive/refactor-golden.md`; constants list documented in `settings-and-seeds.md`.
 
 ### Found
 
@@ -21,7 +22,7 @@
 ### Decided
 
 - User: retire legacy-512 as planned, with the Orchestrator's recommendations.
-- User: the golden record is not absolute. New [golden policy](../../active/refactor-golden.md#policy-2026-10-21-user): ALL EQUAL for code moves; an intended behaviour change uses a controlled re-baseline (changed entries listed first, user approval, old/new hashes recorded).
+- User: the golden record is not absolute. New [golden policy](../../archive/refactor-golden.md#policy-2026-10-21-user): ALL EQUAL for code moves; an intended behaviour change uses a controlled re-baseline (changed entries listed first, user approval, old/new hashes recorded).
 - User: switch off the 512 end-of-training test of notebook 05, `newdata-1` and `wide-1` for future G4 runs. Worker plan first (options: launch guard, override, notebook/default change with re-baseline, docs only).
 - User (later the same day): the golden is not needed; no strict before/after check either. Retire the golden (archive, kept as history); replace it with a short tracked list of constant settings and one fast unit test (a changed constant is edited in the same commit). One combined task, plan first; the user picks the constants. Pending.
 - User: work away from home by SSH from the laptop into this PC, not by copying the environment.
@@ -31,5 +32,5 @@
 - Pending: the user decides when to resume arm G (G1).
 - Pending (optional): back up RAISE, DIV2K and the PC evaluations to the Pi; `loginctl enable-linger` so a logout does not stop herdr and the container.
 - ~~Pending: switching off the 512 end-of-training evaluation in notebook 05 / `newdata-1` / `wide-1` is a separate decision.~~ Done `7921d58`.
-- Next: golden retirement + constants list (one task, plan first; the user picks the constants).
+- ~~Next: golden retirement + constants list (one task, plan first; the user picks the constants).~~ Done `72f51b5`.
 - Note: 8 of the 12 experiment notebooks (and the 3 baseline notebooks) have no train-matched 256 validation; a new run from them needs an approved calibration mapping.

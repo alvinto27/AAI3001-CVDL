@@ -326,8 +326,8 @@ service account.
 | Standard-source wide R2 | [wide-1](../../notebooks/wide-1.ipynb) | [archived env](../../scripts/g4/jobs/archive/wide-1.env) |
 
 Each is a copy of notebook 05 with only its top cell filled in. Tests require
-exact experiment values, RunSettings, RUN_NAME and every comparable golden
-global. The only two named machine differences are asserted explicitly:
+exact experiment values, RunSettings, RUN_NAME and every comparable
+~~golden~~ global (since 2026-10-21 resolved directly from the archived env, without the golden). The only two named machine differences are asserted explicitly:
 `CHECKPOINT_ROOT` is `runs-out/`, not the old PC capture's `/work/runs`, and
 `ROCM_CONV1_FIX_ACTIVE` is false on CUDA G4, not true as in that ROCm capture.
 A third deliberate difference since `7921d58` (2026-10-21, user): notebook 05,
@@ -336,7 +336,7 @@ end-of-training test (the archived envs still resolve `full`). Evaluate on the P
 with the 256 suite. These recipes have no train-matched 256 validation, so a new
 checkpoint needs an approved calibration mapping before the deployment threshold.
 The archived env files are read-only parity fixtures and cannot submit a
-notebook job. The historical golden JSON stays unchanged.
+notebook job. The historical golden JSON stays unchanged (archived 2026-10-21 to `tests/archive/golden/`).
 
 Timing estimates are not promises. Historical full-data counts were 107,900
 images / batch 32 = 3,372 steps per epoch. Prime-1 measured 915 s fit over 10
@@ -383,8 +383,8 @@ A recorded ID never runs twice. Use a new ID for a new attempt.
 1. For a new machine only, complete the maintenance setup/upload/cache/speed
    steps above. Existing G4 bootstrap and disk-layout setup are already done.
 2. Commit/push the intended notebook and code; fetch `origin/yx` on the PC.
-   On that commit, full tests (`scripts/test_cpu.py`) and the golden compare
-   must pass ([test levels](test-levels.md)).
+   On that commit, full tests (`scripts/test_cpu.py`) must pass ([test levels](test-levels.md)).
+   ~~and the golden compare~~ (golden retired 2026-10-21).
 3. Run the exact notebook + SHA command with `--dry-run`. Review effective
    settings, RUN_NAME, job ID, timeout and the two-line metadata env.
 4. Only after explicit user approval, repeat without `--dry-run`.

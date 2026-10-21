@@ -1,7 +1,9 @@
 # Notebook refactor: before-values and checks
 
-The [golden JSON](../../tests/golden/refactor-golden.json) is the phase-0 record;
-do not overwrite it during the refactor. The [checker](../../scripts/refactor_golden.py)
+> **Retired 2026-10-21 (user, `72f51b5`).** The golden compare is no longer a rule. The project changes on purpose; unit tests and the [comparison constants list](../active/settings-and-seeds.md#comparison-constants-list) replace it. The script and records are archived: `scripts/archive/refactor_golden.py`, `tests/archive/golden/`. The published SRM kernels moved to `tests/fixtures/srm_kernels_published.npy`. This page is history. Steps in older plans that require "golden ALL EQUAL" are superseded: use the [test levels](../active/test-levels.md) and the constants test.
+
+The [golden JSON](../../tests/archive/golden/refactor-golden.json) is the phase-0 record;
+do not overwrite it during the refactor. The [checker](../../scripts/archive/refactor_golden.py)
 records effective settings/RUN_NAMEs, train/val/test identities, decoded batches,
 four real checkpoints on 64 reproducible tiles, and a deterministic CPU run.
 Library versions, checkpoint/input hashes and tile coordinates are recorded.
@@ -76,7 +78,7 @@ control worktree are not retained; there are no extra GPU array fixtures.
 | Phase-1 repeat 2 | 2.9173e-4 | 1.8716e-5 | .62890625 |
 
 Initial phase-0 self-reproduction is recorded in
-[self-reproduction.json](../../tests/golden/self-reproduction.json). Its original
+[self-reproduction.json](../../tests/archive/golden/self-reproduction.json). Its original
 GPU tolerance fields are historical, not the current comparison rules above.
 CPU final weights SHA:
 `5525eb379fe37a74b9b1d28bc3caee453cf7835edfb548385ab1b04d28812edb`.
@@ -125,6 +127,6 @@ relaxed. GPU scalar/probability deltas remain informational as before. The GPU
 runner also passes `--set lr=0.0003` (the unchanged LR) and checks that the final
 `run_settings.json` records `lr` with source `override` and in override history.
 
-The package/API design is in the [cvdl plan](plan-cvdl-package.md). Keep old
+The package/API design is in the [cvdl plan](../active/plan-cvdl-package.md). Keep old
 checkpoint parameter and hyperparameter names. Update capture adapters explicitly
 when later phases remove notebook globals; do not weaken exact CPU/data checks.

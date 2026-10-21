@@ -28,7 +28,7 @@ Older docs, journals and result records keep the old paths as written. Use this 
 - Active code must not import from `cvdl/archive/` or `scripts/archive/`.
 - **Rescore an old run on 512 only on a copy of its run folder.** The archived main stage writes its predictions into the run folder; `--output` does not redirect them. Never change existing outputs under `runs/`.
 - Before an idea reuses archived code, restore it with its tests to the active folders (same rule as the [test trim](test-levels.md)).
-- Frozen notebook 04 imports `eval_checkpoint` by name. Its bytes stay unchanged; running it in full is not supported (the golden compare runs only its model definitions).
+- Frozen notebook 04 imports `eval_checkpoint` by name. Its bytes stay unchanged; running it in full is not supported (the golden compare, retired 2026-10-21, ran only its model definitions).
 
 ## Checks (Worker, 2026-10-21)
 

@@ -50,7 +50,7 @@ Open points before that phase:
 
 | Phase | Work | Required evidence |
 | --- | --- | --- |
-| 0, complete | [Before-values and comparison harness](refactor-golden.md) | Exact CPU/settings/data/four-checkpoint results; documented GPU noise rules |
+| 0, complete | [Before-values and comparison harness](../archive/refactor-golden.md) | Exact CPU/settings/data/four-checkpoint results; documented GPU noise rules |
 | 1 | `models`: KV/XuNet/wide/features/cell maps; `metrics`: tied-threshold metrics, summaries and validation cutoffs. Repoint analysis scripts | Entire golden compare; saved-panel metric equality; full tests |
 | 2 | Data/readers/splits/loader construction | Train epochs 0/1 and val/test hashes identical |
 | 3 | Lightning module, scheduling, callbacks | CPU losses/weights equal; checkpoint keys and resume; GPU QUICK |
@@ -152,7 +152,7 @@ defaults through its env bridge. Existing explicit G4 env files remain valid;
 notebook 04 still uses its historical runner path. The saved runner output root
 is an override from `--output`. Compile-cache env values are also recorded.
 
-The QUICK extra-panel cap is an [intended difference](refactor-golden.md#intended-difference-quick-extra-panel-cap-phase-4a).
+The QUICK extra-panel cap is an [intended difference](../archive/refactor-golden.md#intended-difference-quick-extra-panel-cap-phase-4a).
 Settings tests compare every captured effective global and LSB setting for
 newdata-1, wide-1, CPU and GPU QUICK, plus the speed-tool configuration/name.
 They use captured hardware profiles without GPU computation; only absolute
@@ -214,7 +214,7 @@ retains every old source cell and has no outputs. Independent parity tests use
 it; capped-sanity and output-retention behaviour tests use package code. The
 golden settings/data/CPU drivers execute the new notebook, not the archive.
 They preserve exact comparisons except for the explicitly named new settings
-file. All [allowed differences](refactor-golden.md#thin-notebook-drivers-and-allow-list-phase-4c)
+file. All [allowed differences](../archive/refactor-golden.md#thin-notebook-drivers-and-allow-list-phase-4c)
 are printed and regression-tested; unknown changes still fail.
 
 Notebook 04 is untouched. Notebook 02 remains standalone and unchanged as the
