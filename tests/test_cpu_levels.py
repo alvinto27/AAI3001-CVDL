@@ -20,22 +20,20 @@ class PathPolicyTests(unittest.TestCase):
         paths = ['docs/README.md', 'docs/nested/guide.md', 'README.md', 'AGENTS.md', 'CHANGELOG.md']
         lines = policy.decisions(paths)
         self.assertTrue(lines[0].startswith('TESTS: NONE'))
-        self.assertTrue(lines[1].startswith('GOLDEN: NOT REQUIRED'))
-        self.assertEqual(lines[2], policy.REMINDER)
+        self.assertEqual(lines[1], policy.REMINDER)
+        self.assertEqual(len(lines), 2)
         for path in paths:
             self.assertIn(repr(path), lines[0])
 
-    def test_docs_plus_code_keeps_fast_full_and_golden_rules(self):
-        for path, tests, golden in [
-            ('scripts/test_cpu.py', 'FAST', 'NOT REQUIRED'),
-            ('cvdl/models.py', 'FAST', 'REQUIRED'),
-            ('LSB-Dataset-Generator/lsb_torch.py', 'FULL', 'REQUIRED'),
-            ('unknown.txt', 'FULL', 'REQUIRED'),
+    def test_docs_plus_code_keeps_fast_full_rules(self):
+        for path, tests in [
+            ('scripts/test_cpu.py', 'FAST'), ('cvdl/models.py', 'FAST'),
+            ('LSB-Dataset-Generator/lsb_torch.py', 'FULL'), ('unknown.txt', 'FULL'),
         ]:
             with self.subTest(path=path):
                 lines = policy.decisions(['docs/guide.md', path])
                 self.assertTrue(lines[0].startswith('TESTS: ' + tests))
-                self.assertTrue(lines[1].startswith('GOLDEN: ' + golden))
+                self.assertEqual(lines[1:], [policy.REMINDER])
 
     def test_code_read_docs_and_nontext_docs_keep_required_levels(self):
         for path in ('docs/active/plan-architecture-tests.md', *policy.DOCUMENTATION_INPUTS,
@@ -45,14 +43,13 @@ class PathPolicyTests(unittest.TestCase):
                 lines = policy.decisions(['docs/guide.md', path])
                 level = 'FULL' if path == 'docs/figures/report/data-sample.png' else 'FAST'
                 self.assertTrue(lines[0].startswith('TESTS: ' + level))
-                self.assertTrue(lines[1].startswith('GOLDEN: NOT REQUIRED'))
+                self.assertEqual(lines[1:], [policy.REMINDER])
 
     def test_no_changes_need_no_tests(self):
         lines = policy.decisions([])
         self.assertTrue(lines[0].startswith('TESTS: NONE'))
         self.assertIn('(no changed paths)', lines[0])
-        self.assertTrue(lines[1].startswith('GOLDEN: NOT REQUIRED'))
-        self.assertEqual(lines[2], policy.REMINDER)
+        self.assertEqual(lines[1:], [policy.REMINDER])
 
     def test_full_loader_and_frozen_figure_dependencies(self):
         for path in ('LSB-Dataset-Generator/lsb_torch.py', 'tests/test_lsb_torch.py',
@@ -65,7 +62,7 @@ class PathPolicyTests(unittest.TestCase):
                      'data/test/standard-256-v1/pairs-standard.csv',
                      'data/hard-test/256-v1/summary.json'):
             with self.subTest(path=path):
-                self.assertIsNotNone(policy.path_reasons(path)[0])
+                self.assertIsNotNone(policy.path_reasons(path))
                 self.assertTrue(policy.decisions(['docs/guide.md', path])[0].startswith('TESTS: FULL'))
 
     def test_known_areas_are_fast(self):
@@ -81,30 +78,43 @@ class PathPolicyTests(unittest.TestCase):
                      'data/hard-test/256-v1-other/pairs.csv',
                      'data/raise/photo_manifest.csv.backup'):
             with self.subTest(path=path):
-                self.assertIsNone(policy.path_reasons(path)[0])
+                self.assertIsNone(policy.path_reasons(path))
 
-    def test_golden_inputs_and_shared_code_require_golden(self):
-        for path in (*policy.GOLDEN_FILES, 'tests/golden/cpu-det.env',
-                     'cvdl/models.py', 'LSB-Dataset-Generator/lsb_source.py',
-                     'pyproject.toml', 'uv.lock', 'Containerfile.rocm', 'Dockerfile.cpu'):
+    def test_former_comparison_inputs_keep_independent_test_levels(self):
+        for path in ('cvdl/models.py', 'scripts/run_notebook.py', 'scripts/speed_matrix.py',
+                     'scripts/map_demo.py', 'scripts/host_monitor.py', 'scripts/pc_safety.py',
+                     'scripts/g4/preflight.py', 'scripts/g4/jobs/archive/newdata-1.env',
+                     'scripts/g4/jobs/archive/wide-1.env', 'scripts/g4/jobs/speed-1.env',
+                     'tests/test_model_copy_parity.py', 'configs/train-k1to4.yaml',
+                     'notebooks/05_xunet_v4_nonorm.ipynb',
+                     'notebooks/04_baseline_kv_xunet_v3.ipynb',
+                     'notebooks/archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb',
+                     'notebooks/rocm_conv1_wgrad.py', 'scripts/archive/refactor_golden.py',
+                     'tests/archive/golden/cpu-det.env',
+                     'configs/comparison-constants-v1.json', 'tests/test_comparison_constants.py'):
             with self.subTest(path=path):
-                self.assertIsNotNone(policy.path_reasons(path)[1])
+                self.assertTrue(policy.decisions([path])[0].startswith('TESTS: FAST'))
+        for path in ('Datasets/originals/raise/NEF/a.NEF',
+                     'runs/g4-v4-r2/checkpoints/model/best.ckpt'):
+            self.assertIn('unknown area', policy.path_reasons(path))
 
-    def test_new_configs_data_scripts_and_tests_do_not_require_golden(self):
-        for path in ('configs/new-experiment.yaml', 'data/new-test/pairs.csv',
-                     'scripts/test_cpu.py', 'scripts/required_test_level.py',
-                     'tests/test_cpu_levels.py', 'docs/runbook.md'):
-            with self.subTest(path=path):
-                self.assertEqual(policy.path_reasons(path), (None, None))
+    def test_retired_enforcement_has_no_attributes_or_output(self):
+        self.assertFalse(hasattr(policy, 'GOLDEN_FILES'))
+        self.assertFalse(hasattr(policy, 'GOLDEN_PATTERNS'))
+        for paths in ([], ['docs/guide.md'], ['cvdl/models.py'], ['unknown.txt']):
+            with self.subTest(paths=paths):
+                lines = policy.decisions(paths)
+                self.assertEqual(len(lines), 2)
+                self.assertNotIn('GOLDEN:', '\n'.join(lines))
 
     def test_unknown_area_fails_closed_without_prefix_lookalikes(self):
         for path in ('mystery/file.py', 'cvdl-other/file.py', 'README.md.backup',
                      '.github/workflows/check.yml', 'train_template.py'):
-            self.assertTrue(all(policy.path_reasons(path)), path)
+            self.assertIsNotNone(policy.path_reasons(path), path)
 
-    def test_dependencies_require_both_levels(self):
+    def test_dependencies_require_full(self):
         for path in ('pyproject.toml', 'uv.lock', 'Containerfile', 'Dockerfile.dev'):
-            self.assertTrue(all(policy.path_reasons(path)), path)
+            self.assertIsNotNone(policy.path_reasons(path), path)
 
     def test_rename_parser_preserves_both_paths_and_whitespace(self):
         self.assertEqual(policy.parse_name_status(
@@ -113,13 +123,12 @@ class PathPolicyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             policy.parse_name_status(b'R100\0old\0')
 
-    def test_decisions_are_independent_and_reminder_is_always_present(self):
+    def test_decisions_show_inspected_paths_and_exact_reminder(self):
         lines = policy.decisions(['cvdl/models.py'])
         self.assertTrue(lines[0].startswith('TESTS: FAST'))
-        self.assertTrue(lines[1].startswith('GOLDEN: REQUIRED'))
-        self.assertIn('cvdl/models.py', lines[1])
-        self.assertEqual(lines[-1], policy.REMINDER)
-        self.assertIn('GOLDEN: NOT REQUIRED', policy.decisions([])[1])
+        self.assertIn('cvdl/models.py', lines[0])
+        self.assertEqual(lines[1:], ['Before a G4 launch: always FULL tests.'])
+        self.assertEqual(policy.decisions([])[1], policy.REMINDER)
 
 
 class GitChangeTests(unittest.TestCase):
@@ -188,14 +197,14 @@ class GitChangeTests(unittest.TestCase):
         self.assertEqual(policy.changed_paths(self.root, self.base),
                          ['scripts/original.py', 'tests/test_lsb_source.py'])
 
-    def test_missing_base_prints_both_required_and_reminder(self):
+    def test_missing_base_prints_full_and_reminder(self):
         with patch.object(policy, 'ROOT', self.root), redirect_stdout(io.StringIO()) as output:
             self.assertEqual(policy.main(['--base', 'missing-base']), 0)
         lines = output.getvalue().splitlines()
-        self.assertEqual(len(lines), 3)
+        self.assertEqual(len(lines), 2)
         self.assertTrue(lines[0].startswith('TESTS: FULL'))
-        self.assertTrue(lines[1].startswith('GOLDEN: REQUIRED'))
-        self.assertIn('fail closed', lines[1])
+        self.assertIn('fail closed', lines[0])
+        self.assertNotIn('GOLDEN:', '\n'.join(lines))
         self.assertEqual(lines[-1], policy.REMINDER)
 
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-from fnmatch import fnmatchcase
 from pathlib import Path
 import subprocess
 
@@ -29,33 +28,7 @@ DOCUMENTATION_INPUTS = frozenset({
     'docs/figures/report/data-sample.png',
 })
 ROOT_MARKDOWN = frozenset({'README.md', 'AGENTS.md', 'CHANGELOG.md'})
-# Explicit inputs to the current golden recipes, not all experiment configs/data.
-GOLDEN_FILES = frozenset({
-    'scripts/refactor_golden.py', 'scripts/run_notebook.py', 'scripts/speed_matrix.py',
-    'scripts/map_demo.py', 'scripts/host_monitor.py', 'scripts/pc_safety.py',
-    'scripts/g4/preflight.py',
-    'scripts/g4/jobs/archive/newdata-1.env', 'scripts/g4/jobs/archive/wide-1.env',
-    'scripts/g4/jobs/speed-1.env', 'tests/test_model_copy_parity.py',
-    'notebooks/05_xunet_v4_nonorm.ipynb', 'notebooks/04_baseline_kv_xunet_v3.ipynb',
-    'notebooks/archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb',
-    'notebooks/rocm_conv1_wgrad.py',
-    'configs/raise512-run1.yaml', 'configs/train-k1to4.yaml', 'configs/test-bpp1.yaml',
-    'data/raise/photo_manifest.csv', 'data/div2k/photo_manifest.csv',
-    'data/alaska/photo_manifest.csv', 'data/lsdir/photo_manifest.csv',
-})
-# Real pixels and model weights are golden inputs too. Other paths in these
-# ignored output/source areas are unknown, so they fail closed below.
-GOLDEN_PATTERNS = (
-    'Datasets/originals/raise/NEF/*.NEF',
-    'Datasets/originals/div2k/DIV2K_train_HR/*.png',
-    'Datasets/originals/alaska/tiff_various_color/*.tif',
-    'Datasets/originals/lsdir/hr/*/*.png',
-    'runs/xunet*wide-w4_r2-*/checkpoints/*/best*.ckpt',
-    'runs/xunet*wide-w4_mixr2-*/checkpoints/*/best*.ckpt',
-    'runs/g4-v4-r2/checkpoints/*/best*.ckpt',
-    'runs/g4-prime-1/checkpoints/*/best*.ckpt',
-)
-REMINDER = 'Before a G4 launch: always FULL tests and the golden compare.'
+REMINDER = 'Before a G4 launch: always FULL tests.'
 
 
 def dependency_path(path):
@@ -63,10 +36,10 @@ def dependency_path(path):
 
 
 def path_reasons(path):
-    """Return independent full-test and golden reasons (None means not required)."""
+    """Return a FULL-test reason, or None when FAST is sufficient."""
     known = (path in KNOWN_FILES or path.startswith(KNOWN_AREAS) or dependency_path(path))
     if not known:
-        return 'unknown area (fail closed)', 'unknown area (fail closed)'
+        return 'unknown area (fail closed)'
     full = None
     if dependency_path(path):
         full = 'runtime dependencies or container build'
@@ -76,15 +49,7 @@ def path_reasons(path):
         full = 'exhaustive loader test or fixture dependency'
     elif path in FIGURE_FULL_FILES or path.startswith(FIGURE_FULL_PREFIXES):
         full = 'frozen figure replay dependency'
-    golden = None
-    if dependency_path(path):
-        golden = 'runtime dependencies or container build'
-    elif path.startswith(('cvdl/', 'LSB-Dataset-Generator/')):
-        golden = 'shared golden implementation'
-    elif (path in GOLDEN_FILES or path.startswith('tests/golden/')
-          or any(fnmatchcase(path, pattern) for pattern in GOLDEN_PATTERNS)):
-        golden = 'golden script input or executable dependency'
-    return full, golden
+    return full
 
 
 def parse_name_status(data):
@@ -132,24 +97,18 @@ def documentation_text(path):
 
 def decisions(paths):
     paths = sorted(set(paths))
-    full, golden = [], []
+    full = []
     for path in paths:
-        test_reason, golden_reason = path_reasons(path)
+        test_reason = path_reasons(path)
         if test_reason:
             full.append(f'{path!r}: {test_reason}')
-        if golden_reason:
-            golden.append(f'{path!r}: {golden_reason}')
     # Include the inspected paths even when none matched a required-check rule.
     inspected = ', '.join(repr(path) for path in paths) or '(no changed paths)'
     if all(documentation_text(path) for path in paths):
-        return ['TESTS: NONE — documentation text only; inspected: ' + inspected,
-                'GOLDEN: NOT REQUIRED — no golden dependency changed; inspected: ' + inspected,
-                REMINDER]
+        return ['TESTS: NONE — documentation text only; inspected: ' + inspected, REMINDER]
     return [
         'TESTS: FULL — ' + '; '.join(full) if full else
         'TESTS: FAST — no full-only dependency changed; inspected: ' + inspected,
-        'GOLDEN: REQUIRED — ' + '; '.join(golden) if golden else
-        'GOLDEN: NOT REQUIRED — no golden dependency changed; inspected: ' + inspected,
         REMINDER,
     ]
 
@@ -162,7 +121,7 @@ def main(argv=None):
         lines = decisions(changed_paths(ROOT, args.base))
     except (OSError, subprocess.CalledProcessError, ValueError, UnicodeError):
         reason = f'cannot inspect changes against {args.base!r} (fail closed)'
-        lines = ['TESTS: FULL — ' + reason, 'GOLDEN: REQUIRED — ' + reason, REMINDER]
+        lines = ['TESTS: FULL — ' + reason, REMINDER]
     print('\n'.join(lines))
     return 0
 

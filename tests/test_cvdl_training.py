@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 import lightning as L
+import pandas as pd
 from lightning.pytorch.loggers import TensorBoardLogger
 import torch
 
@@ -18,7 +19,29 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from cvdl import callbacks as cb, data, models
 from cvdl.lit import SteganalysisModule, select_best_checkpoint
-from scripts.refactor_golden import CHECKPOINTS, ckpt_structure, read_csv_rows, read_env_file
+
+# Local smoke setup: no dependency on a captured run or archived test fixture.
+CPU_SMOKE_ENV = {
+    'QUICK': 'true', 'V3_DATA': 'otf', 'V3_SOURCE': 'decode', 'V3_MODEL': 'xunet',
+    'V3_NORM': 'none', 'V3_CLIP_T': '3', 'V3_EPOCHS': '1',
+    'V3_LIMIT_TRAIN_BATCHES': '20', 'V3_BATCH_SIZE': '8', 'V3_WORKERS': '0',
+    'V3_EVAL_WORKERS': '0', 'V3_PERSISTENT_WORKERS': 'off', 'V3_COMPILE': 'off',
+    'V3_PRIME_NEXT_EPOCH': 'off', 'V3_MAIN_THREADS': '8',
+    'V3_ROCM_CONV1_FIX': 'false', 'V3_EXTRA_TESTS': 'none',
+}
+CHECKPOINTS = {
+    'wide-w4_r2': 'runs/xunet*wide-w4_r2-*/checkpoints/*/best*.ckpt',
+    'wide-w4_mixr2': 'runs/xunet*wide-w4_mixr2-*/checkpoints/*/best*.ckpt',
+    'g4-v4-r2': 'runs/g4-v4-r2/checkpoints/*/best*.ckpt',
+    'g4-prime-1': 'runs/g4-prime-1/checkpoints/*/best*.ckpt',
+}
+
+
+def metrics_rows(path):
+    """Compare the actual saved prefix, including timing columns; no noise filter."""
+    frame = pd.read_csv(path)
+    rows = frame.astype(object).where(frame.notna(), None).values.tolist()
+    return dict(columns=list(frame.columns), rows=rows)
 
 
 def prepare_data_and_rng():
@@ -83,7 +106,7 @@ def make_trainer(folder, ns, otf, loaders, *, epochs, limit):
 class PackageTrainingTests(unittest.TestCase):
     @unittest.skipUnless((ROOT / 'Datasets/originals/raise/NEF').is_dir(), 'real photos not present')
     def test_cpu_checkpoint_resume_preserves_metrics(self):
-        env = read_env_file(ROOT / 'tests/golden/cpu-det.env')
+        env = CPU_SMOKE_ENV
         before_threads = torch.get_num_threads()
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, env), patch('torch.cuda.is_available', return_value=False):
             folder = Path(temp)
@@ -103,13 +126,13 @@ class PackageTrainingTests(unittest.TestCase):
                 metrics_path = folder / 'logs/csv/run/metrics.csv'
                 last = folder / 'last.ckpt'
                 self.assertEqual(trainer.global_step, 2)
-                saved = ckpt_structure(last)
+                saved = torch.load(last, map_location='cpu', weights_only=False)
                 self.assertEqual((saved['global_step'], saved['epoch']), (2, 0))
                 self.assertTrue(Path(checkpoint.best_model_path).is_file())
                 self.assertEqual(select_best_checkpoint(checkpoint.best_model_path, folder), checkpoint.best_model_path)
-                metrics = read_csv_rows(metrics_path)
+                metrics = metrics_rows(metrics_path)
                 old_rows = metrics['rows']
-                val_column = metrics['kept_columns'].index('val_pe')
+                val_column = metrics['columns'].index('val_pe')
                 self.assertTrue(any(row[val_column] is not None for row in old_rows),
                                 'metrics prefix must include end-of-epoch validation')
                 # Actually resume optimizer/callback/epoch state, not just a model load.
@@ -120,8 +143,10 @@ class PackageTrainingTests(unittest.TestCase):
                     trainer2.fit(resumed, loaders.train, loaders.val, ckpt_path=str(last))
                     logger2.save()
                 self.assertEqual(trainer2.global_step, 4)
-                self.assertEqual(ckpt_structure(last)['global_step'], 4)
-                new_rows = read_csv_rows(metrics_path)['rows']
+                self.assertEqual(torch.load(last, map_location='cpu', weights_only=False)['global_step'], 4)
+                new_metrics = metrics_rows(metrics_path)
+                self.assertEqual(new_metrics['columns'], metrics['columns'])
+                new_rows = new_metrics['rows']
                 self.assertGreater(len(new_rows), len(old_rows))
                 self.assertEqual(new_rows[:len(old_rows)], old_rows)
             finally:

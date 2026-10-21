@@ -18,7 +18,7 @@ NOTEBOOK=ROOT/'notebooks/experiments/srm.ipynb'
 # Published kernels: SRM_Kernels1.npy (shape 5x5x1x30) in
 # https://github.com/BioAITeam/Steganalysis (GBRAS-Net, Reinel et al. 2021), the 30-filter set of
 # Fridrich & Kodovsky, IEEE TIFS 7(3) 2012, used by Ye-Net (Ye, Ni, Yi, IEEE TIFS 12(11) 2017).
-PUBLISHED=ROOT/'tests/golden/srm_kernels_published.npy'
+PUBLISHED=ROOT/'tests/fixtures/srm_kernels_published.npy'
 PUBLISHED_SHA='3bfe80839bf93d9f8b80f2281af3f4e4c4d3ad2e50caa3612961ae197a93db70'
 OPEN=('tile_size','train_tile_size','train_grid','batch_size','tiles_per_epoch')
 

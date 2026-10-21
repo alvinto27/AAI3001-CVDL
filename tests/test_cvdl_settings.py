@@ -1,4 +1,4 @@
-"""Golden settings parity, schema errors, provenance and QUICK extra caps; no GPU runs."""
+"""Settings schema errors, provenance and QUICK extra caps; no GPU runs."""
 from dataclasses import FrozenInstanceError
 import contextlib
 import io
@@ -15,7 +15,6 @@ import pandas as pd
 
 from cvdl.settings import (ROOT, SCHEMA, MachineProfile, automatic_profile, load,
                            extra_panel_limit, plain)
-from scripts.refactor_golden import jsonable, settings_dict
 from scripts.run_notebook import settings_file
 from cvdl.evaluation import panel_dataset
 
@@ -31,33 +30,6 @@ def resolve(**kwargs):
 
 
 class SettingsTests(unittest.TestCase):
-    def test_all_golden_env_settings_and_names(self):
-        golden = json.loads((ROOT/'tests/golden/refactor-golden.json').read_text())['settings']
-        checked = []
-        for name, expected in golden.items():
-            if name == 'standard_test':
-                continue
-            env = expected['env_settings']
-            device = expected.get('globals',{}).get('DEVICE','cuda')
-            actual = load(environ=env, _profile=profile(device))
-            with self.subTest(env=name):
-                self.assertEqual(actual.run_name, expected['run_name'])
-                if 'globals' in expected:
-                    # Absolute checkout paths are profile-owned; the capture root was /work.
-                    def local_paths(value):
-                        if isinstance(value,dict): return {k:local_paths(v) for k,v in value.items()}
-                        if isinstance(value,list): return [local_paths(v) for v in value]
-                        return str(ROOT)+value[5:] if isinstance(value,str) and value.startswith('/work/') else value
-                    self.assertEqual(actual.legacy_globals(), local_paths(expected['globals']))
-                    self.assertEqual(jsonable(settings_dict(actual.to_run_settings())), local_paths(expected['run_settings']))
-                else:
-                    self.assertEqual(jsonable(actual.speed_configuration()), expected['effective_pairs_steps_warmup_workers'])
-                for key in env:
-                    from cvdl.settings import canonical
-                    self.assertEqual(actual.provenance[canonical(key)],'env')
-            checked.append(name)
-        self.assertEqual(sorted(checked), ['cpu-det','newdata-1','quick-gpu','speed-1','wide-1'])
-
     def test_typo_bad_value_and_cross_checks(self):
         for values, message in [({'epohs':3}, 'did you mean.*epochs'),
                                 ({'norm':'grop'}, 'did you mean.*group'),

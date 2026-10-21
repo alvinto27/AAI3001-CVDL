@@ -145,11 +145,6 @@ class ModelCopyParity(unittest.TestCase):
         found = [p for pattern in patterns for p in glob.glob(str(ROOT / pattern))]
         if not found:
             self.skipTest("no real checkpoint in runs/")
-        tiles = None
-        if os.environ.get("CVDL_PARITY_DEVICE") == "cuda":
-            from scripts.refactor_golden import load_tiles
-            images, _ = load_tiles()
-            tiles = torch.from_numpy(images).permute(0, 3, 1, 2).float()
         for path in found:
             with self.subTest(path=Path(path).name):
                 ckpt = torch.load(path, map_location="cpu", weights_only=False)
@@ -157,11 +152,8 @@ class ModelCopyParity(unittest.TestCase):
                 ns = (notebook_model_namespace("notebooks/04_baseline_kv_xunet_v3.ipynb")
                       if "/g4-prime-1/" in path else self.ns)
                 pair = self.pair(ckpt["hyper_parameters"], state, namespace=ns)
-                if tiles is None:
-                    self.assert_same(*pair, size=256)
-                else:
-                    for start in range(0, len(tiles), 16):
-                        self.assert_same(*pair, size=512, x=tiles[start:start + 16])
+                # Same seeded synthetic input on CPU or an explicitly selected GPU.
+                self.assert_same(*pair, size=256)
 
 
 if __name__ == "__main__":

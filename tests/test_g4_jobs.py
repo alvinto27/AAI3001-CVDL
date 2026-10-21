@@ -1,6 +1,7 @@
 """No-cloud shell tests, pinned preflight and G4 recipe parity; no GPU work."""
 from contextlib import redirect_stdout
 from copy import deepcopy
+from dataclasses import asdict
 import hashlib
 import io
 import json
@@ -15,9 +16,9 @@ from unittest.mock import patch
 
 import torch
 
-from cvdl.settings import SCHEMA, automatic_profile, load, machine_profile
+from cvdl.settings import SCHEMA, automatic_profile, load, machine_profile, plain
 from scripts.g4.preflight import preflight, top_values, validate_notebook, validate_job_env
-from scripts.refactor_golden import jsonable, repo_relative_paths, settings_dict
+from scripts.run_notebook import settings_file
 
 ROOT=Path(__file__).resolve().parents[1]
 BOOTSTRAP_SHA='89cc83e9c73cc43476f6daf5e77825ddc298a32a22a52af8ded0909f15b1f2af'
@@ -29,15 +30,15 @@ def git(root,*args):
 
 class RecipeTests(unittest.TestCase):
     def test_two_notebooks_keep_recipe_except_post_fit_and_two_machine_globals(self):
-        golden=json.loads((ROOT/'tests/golden/refactor-golden.json').read_text())['settings']
         base=json.loads((ROOT/'notebooks/05_xunet_v4_nonorm.ipynb').read_text())
         for name in ('newdata-1','wide-1'):
             notebook=json.loads((ROOT/f'notebooks/{name}.ipynb').read_text())
             self.assertEqual(notebook['cells'][:1]+notebook['cells'][2:],base['cells'][:1]+base['cells'][2:])
             settings=load(environ={},_profile=machine_profile('g4'),**top_values(notebook))
-            expected=golden[name]
-            self.assertEqual(settings.run_name,expected['run_name'])
-            legacy=load(environ=expected['env_settings'],_profile=machine_profile('g4'))
+            env=settings_file(ROOT/f'scripts/g4/jobs/archive/{name}.env',[])
+            # Historical PC/ROCm context, with the explicit full G4 job values.
+            legacy=load(environ=env,_profile=machine_profile('pc',rocm=True))
+            self.assertEqual(settings.run_name,legacy.run_name)
             for key,spec in SCHEMA.items():
                 if key in {'validation_recipe','init_checkpoint','init_checkpoint_sha256',
                            'embedding_schedule','embedding_stage_epochs','evaluation_checkpoint','pilot'}:
@@ -49,14 +50,14 @@ class RecipeTests(unittest.TestCase):
                     self.assertEqual((settings.values[key],legacy.values[key]),('none','full'),name)
                 elif not spec.machine:
                     self.assertEqual(settings.values[key],legacy.values[key],f'{name}: {key}')
-            self.assertEqual(repo_relative_paths(jsonable(settings_dict(settings)),ROOT),
-                             repo_relative_paths(expected['run_settings'],'/work'))
-            actual=repo_relative_paths(settings.legacy_globals(),ROOT)
-            before=repo_relative_paths(expected['globals'],'/work')
+            self.assertEqual(plain(asdict(settings.to_run_settings())),
+                             plain(asdict(legacy.to_run_settings())))
+            actual=settings.legacy_globals()
+            before=legacy.legacy_globals()
             changed={key for key in set(actual)|set(before) if actual.get(key)!=before.get(key)}
             self.assertEqual(changed,{'CHECKPOINT_ROOT','ROCM_CONV1_FIX_ACTIVE'})
-            self.assertEqual(before['CHECKPOINT_ROOT'],repo_relative_paths(str(ROOT/'runs'),ROOT))
-            self.assertEqual(actual['CHECKPOINT_ROOT'],repo_relative_paths(str(ROOT/'runs-out'),ROOT))
+            self.assertEqual(before['CHECKPOINT_ROOT'],str(ROOT/'runs'))
+            self.assertEqual(actual['CHECKPOINT_ROOT'],str(ROOT/'runs-out'))
             self.assertIs(before['ROCM_CONV1_FIX_ACTIVE'],True)
             self.assertIs(actual['ROCM_CONV1_FIX_ACTIVE'],False)
             self.assertEqual((settings.workers,settings.eval_workers,settings.quick,settings.compile,settings.prime_next_epoch),

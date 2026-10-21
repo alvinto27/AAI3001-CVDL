@@ -1,11 +1,15 @@
-"""Golden "before" values for the notebook-to-package refactor, and a checker.
+"""ARCHIVED: notebook-to-package before-values; manual historical replay only.
 
-  capture : run selected checks and write values to tests/golden/refactor-golden.json
+Not a required check. Use a compatible historical checkout and its run inputs.
+The optional GPU collector requires full post-fit predictions; current notebooks
+can disable these. No automatic compatibility adapter or recapture is provided.
+
+  capture : run selected checks and write values to tests/archive/golden/refactor-golden.json
   compare : run selected checks into memory and compare with the golden file
 
 Run inside the PC GPU container, from anywhere:
-  podman exec -w /work aai3001 python scripts/refactor_golden.py capture
-  podman exec -w /work aai3001 python scripts/refactor_golden.py compare --only settings,models
+  podman exec -w /work aai3001 python scripts/archive/refactor_golden.py capture
+  podman exec -w /work aai3001 python scripts/archive/refactor_golden.py compare --only settings,models
 
 Parts (--only takes a comma list; default excludes GPU):
   settings : effective settings, RUN_NAME and data records for the G4 env files and the QUICK env files,
@@ -39,9 +43,9 @@ import time
 import shutil
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))  # package import also works with --only models
-GOLDEN = ROOT / "tests/golden/refactor-golden.json"
+GOLDEN = ROOT / "tests/archive/golden/refactor-golden.json"
 NOTEBOOK = ROOT / "notebooks/05_xunet_v4_nonorm.ipynb"
 STANDARD_TEST_SHA = "fdd989f7bdab0ec6f9fd6f4c57bdde981d16b54aa8c37e5da8fd3dfcc8b06837"
 SETTING_FIELDS = ["cover_id", "k", "bit_mode", "method", "placement", "payload_kind", "stride",
@@ -50,8 +54,8 @@ ENV_FILES = {
     "newdata-1": ROOT / "scripts/g4/jobs/archive/newdata-1.env",
     "wide-1": ROOT / "scripts/g4/jobs/archive/wide-1.env",
     "speed-1": ROOT / "scripts/g4/jobs/speed-1.env",
-    "quick-gpu": ROOT / "tests/golden/quick-gpu.env",
-    "cpu-det": ROOT / "tests/golden/cpu-det.env",
+    "quick-gpu": ROOT / "tests/archive/golden/quick-gpu.env",
+    "cpu-det": ROOT / "tests/archive/golden/cpu-det.env",
 }
 SCRATCH = ROOT / "runs/.scratch"
 PARTS = ("settings", "data", "models", "cpu", "gpu")
