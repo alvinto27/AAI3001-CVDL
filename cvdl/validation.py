@@ -191,6 +191,12 @@ def load_frozen(root, settings, train_grid, train_tile, rid):
 from lsb_torch import FixedPairs
 
 
+def evaluation_tensor(image):
+    """Evaluator pixels: contiguous CHW RGB8, no resize, scaling or augmentation."""
+    import torch
+    return torch.from_numpy(np.ascontiguousarray(image)).permute(2,0,1).contiguous()
+
+
 class MatchedValidationPairs(FixedPairs):
     """Replay recorded kwargs and embedding keys, with explicit overlap geometry."""
     def __init__(self, corpus, frame):
@@ -220,5 +226,4 @@ class MatchedValidationPairs(FixedPairs):
         kwargs = json.loads(row.draw_kwargs)
         kwargs['rng'] = np.random.default_rng(np.random.SeedSequence(json.loads(row.embedding_seed_key)))
         stego, _, _ = embed_fast(pixels, **kwargs)
-        tensor = lambda image: torch.from_numpy(np.ascontiguousarray(image)).permute(2, 0, 1).contiguous()
-        return tensor(clean), tensor(stego), index
+        return evaluation_tensor(clean), evaluation_tensor(stego), index

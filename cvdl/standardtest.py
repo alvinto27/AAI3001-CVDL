@@ -250,11 +250,20 @@ def prepare_output(path, *, overwrite=False):
     return path
 
 
+def load_network(checkpoint, device):
+    """Strict evaluator reconstruction, shared by saved-checkpoint inference tools."""
+    import torch
+    from .models import model_from_hparams
+    checkpoint_data=torch.load(checkpoint,map_location='cpu',weights_only=False)
+    network=model_from_hparams(checkpoint_data.get('hyper_parameters',{})).eval()
+    network.load_state_dict({k.removeprefix('net.'):v for k,v in checkpoint_data['state_dict'].items()},strict=True)
+    return network.to(device)
+
+
 def run(settings, checkpoint, run_folder, *, higher_k=False, hard=True, output=None, overwrite=False, provenance=None):
     """New-suite branch: test only; never execute legacy post_fit or modify training records."""
     import torch
     from lsb_torch import Corpus, RunSettings
-    from .models import model_from_hparams
     from .hardtest import score
     from .settings import plain
     from . import deployment as C
@@ -297,11 +306,7 @@ def run(settings, checkpoint, run_folder, *, higher_k=False, hard=True, output=N
         if any(saved.get(k) != v for k, v in identity.items()):
             raise ValueError('evaluation identity differs; use a fresh output folder')
     out = prepare_output(out, overwrite=overwrite)
-    checkpoint_data = torch.load(checkpoint, map_location='cpu', weights_only=False)
-    hparams = checkpoint_data.get('hyper_parameters', {})
-    network = model_from_hparams(hparams).eval()
-    network.load_state_dict({k.removeprefix('net.'): v for k, v in checkpoint_data['state_dict'].items()}, strict=True)
-    network.to(settings.device)
+    network = load_network(checkpoint, settings.device)
     # Test photo identities always come from the suite's verified root manifests,
     # never a model's borrowed/alternate training manifest_root.
     corpus = Corpus(settings.root, RunSettings(sources=('raise', 'div2k', 'alaska', 'lsdir'), source=settings.source))
