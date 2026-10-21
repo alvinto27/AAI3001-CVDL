@@ -28,6 +28,7 @@
 
 ### Decided
 
+- **User: run 13 (`srm-cell-aux-20261021T054704Z-6997`, `last.ckpt`) is the submission model**, for both the tile score and the heatmap (trained cell head). This is a user choice over the frozen standard guard, which run 13 misses (2.97% vs control 2.65%; SRM-e50 2.54% stays the best tile-only score). One model, one checkpoint. Orchestrator had recommended SRM-e50 for the score + run 13 head for the map.
 - User: retire legacy-512 as planned, with the Orchestrator's recommendations.
 - User: the golden record is not absolute. New [golden policy](../../archive/refactor-golden.md#policy-2026-10-21-user): ALL EQUAL for code moves; an intended behaviour change uses a controlled re-baseline (changed entries listed first, user approval, old/new hashes recorded).
 - User: switch off the 512 end-of-training test of notebook 05, `newdata-1` and `wide-1` for future G4 runs. Worker plan first (options: launch guard, override, notebook/default change with re-baseline, docs only).

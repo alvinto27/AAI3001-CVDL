@@ -1,5 +1,7 @@
 # Plan: cell-level training at 256 (changed-cell targets, one run)
 
+**Result 2026-10-21 (run 13, eval `ea32a4be0e2ce3597fbd`):** cell marks pass (head .863 within-tile AUC; beats control CAM by +.070 [+.053, +.088]; test cell FA 3.8%); standard guard missed (2.97% vs 2.65%); hard bonus not met (+.005 [+.0004, +.0097]). User chose run 13 as the submission model. Details: [2026-10-21 journal](../journal/2026-10-21/README.md).
+
 **Status: approved by the user 2026-10-21 (decisions A, B and C as recommended in section 12).** The pass marks and decision rules in section 7 are frozen before any training. This plan replaces the [older 512 plan](plan-per-cell-training.md). Written by the Worker (read-only plan at `0bcedbb`); copied here unchanged from section 1 on, apart from this header.
 
 ## 1. Goal and recommended decision
