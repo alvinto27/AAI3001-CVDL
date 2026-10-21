@@ -18,6 +18,7 @@
 - Worker: `ac72092` cell evaluation tools (`scripts/cell_eval.py`, `scripts/compare_cell_tiles.py`, `cvdl/cell_metrics.py`; 373 tests). Control CAM smoke: primary within-tile AUC .793 [.757, .828], so the CAM alone already passes the 0.75 mark. Orchestrator fixed the primary metric (mean within-tile AUC) before run-13 results (`11cee37`).
 - Worker: run 13 evaluated, `ea32a4be0e2ce3597fbd` (eval batch 32 like the control; batch 128 ran out of GPU memory). See Found.
 - Worker: `5981ab2` optional cell section in the report generator (`--cell-dir`, `--cell-reference-dir`); run 13 report built. `8c05e03` `scripts/photo_heatmap.py` (whole-photo cell maps; shared evaluator loading extracted, FULL 378 pass, constants pass). Orchestrator: `docs/findings.md` rewritten for 256 (`e82c9ce`).
+- Worker_2: pipeline step 1 `0968a34` on `pipeline`: `cvdl/pipeline/` (`load_pipeline`, `analyze`, CLI `python -m cvdl.pipeline`), strict input policy, shared `cvdl/photo_inference.py` / `cvdl/pixels.py`, `scripts/build_deploy_bundle.py`, default bundle `deploy/run13-rule-c-v1/` (weights 2.5 MB + `deploy.json`; cut-offs .5116998553 / .3110628426 everywhere). Parity: 3 validation photos x 4 versions match the saved rule-(c) features and verdicts; heatmaps bit-identical to the old script. No lightning/pandas/yaml at run time. 32 MP CPU photo 48.6 s, +577 MiB. FULL 402 pass (511 s).
 
 ### Found
 
