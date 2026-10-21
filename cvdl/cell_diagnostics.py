@@ -86,12 +86,12 @@ def cell_maps(network, images):
     with torch.inference_mode():
         features=network.features(images.float())
         cam=F.conv2d(features,network.classifier.weight[:,:,None,None],network.classifier.bias)
-        aux=network.cell_head(features)[:,0]
+        aux=network.cell_head(features)[:,0] if hasattr(network,'cell_head') else None
         tile=network.classifier(features.mean((-2,-1))).softmax(1)[:,1]
     return cam[:,1]-cam[:,0],aux,tile
 
 
-def render_cell_figure(network, corpus, root, output, *, score_limits):
+def render_cell_figure(network, corpus, root, output, *, score_limits, manifest=None, control_cam=None, control_limits=None):
     """Required same-tile comparison. Limits must be frozen from validation.
 
     score_limits = {'cam':(low,high),'aux':(low,high)}. No per-image scaling.
@@ -103,11 +103,15 @@ def render_cell_figure(network, corpus, root, output, *, score_limits):
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
     root=Path(root);output=Path(output)
-    manifest=json.loads((root/MANIFEST).read_text())
+    manifest=json.loads((root/MANIFEST).read_text()) if manifest is None else manifest
     rows={r['pair_id']:r for r in selected_rows(root,'test',manifest=manifest)}
-    if set(score_limits)!={'cam','aux'} or any(len(v)!=2 or not np.isfinite(v).all() or v[0]>=v[1] for v in score_limits.values()):
+    has_aux=hasattr(network,'cell_head')
+    if set(score_limits)!=({'cam','aux'} if has_aux else {'cam'}) or any(len(v)!=2 or not np.isfinite(v).all() or v[0]>=v[1] for v in score_limits.values()):
         raise ValueError('CAM and auxiliary limits must be finite validation-derived ranges')
-    fig,axes=plt.subplots(len(manifest['figure']),5,figsize=(15,9),squeeze=False)
+    if control_cam is not None and (control_limits is None or len(control_limits)!=2 or not np.isfinite(control_limits).all() or control_limits[0]>=control_limits[1]):
+        raise ValueError('control CAM requires fixed validation limits')
+    columns=4+int(has_aux)+int(control_cam is not None)
+    fig,axes=plt.subplots(len(manifest['figure']),columns,figsize=(3*columns,9),squeeze=False)
     records=[];device=next(network.parameters()).device
     network.eval()
     for index,chosen in enumerate(manifest['figure']):
@@ -115,7 +119,7 @@ def render_cell_figure(network, corpus, root, output, *, score_limits):
         clean,stego,counts,valid=replay_cell_pair(corpus,row)
         images=torch.from_numpy(np.stack([clean,stego])).permute(0,3,1,2).to(device)
         cam,aux,tile=cell_maps(network,images)
-        cam=cam.cpu().numpy();aux=aux.cpu().numpy()
+        cam=cam.cpu().numpy();aux=aux.cpu().numpy() if aux is not None else None
         axes[index,0].imshow(stego);axes[index,0].set_title(f"{row['diagnostic_panel']} / {row['placement']}\nk=1, bpp={float(row['effective_bpp']):.3f}")
         inset=axes[index,0].inset_axes([.02,.02,.28,.28]);inset.imshow(clean);inset.set_axis_off();inset.set_title('clean',fontsize=8)
         axes[index,1].imshow(np.abs(stego.astype(float)-clean.astype(float)).max(2)*16,vmin=0,vmax=255,cmap='gray')
@@ -127,14 +131,17 @@ def render_cell_figure(network, corpus, root, output, *, score_limits):
         axes[index,2].set_title('Cell target / sparse weight')
         for r,c in zip(*np.where((counts==0)&~valid)):
             axes[index,2].add_patch(Rectangle((c-.5,r-.5),1,1,fill=False,hatch='//',edgecolor='gray',linewidth=0))
-        for axis,values,key,title in ((axes[index,3],cam[1],'cam','Tile-head CAM margin'),(axes[index,4],aux[1],'aux','Trained auxiliary logit')):
-            im=axis.imshow(values,interpolation='nearest',cmap='coolwarm',vmin=score_limits[key][0],vmax=score_limits[key][1])
+        maps=[(cam[1],score_limits['cam'],'Tile-head CAM margin')]
+        if has_aux:maps.append((aux[1],score_limits['aux'],'Trained auxiliary logit'))
+        if control_cam is not None:maps.append((control_cam[row['pair_id']],control_limits,'Control CAM margin'))
+        for axis,(values,limits,title) in zip(axes[index,3:],maps):
+            im=axis.imshow(values,interpolation='nearest',cmap='coolwarm',vmin=limits[0],vmax=limits[1])
             axis.set_title(title);fig.colorbar(im,ax=axis,fraction=.046,pad=.04)
         for axis in axes[index]:axis.set_xticks([]);axis.set_yticks([])
         records.append(dict(pair_id=row['pair_id'],source_photo=row['source_photo'],k=int(row['k']),
             bpp=float(row['effective_bpp']),method=row['method'],placement=row['placement'],
             tile_clean_score=float(tile[0]),tile_stego_score=float(tile[1]),counts=counts.tolist(),valid_negative=valid.tolist()))
-    fig.suptitle('Same tiles: changed-cell targets, tile-head CAM, trained auxiliary head\n32-pixel spacing; 48×48 receptive field. Maps are not causal pixel saliency.')
+    fig.suptitle('Same tiles: changed-cell targets, tile-head CAM'+(', trained auxiliary head' if has_aux else ' (no auxiliary head)')+'\n32-pixel spacing; 48×48 receptive field. Maps are not causal pixel saliency.')
     fig.tight_layout();output.parent.mkdir(parents=True,exist_ok=True)
     try:fig.savefig(output,dpi=160)
     finally:plt.close(fig)
