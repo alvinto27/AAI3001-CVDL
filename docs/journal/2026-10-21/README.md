@@ -32,6 +32,8 @@
 
 ### Decided
 
+- **User: accept photo rule (c)** (logistic, cell + tile features; frozen `runs/verification/photo-verdict-run13-2026-10-21/frozen-rules.json`) as the photo verdict, with the failed FA mark (8.5% vs 7%; ALASKA unseen 17.2%) reported as a known limit. Noisy camera photos (ALASKA, seen and unseen) stay the main open weakness.
+- User: before more experiments, build the app pipeline (photo in -> tiles -> model -> stitched heatmap, tile scores, photo verdict) on a new branch `pipeline` from `yx`.
 - **User: run 13 (`srm-cell-aux-20261021T054704Z-6997`, `last.ckpt`) is the submission model**, for both the tile score and the heatmap (trained cell head). This is a user choice over the frozen standard guard, which run 13 misses (2.97% vs control 2.65%; SRM-e50 2.54% stays the best tile-only score). One model, one checkpoint. Orchestrator had recommended SRM-e50 for the score + run 13 head for the map.
 - User: retire legacy-512 as planned, with the Orchestrator's recommendations.
 - User: the golden record is not absolute. New [golden policy](../../archive/refactor-golden.md#policy-2026-10-21-user): ALL EQUAL for code moves; an intended behaviour change uses a controlled re-baseline (changed entries listed first, user approval, old/new hashes recorded).

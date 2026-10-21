@@ -41,6 +41,20 @@ The model gives an 8x8 grid of cell scores per 256 tile. Frozen diagnostic set: 
 - At a strict cell cut-off (5% false cells on validation; 3.8% on test) every map finds about **16%** of the changed cells. Training improved the ranking inside a tile, not the count above a strict cut-off.
 - Figure: `runs/verification/cell-run13-2026-10-21/cells/cells.png` (git-ignored run output).
 
+## Photo verdict (rule c, accepted by the user 2026-10-21)
+
+A whole photo is cut into 256 tiles; a small logistic rule reads 8 summary numbers (4 from the cell-head map, such as the largest connected group of flagged cells, and 4 from the tile scores) and gives one yes/no. Fitted and calibrated on 448 validation photos; frozen before the test. Record: `runs/verification/photo-verdict-run13-2026-10-21/REPORT.md`; [2026-10-21 journal](journal/2026-10-21/README.md).
+
+| TEST photos (576; 1 clean + 12 stego versions each) | Clean photos flagged | Messages missed | P_E | AUC |
+| --- | ---: | ---: | ---: | ---: |
+| All | 8.5% | 9.3% | 8.9% | .960 |
+| RAISE / DIV2K / LSDIR | 2.1 / 9.4 / 3.1% | 1.7 / 2.3 / 4.2% | 1.9 / 5.9 / 3.6% | — |
+| ALASKA seen / unseen | 9.4 / **17.2%** | 20.8 / 14.0% | 15.1 / 15.6% | — |
+| Hard: k=1, 0.05-0.15 bpp | 7.8% | 38.1% | 23.0% | .872 |
+
+- Frozen mark: FA <= 7% **failed** (8.5%; validation 4.9%); hard P_E <= 25% passed. Accepted with this limit.
+- Tile scores add value over cell features alone: P_E -2.0 pts [-2.7, -1.3]; -6.8 pts on hard k=1. "Any tile above the tile cut-off" flags 5 of 6 clean photos and must not be used.
+
 ## What we learned (256 era)
 
 - **256 training tiles beat 512**, and overlap-last tiling beats trim and pad at both sizes (overlap-256 3.43% vs overlap-512 5.61%).
