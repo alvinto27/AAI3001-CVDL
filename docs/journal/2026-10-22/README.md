@@ -52,3 +52,4 @@
 ### Next
 
 - Next working day: ideas #16 paired training (code fix for tied augmentation, SRM-e50 paired, then the cell model paired). Pending (user): cell model run-13 style (15 epochs from the new e50) or 50 epochs from scratch.
+- User: paired training plan approved ([plan](../../active/plan-paired-training.md)) with the Orchestrator's changes: R2 = run 13's 15-epoch fine-tune, paired, from R1 (fallback SRM-e50); R2 start checkpoint set by a notebook commit (no runner change); evaluation tools built while R1 trains; R1 rule has a second route (hard low AUC +.01). Decision rules frozen before any result. Code and PC pilot tonight; R1 and R2 on 2026-10-23.
