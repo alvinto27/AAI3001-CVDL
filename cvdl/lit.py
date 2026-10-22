@@ -30,8 +30,6 @@ class SteganalysisModule(L.LightningModule):
         # front_end is saved only when it is not the default, so KV checkpoints keep their old hyper_parameters.
         if cell_supervision not in ('off','changed_cells_v1') or not np.isfinite(cell_loss_weight) or cell_loss_weight <= 0:
             raise ValueError('invalid cell supervision/loss weight')
-        if cell_supervision!='off' and paired_batches:
-            raise ValueError('cell training requires unpaired batches')
         self.save_hyperparameters(ignore=["validation_data", "conv1_factory", *(["front_end"] if front_end == "kv" else []),
             *(['cell_supervision','cell_loss_weight'] if cell_supervision=='off' else []),
             *(['channels_last'] if not channels_last else [])])
@@ -73,7 +71,14 @@ class SteganalysisModule(L.LightningModule):
     def training_step(self, batch, batch_idx):
         if self.hparams.get('cell_supervision','off')!='off':
             from .cell_training import cell_loss
-            images,targets,tags=batch
+            if self.hparams.paired_batches:
+                clean,stego,tags=batch
+                images=torch.cat((clean,stego),dim=0)
+                targets=torch.cat((torch.zeros(len(clean),dtype=torch.long,device=clean.device),
+                                   torch.ones(len(stego),dtype=torch.long,device=stego.device)))
+                tags=torch.cat((tags[:,0],tags[:,1]),dim=0)
+            else:
+                images,targets,tags=batch
             logits,aux=self.net(images.float(),return_aux=True)
             tile_ce=F.cross_entropy(logits.float(),targets)
             auxiliary,stats=cell_loss(aux.float(),tags)

@@ -101,9 +101,11 @@ def kv_residual(image: torch.Tensor) -> torch.Tensor:
 
 
 class PairDataset(Dataset):
-    """Load paired tiles for validation, testing, and optional paired training."""
+    """Load paired validation/test tiles; augmented PNG pairing is unsupported."""
 
     def __init__(self, frame: pd.DataFrame, data_root: Path, train: bool = False):
+        if train:
+            raise ValueError('augmented paired PNG training is unsupported; use OTF pairing')
         self.data_root = Path(data_root)
         self.frame = frame.reset_index(drop=True)
         self.train = train
@@ -116,8 +118,7 @@ class PairDataset(Dataset):
         clean = read_raw(self.data_root / row["file_clean"])
         stego = read_raw(self.data_root / row["file_stego"])
         if self.train:
-            clean = augment_image(clean)
-            stego = augment_image(stego)
+            raise ValueError('augmented paired PNG training is unsupported; use OTF pairing')
         return clean, stego, index
 
 

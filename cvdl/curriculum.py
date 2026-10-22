@@ -42,8 +42,10 @@ class CurriculumImages(TrainingImages):
         super().__init__(corpus)
         if cell_supervision not in ('off','changed_cells_v1'):
             raise ValueError('unknown cell supervision')
-        if cell_supervision != 'off' and (mode != 'original' or corpus.train_tile != 256 or corpus.settings.paired_batches or corpus.settings.source_mix is None):
-            raise ValueError('cell targets need original schedule, 256 mixed-source unpaired training')
+        if corpus.settings.paired_batches and mode != 'original':
+            raise ValueError('paired training requires the original schedule')
+        if cell_supervision != 'off' and (mode != 'original' or corpus.train_tile != 256 or corpus.settings.source_mix is None):
+            raise ValueError('cell targets need original schedule, 256 mixed-source training')
         self.cell_supervision=cell_supervision
         from lsb_batch import read_config
         if corpus.config.as_dict()!=read_config(corpus.root/'configs/train-k1to4.yaml').as_dict():
@@ -80,7 +82,13 @@ class CurriculumImages(TrainingImages):
                 # Metadata is carried through shuffle/packing to the callback;
                 # only actually consumed stegos enter the epoch counts.
                 tag=(pair_id*2,int(original))
-                if self.cell_supervision!='off':
+                if settings.paired_batches:
+                    clean_tag,stego_tag=tag,(tag[0]+1,tag[1])
+                    if self.cell_supervision!='off':
+                        clean_tag=clean_tag+(np.zeros((8,8),dtype=np.uint16),np.ones((8,8),dtype=bool))
+                        stego_tag=stego_tag+tuple(result[2])
+                    yield clean,stego,(clean_tag,stego_tag),meta['embedding_seed_key']
+                elif self.cell_supervision!='off':
                     yield clean,0,tag+(np.zeros((8,8),dtype=np.uint16),np.ones((8,8),dtype=bool)),meta['embedding_seed_key']
                     yield stego,1,(tag[0]+1,tag[1],*result[2]),meta['embedding_seed_key']
                 else:
@@ -89,6 +97,19 @@ class CurriculumImages(TrainingImages):
             del photo
 
     def _output(self,item):
+        if self.corpus.settings.paired_batches:
+            from lsb_torch import image_tensor
+            clean,stego,tags,entropy=item
+            dtype=getattr(torch,self.corpus.settings.tensor_dtype)
+            if self.cell_supervision!='off':
+                images=[];packed=[]
+                for image,tag in zip((clean,stego),tags):
+                    image,cells=image_tensor(image,entropy,1,self.corpus.settings.augment,dtype,cell_targets=tag[2:])
+                    images.append(image)
+                    packed.append(torch.cat((torch.tensor(tag[:2],dtype=torch.long),*(a.flatten() for a in cells))))
+                return *images,torch.stack(packed)
+            return (image_tensor(clean,entropy,1,self.corpus.settings.augment,dtype),
+                    image_tensor(stego,entropy,1,self.corpus.settings.augment,dtype),torch.tensor(tags,dtype=torch.long))
         if self.cell_supervision!='off':
             from lsb_torch import image_tensor
             image,label,tag,entropy=item
@@ -119,9 +140,15 @@ class CurriculumCounts(L.Callback):
 
     def on_train_batch_end(self,trainer,module,outputs,batch,batch_idx):
         _,labels,tags=batch
-        stego=labels==1
-        self.original+=int(((tags[:,1]==1)&stego).sum())
-        self.staged+=int(((tags[:,1]==0)&stego).sum())
+        if getattr(module,'hparams',{}).get('paired_batches',False):
+            # One stego tag per pair; batch[1] contains pixels, not labels.
+            flags=tags[:,1,1]
+            self.original+=int((flags==1).sum())
+            self.staged+=int((flags==0).sum())
+        else:
+            stego=labels==1
+            self.original+=int(((tags[:,1]==1)&stego).sum())
+            self.staged+=int(((tags[:,1]==0)&stego).sum())
 
     def on_train_epoch_end(self,trainer,module):
         self._write(int(trainer.current_epoch))

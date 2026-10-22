@@ -521,10 +521,10 @@ def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_v
     if bool(c['init_checkpoint']) != bool(c['init_checkpoint_sha256']):
         raise ValueError('init_checkpoint and required SHA-256 must be supplied together')
     if c['embedding_schedule'] is not None:
-        if (c['data']!='otf' or not c['source_mix'] or c['paired_batches'] or
+        if (c['data']!='otf' or not c['source_mix'] or (c['paired_batches'] and c['embedding_schedule']!='original') or
                 c['batch_size']%8 or c['tiles_per_epoch']%4 or not c['train_yaml'] or
                 c['epochs']!=3*c['embedding_stage_epochs'] or not c['init_checkpoint']):
-            raise ValueError('embedding schedule needs OTF source mix, unpaired batch divisible by8, tiles divisible by4, train_yaml, weights start, and three complete stages')
+            raise ValueError('embedding schedule needs OTF source mix, batch divisible by8, tiles divisible by4, train_yaml, weights start, and three complete stages; paired mode needs original schedule')
     if c['cell_supervision']!='off':
         if (c['embedding_schedule']!='original' or c['train_tile_size']!=256 or c['train_grid']!='overlap_last' or
                 c['model']!='xunet_wide' or c['width']!=4 or c['front_end']!='srm' or c['norm']!='none' or
