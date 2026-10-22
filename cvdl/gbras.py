@@ -10,7 +10,8 @@ GBRAS_Net() (cell 9) and its saved model.summary() (cell 20).
 Layer audit (NCHW here; authors use NHWC). All convolutions stride 1 and
 have zero bias initially; regular/separable convolutions use Glorot uniform.
 DW=depthwise; Sep=DW3x3 multiplier 3 then pointwise1x1, bias only at output.
-BN=beta only (no gamma), eps=.001, Keras momentum=.2 (Torch momentum=.8).
+BN=learned beta only (gamma fixed at 1), eps=.001, Keras momentum=.2
+(Torch momentum=.8).
 Activations precede BN. 'same' is zero padding; all pools are valid.
 Counts below are the authors' Keras counts: learned values + moving mean/var.
 
@@ -88,9 +89,16 @@ from .models import SRMFilter
 
 
 class GBRASBatchNorm(nn.BatchNorm2d):
-    """Author BN: learned beta, no gamma; fused TF2.2 variance convention."""
+    """Learned beta, fixed gamma=1; fused TF2.2 variance convention.
+
+    ROCm2.14 backward fails with weight=None and a learned bias ("tensor does
+    not have a device"). Use an unlearned, non-persistent ones buffer on ALL
+    devices: identical math, no gamma parameter or saved checkpoint key.
+    """
     def __init__(self, channels):
         super().__init__(channels, eps=.001, momentum=.8, affine=False)
+        del self.weight
+        self.register_buffer('weight',torch.ones(channels),persistent=False)
         self.bias = nn.Parameter(torch.zeros(channels))
 
 

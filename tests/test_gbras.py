@@ -73,7 +73,10 @@ class GBRASArchitectureTests(unittest.TestCase):
         norms=[m for m in body.modules() if isinstance(m,GBRASBatchNorm)]
         self.assertEqual(len(norms),13)
         for bn in norms:
-            self.assertEqual((bn.eps,bn.momentum),(.001,.8));self.assertIsNone(bn.weight)
+            self.assertEqual((bn.eps,bn.momentum),(.001,.8))
+            self.assertTrue(torch.equal(bn.weight,torch.ones_like(bn.weight)))
+            self.assertFalse(bn.weight.requires_grad);self.assertNotIn('weight',bn.state_dict())
+            self.assertNotIn('weight',dict(bn.named_parameters()))
             self.assertTrue(bn.bias.requires_grad)
         self.assertEqual(tuple(out.shape),(1,2,16,16))
         self.assertEqual(sum(p.numel() for p in body.parameters()),164734)
@@ -98,6 +101,40 @@ class GBRASArchitectureTests(unittest.TestCase):
                      else k*k*(ni+layer.out_channels))
                 self.assertLessEqual(float(layer.weight.detach().abs().max()),(6/fan)**.5)
                 if layer.bias is not None:self.assertTrue(torch.equal(layer.bias,torch.zeros_like(layer.bias)))
+
+    def test_cpu_fixed_gamma_matches_previous_none_weight_outputs_and_gradients(self):
+        for training in (True,False):
+            bn=GBRASBatchNorm(3).train(training)
+            with torch.no_grad():
+                bn.running_mean.copy_(torch.tensor([.1,.2,.3]));bn.running_var.fill_(2)
+                bn.bias.copy_(torch.tensor([.5,-.5,.2]))
+            mean,var=bn.running_mean.clone(),bn.running_var.clone()
+            bias=bn.bias.detach().clone().requires_grad_()
+            x=torch.randn(2,3,4,5,requires_grad=True);reference=x.detach().clone().requires_grad_()
+            actual=bn(x)
+            previous=F.batch_norm(reference,mean,var,None,bias,training,.8,.001)
+            torch.testing.assert_close(actual,previous,rtol=1e-5,atol=1e-6)
+            gradient=torch.randn_like(actual)
+            actual.backward(gradient);previous.backward(gradient)
+            torch.testing.assert_close(x.grad,reference.grad,rtol=1e-5,atol=1e-6)
+            torch.testing.assert_close(bn.bias.grad,bias.grad,rtol=1e-5,atol=1e-6)
+            torch.testing.assert_close(bn.running_mean,mean,rtol=0,atol=0)
+            torch.testing.assert_close(bn.running_var,var,rtol=0,atol=0)
+
+    @unittest.skipUnless(torch.cuda.is_available(),'small explicit GPU backward check')
+    def test_gpu_fixed_gamma_full_body_forward_backward(self):
+        net=GBRASNet().cuda().train()
+        x=torch.randint(0,256,(2,3,256,256),device='cuda').float()
+        loss=F.cross_entropy(net(x),torch.tensor([0,1],device='cuda'))
+        loss.backward();torch.cuda.synchronize()
+        self.assertTrue(torch.isfinite(loss))
+        for name,p in net.named_parameters():
+            if p.requires_grad:self.assertTrue(p.grad is not None and torch.isfinite(p.grad).all(),name)
+        for layer in net.modules():
+            if isinstance(layer,GBRASBatchNorm):
+                self.assertEqual(layer.weight.device.type,'cuda')
+                self.assertFalse(layer.weight.requires_grad)
+                self.assertNotIn('weight',layer.state_dict())
 
     def test_256_forward_backward_frozen_front_and_unmodified_clamp(self):
         torch.manual_seed(20261021);net=GBRASNet().train();x=torch.randint(0,256,(2,3,256,256)).float()
