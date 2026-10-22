@@ -30,7 +30,8 @@ def configure(settings):
 
 
 def conv1_factory(settings):
-    if settings.rocm_conv1_fix and settings.rocm and settings.device == 'cuda':
+    # This workaround is for XuNet's dense 5x5 conv1, not GBRAS's 1x1 adapter.
+    if settings.model!='gbras' and settings.rocm_conv1_fix and settings.rocm and settings.device == 'cuda':
         from notebooks.rocm_conv1_wgrad import UnfoldWgradConv2d
         return UnfoldWgradConv2d.from_conv
     return None

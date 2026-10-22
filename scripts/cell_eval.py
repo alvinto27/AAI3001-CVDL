@@ -33,7 +33,8 @@ def score(network,root,rows,*,device,workers,batch_pairs):
     kwargs=dict(batch_size=batch_pairs,num_workers=workers,pin_memory=device=='cuda',worker_init_fn=initialize_worker)
     if workers:kwargs.update(multiprocessing_context='spawn',prefetch_factor=1)
     loader=DataLoader(dataset,**kwargs)
-    collected={k:[] for k in ('counts','valid_negative','cam')}
+    primary='class_score' if hasattr(network,'class_score_cells') else 'cam'
+    collected={k:[] for k in ('counts','valid_negative',primary)}
     if hasattr(network,'cell_head'):collected['aux']=[]
     for images,counts,valid,indices in loader:
         if indices.tolist()!=list(range(sum(len(v) for v in collected['counts']),sum(len(v) for v in collected['counts'])+len(images))):
@@ -41,14 +42,14 @@ def score(network,root,rows,*,device,workers,batch_pairs):
         batch=len(images)
         images=images.reshape(-1,256,256,3).permute(0,3,1,2).to(device=device,dtype=torch.float32)
         cam,aux,_=cell_maps(network,images)
-        collected['cam'].append(cam.cpu().numpy().reshape(batch,2,8,8))
+        collected[primary].append(cam.cpu().numpy().reshape(batch,2,8,8))
         if aux is not None:collected['aux'].append(aux.cpu().numpy().reshape(batch,2,8,8))
         collected['counts'].append(counts.numpy());collected['valid_negative'].append(valid.numpy())
     return {k:np.concatenate(v) for k,v in collected.items()},dataset.corpus
 
 
 def report(val_rows,test_rows,val,test,*,replicates=REPLICATES):
-    maps=[k for k in ('cam','aux') if k in val]
+    maps=[k for k in ('cam','class_score','aux') if k in val]
     result={'primary_localization':'mean_per_eligible_stego_tile_auc; contiguous only',
         'secondary_localization':'pooled eligible-stego-cell AUC',
         'bootstrap':dict(unit='source_photo',replicates=replicates,seed=SEED,interval='percentile95; shared draws for maps'),
@@ -131,6 +132,8 @@ def main():
     val,_=score(network,ROOT,val_rows,device=args.device,workers=args.workers,batch_pairs=args.batch_pairs)
     test,corpus=score(network,ROOT,test_rows,device=args.device,workers=args.workers,batch_pairs=args.batch_pairs)
     summary=report(val_rows,test_rows,val,test,replicates=args.replicates)
+    if hasattr(network,'class_score_cells'):
+        summary['map_definition']='class_score: post-ELU/BN two-class margin, native stride16 averaged to32; not a CAM'
     for split,rows,arrays in (('val',val_rows,val),('test',test_rows,test)):
         pd.DataFrame(rows).to_csv(args.output/f'{split}-pairs.csv',index=False)
         np.savez_compressed(args.output/f'{split}-scores.npz',**arrays)

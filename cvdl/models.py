@@ -199,6 +199,9 @@ def model_from_hparams(hparams):
         network = XuNetWide(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
     elif model == 'xunet_wide_delayed':
         network = XuNetWideDelayed(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
+    elif model == 'gbras':
+        from .gbras import GBRASNet
+        network = GBRASNet(clip_t=clip_t, norm=norm, front_end=front_end)
     else:
         raise ValueError(f'unsupported checkpoint model: {model}')
     supervision = hparams.get('cell_supervision', 'off')
