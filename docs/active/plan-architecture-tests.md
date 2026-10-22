@@ -1,6 +1,6 @@
 # Plan: architecture tests — delayed pooling and GBRAS-Net (ideas board #10)
 
-Status: **approved by the user 2026-10-19**: arms A and G, choices D3-D6 as recommended, decision rule below (confirmed before any result). A 2-GPU VM and the seed repeat were considered and declined (user). Code: Worker_4. **Arm A done: no gain (see Results). Arm G waits for the user's adapter choice.**
+Status: **approved by the user 2026-10-19**: arms A and G, choices D3-D6 as recommended, decision rule below (confirmed before any result). A 2-GPU VM and the seed repeat were considered and declined (user). Code: Worker_4. **Arm A done: no gain (see Results). ~~Arm G waits for the user's adapter choice.~~ Arm G resumed 2026-10-21 (user): adapter option 1 (learned 1x1, 90 -> 30); code next.**
 
 ## Questions
 
@@ -16,7 +16,7 @@ User decisions 2026-10-19: keep the **fixed SRM front end** (no learned first la
 ## GBRAS-Net (Tabares-Soto et al., "GBRAS-Net: A Convolutional Neural Network Architecture for Spatial Image Steganalysis", IEEE Access 2021; code: github.com/BioAITeam/Steganalysis)
 
 - Preprocessing: the 30 SRM filters, fixed. Body: depthwise and separable convolutions with skip connections; about 166k parameters.
-~~- Grayscale in the paper. Our adaptation: our existing SRM front end (30 filters per colour channel, 90 channels) feeds the GBRAS-Net body; only the body's first layer input width changes. Recorded as an adaptation.~~ Not possible as written (Worker_4, from the authors' code at `0b40ab0`): the first GBRAS block adds a 30-channel skip from its input; 90 channels do not match. **User choice pending:** (1) a learned 1x1 adapter 90 -> 30, then GBRAS as published (Orchestrator recommends); (2) widen the early GBRAS blocks to 90; (3) average R/G/B responses into 30 fixed channels. Our SRM front end and clamp stay unchanged (no GBRAS 3*tanh). Built from the authors' code only; the paper PDF was not reachable.
+~~- Grayscale in the paper. Our adaptation: our existing SRM front end (30 filters per colour channel, 90 channels) feeds the GBRAS-Net body; only the body's first layer input width changes. Recorded as an adaptation.~~ Not possible as written (Worker_4, from the authors' code at `0b40ab0`): the first GBRAS block adds a 30-channel skip from its input; 90 channels do not match. ~~**User choice pending:**~~ **User chose (1) on 2026-10-21:** (1) a learned 1x1 adapter 90 -> 30, then GBRAS as published (Orchestrator recommends); (2) widen the early GBRAS blocks to 90; (3) average R/G/B responses into 30 fixed channels. Our SRM front end and clamp stay unchanged (no GBRAS 3*tanh). Built from the authors' code only; the paper PDF was not reachable.
 - The worker builds the body from the paper and the public code, with a citation and a layer-by-layer check against the code. No guessed layers.
 
 ## Arms
