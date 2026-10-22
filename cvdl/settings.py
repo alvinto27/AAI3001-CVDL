@@ -161,7 +161,7 @@ SCHEMA = MappingProxyType({
     'lr_drops': Definition('tuple?', drops, lambda c:((c['epochs']//2+1,.1),), 'None=automatic; increasing epoch:factor; factor (0,1]', 'LR drop plan.', env='V3_LR_DROPS', legacy_global='LR_DROPS'),
     'init_checkpoint': Definition('path?', optional_string, None, 'path or None', 'Weights-only start checkpoint; resume stays separate.'),
     'init_checkpoint_sha256': Definition('str?', optional_string, None, '64 lowercase hex characters', 'Required start-file SHA-256.', lambda v:v is None or bool(re.fullmatch(r'[0-9a-f]{64}',v))),
-    'embedding_schedule': Definition('str?', optional_string, None, 'None/low_bpp/original', 'Approved three-stage embedding schedule.', lambda v:v in {None,'low_bpp','original'}),
+    'embedding_schedule': Definition('str?', optional_string, None, 'None/low_bpp/original/low_bpp50_v1', 'Opt-in embedding schedule.', lambda v:v in {None,'low_bpp','original','low_bpp50_v1'}),
     'embedding_stage_epochs': Definition('int', integer, 5, '>0', 'Epochs in each of three embedding stages.', lambda v:v>0),
     'cell_supervision': Definition('str', str, 'off', 'off/changed_cells_v1', 'Opt-in changed-cell auxiliary target.', lambda v:v in {'off','changed_cells_v1'}),
     'cell_loss_weight': Definition('float', number, .2, '>0', 'Auxiliary cell BCE weight.', lambda v:v>0),
@@ -520,7 +520,21 @@ def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_v
         raise ValueError('GBRAS arm requires front_end=srm, intrinsic norm=batch and clip_t=3')
     if bool(c['init_checkpoint']) != bool(c['init_checkpoint_sha256']):
         raise ValueError('init_checkpoint and required SHA-256 must be supplied together')
-    if c['embedding_schedule'] is not None:
+    if c['embedding_schedule']=='low_bpp50_v1':
+        if (c['data']!='otf' or dict(c['source_mix'] or {})!={'raise':.4,'lsdir':.2,'alaska':.4} or
+                c['tiles_per_epoch']!=180000 or c['batch_size']%8 or not c['train_yaml'] or
+                c['epochs']!=50 or c['init_checkpoint'] or c['init_checkpoint_sha256'] or
+                'embedding_stage_epochs' in supplied or c['cell_supervision']!='off' or
+                c['model']!='xunet_wide' or c['front_end']!='srm' or c['width']!=4 or
+                c['norm']!='none' or c['clip_t']!=3. or c['train_tile_size']!=256 or
+                c['train_grid']!='overlap_last' or c['lr']!=3e-4 or c['warmup_epochs']!=1 or
+                c['lr_drops']!=((8,.3),(33,.1)) or c['evaluation_checkpoint']!='best' or
+                c['precision']!='32' or c['channels_last']):
+            raise ValueError('low_bpp50_v1 needs the 50-epoch scratch SRM-e50 recipe, no init/stage length, best selection, and either batch mode')
+        if not c['pilot'] and (c['checkpoint_validation']!='capped' or c['val_cap_raise']!=5000 or
+                               c['val_cap_lsdir']!=1500 or c['batch_size']!=128):
+            raise ValueError('low_bpp50_v1 needs SRM-e50 capped validation and batch128; only PC pilot overrides are allowed')
+    elif c['embedding_schedule'] is not None:
         if (c['data']!='otf' or not c['source_mix'] or (c['paired_batches'] and c['embedding_schedule']!='original') or
                 c['batch_size']%8 or c['tiles_per_epoch']%4 or not c['train_yaml'] or
                 c['epochs']!=3*c['embedding_stage_epochs'] or not c['init_checkpoint']):
@@ -538,6 +552,7 @@ def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_v
     if not c['pilot']:absent+=['pilot']
     if c['init_checkpoint'] is None:absent+=['init_checkpoint','init_checkpoint_sha256']
     if c['embedding_schedule'] is None:absent+=['embedding_schedule','embedding_stage_epochs']
+    elif c['embedding_schedule']=='low_bpp50_v1':absent+=['embedding_stage_epochs']
     if c['evaluation_checkpoint']=='best':absent+=['evaluation_checkpoint']
     for name in absent:c.pop(name);origins_all.pop(name)
     result = Settings(freeze(c),freeze(origins_all),profile.name,freeze(history))

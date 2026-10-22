@@ -1,8 +1,9 @@
-"""Opt-in weight-only starts and fixed low-bpp curriculum (approved C1-C6).
+"""Opt-in weight-only starts and versioned embedding curricula.
 
-Training uses the original photo schedule, OTF seeds, augmentation and shuffle.
-Only the embedding config changes. Exactly one quarter of scheduled tile draws
-uses the original config, before worker sharding/shuffling (not a batch quota).
+Use the original photo schedule, OTF seeds, augmentation and shuffle. The legacy
+low_bpp policy retains an exact quarter of original-config draws. low_bpp50_v1
+starts with seven normal epochs, then retains an exact half. Assignment precedes
+worker sharding/shuffling; neither policy imposes a per-batch quota.
 """
 from dataclasses import replace
 import hashlib
@@ -16,8 +17,32 @@ from lsb_torch import TrainingImages
 
 STAGES = ((.35,1),(.25,2),(.15,3))
 
+# Separate versioned policy: zero-based start/end, bpp maximum, k1 weight,
+# original fraction. Never extend/reinterpret the legacy three-stage table.
+SCRATCH50 = 'low_bpp50_v1'
+SCRATCH50_STAGES = ((0,7,.5,1,1.), (7,20,.35,1,.5),
+                    (20,32,.25,2,.5), (32,50,.15,3,.5))
+
+
+def scratch50_record(count):
+    table=[dict(start=start,end=end,bpp_min=.05,bpp_max=maximum,
+                k1_weight=weight,original_fraction=fraction,
+                original_draws=int(count*fraction),staged_draws=count-int(count*fraction))
+           for start,end,maximum,weight,fraction in SCRATCH50_STAGES]
+    canonical=json.dumps(dict(mode=SCRATCH50,stages=SCRATCH50_STAGES),sort_keys=True,separators=(',',':'))
+    return dict(mode=SCRATCH50,version=1,epoch_index='zero-based',stages=table,
+                table_sha256=hashlib.sha256(canonical.encode()).hexdigest(),
+                assignment='exact per epoch before worker sharding; counts reflect consumed stegos')
+
 
 def stage_for_epoch(epoch, stage_epochs=5, mode='low_bpp'):
+    if mode==SCRATCH50:
+        if type(epoch) is not int or not 0<=epoch<50:
+            raise ValueError('epoch outside low_bpp50_v1 (0..49)')
+        for i,(start,end,maximum,weight,fraction) in enumerate(SCRATCH50_STAGES):
+            if start<=epoch<end:
+                return dict(stage=i+1,bpp_min=.05,bpp_max=maximum,k1_weight=weight,
+                            original_fraction=fraction)
     if type(epoch) is not int or not 0<=epoch<3*stage_epochs:
         raise ValueError('epoch outside the three-stage schedule')
     stage=epoch//stage_epochs
@@ -28,6 +53,14 @@ def stage_for_epoch(epoch, stage_epochs=5, mode='low_bpp'):
 
 
 def original_positions(count, seed, epoch, mode):
+    if mode==SCRATCH50:
+        stage=stage_for_epoch(epoch,mode=mode)
+        if count%2:raise ValueError('exact half needs tiles_per_epoch divisible by two')
+        if stage['original_fraction']==1.:return np.ones(count,dtype=bool)
+        flags=np.zeros(count,dtype=bool)
+        rng=np.random.default_rng(np.random.SeedSequence([seed,epoch,0x43353031]))
+        flags[rng.permutation(count)[:count//2]]=True
+        return flags
     if count%4:raise ValueError('exact quarter needs tiles_per_epoch divisible by four')
     if mode=='original':return np.ones(count,dtype=bool)
     if mode!='low_bpp':raise ValueError('unknown embedding schedule')
@@ -40,10 +73,12 @@ def original_positions(count, seed, epoch, mode):
 class CurriculumImages(TrainingImages):
     def __init__(self,corpus,mode,stage_epochs,*,cell_supervision='off'):
         super().__init__(corpus)
+        if mode==SCRATCH50 and stage_epochs is not None:
+            raise ValueError('low_bpp50_v1 has fixed boundaries, not a legacy stage length')
         if cell_supervision not in ('off','changed_cells_v1'):
             raise ValueError('unknown cell supervision')
-        if corpus.settings.paired_batches and mode != 'original':
-            raise ValueError('paired training requires the original schedule')
+        if corpus.settings.paired_batches and mode not in ('original',SCRATCH50):
+            raise ValueError('paired training requires the original schedule or low_bpp50_v1')
         if cell_supervision != 'off' and (mode != 'original' or corpus.train_tile != 256 or corpus.settings.source_mix is None):
             raise ValueError('cell targets need original schedule, 256 mixed-source training')
         self.cell_supervision=cell_supervision
@@ -196,7 +231,9 @@ def start_identity(settings):
     identity={k:plain(v) for k,v in settings.values.items() if not SCHEMA[k].machine}
     if settings.train_yaml:
         identity['train_yaml_sha256']=hashlib.sha256(Path(settings.train_yaml).read_bytes()).hexdigest()
-    if getattr(settings,'embedding_schedule',None) is not None:
+    if getattr(settings,'embedding_schedule',None)==SCRATCH50:
+        identity['embedding_schedule_identity']=scratch50_record(settings.tiles_per_epoch)
+    elif getattr(settings,'embedding_schedule',None) is not None:
         identity['stage_table']=[list(s) for s in STAGES]
     return identity
 
@@ -210,7 +247,21 @@ def check_start(settings,folder):
         if prior['settings']!=identity:raise ValueError('start/resume settings or initialization fingerprint changed')
         if not resume:raise ValueError('existing initialized run has no last.ckpt; use a new run')
     elif resume:raise ValueError('resume checkpoint has no initialization identity record')
+    if resume and getattr(settings,'embedding_schedule',None)==SCRATCH50:
+        saved=torch.load(Path(folder)/'last.ckpt',map_location='cpu',weights_only=False)
+        if saved.get('hyper_parameters',{}).get('embedding_schedule_identity')!=identity['embedding_schedule_identity']:
+            raise ValueError('resume checkpoint schedule identity mismatch')
     return resume
+
+
+def initialize_scratch50(settings,folder,resume):
+    """Record a random start without invoking checkpoint/weights-only loading."""
+    path=Path(folder)/'training_start.json'
+    if resume:return json.loads(path.read_text())
+    record=dict(initialization='random',weights_only=False,optimizer_restored=False,
+                scheduler_restored=False,settings=start_identity(settings))
+    path.write_text(json.dumps(record,indent=2)+'\n')
+    return record
 
 
 def initialize(settings,module,folder,resume):

@@ -51,11 +51,14 @@ def create_data(s):
             from .pilot import apply
             apply(otf, s)
         if getattr(s,'embedding_schedule',None) is not None:
-            from .curriculum import CurriculumImages
-            otf.train=CurriculumImages(otf.corpus,s.embedding_schedule,s.embedding_stage_epochs,
+            from .curriculum import CurriculumImages, SCRATCH50, scratch50_record
+            otf.train=CurriculumImages(otf.corpus,s.embedding_schedule,getattr(s,'embedding_stage_epochs',None),
                 **({'cell_supervision':s.cell_supervision} if getattr(s,'cell_supervision','off')!='off' else {}))
-            otf.record['embedding_schedule']=dict(mode=s.embedding_schedule,stage_epochs=s.embedding_stage_epochs,
-                original_fraction=.25 if s.embedding_schedule=='low_bpp' else 1.,assignment='exact per epoch before worker sharding; counts reflect consumed stegos')
+            if s.embedding_schedule==SCRATCH50:
+                otf.record['embedding_schedule']=scratch50_record(otf.corpus.settings.tiles_per_epoch)
+            else:
+                otf.record['embedding_schedule']=dict(mode=s.embedding_schedule,stage_epochs=s.embedding_stage_epochs,
+                    original_fraction=.25 if s.embedding_schedule=='low_bpp' else 1.,assignment='exact per epoch before worker sharding; counts reflect consumed stegos')
         otf.record.update(compile_mode=s.compile, prime_next_epoch=s.prime_next_epoch)
         return otf, data.otf_pair_tables(otf)
     labels = data.load_labels(labels_path=s.labels_path)
@@ -140,8 +143,9 @@ def create_training(s, otf_data, loaders, *, trainer_options=None):
     checkpoint_dir = Path(s.output_root) / s.run_directory_name
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     starting=getattr(s,'init_checkpoint',None) is not None
+    scratch50=getattr(s,'embedding_schedule',None)=='low_bpp50_v1'
     resuming=False; prior_model={}
-    if starting:
+    if starting or scratch50:
         from .curriculum import check_start
         resuming=check_start(s,checkpoint_dir)
         if resuming:prior_model=json.loads((checkpoint_dir/'model_run_settings.json').read_text())
@@ -167,6 +171,9 @@ def create_training(s, otf_data, loaders, *, trainer_options=None):
                           "weight_decay": 1e-4, "lr_drops": s.lr_drops,
                           "batch_size": s.batch_size, "precision": s.precision, "model": s.model, "width": s.width, "persistent_validation_workers": s.persistent_workers,
                           "train_yaml": s.train_yaml, "extra_tests": s.extra_tests}
+    if scratch50:
+        from .curriculum import scratch50_record
+        model_run_settings['embedding_schedule_identity']=scratch50_record(s.tiles_per_epoch)
     (checkpoint_dir / "model_run_settings.json").write_text(json.dumps(model_run_settings, indent=2) + "\n")
     print("Model run settings:", json.dumps(model_run_settings, indent=2))
     if s.data == "otf":
@@ -237,7 +244,12 @@ def create_training(s, otf_data, loaders, *, trainer_options=None):
         initialization=initialize(s,lightning_model,checkpoint_dir,resuming)
         model_run_settings['initialization_checkpoint_sha256']=initialization['checkpoint_sha256']
         model_run_settings['evaluation_checkpoint']=getattr(s,'evaluation_checkpoint','best')
-    if s.name:
+    if scratch50:
+        from .curriculum import initialize_scratch50
+        initialize_scratch50(s,checkpoint_dir,resuming)
+        lightning_model.hparams['embedding_schedule_identity']=model_run_settings['embedding_schedule_identity']
+        model_run_settings['initialization']='random'
+    if s.name or scratch50:
         import hashlib
         digest=hashlib.sha256()
         for name,tensor in lightning_model.net.state_dict().items():
@@ -257,4 +269,4 @@ def create_training(s, otf_data, loaders, *, trainer_options=None):
 def curriculum_callbacks(s,folder):
     if getattr(s,'embedding_schedule',None) is None:return []
     from .curriculum import CurriculumCounts
-    return [CurriculumCounts(folder/'embedding_epoch_counts.jsonl',s.embedding_schedule,s.embedding_stage_epochs)]
+    return [CurriculumCounts(folder/'embedding_epoch_counts.jsonl',s.embedding_schedule,getattr(s,'embedding_stage_epochs',None))]
