@@ -58,3 +58,8 @@
 - User: #17 becomes a full 50-epoch curriculum from scratch (SRM-e50 recipe); the paired variant if R1 passes its rule, else unpaired. Worker_2: read-only plan.
 - User: the #17 curriculum run stays at a fixed 50 epochs; more epochs / early stopping shelved as ideas #18 until evidence shows they are needed (SRM-e50 curve: flat after the last LR drop; run 11 gave nothing).
 - User: [curriculum50 plan](../../active/plan-curriculum50.md) approved: schedule A (100% normal mix epochs 1-7, then 50% normal + 50% staged .05-.35 / .05-.25 / .05-.15 bpp with k=1 weight 1/2/3; LR drops at epochs 8 and 33); rule: hard k=1 low AUC +.01 with the interval above 0, standard P_E guard +0.25 points, selected epoch >= 8. Worker_2 builds both notebooks.
+- Worker_2: curriculum50 implementation `77f0ecd` (`low_bpp50_v1`; notebooks differ from `srm-e50.ipynb` only by name + schedule (+ paired)). Run 10/11 data, RNG and records reproduce exactly; epochs 1-7 equal the normal recipe; resume across the stage change restores the optimizer and LR. FULL 434 pass (a first FULL had one PC-safety semaphore warning after the GPU probes; the safety tests and a clean FULL alone passed). PC probes (correctness only) CE: unpaired .690 -> .663, paired .693 -> .679. Both G4 preflights pass. Run queue row 17.
+
+### Next
+
+- 2026-10-23: tell the user, launch R1 (row 15). Build the evaluation tools while R1 trains. R1 verdict -> R2 (row 16) and the curriculum variant (row 17); order to choose.
