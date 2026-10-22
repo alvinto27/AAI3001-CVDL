@@ -46,4 +46,9 @@
 
 ### Decided
 
-- Pending (user): long run at about $15-16 (needs resume and the Pi watchdog first; the $20 cap leaves little room for preemptions) or stop arm G. The overhead bug is not worth a fix: the run 14 validation time is enough for the projection.
+- ~~Pending (user): long run at about $15-16 (needs resume and the Pi watchdog first; the $20 cap leaves little room for preemptions) or stop arm G. The overhead bug is not worth a fix: the run 14 validation time is enough for the projection.~~
+- **User: stop arm G (option B).** Finding for the report: GBRAS-Net costs about 7x the compute of SRM-30 at 256 px colour tiles; BF16 gives 1.10x; too costly for this project. Code stays (opt-in). Resume and the Pi watchdog are not built (design kept in the speed plan). Spend on arm G: run 14 about $1.2, timing boot about $0.5.
+
+### Next
+
+- Next working day: ideas #16 paired training (code fix for tied augmentation, SRM-e50 paired, then the cell model paired). Pending (user): cell model run-13 style (15 epochs from the new e50) or 50 epochs from scratch.
