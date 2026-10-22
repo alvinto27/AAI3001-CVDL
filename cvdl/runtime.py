@@ -134,8 +134,8 @@ def finish_training(s, bundle, loaders):
     return str(checkpoint.last_model_path) if getattr(s,'evaluation_checkpoint','best')=='last' else best
 
 
-def create_training(s, otf_data, loaders):
-    """Wire checkpoint-compatible callbacks, loggers, Trainer and module."""
+def create_training(s, otf_data, loaders, *, trainer_options=None):
+    """Wire the shared training path; optional loop bounds serve benchmark tools."""
     train_loader, val_loader = loaders.train, loaders.val
     checkpoint_dir = Path(s.output_root) / s.run_directory_name
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -226,6 +226,7 @@ def create_training(s, otf_data, loaders):
         log_every_n_steps=50,
         enable_progress_bar=not s.headless,
         deterministic=False,
+        **(trainer_options or {}),
     )
     training_started = time.perf_counter()
     assert trainer.checkpoint_callbacks == [checkpoint_callback], "only one best-and-last checkpoint callback is allowed"
