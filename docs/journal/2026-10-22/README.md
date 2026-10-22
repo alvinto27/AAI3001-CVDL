@@ -18,4 +18,5 @@
 
 ### Decided
 
-- Run 14 stopped; 30 epochs do not fit the 165/180-min limits. Next step: user decision (full 30 epochs on a long boot about $16; shorter run (not a fair comparison); speed-ups first; or stop arm G). Pending.
+- Run 14 stopped; 30 epochs do not fit the 165/180-min limits. Next step: user decision (full 30 epochs on a long boot about $16; shorter run (not a fair comparison); speed-ups first; or stop arm G). ~~Pending.~~
+- **User: option C** (speed-ups first: BF16 mixed precision, channels-last, compile options; measured on the G4), then, if still above 180 min, one long unsupervised run. Worker_2: read-only speed plan next.
