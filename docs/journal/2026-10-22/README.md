@@ -24,3 +24,26 @@
 - User raised paired training (ideas #16): partners in the same batch with the same flip/rotation. Found: the current paired mode does not tie the augmentation (the seed includes the label). Order chosen by the user: GBRAS timing boot -> GBRAS long overnight run -> paired work next working day (code fix, SRM-e50 paired, cell model paired). Pending: run-13 style or 50 epochs from scratch for the cell model.
 - User agreed: the GBRAS long run starts unattended only when resume and the Pi watchdog are ready and tested; otherwise it moves to the next night and the paired work (#16) fills the day.
 - User: tell the user before every G4 launch. The GCE max run duration (now 300 min, termination action STOP, spot) can be changed by the Orchestrator with `gcloud compute instances set-scheduling rtx6000pro --zone=us-central1-c --max-run-duration=<N>m` only while the VM is TERMINATED; for a long run, propose the value, set it after the user's OK, and set it back to 300 min afterwards.
+
+## GBRAS speed-ups measured on the G4
+
+### Did
+
+- Worker_2: step 1 `3c86e52` (SRM + clamp kept FP32 under AMP for every SRM model; opt-in `channels_last`; FP32 path bit-identical for KV, SRM-wide, delayed, run 13, GBRAS; FAST 406 pass). Step 2a `1f3efe0` (timing and numerics benchmark on the shared runtime; FULL 416 pass).
+- Run_Supervisor: timing boot `gbras-speed-bench-20261022T120338Z-3374` (GCE limit set to 60 min for the boot, restored to 300 min after). 12:04:50Z-12:22:38Z, about $0.5. The four configurations completed; the last part (validation and checkpoint overhead of the winner) failed with a code error (`cannot prime while the current epoch is running`, `cvdl/gbras_bench.py` line 341), so the tool wrote no projection. No retry.
+
+### Found
+
+| Configuration (batch 128) | Steps/s | Peak GPU memory | Numerics gates |
+| --- | ---: | ---: | --- |
+| FP32, NCHW (run 14 setting) | 2.48 | 37.1 GB | reference |
+| BF16, NCHW | 2.73 | 18.8 GB | pass (probability p99 gap .0029) |
+| BF16, channels-last | 2.73 | 18.8 GB | pass (.0022) |
+| FP32, channels-last | 1.81 | 37.3 GB | pass |
+
+- BF16 gives only 1.10x; channels-last gives nothing (slower in FP32). Memory halves. The model is limited by memory traffic of many small full-resolution passes, not by the arithmetic precision.
+- Projection (Orchestrator arithmetic; run 14 validation about 1 min per epoch): 2,813 steps x 0.367 s = 17.2 min per epoch; 30 epochs about **9-9.5 h, about $15-16** on spot.
+
+### Decided
+
+- Pending (user): long run at about $15-16 (needs resume and the Pi watchdog first; the $20 cap leaves little room for preemptions) or stop arm G. The overhead bug is not worth a fix: the run 14 validation time is enough for the projection.
