@@ -85,7 +85,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from .models import SRMFilter
+from .models import SRMFilter, clipped_residuals
 
 
 class GBRASBatchNorm(nn.BatchNorm2d):
@@ -181,7 +181,7 @@ class GBRASNet(nn.Module):
         self.body = GBRASBody()
 
     def features(self, x):
-        return self.body(self.adapter(torch.clamp(self.kv(x), -self.clip_t, self.clip_t)))
+        return self.body(self.adapter(clipped_residuals(self.kv, x, self.clip_t)))
 
     def forward(self, x):
         return self.features(x).mean((-2,-1))

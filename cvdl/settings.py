@@ -133,6 +133,7 @@ SCHEMA = MappingProxyType({
     'headless': Definition('bool', boolean, False, 'bool', 'Compact headless progress.', env='CVDL_HEADLESS_LOG', machine=True),
     'main_threads': Definition('int', integer, 1, '>0', 'Main PyTorch threads.', lambda v:v>0, 'V3_MAIN_THREADS', 'MAIN_THREADS', True),
     'precision': Definition('str', str, '32', '32/bf16-mixed within profile limits', 'Training precision.', lambda v:v in {'32','bf16-mixed'}, 'V3_PRECISION', 'PRECISION', True),
+    'channels_last': Definition('bool', boolean, False, 'bool', 'Channels-last model and image-batch memory format.', env='V3_CHANNELS_LAST', machine=True),
     'persistent_workers': Definition('bool', boolean, True, 'bool', 'Persistent validation workers.', env='V3_PERSISTENT_WORKERS', machine=True),
     'compile': Definition('str', compile_mode, 'off', 'off/default', 'Inner network compilation.', lambda v:v in {'off','default'}, 'V3_COMPILE', 'COMPILE_MODE', True),
     'compile_threads': Definition('int', integer, 4, '>0', 'Inductor compile worker limit.', lambda v:v>0, 'TORCHINDUCTOR_COMPILE_THREADS', machine=True),

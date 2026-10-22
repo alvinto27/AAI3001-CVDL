@@ -81,6 +81,20 @@ class SRMFilter(nn.Module):
         return self.conv(x)
 
 
+def clipped_residuals(front, x, clip_t):
+    """Protect fixed SRM residuals and clamp from outer AMP rounding.
+
+    KV retains its historical autocast behavior. FP32 inputs outside AMP keep
+    the old operations and checkpoint state exactly.
+    """
+    if isinstance(front, SRMFilter):
+        with torch.autocast(device_type=x.device.type, enabled=False):
+            x = front(x.float())
+            return torch.clamp(x, -clip_t, clip_t) if clip_t is not None else x
+    x = front(x)
+    return torch.clamp(x, -clip_t, clip_t) if clip_t is not None else x
+
+
 FRONT_ENDS = {'kv': (KVFilter, 3), 'srm': (SRMFilter, 90)}
 
 
@@ -118,9 +132,7 @@ class XuNet(nn.Module):
         self.classifier = nn.Linear(128, 2)
 
     def features(self, x):
-        x = self.kv(x)
-        if self.clip_t is not None:
-            x = torch.clamp(x, -self.clip_t, self.clip_t)
+        x = clipped_residuals(self.kv, x, self.clip_t)
         x = self.pool(torch.tanh(self.bn1(torch.abs(self.conv1(x)))))
         x = self.pool(torch.tanh(self.bn2(self.conv2(x))))
         x = self.pool(F.relu(self.bn3(self.conv3(x))))
@@ -152,9 +164,7 @@ class XuNetWide(XuNet):
         self.classifier = nn.Linear(d, 2)
 
     def features(self, x):
-        x = self.kv(x)
-        if self.clip_t is not None:
-            x = torch.clamp(x, -self.clip_t, self.clip_t)
+        x = clipped_residuals(self.kv, x, self.clip_t)
         x = self.pool(torch.tanh(self.bn1(torch.abs(self.conv1(x)))))
         x = self.pool(torch.tanh(self.bn2(self.conv2(x))))
         for name in (3, 4, 5):
@@ -177,9 +187,7 @@ class XuNetWideDelayed(XuNetWide):
         super().__init__(clip_t=clip_t, norm=norm, width=width, front_end=front_end)
 
     def features(self, x):
-        x = self.kv(x)
-        if self.clip_t is not None:
-            x = torch.clamp(x, -self.clip_t, self.clip_t)
+        x = clipped_residuals(self.kv, x, self.clip_t)
         x = torch.tanh(self.bn1(torch.abs(self.conv1(x))))
         x = torch.tanh(self.bn2(self.conv2(x)))
         for name in (3, 4, 5):

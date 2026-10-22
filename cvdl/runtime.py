@@ -149,6 +149,15 @@ def create_training(s, otf_data, loaders):
                           "compile_target": "net" if s.compile == "default" else None,
                           "compile_dynamic": False if s.compile == "default" else None,
                           "compile_fullgraph": False if s.compile == "default" else None,
+                          "channels_last": s.channels_last,
+                          "memory_format": "channels_last" if s.channels_last else "contiguous",
+                          "amp_boundaries": {
+                              "srm_front_end_and_clamp": "float32_autocast_disabled" if s.front_end == "srm" else "not_used",
+                              "learned_layers": "lightning_bfloat16_autocast" if s.precision == "bf16-mixed" else "float32",
+                              "normalization_parameters_and_running_stats": "float32",
+                              "cross_entropy": "float32",
+                              "validation_probabilities_and_metrics": "float32",
+                          },
                           "tf32_matmul": torch.backends.cuda.matmul.allow_tf32,
                           "tf32_cudnn": torch.backends.cudnn.allow_tf32,
                           "torch_version": str(torch.__version__),
@@ -220,7 +229,7 @@ def create_training(s, otf_data, loaders):
     )
     training_started = time.perf_counter()
     assert trainer.checkpoint_callbacks == [checkpoint_callback], "only one best-and-last checkpoint callback is allowed"
-    lightning_model = SteganalysisModule(clip_t=s.clip_t, norm=s.norm, validation_data=otf_data, conv1_factory=conv1_factory(s), lr=s.lr, max_epochs=s.epochs, paired_batches=s.paired_batches, steps_per_epoch=len(train_loader), warmup_epochs=s.warmup_epochs, grad_clip=s.grad_clip, lr_drops=s.lr_drops, batch_size=s.batch_size, precision=s.precision, model=s.model, width=s.width, front_end=s.front_end,
+    lightning_model = SteganalysisModule(clip_t=s.clip_t, norm=s.norm, validation_data=otf_data, conv1_factory=conv1_factory(s), lr=s.lr, max_epochs=s.epochs, paired_batches=s.paired_batches, channels_last=s.channels_last, steps_per_epoch=len(train_loader), warmup_epochs=s.warmup_epochs, grad_clip=s.grad_clip, lr_drops=s.lr_drops, batch_size=s.batch_size, precision=s.precision, model=s.model, width=s.width, front_end=s.front_end,
         **(dict(cell_supervision=s.cell_supervision,cell_loss_weight=s.cell_loss_weight) if getattr(s,'cell_supervision','off')!='off' else {}))
     if starting:
         from .curriculum import initialize
