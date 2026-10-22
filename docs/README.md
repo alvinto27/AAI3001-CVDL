@@ -4,6 +4,7 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Nothing
 
 ## Current references (`active/` means kept for use, not permission to run)
 - [2026-10-19 session handoff — read first next session](active/handoff-2026-10-19.md)
+- [50-epoch low-bpp curriculum from scratch (ideas #17) — approved plan (2026-10-22)](active/plan-curriculum50.md)
 - [Paired training (ideas #16): R1 SRM-e50 paired, R2 cell model paired — approved plan (2026-10-22)](active/plan-paired-training.md)
 - [GBRAS speed-ups and unattended long runs (watchdog, resume) — approved plan (2026-10-22)](active/plan-gbras-speed.md)
 - [Cell-level training at 256 — approved plan, frozen pass marks, matched control `srm-low-bpp-control` (2026-10-21)](active/plan-cell-training-256.md)

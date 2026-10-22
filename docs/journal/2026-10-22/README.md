@@ -57,3 +57,4 @@
 - User raised ideas #17: paired low-bpp curriculum (#9 + #16). Recorded; decide after the R1/R2 results.
 - User: #17 becomes a full 50-epoch curriculum from scratch (SRM-e50 recipe); the paired variant if R1 passes its rule, else unpaired. Worker_2: read-only plan.
 - User: the #17 curriculum run stays at a fixed 50 epochs; more epochs / early stopping shelved as ideas #18 until evidence shows they are needed (SRM-e50 curve: flat after the last LR drop; run 11 gave nothing).
+- User: [curriculum50 plan](../../active/plan-curriculum50.md) approved: schedule A (100% normal mix epochs 1-7, then 50% normal + 50% staged .05-.35 / .05-.25 / .05-.15 bpp with k=1 weight 1/2/3; LR drops at epochs 8 and 33); rule: hard k=1 low AUC +.01 with the interval above 0, standard P_E guard +0.25 points, selected epoch >= 8. Worker_2 builds both notebooks.
