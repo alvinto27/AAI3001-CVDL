@@ -47,3 +47,20 @@
 - Worker_2: slim resume `58aa081`: `submit.sh resume <job>` (retained GCE metadata, then the disk job record checked on boot; attempt counter), resume only from the interrupted state with the same commit, notebook and settings and a readable `last.ckpt` (SHA recorded); `DurableCheckpointIO` for every checkpoint save (same-folder temp, fsync, `os.replace`, folder fsync); `attempts.jsonl`; same Pi folder. Bug fixed on the way: on a service stop the old runner could record an interrupted run as exit 0; now 143 / interrupted. A CPU run interrupted at the 7 -> 8 stage boundary and resumed equals the uninterrupted run exactly. FULL 458 pass. Install on the VM needs a maintenance boot after the curriculum run.
 - Curriculum50 paired relaunch `srm-e50-curriculum50-paired-20261023T090435Z-3325` done: 158.3 min, exit 0; stage switch at epoch 8 with exact 90,000 / 90,000 counts; best capped val P_E .0419, AUC .9922 (R1 .0444 / .9917). Delivered, Pi = PC. Worker_2: calibration mapping entry (approved, as R1), evaluation and the frozen `curriculum50` verdict vs R1. Run_Supervisor: maintenance boot to install the resume runner (user told).
 - Run_Supervisor: resume runner installed on the VM (maintenance boot; 4 stockouts first; up 12:06:36Z, stop 12:09:36Z, about $0.1). `~/.local/lib/cvdl-g4/job.sh` `f4aa9aa7...` and `job_run.last-good` `3fe4bbfb...` equal the files of `58aa081`. `runs-out/` untouched. VM TERMINATED, 300 min / STOP.
+- Curriculum50 paired evaluation `a615397d39af1655d9ca` (best, epoch 40 one-based; schedule identity and the 50 epochs of counts verified: 5.13 M original + 3.87 M staged draws):
+
+| P_E % | SRM-e50 | R1 paired | Curriculum50 paired |
+| --- | ---: | ---: | ---: |
+| Standard-256 | 2.54 | 2.55 | 2.57 |
+| ALASKA seen | 19.42 | 18.99 | 19.72 |
+| ALASKA unseen | 16.30 | 15.58 | 16.68 |
+| LSDIR | 9.39 | 8.84 | 9.35 |
+| Hard k=1 low AUC | .7450 | .7574 | .7568 |
+
+- Frozen rule `curriculum50` vs R1: hard ΔAUC -.0006 [-.0056, +.0043] (needs +.01, lower bound > 0): FAIL; standard guard passes; epoch >= 8 passes. **Final: FAIL.** On top of pairing, the 50-epoch curriculum adds nothing measurable; seen-ALASKA noisy false alarms are higher (37.0% vs 32.3%).
+
+### Decided (end of day, by the frozen rules)
+
+- Pairing (#16) helps the hard cases (+.012) at no standard cost and no speed cost: use paired batches for future SRM training.
+- The 50-epoch curriculum (#17) gives no gain over pairing alone. Not adopted.
+- R2 fails its localization rule but has the lowest standard P_E so far (2.43%) with the same heatmap quality as run 13. Pending (user): switch the submission model to R2 or keep run 13.
