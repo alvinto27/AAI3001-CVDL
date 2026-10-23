@@ -64,3 +64,4 @@
 - Pairing (#16) helps the hard cases (+.012) at no standard cost and no speed cost: use paired batches for future SRM training.
 - The 50-epoch curriculum (#17) gives no gain over pairing alone. Not adopted.
 - R2 fails its localization rule but has the lowest standard P_E so far (2.43%) with the same heatmap quality as run 13. Pending (user): switch the submission model to R2 or keep run 13.
+- User: keep R2 in mind as the submission model (no switch yet). Approved run 18: a cell fine-tune from the Curriculum50 paired best, otherwise exactly R2; frozen rule `paired_r2` with R2 as the reference. Not chosen: a 50-epoch curriculum with the cell head from scratch (several differences at once).
