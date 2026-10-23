@@ -1,6 +1,6 @@
 # G4 resume after a spot preemption (ideas #19)
 
-**Status: approved by the user 2026-10-23 as the SLIM version below; Worker_2's full plan follows for reference (the slim list wins where they differ).**
+**Status: approved by the user 2026-10-23 as the SLIM version below; built `58aa081` (FULL 458 pass); install on the VM pending (a maintenance boot: `install -m755` of `scripts/g4/job.sh` to `~/.local/lib/cvdl-g4/job.sh` and `job_run.sh` to `job_run.last-good`; exact commands in `runs/.scratch/g4-resume-impl-2026-10-23/README.md`). Worker_2's full plan follows for reference (the slim list wins where they differ).**
 
 | Part | Slim version (approved) |
 | --- | --- |
