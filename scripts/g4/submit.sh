@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
-# Validate locally, then submit one pinned metadata job. --dry-run never calls GCE.
+# Validate locally, then submit one pinned metadata job. Resume dry-run reads GCE metadata only.
 set -euo pipefail
 ACTION=${1:-}
-[[ $ACTION == run || $ACTION == maintenance || $ACTION == off || $ACTION == status ]] || {
+[[ $ACTION == run || $ACTION == resume || $ACTION == maintenance || $ACTION == off || $ACTION == status ]] || {
     echo 'Usage: submit.sh run --notebook PATH [--commit SHA] [--timeout-min N] [--dry-run]' >&2
+    echo 'Resume most recent stopped job: submit.sh resume JOB [--dry-run]' >&2
     echo 'Speed tool only: submit.sh run --env-file scripts/g4/jobs/speed-1.env [options]' >&2
     exit 2
 }
 shift
+RESUME_JOB=
+if [[ $ACTION == resume ]]; then
+    RESUME_JOB=${1:?resume needs a job ID}; shift
+    [[ $RESUME_JOB =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,100}$ && $RESUME_JOB != *..* ]] || exit 2
+    for option in "$@"; do [[ $option == --dry-run ]] || { echo 'resume reuses the original record; only --dry-run is allowed' >&2; exit 2; }; done
+fi
 NOTEBOOK=
 ENV_FILE=
 COMMIT=HEAD
@@ -30,8 +37,20 @@ cd "$ROOT"
 INSTANCE=rtx6000pro
 ZONE=us-central1-c
 TEMP_ENV=
-trap '[[ -z $TEMP_ENV ]] || rm -f -- "$TEMP_ENV"' EXIT
-if [[ $ACTION == run ]]; then
+TEMP_META=
+TEMP_FIELDS=
+ATTEMPT=0
+trap 'rm -f -- ${TEMP_ENV:+"$TEMP_ENV"} ${TEMP_META:+"$TEMP_META"} ${TEMP_FIELDS:+"$TEMP_FIELDS"}' EXIT
+if [[ $ACTION == resume ]]; then
+    command -v gcloud >/dev/null || { echo 'Install and authenticate gcloud first' >&2; exit 2; }
+    TEMP_META=$(mktemp); TEMP_FIELDS=$(mktemp)
+    gcloud compute instances describe "$INSTANCE" --zone="$ZONE" --format=json > "$TEMP_META"
+    podman exec -i -w /work aai3001 python scripts/g4/resume.py metadata "$RESUME_JOB" < "$TEMP_META" > "$TEMP_FIELDS"
+    mapfile -t retained < "$TEMP_FIELDS"
+    [[ ${#retained[@]} == 5 ]] || exit 2
+    COMMIT=${retained[0]}; NOTEBOOK=${retained[1]}; TIMEOUT=${retained[2]}; MAX_RUN=${retained[3]}; ATTEMPT=${retained[4]}
+fi
+if [[ $ACTION == run || $ACTION == resume ]]; then
     [[ -z $(git status --porcelain) ]] || { echo 'Dirty checkout: commit or remove changes before submission (also dry-run)' >&2; exit 2; }
     [[ $COMMIT =~ ^[a-zA-Z0-9][a-zA-Z0-9._/-]*$ && $COMMIT != *..* ]] || { echo 'Invalid commit' >&2; exit 2; }
     COMMIT=$(git rev-parse --verify "$COMMIT^{commit}")
@@ -60,7 +79,8 @@ if [[ $ACTION == run ]]; then
         label=$(printf '%s' "$label" | tr -cs 'A-Za-z0-9_-' '-' | cut -c1-50)
         [[ $label =~ ^[A-Za-z0-9] ]] || label="nb-$label"
     fi
-    JOB_ID="${label}-$(date -u +%Y%m%dT%H%M%SZ)-$(printf '%04d' "$((RANDOM % 10000))")"
+    if [[ $ACTION == resume ]]; then JOB_ID=$RESUME_JOB
+    else JOB_ID="${label}-$(date -u +%Y%m%dT%H%M%SZ)-$(printf '%04d' "$((RANDOM % 10000))")"; fi
     if [[ -z $ENV_FILE ]]; then
         TEMP_ENV=$(mktemp)
         printf 'V3_NOTEBOOK=%s\nCVDL_JOB_ID=%s\n' "$NOTEBOOK" "$JOB_ID" > "$TEMP_ENV"
@@ -86,9 +106,9 @@ else
         echo "VM status is $current. Stop it before submitting metadata for the next boot." >&2; exit 2;
     }
 fi
-if [[ $ACTION == run ]]; then
+if [[ $ACTION == run || $ACTION == resume ]]; then
     execute gcloud compute instances add-metadata "$INSTANCE" --zone="$ZONE" \
-        --metadata="job-mode=run,job-id=$JOB_ID,job-commit=$COMMIT,job-timeout-min=$TIMEOUT,max-run-minutes=$MAX_RUN" \
+        --metadata="job-mode=$ACTION,job-id=$JOB_ID,job-commit=$COMMIT,job-timeout-min=$TIMEOUT,max-run-minutes=$MAX_RUN,job-protocol=resume-v1,job-attempt=$ATTEMPT" \
         --metadata-from-file="job-env=$ENV_FILE"
 else
     execute gcloud compute instances add-metadata "$INSTANCE" --zone="$ZONE" --metadata="job-mode=$ACTION"

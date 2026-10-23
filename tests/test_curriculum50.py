@@ -297,6 +297,72 @@ class Curriculum50Tests(unittest.TestCase):
             restored=SteganalysisModule.load_from_checkpoint(path,map_location='cpu',strict=True,weights_only=False)
             for k,v in module.state_dict().items():self.assertTrue(torch.equal(v,restored.state_dict()[k]))
 
+    def test_deterministic_shared_cpu_interrupted_resume_matches_uninterrupted_across_7_to_8(self):
+        from cvdl.checkpoint_io import DurableCheckpointIO
+        class Trace(L.Callback):
+            def __init__(self):self.rows=[]
+            def on_train_batch_start(self,trainer,module,batch,batch_idx):
+                digest=hashlib.sha256()
+                def add(value):
+                    if isinstance(value,torch.Tensor):
+                        digest.update(str((value.dtype,tuple(value.shape))).encode());digest.update(value.cpu().numpy().tobytes())
+                    elif isinstance(value,(tuple,list)):
+                        for item in value:add(item)
+                    else:raise TypeError(type(value))
+                add(batch)
+                self.rows.append((trainer.current_epoch,trainer.global_step,
+                    trainer.lr_scheduler_configs[0].scheduler.last_epoch,
+                    trainer.optimizers[0].param_groups[0]['lr'],digest.hexdigest()))
+        original=SteganalysisModule
+        def tiny(**kwargs):
+            module=original(**kwargs)
+            module.net=torch.nn.Sequential(torch.nn.Conv2d(3,2,1),torch.nn.AdaptiveAvgPool2d(1),torch.nn.Flatten())
+            return module
+        def same(a,b):
+            if isinstance(a,torch.Tensor):self.assertTrue(torch.equal(a,b))
+            elif isinstance(a,dict):
+                self.assertEqual(a.keys(),b.keys())
+                for key in a:same(a[key],b[key])
+            elif isinstance(a,(list,tuple)):
+                self.assertEqual(len(a),len(b))
+                for x,y in zip(a,b):same(x,y)
+            else:self.assertEqual(a,b)
+        def run(folder,steps,seed):
+            torch.manual_seed(seed)
+            s=settings(True,output_root=str(folder),compile='off',workers=0,eval_workers=0,
+                persistent_workers=False,prime_next_epoch=False)
+            c=make_corpus(True);dataset=CurriculumImages(c,SCRATCH50,None)
+            train=training_loader(dataset,20,num_workers=0,pin_memory=False)
+            images=torch.zeros(2,3,256,256,dtype=torch.uint8)
+            val=torch.utils.data.DataLoader([(images,images,torch.tensor([0,1]))],batch_size=None)
+            otf=SimpleNamespace(train=dataset,corpus=c,checkpoint_validation='full',
+                save_record=lambda p:Path(p).write_text(json.dumps(scratch50_record(20))))
+            try:
+                bundle=runtime.create_training(s,otf,SimpleNamespace(train=train,val=val),
+                    trainer_options=dict(max_steps=steps,num_sanity_val_steps=0))
+                self.assertIsInstance(bundle.trainer.strategy.checkpoint_io,DurableCheckpointIO)
+                trace=Trace();bundle.trainer.callbacks.append(trace)
+                bundle.trainer.fit(bundle.lightning_model,train,val,ckpt_path='last')
+                saved=torch.load(bundle.checkpoint_dir/'last.ckpt',map_location='cpu',weights_only=False)
+                counts=(bundle.checkpoint_dir/'embedding_epoch_counts.jsonl').read_text()
+                return saved,trace.rows,counts
+            finally:train.shutdown()
+        with TemporaryDirectory() as folder,patch('cvdl.runtime.SteganalysisModule',side_effect=tiny),patch('cvdl.callbacks.TrainingCurves.redraw'):
+            base,base_trace,base_counts=run(Path(folder)/'base',8,8123)
+            first,first_trace,_=run(Path(folder)/'split',7,8123)
+            self.assertEqual((first['epoch'],first['global_step']),(6,7))
+            # New dataset/loader/model/process RNG: only the checkpoint supplies trained state.
+            resumed,resume_trace,resume_counts=run(Path(folder)/'split',8,999)
+            self.assertEqual(base_trace,first_trace+resume_trace)
+            self.assertEqual(resume_trace[0][:3],(7,7,7))
+            self.assertEqual((resumed['epoch'],resumed['global_step']),(7,8))
+            for key in ('state_dict','optimizer_states','lr_schedulers','hyper_parameters'):
+                same(base[key],resumed[key])
+            self.assertEqual(base_counts,resume_counts)
+            rows=[json.loads(x) for x in resume_counts.splitlines()]
+            self.assertEqual((rows[-1]['original_stegos'],rows[-1]['stage_stegos']),(10,10))
+            self.assertEqual(len(rows),8)
+
     def test_real_data_records_match_normal_except_new_schedule(self):
         # Metadata/CSV verification only: no full photos or GPU are read.
         base=top_values(json.loads((ROOT/'notebooks/experiments/srm-e50.ipynb').read_text()))

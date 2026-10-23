@@ -21,7 +21,7 @@ from scripts.g4.preflight import preflight, top_values, validate_notebook, valid
 from scripts.run_notebook import settings_file
 
 ROOT=Path(__file__).resolve().parents[1]
-BOOTSTRAP_SHA='89cc83e9c73cc43476f6daf5e77825ddc298a32a22a52af8ded0909f15b1f2af'
+BOOTSTRAP_SHA='f4aa9aa7567539d2ee035476965ecf26c192924156480cbe39c600e97c0172a1'
 
 
 def git(root,*args):
@@ -86,7 +86,7 @@ class RecipeTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'requires.*pc.*detected.*g4'):
                 automatic_profile()
 
-    def test_installed_bootstrap_source_is_unchanged_and_execs_checkout(self):
+    def test_installed_bootstrap_source_is_pinned_and_execs_checkout(self):
         source=(ROOT/'scripts/g4/job.sh').read_text()
         self.assertEqual(hashlib.sha256(source.encode()).hexdigest(),BOOTSTRAP_SHA)
         self.assertNotIn('V3_NOTEBOOK',source)
@@ -101,7 +101,7 @@ class SubmissionTests(unittest.TestCase):
         cls.temp=tempfile.TemporaryDirectory(prefix='cvdl-g4-tests-')
         parent=Path(cls.temp.name);cls.root=parent/'repo';cls.root.mkdir()
         paths=git(ROOT,'ls-files').splitlines()+[
-            'scripts/g4/preflight.py','notebooks/newdata-1.ipynb','notebooks/wide-1.ipynb',
+            'scripts/g4/preflight.py','scripts/g4/resume.py','cvdl/checkpoint_io.py','notebooks/newdata-1.ipynb','notebooks/wide-1.ipynb',
             'scripts/g4/jobs/archive/newdata-1.env','scripts/g4/jobs/archive/wide-1.env',
             'scripts/g4/jobs/archive/README.md']
         copied=[]

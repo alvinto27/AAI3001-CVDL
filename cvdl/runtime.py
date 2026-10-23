@@ -220,7 +220,9 @@ def create_training(s, otf_data, loaders, *, trainer_options=None):
         auto_insert_metric_name=False, monitor="val_pe", mode="min", save_top_k=1, save_last=True,
         every_n_epochs=1, save_on_train_epoch_end=False,
     )
+    from .checkpoint_io import DurableCheckpointIO
     trainer = L.Trainer(
+        plugins=[DurableCheckpointIO()],
         max_epochs=s.epochs,
         **({"limit_train_batches": s.limit_train_batches} if s.limit_train_batches else {}),
         precision=s.precision,

@@ -72,12 +72,24 @@ meta_value() {
 valid_id() { [[ $1 =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,100}$ && $1 != .* && $1 != *..* ]]; }
 valid_commit() { [[ $1 =~ ^[a-zA-Z0-9][a-zA-Z0-9._/-]*$ && $1 != *..* ]]; }
 field() { grep -m1 "^$2=" "$STATE_ROOT/jobs/$1.record" 2>/dev/null | cut -d= -f2- || true; }
+helper() {
+    if [[ $MODE == test ]]; then
+        local converted=() arg
+        for arg in "$@"; do converted+=("${arg/#$ROOT\//\/work\/}"); done
+        podman exec -w /work aai3001 python scripts/g4/resume.py "${converted[@]}"
+    else "$ROOT/.venv/bin/python" "$ROOT/scripts/g4/resume.py" "$@"; fi
+}
 write_record() {
     local id=$1 status=$2 started=$3 ended=$4 code=$5 delivered=$6
-    local path="$STATE_ROOT/jobs/$id.record" tmp="$STATE_ROOT/jobs/.$id.record.$$"
-    printf 'job-id=%s\nstate=%s\nstarted-at=%s\nended-at=%s\nexit-code=%s\ndelivered=%s\n' \
-        "$id" "$status" "$started" "$ended" "$code" "$delivered" > "$tmp"
-    mv -f "$tmp" "$path"
+    local path="$STATE_ROOT/jobs/$id.record"
+    local commit notebook attempt env_sha training
+    commit=$(field "$id" commit); notebook=$(field "$id" notebook); attempt=$(field "$id" attempt); env_sha=$(field "$id" env-sha256)
+    training=${7:-$(field "$id" training-state)}
+    if [[ $id == "${JOB_ID:-}" && ${OWN_JOB:-0} == 1 ]]; then
+        commit=$COMMIT; notebook=$NOTEBOOK; attempt=$ATTEMPT; env_sha=$ENV_SHA
+    fi
+    printf 'job-id=%s\nstate=%s\nstarted-at=%s\nended-at=%s\nexit-code=%s\ndelivered=%s\nprotocol=resume-v1\ncommit=%s\nnotebook=%s\nattempt=%s\nenv-sha256=%s\ntraining-state=%s\n' \
+        "$id" "$status" "$started" "$ended" "$code" "$delivered" "$commit" "$notebook" "$attempt" "$env_sha" "$training" | helper record "$path"
 }
 shutdown_vm() {
     if [[ $MODE == test ]]; then note 'TEST SHUTDOWN -h now'; else note 'shutdown -h now'; sudo shutdown -h now; fi
@@ -88,6 +100,9 @@ deliver() {
     if [[ ! -f $INBOX_KEY ]]; then note "Missing inbox key: $INBOX_KEY"; return 1; fi
     if (( DELIVERY_BUDGET <= 0 )); then note "Pi retry budget exhausted for $id"; return 1; fi
     end=$((SECONDS + DELIVERY_BUDGET))
+    local sync_options=() attempt_number
+    attempt_number=$(field "$id" attempt)
+    if [[ $attempt_number =~ ^(0|[1-9][0-9]{0,8})$ ]] && (( attempt_number > 0 )); then sync_options=(--delete-delay); fi
     local ready=0 ready_end=$((SECONDS + 30))
     (( ready_end > end )) && ready_end=$end
     while (( SECONDS < ready_end )); do
@@ -108,7 +123,7 @@ deliver() {
         remain=$((end - SECONDS))
         connect=5; (( remain < connect )) && connect=$remain
         note "Upload $id (up to ${remain}s left)"
-        if rsync -r -t --partial --timeout="$remain" \
+        if rsync -r -t --partial "${sync_options[@]}" --timeout="$remain" \
             -e "ssh -i $INBOX_KEY -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=$connect -o StrictHostKeyChecking=accept-new" \
             -- "$out" "$INBOX_USER@$INBOX_HOST:."; then
             note "Delivered $id"
@@ -133,6 +148,13 @@ deliver_pending() {
     for path in "$STATE_ROOT"/jobs/*.record; do
         id=${path##*/}; id=${id%.record}
         valid_id "$id" || continue
+        if [[ $(field "$id" training-state) =~ ^(starting|running)$ ]]; then
+            local recovered
+            recovered=$(helper outcome "$ROOT/runs-out/$id" unknown) || recovered=failed
+            write_record "$id" pending "$(field "$id" started-at)" "$(stamp)" unknown no "$recovered"
+            helper attempt "$STATE_ROOT/jobs/$id.attempts.jsonl" "$ROOT/runs-out/$id" "$id" "$(field "$id" attempt)" end 'abrupt stop detected on next boot; time is detection time' || true
+            [[ -d "$ROOT/runs-out/$id" && -f "$STATE_ROOT/jobs/$id.attempts.jsonl" ]] && cp "$STATE_ROOT/jobs/$id.attempts.jsonl" "$ROOT/runs-out/$id/attempts.jsonl"
+        fi
         [[ $(field "$id" delivered) == yes ]] && continue
         note "Resend pending $id before new job"
         started=$(field "$id" started-at); ended=$(field "$id" ended-at); code=$(field "$id" exit-code)
@@ -153,7 +175,7 @@ if [[ $JOB_MODE == maintenance ]]; then
     exit 0
 fi
 DELIVERY_BUDGET=$RETRY_SECONDS
-if [[ $JOB_MODE != run ]]; then
+if [[ $JOB_MODE != run && $JOB_MODE != resume ]]; then
     deliver_pending
     note "Job mode $JOB_MODE: pending results sent if possible; stop"
     shutdown_vm
@@ -166,10 +188,16 @@ RUN_STARTED=0
 RUN_PID=
 MONITOR_PID=
 RUN_ENV=
+COMMIT=
+NOTEBOOK=
+ATTEMPT=0
+ENV_SHA=
+OWN_JOB=0
+RESUMING=0
 cleanup() {
     local rc=$?
     trap - EXIT
-    if (( RUN_STARTED == 0 )); then EXIT_CODE=$rc; fi
+    if (( RUN_STARTED == 0 || rc != 0 )); then EXIT_CODE=$rc; fi
     if [[ -n $RUN_PID ]] && kill -0 "$RUN_PID" 2>/dev/null; then
         kill -TERM "$RUN_PID" 2>/dev/null || true
         wait "$RUN_PID" 2>/dev/null || true
@@ -178,7 +206,7 @@ cleanup() {
         kill "$MONITOR_PID" 2>/dev/null || true
         wait "$MONITOR_PID" 2>/dev/null || true
     fi
-    if [[ -n $JOB_ID ]] && valid_id "$JOB_ID" && [[ -f "$STATE_ROOT/jobs/$JOB_ID.record" ]]; then
+    if (( OWN_JOB )) && [[ -n $JOB_ID ]] && valid_id "$JOB_ID" && [[ -f "$STATE_ROOT/jobs/$JOB_ID.record" ]]; then
         local out="$ROOT/runs-out/$JOB_ID" finished
         mkdir -p "$out"
         # Notebook 05 keeps the full cell output only in run.log. Preserve a
@@ -188,34 +216,43 @@ cleanup() {
         fi
         [[ -n $RUN_ENV && -f $RUN_ENV ]] && cp "$RUN_ENV" "$out/job.env"
         finished=$(stamp)
+        local training
+        training=$(helper outcome "$out" "$EXIT_CODE") || training=failed
+        helper attempt "$STATE_ROOT/jobs/$JOB_ID.attempts.jsonl" "$out" "$JOB_ID" "$ATTEMPT" end "$training exit=$EXIT_CODE" || true
+        [[ -f "$STATE_ROOT/jobs/$JOB_ID.attempts.jsonl" ]] && cp "$STATE_ROOT/jobs/$JOB_ID.attempts.jsonl" "$out/attempts.jsonl"
         if deliver "$JOB_ID"; then
-            write_record "$JOB_ID" delivered "$STARTED" "$finished" "$EXIT_CODE" yes
+            write_record "$JOB_ID" delivered "$STARTED" "$finished" "$EXIT_CODE" yes "$training"
         else
-            write_record "$JOB_ID" pending "$STARTED" "$finished" "$EXIT_CODE" no
+            write_record "$JOB_ID" pending "$STARTED" "$finished" "$EXIT_CODE" no "$training"
         fi
     fi
     note "Job process exit=$rc, runner exit=$EXIT_CODE"
     shutdown_vm
 }
 trap cleanup EXIT
-trap 'note "Job service received SIGTERM"; exit 143' TERM
-trap 'note "Job service received SIGINT"; exit 130' INT
+trap 'note "Job service received SIGTERM"; EXIT_CODE=143; exit 143' TERM
+trap 'note "Job service received SIGINT"; EXIT_CODE=130; exit 130' INT
 # Pending uploads are attempted even when this boot has no valid or new job-id.
 deliver_pending
 meta_value job-id ''
 JOB_ID=$META_RESULT
 if [[ -z $JOB_ID ]]; then note 'No job-id; stop'; exit 0; fi
 if ! valid_id "$JOB_ID"; then note 'Invalid job-id; stop'; JOB_ID=; exit 2; fi
-if [[ -f "$STATE_ROOT/jobs/$JOB_ID.record" ]]; then
-    note "Job-id $JOB_ID already recorded; do not run again"
-    JOB_ID=
-    exit 0
+exec 9>"$STATE_ROOT/jobs/$JOB_ID.lock"
+if ! flock -n 9; then note 'Job already locked'; JOB_ID=; exit 2; fi
+if [[ $JOB_MODE == run && -f "$STATE_ROOT/jobs/$JOB_ID.record" ]]; then
+    note "Job-id $JOB_ID already recorded; do not run again"; JOB_ID=; exit 0
 fi
+if [[ $JOB_MODE == resume && ! -f "$STATE_ROOT/jobs/$JOB_ID.record" ]]; then note 'Resume has no job record'; JOB_ID=; exit 2; fi
 STARTED=$(stamp)
-write_record "$JOB_ID" starting "$STARTED" '' '' no
+if [[ $JOB_MODE == run ]]; then
+    OWN_JOB=1
+    if ! write_record "$JOB_ID" starting "$STARTED" '' '' no starting; then OWN_JOB=0; exit 2; fi
+    if ! helper attempt "$STATE_ROOT/jobs/$JOB_ID.attempts.jsonl" "$ROOT/runs-out/$JOB_ID" "$JOB_ID" 0 start run; then exit 2; fi
+fi
 meta_value job-commit origin/yx
 COMMIT=$META_RESULT
-if ! valid_commit "$COMMIT"; then note 'Invalid commit'; exit 2; fi
+if ! valid_commit "$COMMIT"; then note 'Invalid commit'; COMMIT=; exit 2; fi
 meta_value job-timeout-min 100
 TIMEOUT_MIN=$META_RESULT
 meta_value max-run-minutes 120
@@ -225,11 +262,37 @@ if [[ ! $TIMEOUT_MIN =~ ^[0-9]+([.][0-9]+)?$ || ! $MAX_RUN_MIN =~ ^[0-9]+$ ]] ||
     note "Invalid job timeout: $TIMEOUT_MIN min; max-run=$MAX_RUN_MIN min; must be <= max-run minus 15"
     exit 2
 fi
+meta_value job-attempt 0
+ATTEMPT=$META_RESULT
+[[ $ATTEMPT =~ ^(0|[1-9][0-9]{0,8})$ ]] || { note 'Invalid attempt'; exit 2; }
+if [[ $JOB_MODE == resume ]]; then
+    RESUMING=1
+    saved_attempt=$(field "$JOB_ID" attempt)
+    if [[ $(field "$JOB_ID" job-id) != "$JOB_ID" || $(field "$JOB_ID" protocol) != resume-v1 || $(field "$JOB_ID" training-state) != interrupted \
+        || $(field "$JOB_ID" commit) != "$COMMIT" || ! $saved_attempt =~ ^(0|[1-9][0-9]{0,8})$ ]] \
+        || (( ATTEMPT != saved_attempt + 1 )); then note 'Resume record/state/commit/attempt mismatch'; JOB_ID=; exit 2; fi
+    STARTED=$(field "$JOB_ID" started-at)
+else
+    (( ATTEMPT == 0 )) || { note 'Fresh run must have attempt zero'; exit 2; }
+fi
 RUN_ENV="$STATE_ROOT/env/$JOB_ID.env"
+(( RESUMING )) && RUN_ENV="$STATE_ROOT/env/$JOB_ID-attempt-$ATTEMPT.env"
 if ! metadata job-env "$RUN_ENV"; then note 'Missing job-env metadata'; exit 2; fi
 chmod 600 "$RUN_ENV"
 # Metadata is data, never shell code. Validate against the job checkout below.
 NOTEBOOK=$(grep -m1 '^V3_NOTEBOOK=' "$RUN_ENV" | cut -d= -f2- || true)
+ENV_SHA=$(printf '%s' "$(<"$RUN_ENV")" | sha256sum | cut -d' ' -f1)
+if (( RESUMING )) && [[ $(field "$JOB_ID" notebook) != "$NOTEBOOK" || $(field "$JOB_ID" env-sha256) != "$ENV_SHA" ]]; then
+    note 'Resume notebook/settings env mismatch'; JOB_ID=; exit 2
+fi
+OWN_JOB=1
+if ! write_record "$JOB_ID" starting "$STARTED" '' '' no starting; then note 'Cannot persist attempt claim'; OWN_JOB=0; exit 2; fi
+if (( RESUMING )) && ! helper attempt "$STATE_ROOT/jobs/$JOB_ID.attempts.jsonl" "$ROOT/runs-out/$JOB_ID" "$JOB_ID" "$ATTEMPT" start "$JOB_MODE"; then
+    note 'Could not record attempt start'; exit 2
+fi
+if (( RESUMING )) && ! helper checkpoint "$ROOT/runs-out/$JOB_ID" > "$STATE_ROOT/jobs/$JOB_ID-checkpoint-in.json"; then
+    note 'Resume needs a readable full last checkpoint; refuse fresh start'; exit 2
+fi
 if [[ $MODE == production ]]; then
     if [[ -n $(git status --porcelain) ]]; then note 'Dirty checkout; refuse git checkout'; exit 2; fi
     # The bootstrap has normally done this already. Bash reads a script while it runs,
@@ -261,12 +324,13 @@ if [[ $MODE == test ]]; then
 else
     runner=(env CVDL_EXPECTED_PROFILE=g4 "$ROOT/.venv/bin/python" scripts/run_notebook.py --notebook "$NOTEBOOK" --env-file "$RUN_ENV" --output "runs-out/$JOB_ID" --host-monitor on)
 fi
-write_record "$JOB_ID" running "$STARTED" '' '' no
+if (( RESUMING )); then runner+=(--resume); fi
+if ! write_record "$JOB_ID" running "$STARTED" '' '' no running; then note 'Cannot persist running state'; exit 2; fi
 RUN_STARTED=1
 if [[ $MODE == test ]]; then
-    "${runner[@]}" > "$STATE_ROOT/logs/$JOB_ID-run.log" 2>&1 &
+    "${runner[@]}" >> "$STATE_ROOT/logs/$JOB_ID-run.log" 2>&1 &
 else
-    timeout --signal=TERM --kill-after=30s "${TIMEOUT_MIN}m" "${runner[@]}" > "$STATE_ROOT/logs/$JOB_ID-run.log" 2>&1 &
+    timeout --signal=TERM --kill-after=30s "${TIMEOUT_MIN}m" "${runner[@]}" >> "$STATE_ROOT/logs/$JOB_ID-run.log" 2>&1 &
 fi
 RUN_PID=$!
 # Do not put telemetry in the runner folder until it has started: it must be empty.
