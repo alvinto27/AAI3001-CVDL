@@ -204,6 +204,12 @@ class PairedTrainingTests(unittest.TestCase):
             new=json.loads((ROOT/f'notebooks/experiments/{base}-paired.ipynb').read_text())
             expected=json.loads(json.dumps(old));src=expected['cells'][1]['source'];i=src.index(f'    name="{base}",\n')
             src[i:i+1]=[f'    name="{base}-paired",\n','    paired_batches=True,\n']
+            if base=='srm-cell-aux':
+                prior=top_values(old)
+                for key,value in (
+                    ('init_checkpoint','runs-out/srm-e50-paired-20261023T022339Z-4518/checkpoints/srm-e50-paired-20261023T022339Z-4518/best-epoch39-val_pe0.0444-val_auc0.9917.ckpt'),
+                    ('init_checkpoint_sha256','b00cd4b6d1f4c3648580691c9cf0e2a4bd83c55740a3cf2a7a561a8adf12f180')):
+                    src[src.index(f'    {key}={prior[key]!r},\n')]=f'    {key}={value!r},\n'
             self.assertEqual(new,expected)
             s=load(environ={},_profile=machine_profile('g4',device='cpu'),**top_values(new))
             self.assertTrue(s.paired_batches);self.assertEqual(s.batch_size,128);self.assertEqual(s.tiles_per_epoch,180000)
