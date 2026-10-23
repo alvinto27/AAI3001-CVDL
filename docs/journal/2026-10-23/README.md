@@ -66,3 +66,19 @@
 - R2 fails its localization rule but has the lowest standard P_E so far (2.43%) with the same heatmap quality as run 13. Pending (user): switch the submission model to R2 or keep run 13.
 - User: keep R2 in mind as the submission model (no switch yet). Approved run 18: a cell fine-tune from the Curriculum50 paired best, otherwise exactly R2; frozen rule `paired_r2` with R2 as the reference. Not chosen: a 50-epoch curriculum with the cell head from scratch (several differences at once).
 - Run 18 `srm-cell-aux-curriculum50-paired-20261023T133537Z-1366` (`a7dfdaa`; starts from Curriculum50 best, epoch 40 one-based): 8 stockouts, then 13:37:14-14:25:42Z, 48.5 min, exit 0. **Bug in `58aa081`:** `last.ckpt`, the best checkpoint and `attempts.jsonl` reached the Pi as mode 600 (`tempfile.mkstemp`; `os.replace` keeps the mode), so `rpi400` could not read them; the user ran `sudo find ... -perm 600 -exec chmod 644` for this job. Copied, Pi = PC SHA. Worker_2: permission fix, then the run 18 evaluation. No G4 launch until the fix is in place.
+- Worker_2: permission fix `bf84b6c` (shared same-folder exclusive temporary file created with mode 0666 so the umask applies; checkpoint and attempt writers use it; the public `attempts.jsonl` copy replaces a stale mode-600 file). FULL 463 pass. No maintenance boot needed: the next run refreshes `job_run.last-good` from its pinned checkout.
+- Run 18 evaluation `b3d9a49137b5dbd7bd5a` (last = best, epoch 15; own `60da` cutoff .5094):
+
+| Measure | Run 13 | R2 | Run 18 |
+| --- | ---: | ---: | ---: |
+| Standard-256 P_E % | 2.97 | **2.43** | 2.62 |
+| ALASKA seen / unseen / LSDIR P_E % | 18.95 / 16.21 / 9.26 | 19.10 / 15.83 / 9.08 | 18.82 / 15.85 / 9.16 |
+| Hard k=1 low AUC | .7513 | .7505 | .7509 |
+| Cell head, mean per-tile AUC | .8629 | .8597 | **.8669** |
+| Cell recall / FA at own 5% cutoff | 15.9% / 3.8% | 16.9% / 4.8% | 16.1% / 4.2% |
+
+- Frozen rule `paired_r2` vs R2: cell +.007 [-.002, +.016] (needs +.02, lower bound > 0): FAIL; standard +.19 points [-.06, +.42] (upper bound above +.25): FAIL; hard and cell FA guards pass. **Final: FAIL.** The curriculum start gives a slightly better heatmap but a slightly worse standard score; neither difference is established.
+
+### Decided
+
+- No new submission model from today by the frozen rules. R2 (standard 2.43%, heatmap .860) and run 13 (submission, 2.97%, .863) stay the two candidates; the user keeps R2 in mind.
