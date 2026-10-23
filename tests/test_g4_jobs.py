@@ -101,7 +101,7 @@ class SubmissionTests(unittest.TestCase):
         cls.temp=tempfile.TemporaryDirectory(prefix='cvdl-g4-tests-')
         parent=Path(cls.temp.name);cls.root=parent/'repo';cls.root.mkdir()
         paths=git(ROOT,'ls-files').splitlines()+[
-            'scripts/g4/preflight.py','scripts/g4/resume.py','cvdl/checkpoint_io.py','notebooks/newdata-1.ipynb','notebooks/wide-1.ipynb',
+            'scripts/g4/preflight.py','scripts/g4/resume.py','cvdl/checkpoint_io.py','cvdl/file_io.py','notebooks/newdata-1.ipynb','notebooks/wide-1.ipynb',
             'scripts/g4/jobs/archive/newdata-1.env','scripts/g4/jobs/archive/wide-1.env',
             'scripts/g4/jobs/archive/README.md']
         copied=[]

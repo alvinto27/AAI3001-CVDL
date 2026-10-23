@@ -8,7 +8,9 @@ import os
 from pathlib import Path
 import re
 import sys
-import tempfile
+
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
+from cvdl.file_io import default_mode_temp
 
 PROTOCOL='resume-v1'
 
@@ -66,7 +68,7 @@ def outcome(output,code):
 
 def atomic_text(path,text):
     path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
-    fd,name=tempfile.mkstemp(dir=path.parent,prefix='.'+path.name+'.')
+    fd,name=default_mode_temp(path)
     try:
         with os.fdopen(fd,'w') as f:f.write(text);f.flush();os.fsync(f.fileno())
         os.replace(name,path)

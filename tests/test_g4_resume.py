@@ -44,6 +44,48 @@ class CheckpointTests(unittest.TestCase):
             self.assertEqual(events,['file','replace','folder']*2)
             self.assertEqual(sorted(p.name for p in Path(folder).iterdir()),['best-epoch00.ckpt','last.ckpt'])
 
+    def test_checkpoint_record_and_attempt_modes_follow_umask_on_create_and_replace(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for mask in (0o022,0o027,0o077):
+                with self.subTest(umask=oct(mask)):
+                    root=Path(folder)/str(mask);out=root/'out'
+                    paths=[out/'checkpoints/job/best-epoch00.ckpt',out/'checkpoints/job/last.ckpt',root/'job.record',root/'job.attempts.jsonl']
+                    previous=os.umask(mask)
+                    try:
+                        for generation,event in enumerate(('start','end')):
+                            if generation:
+                                for path in paths:path.chmod(0o600)
+                            for path in paths[:2]:checkpoint(path)
+                            resume.atomic_text(paths[2],f'generation={generation}\n')
+                            resume.attempt(paths[3],out,'job',0,event,'mode test')
+                            for path in paths:self.assertEqual(stat.S_IMODE(path.stat().st_mode),0o666&~mask,str(path))
+                            self.assertEqual(os.umask(mask),mask)  # Writers must not mutate global umask.
+                    finally:os.umask(previous)
+
+    def test_atomic_text_keeps_file_replace_folder_durability_and_failure_cleanup(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'job.attempts.jsonl';events=[];real_sync=os.fsync;real_replace=os.replace
+            def sync(fd):
+                events.append('folder' if stat.S_ISDIR(os.fstat(fd).st_mode) else 'file');return real_sync(fd)
+            def replace(source,target):
+                self.assertEqual(Path(source).parent,Path(target).parent)
+                events.append('replace');return real_replace(source,target)
+            with patch('scripts.g4.resume.os.fsync',side_effect=sync),patch('scripts.g4.resume.os.replace',side_effect=replace):
+                resume.atomic_text(path,'old\n')
+            self.assertEqual(events,['file','replace','folder'])
+            for operation in ('os.fsync','os.replace'):
+                with patch('scripts.g4.resume.'+operation,side_effect=OSError('interrupted')):
+                    with self.assertRaises(OSError):resume.atomic_text(path,'new\n')
+                self.assertEqual(path.read_text(),'old\n');self.assertEqual(list(path.parent.iterdir()),[path])
+
+    def test_default_mode_temp_collision_never_clobbers_existing_file(self):
+        from cvdl.file_io import default_mode_temp
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'last.ckpt';existing=path.parent/('.last.ckpt.'+'a'*32+'.tmp');existing.write_text('keep')
+            with patch('cvdl.file_io.secrets.token_hex',side_effect=['a'*32,'b'*32]):fd,name=default_mode_temp(path)
+            os.close(fd);Path(name).unlink()
+            self.assertEqual(existing.read_text(),'keep')
+
     def test_failed_serialization_or_replace_preserves_old_checkpoint_and_cleans_temp(self):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/'last.ckpt';checkpoint(path);before=path.read_bytes()
@@ -151,8 +193,13 @@ else:
             cwd=self.root,env={**self.env,'G4_REPO_ROOT':str(self.root),'G4_STATE_ROOT':str(f.area),'MOCK_RUN_EXIT':str(code)},text=True,capture_output=True,timeout=45)
 
     def test_authorized_resume_same_output_and_counter_prevents_repeat_after_reboot(self):
-        f=self.prepare();done=self.boot(f,143)
+        f=self.prepare();public=f.output/'attempts.jsonl';public.write_text('stale');public.chmod(0o600)
+        previous=os.umask(0o022)
+        try:done=self.boot(f,143)
+        finally:os.umask(previous)
         self.assertEqual(done.returncode,143,done.stdout+done.stderr)
+        self.assertEqual(stat.S_IMODE(public.stat().st_mode),0o644)
+        self.assertEqual(stat.S_IMODE((f.record.parent/(f.job+'.attempts.jsonl')).stat().st_mode),0o644)
         self.assertIn('--resume',self.marker.read_text());self.assertIn('runs-out/'+f.job,self.marker.read_text())
         self.assertEqual((f.output/'run.log').read_text(),'ORIGINAL\nMOCK RUN\n')
         self.assertIn('attempt=1',f.record.read_text());self.assertIn('training-state=interrupted',f.record.read_text())

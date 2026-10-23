@@ -153,7 +153,7 @@ deliver_pending() {
             recovered=$(helper outcome "$ROOT/runs-out/$id" unknown) || recovered=failed
             write_record "$id" pending "$(field "$id" started-at)" "$(stamp)" unknown no "$recovered"
             helper attempt "$STATE_ROOT/jobs/$id.attempts.jsonl" "$ROOT/runs-out/$id" "$id" "$(field "$id" attempt)" end 'abrupt stop detected on next boot; time is detection time' || true
-            [[ -d "$ROOT/runs-out/$id" && -f "$STATE_ROOT/jobs/$id.attempts.jsonl" ]] && cp "$STATE_ROOT/jobs/$id.attempts.jsonl" "$ROOT/runs-out/$id/attempts.jsonl"
+            [[ -d "$ROOT/runs-out/$id" && -f "$STATE_ROOT/jobs/$id.attempts.jsonl" ]] && cp --remove-destination "$STATE_ROOT/jobs/$id.attempts.jsonl" "$ROOT/runs-out/$id/attempts.jsonl"
         fi
         [[ $(field "$id" delivered) == yes ]] && continue
         note "Resend pending $id before new job"
@@ -219,7 +219,7 @@ cleanup() {
         local training
         training=$(helper outcome "$out" "$EXIT_CODE") || training=failed
         helper attempt "$STATE_ROOT/jobs/$JOB_ID.attempts.jsonl" "$out" "$JOB_ID" "$ATTEMPT" end "$training exit=$EXIT_CODE" || true
-        [[ -f "$STATE_ROOT/jobs/$JOB_ID.attempts.jsonl" ]] && cp "$STATE_ROOT/jobs/$JOB_ID.attempts.jsonl" "$out/attempts.jsonl"
+        [[ -f "$STATE_ROOT/jobs/$JOB_ID.attempts.jsonl" ]] && cp --remove-destination "$STATE_ROOT/jobs/$JOB_ID.attempts.jsonl" "$out/attempts.jsonl"
         if deliver "$JOB_ID"; then
             write_record "$JOB_ID" delivered "$STARTED" "$finished" "$EXIT_CODE" yes "$training"
         else

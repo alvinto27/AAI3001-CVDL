@@ -1,8 +1,8 @@
 """Durable local checkpoint replacement shared by every Trainer checkpoint save."""
 import os
 from pathlib import Path
-import tempfile
 import torch
+from .file_io import default_mode_temp
 from lightning.fabric.plugins.io import TorchCheckpointIO
 
 
@@ -13,7 +13,7 @@ class DurableCheckpointIO(TorchCheckpointIO):
         if '://' in str(path):
             raise ValueError('durable checkpoints require a local path')
         path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
-        fd,name=tempfile.mkstemp(prefix='.'+path.name+'.',suffix='.tmp',dir=path.parent)
+        fd,name=default_mode_temp(path)
         try:
             with os.fdopen(fd,'wb') as stream:
                 torch.save(checkpoint,stream)
