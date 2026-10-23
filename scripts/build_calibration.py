@@ -15,7 +15,8 @@ MIX='xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_mi
 RUNS=(WIDE,MIX,'tiling-overlap-20261016T135926Z-8501','tiling-trim-20261016T144117Z-3222',
  'tiling-pad-20261017T013055Z-7210','tiling-overlap-256-20261017T022212Z-9778',
  'tiling-trim-256-20261017T032025Z-8579','tiling-pad-256-20261017T043145Z-9721',
- 'srm-20261017T052857Z-4521','srm-e50-20261017T111310Z-0214')
+ 'srm-20261017T052857Z-4521','srm-e50-20261017T111310Z-0214',
+ 'srm-e50-paired-20261023T022339Z-4518')
 
 
 def build(root=ROOT):
@@ -61,7 +62,7 @@ def build(root=ROOT):
         entries.append(dict(run_name=run,checkpoint_file=checkpoint.name,checkpoint_sha256=V.digest(checkpoint.read_bytes()),
             recipe_id=list_id,recipe_sha256=pinned['recipe_sha256'],pairs_sha256=pinned['pairs_sha256'],
             threshold_origin='post_hoc_256'))
-    if len({r['checkpoint_sha256'] for r in entries})!=10:raise ValueError('duplicate checkpoint mapping')
+    if len({r['checkpoint_sha256'] for r in entries})!=len(RUNS):raise ValueError('duplicate checkpoint mapping')
     mapping=V.canonical(dict(version='evaluation-calibration-v1',entries=entries))+'\n'
     outputs[root/'configs/evaluation-calibration-v1.json']=mapping
     return outputs,dict(recipe_id=rid,summary=summary,training_counts=counts,mapping_sha256=V.digest(mapping.encode()),entries=entries)
