@@ -28,3 +28,5 @@
 ### Decided
 
 - By the frozen rule: R2 starts from R1 best (`b00cd4b6...f180`); the curriculum run uses the paired variant (run queue 16, 17).
+- Worker_2: `59f0566` R2 notebook starts from R1 best (path on the VM `runs-out/...`, SHA `b00cd4b6...f180`), test expectation updated for exactly these two values; FULL 446 pass at `59f0566` (run in parallel with the launch; notebook-only change).
+- R2 `srm-cell-aux-paired-20261023T054148Z-4299`: 05:43:44-06:32:16Z, 48.5 min, exit 0; start checkpoint found and SHA verified on the VM. Evaluation next (Worker_2). Curriculum50 paired (row 17, `77f0ecd`) handed to Run_Supervisor.
