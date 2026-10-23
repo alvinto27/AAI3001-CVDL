@@ -41,3 +41,5 @@
 | Cell recall / FA at own 5% validation cutoff (all placements) | 15.9% / 3.8% | 16.9% / 4.8% | context |
 
 - Frozen rule `paired_r2`: head gain +.02 FAIL, lower bound > 0 FAIL; standard guard, hard guard, cell FA <= 7% pass. **Final: FAIL** (no localization gain). The standard tile score improved clearly; R2's standard P_E (2.43%) is also below SRM-e50's 2.54% (not a frozen comparison).
+- Curriculum50 paired preempted (spot) at 08:26:10Z, about epoch 37 of 50; nothing delivered; fresh relaunch 1 of 3 (same commit and command). About 105 min / $2.9 lost.
+- Orchestrator error found: G4 resume had been shelved together with arm G (2026-10-22), although it is not GBRAS-specific. User: restore it as ideas #19; Worker_2 read-only plan.
