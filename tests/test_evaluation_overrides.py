@@ -37,6 +37,30 @@ class EvaluationOverrideTests(unittest.TestCase):
         self.assertEqual(self.saved.read_bytes(),self.original)
         self.assertIsNone(snapshot)
 
+    def test_curriculum50_evaluation_batch_does_not_relax_training_guard(self):
+        from cvdl.settings import load
+        from scripts.g4.preflight import top_values
+        notebook=json.loads((er.ROOT/'notebooks/experiments/srm-e50-curriculum50.ipynb').read_text())
+        for paired in (False,True):
+            values=top_values(notebook);values['paired_batches']=paired
+            training=load(environ={},_profile=machine_profile('pc',root=er.ROOT),**values)
+            self.saved.write_text(json.dumps(dict(values=plain(training.values))))
+            before=self.saved.read_bytes()
+            settings,context,_=self.resolve(('eval_batch_size=32',))
+            self.assertEqual(settings.batch_size,32)
+            self.assertEqual(settings.embedding_schedule,'low_bpp50_v1')
+            self.assertEqual(settings.paired_batches,paired)
+            self.assertEqual(settings.epochs,50)
+            self.assertEqual(settings.lr_drops,((8,.3),(33,.1)))
+            self.assertEqual(settings.checkpoint_validation,'capped')
+            self.assertEqual(context['evaluation_overrides'][0]['value'],32)
+            self.assertIn('override',settings.provenance['batch_size'])
+            self.assertEqual(self.saved.read_bytes(),before)
+            self.assertEqual(er.settings_for_run(self.folder).batch_size,128)
+            values['batch_size']=32
+            with self.assertRaisesRegex(ValueError,'batch128'):
+                load(environ={},_profile=machine_profile('pc',root=er.ROOT),**values)
+
     def test_forbidden_model_data_and_identity_keys_fail(self):
         for key in ('model','width','norm','clip_t','front_end','source_mix','tiles_per_epoch','seed',
                     'run_seed','tile_size','train_grid','sources','evaluation_yaml','quick','workers','root'):

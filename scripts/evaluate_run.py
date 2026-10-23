@@ -114,7 +114,18 @@ def settings_for_run(folder, *, eval_overrides=()):
         overrides=dict(quick=record['quick'])
     experiment['train_yaml']=portable_config(experiment.get('train_yaml'))
     overrides.update(evaluation_override_values(eval_overrides))
-    return load(environ={},_profile=profile,overrides=overrides,**experiment)
+    # Resolve/validate the original training recipe FIRST. The fixed scratch
+    # curriculum intentionally refuses non-128 training batches; an evaluation
+    # batch is not a training-recipe change. Never relax its settings guard.
+    evaluation_batch=(overrides.pop('batch_size',None)
+                      if experiment.get('embedding_schedule')=='low_bpp50_v1' else None)
+    settings=load(environ={},_profile=profile,overrides=overrides,**experiment)
+    if evaluation_batch is None:return settings
+    from dataclasses import replace
+    from cvdl.settings import freeze
+    return replace(settings,values=freeze(dict(settings.values,batch_size=evaluation_batch)),
+        provenance=freeze(dict(settings.provenance,batch_size='override: evaluation only')),
+        overrides=freeze((*settings.overrides,dict(name='batch_size',value=evaluation_batch))))
 
 
 # These are exactly the architecture choices read by model_from_hparams.
