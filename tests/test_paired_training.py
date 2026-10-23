@@ -222,6 +222,59 @@ class PairedTrainingTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'paired mode needs original'):load(environ={},_profile=machine_profile('pc',device='cpu'),**bad)
             else:self.assertEqual((s.epochs,s.checkpoint_validation,getattr(s,'evaluation_checkpoint','best')),(50,'capped','best'))
 
+    def test_curriculum50_cell_notebook_only_name_pairing_and_initializer_differ(self):
+        from scripts.g4.preflight import top_values
+        name='srm-cell-aux-curriculum50-paired'
+        old=json.loads((ROOT/'notebooks/experiments/srm-cell-aux.ipynb').read_text())
+        new=json.loads((ROOT/f'notebooks/experiments/{name}.ipynb').read_text())
+        paired=json.loads((ROOT/'notebooks/experiments/srm-cell-aux-paired.ipynb').read_text())
+        checkpoint='runs-out/srm-e50-curriculum50-paired-20261023T090435Z-3325/checkpoints/srm-e50-curriculum50-paired-20261023T090435Z-3325/best-epoch39-val_pe0.0419-val_auc0.9922.ckpt'
+        sha='14c8e05c3d476912dd5540970060d3634b3a72b7d375ba5dad5ccafd50905c3a'
+        for reference,add_pairing in ((old,True),(paired,False)):
+            expected=json.loads(json.dumps(reference));src=expected['cells'][1]['source'];prior=top_values(reference)
+            i=src.index(f'    name="{prior["name"]}",\n')
+            src[i:i+1]=[f'    name="{name}",\n']+(['    paired_batches=True,\n'] if add_pairing else [])
+            for key,value in (('init_checkpoint',checkpoint),('init_checkpoint_sha256',sha)):
+                src[src.index(f'    {key}={prior[key]!r},\n')]=f'    {key}={value!r},\n'
+            self.assertEqual(new,expected)  # Every cell, output and metadata field remains strict.
+        for values in (top_values(paired),top_values(new)):
+            p=Path(values['init_checkpoint']).parts
+            self.assertEqual((p[0],p[2]),('runs-out','checkpoints'));self.assertEqual(p[1],p[3]);self.assertEqual(len(p),5)
+        s=load(environ={},_profile=machine_profile('g4',device='cpu'),**top_values(new))
+        self.assertTrue(s.paired_batches)
+        self.assertEqual((s.embedding_schedule,s.embedding_stage_epochs),('original',5))
+        self.assertEqual((s.epochs,s.lr,s.lr_drops,s.evaluation_checkpoint),(15,3e-5,(),'last'))
+        self.assertEqual((s.batch_size,s.tiles_per_epoch,s.cell_supervision,s.cell_loss_weight),(128,180000,'changed_cells_v1',.2))
+        self.assertEqual((s.validation_recipe,s.checkpoint_validation),('60da4391043e8ce48ff2','train_matched'))
+
+    def test_curriculum50_source_is_weights_only_into_original_schedule_fresh_head(self):
+        from cvdl.curriculum import initialize,check_start,scratch50_record,stage_for_epoch
+        from scripts.g4.preflight import top_values
+        with TemporaryDirectory() as folder:
+            source=SteganalysisModule(**{k:v for k,v in ENABLED.items() if k!='cell_supervision'},paired_batches=True)
+            source.hparams['embedding_schedule_identity']=scratch50_record(180000)
+            target=SteganalysisModule(**ENABLED,paired_batches=True,lr=3e-5,max_epochs=15,lr_drops=())
+            path=Path(folder)/'curriculum.ckpt'
+            torch.save(dict(state_dict=source.state_dict(),hyper_parameters=dict(source.hparams),epoch=39,global_step=112520,
+                optimizer_states=[{'must_not_restore':True}],lr_schedulers=[{'last_epoch':112520}]),path)
+            values=top_values(json.loads((ROOT/'notebooks/experiments/srm-cell-aux-curriculum50-paired.ipynb').read_text()))
+            values.update(init_checkpoint=str(path),init_checkpoint_sha256=hashlib.sha256(path.read_bytes()).hexdigest())
+            s=load(environ={},_profile=machine_profile('pc',device='cpu'),**values)
+            run=Path(folder)/'fine-tune';run.mkdir()
+            self.assertFalse(check_start(s,run))
+            head={k:v.clone() for k,v in target.net.cell_head.state_dict().items()}
+            record=initialize(s,target,run,False)
+            self.assertEqual((record['weights_only'],record['optimizer_restored'],record['scheduler_restored'],record['source_epoch']),(True,False,False,39))
+            self.assertEqual(record['settings']['embedding_schedule'],'original')
+            self.assertNotIn('embedding_schedule_identity',record['settings'])
+            self.assertNotIn('embedding_schedule_identity',target.hparams)
+            for key,value in source.net.state_dict().items():self.assertTrue(torch.equal(value,target.net.state_dict()[key]),key)
+            for key,value in head.items():self.assertTrue(torch.equal(value,target.net.cell_head.state_dict()[key]),key)
+            optim=target.configure_optimizers()
+            self.assertEqual(len(optim['optimizer'].state),0)
+            self.assertEqual(optim['lr_scheduler']['scheduler'].last_epoch,0)
+            self.assertEqual(stage_for_epoch(14,5,s.embedding_schedule)['original_fraction'],1.)
+
     def test_paired_source_weights_only_fresh_head_and_strict_compile_reload(self):
         with TemporaryDirectory() as folder:
             source=SteganalysisModule(**{k:v for k,v in ENABLED.items() if k!='cell_supervision'},paired_batches=True)
