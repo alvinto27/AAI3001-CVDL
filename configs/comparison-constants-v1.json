@@ -169,7 +169,7 @@
     "train_matched_version": "train-matched-val-v1",
     "train_matched_rounding": "total=round_half_up(train_pairs/10); source=largest_remainder(normalized_mix), ties=source_name",
     "deployment_policy": "validation-min-pe-v1/atol1e-12/min-fa/first-ascending/float64-ge",
-    "calibration_mapping_sha256": "c18819d14dabccab67136ef702063d2d3a338b369b459ae77e095f8f436ecf3a",
+    "calibration_mapping_sha256": "14f2674478b765f957f6bd7e6b9843201229e4a9adfdd06776b456e9647a5275",
     "hard_version": "hard-test-256-v1",
     "hard_ks": [
       1,
@@ -220,7 +220,7 @@
       "data/div2k/split_seed0.csv": "2a19c117b33f0d053f24e77366c340e4920aa8d1d6f9644d6f3d09ec2d1fd3f8",
       "data/lsdir/split.csv": "c0a6a2d759b3d5c646300d9f34e985fb949b2382c714e6d34dc5636e1353709a",
       "data/raise/split_seed0.csv": "3871ea9a1cd1973bed9902ae80b2bf3d25f9a0f1d6a45167b89a3f59cc28f38f",
-      "configs/evaluation-calibration-v1.json": "c18819d14dabccab67136ef702063d2d3a338b369b459ae77e095f8f436ecf3a"
+      "configs/evaluation-calibration-v1.json": "14f2674478b765f957f6bd7e6b9843201229e4a9adfdd06776b456e9647a5275"
     },
     "json_fields": {
       "data/test/standard-256-v1/summary.json": {

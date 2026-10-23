@@ -89,13 +89,25 @@ class CalibrationTests(unittest.TestCase):
             self.assertTrue(pd.read_csv(Path(t)/'reference.csv').empty)
 
     def test_mapping_is_pinned_and_exact_roster(self):
-        entries=C.mapping(ROOT);self.assertEqual(len(entries),11)
-        self.assertEqual(sum(e['recipe_id']=='60da4391043e8ce48ff2' for e in entries.values()),10)
+        entries=C.mapping(ROOT);self.assertEqual(len(entries),12)
+        self.assertEqual(sum(e['recipe_id']=='60da4391043e8ce48ff2' for e in entries.values()),11)
+        # Removing only the appended entry must reproduce all old eleven bytes.
+        raw=(ROOT/C.MAPPING).read_bytes()
+        old=json.loads(raw);appended=old['entries'].pop()
+        old_raw=(V.canonical(old)+'\n').encode()
+        self.assertEqual(V.digest(old_raw),'c18819d14dabccab67136ef702063d2d3a338b369b459ae77e095f8f436ecf3a')
+        prefix=old_raw[:old_raw.index(b'],"version"')]
+        self.assertEqual(raw[:len(prefix)],prefix)
+        self.assertEqual(appended['checkpoint_sha256'],'14c8e05c3d476912dd5540970060d3634b3a72b7d375ba5dad5ccafd50905c3a')
         baseline=entries['bf64848a49bdc6e20b7fcdba47cb8eee0ed247b909a928cc45e4a4102db9f076']
         paired=entries['b00cd4b6d1f4c3648580691c9cf0e2a4bd83c55740a3cf2a7a561a8adf12f180']
         self.assertEqual(paired,dict(baseline,run_name='srm-e50-paired-20261023T022339Z-4518',
             checkpoint_file='best-epoch39-val_pe0.0444-val_auc0.9917.ckpt',
             checkpoint_sha256='b00cd4b6d1f4c3648580691c9cf0e2a4bd83c55740a3cf2a7a561a8adf12f180'))
+        curriculum=entries['14c8e05c3d476912dd5540970060d3634b3a72b7d375ba5dad5ccafd50905c3a']
+        self.assertEqual(curriculum,dict(baseline,run_name='srm-e50-curriculum50-paired-20261023T090435Z-3325',
+            checkpoint_file='best-epoch39-val_pe0.0419-val_auc0.9922.ckpt',
+            checkpoint_sha256='14c8e05c3d476912dd5540970060d3634b3a72b7d375ba5dad5ccafd50905c3a'))
         with tempfile.TemporaryDirectory() as t:
             p=Path(t)/C.MAPPING;p.parent.mkdir();p.write_bytes((ROOT/C.MAPPING).read_bytes()+b' ')
             with self.assertRaisesRegex(ValueError,'mapping SHA'):C.mapping(t)
