@@ -30,3 +30,14 @@
 - By the frozen rule: R2 starts from R1 best (`b00cd4b6...f180`); the curriculum run uses the paired variant (run queue 16, 17).
 - Worker_2: `59f0566` R2 notebook starts from R1 best (path on the VM `runs-out/...`, SHA `b00cd4b6...f180`), test expectation updated for exactly these two values; FULL 446 pass at `59f0566` (run in parallel with the launch; notebook-only change).
 - R2 `srm-cell-aux-paired-20261023T054148Z-4299`: 05:43:44-06:32:16Z, 48.5 min, exit 0; start checkpoint found and SHA verified on the VM. Evaluation next (Worker_2). Curriculum50 paired (row 17, `77f0ecd`) handed to Run_Supervisor.
+- R2 evaluation `4e5d3592a9f84387cc51` (last, SHA checked; own `60da` cutoff .4527):
+
+| Measure | Run 13 (last) | R2 (last) | Δ [95%] |
+| --- | ---: | ---: | --- |
+| Standard-256 P_E % | 2.97 | **2.43** | -0.53 points [-0.84, -0.22] |
+| ALASKA seen / unseen / LSDIR P_E % | 18.95 / 16.21 / 9.26 | 19.10 / 15.83 / 9.08 | context |
+| Hard k=1 low AUC | .7513 | .7505 | -.001 [-.006, +.004] |
+| Cell head, mean per-eligible-stego-tile AUC (128 tiles) | .8629 | .8597 | -.003 [-.015, +.009] |
+| Cell recall / FA at own 5% validation cutoff (all placements) | 15.9% / 3.8% | 16.9% / 4.8% | context |
+
+- Frozen rule `paired_r2`: head gain +.02 FAIL, lower bound > 0 FAIL; standard guard, hard guard, cell FA <= 7% pass. **Final: FAIL** (no localization gain). The standard tile score improved clearly; R2's standard P_E (2.43%) is also below SRM-e50's 2.54% (not a frozen comparison).
