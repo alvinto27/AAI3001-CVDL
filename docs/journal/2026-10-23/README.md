@@ -82,3 +82,21 @@
 ### Decided
 
 - No new submission model from today by the frozen rules. R2 (standard 2.43%, heatmap .860) and run 13 (submission, 2.97%, .863) stay the two candidates; the user keeps R2 in mind.
+
+## Day summary
+
+| Run | Job | Started from | Frozen rule | Result | Key numbers |
+| --- | --- | --- | --- | --- | --- |
+| 15, R1 | `srm-e50-paired-20261023T022339Z-4518` | scratch | `paired_r1` vs SRM-e50 | **PASS** (route b) | hard k=1 low AUC .7450 -> .7574 (+.012 [+.008, +.017]); standard 2.54 -> 2.55% |
+| 16, R2 | `srm-cell-aux-paired-20261023T054148Z-4299` | R1 best | `paired_r2` vs run 13 | FAIL (no heatmap gain) | heatmap .863 -> .860; **standard 2.97 -> 2.43%** (-0.53 [-0.84, -0.22]) |
+| 17, Curriculum50 paired | `srm-e50-curriculum50-paired-20261023T090435Z-3325` | scratch | `curriculum50` vs R1 | FAIL | hard .7574 -> .7568 (-.0006 [-.0056, +.0043]); standard 2.57% |
+| 18, cell from Curriculum50 | `srm-cell-aux-curriculum50-paired-20261023T133537Z-1366` | Curriculum50 best | `paired_r2` vs R2 | FAIL | heatmap .860 -> .867 (+.007 [-.002, +.016]); standard 2.43 -> 2.62% (+.19 [-.06, +.42]) |
+
+- Lessons: pairing helps the hard cases at no cost (use it for future SRM training); a curriculum on top of pairing adds nothing; the heatmap quality stays at about .86-.87 whatever the start checkpoint.
+- G4 spend today about $14.3: R1 $4.2, R2 $1.3, Curriculum50 preempted attempt $2.9 + relaunch $4.3, run 18 $1.3, maintenance boot $0.1. Many stockouts in the evening (3 + 4 + 8 attempts).
+- Tooling: `scripts/training_decision.py` (`781a9bf`); calibration mapping entries for R1 (`cbc124e`) and Curriculum50 (`3aefd40`); slim G4 resume (`58aa081`, installed on the VM) with the permission fix (`bf84b6c`). FULL 463 pass.
+
+### Next
+
+- **Pending (user, 2026-10-24): the submission model.** Candidates: run 13 (current; standard 2.97%, heatmap .863), **R2** (standard 2.43%, heatmap .860), run 18 (standard 2.62%, heatmap .867, not established). A switch needs the photo-verdict rule (c) re-fit on the new model and a new deploy bundle on `pipeline` (about 1 h of worker time, no G4).
+- Later: the Pi watchdog (plan-gbras-speed section 6); the first real use of `submit.sh resume`; the noisy-camera false alarms (ALASKA seen noisy about 32-37%).
