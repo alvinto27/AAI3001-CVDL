@@ -82,9 +82,23 @@ def selection(*,tile_cutoff=TILE_CUTOFF,head_cutoff=HEAD_CUTOFF):
         config_sha256=hashlib.sha256((ROOT/'configs/train-k1to4.yaml').read_bytes()).hexdigest(), photos=photos)
 
 
+def file_hash(path):
+    """Hash source files without importing the deployment package."""
+    with Path(path).open('rb') as stream:
+        return hashlib.file_digest(stream,'sha256').hexdigest()
+
+
+def cutoff_sources(run,evaluation_id,cell_summary):
+    calibration=Path(run)/'evaluation/standard-256-v1'/evaluation_id/'validation/calibration.json'
+    sources={name:dict(path=str(path),sha256=file_hash(path)) for name,path in
+        (('tile_calibration',calibration),('cell_summary',Path(cell_summary)))}
+    sources['tile_threshold_id']=json.loads(calibration.read_text())['threshold_id']
+    return sources
+
+
 def collection_inputs(run,evaluation_id,cell_summary,map_kind,checkpoint=None):
     """Resolve model-specific validation thresholds before collecting any scores."""
-    from cvdl.pipeline.bundle import file_hash
+    if map_kind not in ('trained_head','cam'):raise ValueError('unsupported map kind')
     run=Path(run)
     calibration=json.loads((run/'evaluation/standard-256-v1'/evaluation_id/'validation/calibration.json').read_text())
     if calibration['quick'] or not calibration['deployment'] or calibration['geometry']!={'grid':'overlap_last','tile_size':256}:
@@ -95,14 +109,23 @@ def collection_inputs(run,evaluation_id,cell_summary,map_kind,checkpoint=None):
         checkpoint=matches[0]
     if file_hash(checkpoint)!=calibration['checkpoint_sha256']:raise ValueError('checkpoint/calibration mismatch')
     cells=json.loads(Path(cell_summary).read_text())
-    tile=calibration['cutoff'];head=cells['maps']['aux' if map_kind=='trained_head' else 'cam']['cutoff']
+    cell=cells['maps']['aux' if map_kind=='trained_head' else 'cam']
+    # Keep native cutoff-only summaries supported; validate any supplied counts.
+    if ('validation_FA' in cell or 'validation_negative_cells' in cell) and (
+            not 0<=cell.get('validation_FA',float('nan'))<=.05 or cell.get('validation_negative_cells',0)<=0):
+        raise ValueError('cell cutoff must use the own validation 5% operating point')
+    tile=calibration['cutoff'];head=cell['cutoff']
+    # Cell scores are logits/margins, not probabilities; do not restrict to [0,1].
+    if not np.isfinite(tile) or not 0<=tile<=1 or not np.isfinite(head):
+        raise ValueError('invalid tile/cell cutoff')
     if run.name==RUN and evaluation_id==EID and map_kind=='trained_head':
         if round(tile,10)!=TILE_CUTOFF or round(head,10)!=HEAD_CUTOFF:raise ValueError('accepted run-13 cutoffs changed')
         tile,head=TILE_CUTOFF,HEAD_CUTOFF
     return Path(checkpoint),tile,head
 
 
-def collect(output, frozen,*,checkpoint=None,evaluation_id=EID,map_kind='trained_head',device='cuda',validation_only=False):
+def collect(output, frozen,*,checkpoint=None,evaluation_id=EID,map_kind='trained_head',device='cuda',validation_only=False,
+            sources=None,run_name=None):
     from scripts.pc_safety import own_process_group, available_gb, kill_group, check_workers
     own_process_group()
     check_workers(0)
@@ -114,7 +137,6 @@ def collect(output, frozen,*,checkpoint=None,evaluation_id=EID,map_kind='trained
                 print('STOP: RAM floor or 180-minute budget reached; resume cache after review',flush=True)
                 kill_group()
     thread=threading.Thread(target=watch,daemon=True)
-    thread.start()
     import torch
     torch.set_num_threads(1)
     from cvdl.standardtest import load_network
@@ -127,10 +149,13 @@ def collect(output, frozen,*,checkpoint=None,evaluation_id=EID,map_kind='trained
         checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(), batch_size=8,workers=0,
         tile_cutoff=frozen['tile_cutoff'],head_cutoff=frozen['head_cutoff'],
         evaluation_id=evaluation_id,map_kind=map_kind)
+    if sources is not None:
+        identity.update(checkpoint=str(checkpoint),run_name=run_name or checkpoint.parent.name,
+            cutoff_sources=sources)
     identity_path=output/'cache-identity.json'
     if identity_path.exists():
         saved_identity=json.loads(identity_path.read_text())
-        legacy={k:v for k,v in identity.items() if k not in ('map_kind','evaluation_id')}
+        legacy={k:identity[k] for k in ('selection_sha256','checkpoint_sha256','batch_size','workers','tile_cutoff','head_cutoff')}
         legacy_ok=(saved_identity==legacy and evaluation_id==EID and map_kind=='trained_head' and
             identity['checkpoint_sha256']=='4dc9ab8e8ce6ed98e36da71625b3eff386999a0ac57b67b3cfbfb6bb87dd78b9')
         if saved_identity!=identity and not legacy_ok:raise ValueError('cache identity mismatch')
@@ -139,6 +164,7 @@ def collect(output, frozen,*,checkpoint=None,evaluation_id=EID,map_kind='trained
     network=load_network(checkpoint,device)
     if map_kind=='trained_head' and not hasattr(network,'cell_head'):raise ValueError('headless model requires CAM and its own rule fit')
     config=read_config(ROOT/'configs/train-k1to4.yaml')
+    thread.start()
     for number, selected in enumerate(frozen['photos'],1):
         record=selected['record'];partition=selected['partition']
         if validation_only and partition=='test':continue
@@ -178,6 +204,12 @@ def collect(output, frozen,*,checkpoint=None,evaluation_id=EID,map_kind='trained
         print(json.dumps(dict(completed=number,total=len(frozen['photos']),partition=partition,
             photo_id=record['photo_id'],elapsed_minutes=round((time.monotonic()-started)/60,2))),flush=True)
     stop.set();thread.join()
+    if file_hash(checkpoint)!=identity['checkpoint_sha256']:
+        raise ValueError('checkpoint changed during cache build')
+    if sources is not None:
+        for name in ('tile_calibration','cell_summary'):
+            if file_hash(sources[name]['path'])!=sources[name]['sha256']:
+                raise ValueError('cutoff source changed during cache build')
     print('CACHE COMPLETE',flush=True)
 
 
@@ -207,7 +239,8 @@ def main():
         photos=[p for p in frozen['photos'] if p['partition']==partition]
         print(partition,len(photos),sum(p['tiles'] for p in photos),flush=True)
     if not args.select_only:collect(args.output,frozen,checkpoint=checkpoint,evaluation_id=args.evaluation_id,
-        map_kind=args.map_kind,device=args.device,validation_only=args.validation_only)
+        map_kind=args.map_kind,device=args.device,validation_only=args.validation_only,
+        sources=cutoff_sources(args.run,args.evaluation_id,args.cell_summary),run_name=args.run.name)
 
 
 if __name__=='__main__':

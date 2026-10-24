@@ -133,7 +133,8 @@ def score(output):
 
 
 def report(output,frozen,result):
-    lines=['# Frozen run 13: photo verdict', '',
+    name=frozen['cache_identity'].get('run_name','run 13')
+    lines=[f'# Frozen {name}: photo verdict', '',
         '**Practical mark: '+('PASS' if result['practical_mark_pass'] else 'FAIL')+'**', '',
         'Pass requires (c) pooled TEST photo FA ≤7% AND hard-slice P_E ≤25%.',
         'Pooled added value over (a): '+str(result['pooled_added_value']['a'])+'; over (b): '+str(result['pooled_added_value']['b'])+'.',
@@ -176,7 +177,7 @@ def report(output,frozen,result):
         '- Validation uses source-manifest val as approved, not the CNN’s 60da list. That list covers 150 RAISE, 1,000 ALASKA and 1,347 LSDIR photos, with no DIV2K.',
         '- Val/TEST photo IDs are disjoint. All 28 ALASKA-seen camera models overlap validation; none of the 8 unseen models does. Seen-camera results are not unseen-camera evidence. A pooled 5% calibration target is not a per-camera guarantee.',
         '- Whole-photo bpp sets total payload, not payload per tile. Local difficulty differs from tile training, especially stride clipping and contiguous bands. Effective bpp and clipping are recorded in the feature cache.',
-        '- Run 13 and the existing cutoffs had already been selected/evaluated with earlier validation/TEST evidence. Excluding six viewed demos reduces direct reuse, but this is not a wholly untouched benchmark.',
+        '- The CNN and the existing cutoffs had already been selected/evaluated with earlier validation/TEST evidence. Excluding six viewed demos reduces direct reuse, but this is not a wholly untouched benchmark.',
         '- No caps, features, seeds, cutoffs or marks were changed after observing these results. Bootstrap intervals do not include fitting/calibration uncertainty.', '',
         '## Files', '',
         '- `photo-list.json`: pre-inference IDs, partitions and seed keys.',
