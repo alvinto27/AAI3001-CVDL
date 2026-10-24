@@ -83,6 +83,7 @@ A whole photo is cut into 256 tiles; a small logistic rule reads 8 summary numbe
 
 ## What we learned (256 era)
 
+- **Colour matters (2026-10-24, #11).** At the same pixels and payload, a message only in green is found more easily than RGB-spread (run 18 AUC .775 vs .725), and only in red or blue less easily (.660 / .662), for all three models tested. Red/blue-only hiding is a blind spot (miss +5-6 points). [Journal](journal/2026-10-24/README.md).
 - **256 training tiles beat 512**, and overlap-last tiling beats trim and pad at both sizes (overlap-256 3.43% vs overlap-512 5.61%).
 - **The SRM front end is the largest single gain** (SRM-30 3.07% vs KV overlap-256 3.43%; better on every panel). 50 epochs improve it further (2.54%).
 - **Low-bpp k=1 is the hard core.** Every model is near chance on ALASKA k1 low+noisy (AUC .51-.52 at the 10-18 rescore). Training tricks aimed at it move the threshold more than the ranking: srm-hard (misses down, false alarms up), the curriculum (+.019 hard AUC, +0.56 pts standard P_E), the cell head (+.005 hard AUC, +0.32 pts).

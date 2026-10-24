@@ -43,3 +43,36 @@
 - User: do #11 (RGB channel analysis, test only) first, before #20. Worker_3: read-only plan.
 - #11 plan (Worker_3, scratch `runs/.scratch/rgb-channel-plan-2026-10-24/PLAN.md`): 480 test photos (48 noisy + 48 other per source/split), one tile each; k 1/2; 0.05/0.15/0.50 bpp; contiguous and random; the same message per photo in every variant. Variants: R only, G only, B only, same-pixel RGB (main), and today's RGB layout built fresh (bridge; it covers about 1/3 as many pixels). A correlated-change control was dropped: LSB replacement cannot give equal changes in R, G and B without biasing the pixels. Frozen rule on run 18 (k=1, random, 0.05/0.15): a colour effect needs |dAUC| >= .02 with a 98.3% interval excluding 0; all within +/-.02 = no large effect; wide = inconclusive.
 - Orchestrator to the user: #11 can show a colour blind spot but cannot show whether #20 would help (density and colour relations are tangled). **User: do #11 anyway (curiosity).** Amendment: estimate the interval width from existing scores first; use 2 tiles per photo if 48 photos per group are too few.
+
+## #11 RGB channel analysis: result
+
+### Did
+
+- Worker_3: code `9361d8b` (an explicit-unit replacement entry point in `lsb_engine.py`, old generator output byte-identical on 192 recorded cases; `cvdl/channel_analysis.py`; build and evaluate scripts). FULL 484 pass. Panel frozen before scoring (recipe SHA-256 `3604b153...6e11`): 480 test photos, one tile each, 48 per source/split/noise group; 5,760 stegos per arm; 29,280 images per model. Width check from existing scores: expected adjusted half-width .019 (kept one tile per photo; actual .009).
+- PC GPU scoring, about 29 s per model (R1, run 18, SRM-e50), then the frozen report once. Output `runs/verification/rgb-channel-analysis-2026-10-24/`.
+
+### Found
+
+Primary aggregate (k=1, random, 0.05 + 0.15 bpp, mean AUC over the 10 source/noise groups):
+
+| Model | R only | G only | B only | Same-pixel RGB | Today's RGB layout |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Run 18 (primary) | .660 | **.775** | .662 | .725 | .721 |
+| R1 | .657 | .783 | .645 | .718 | .716 |
+| SRM-e50 | .629 | .772 | .641 | .707 | .704 |
+
+| Run 18 contrast vs same-pixel RGB | dAUC | 98.3% interval | Miss / P_E change at the frozen cut-off |
+| --- | ---: | --- | ---: |
+| R only | -.065 | [-.074, -.056] | P_E +6.0 points |
+| G only | +.050 | [+.041, +.058] | P_E -5.1 points |
+| B only | -.063 | [-.072, -.054] | P_E +4.8 points |
+
+- **Frozen rule verdict (run 18): EFFECT** for all three colours. The same pattern holds for R1 and SRM-e50: a message only in red or only in blue is clearly harder to find; only in green, clearly easier.
+- R only vs G only vs B only is a fair comparison (same pixels, same density), so the models really are more sensitive to green than to red and blue. Possible cause (not tested): camera sensors have the least noise in green (two green sites per Bayer block, highest sensitivity) and the most in blue, so a change stands out most in green.
+- Today's RGB layout vs same-pixel RGB: no clear difference (per-rate intervals include 0), so the pixel footprint of today's generator does not matter here.
+- Run 18 cell head (contiguous k=1): the same order (G .78-.82, R .68-.74, B .65-.71 within-tile AUC); clean-cell FA about 5%.
+- Limits: single-colour vs RGB mixes 3x density with colour relations, so the RGB contrasts do not show whether #20 would help. Test photos were used before.
+
+### Decided
+
+- Blind spot to report: hiding only in red or blue raises the miss rate by about 5-6 points for all three models. No model or threshold change from this check.
