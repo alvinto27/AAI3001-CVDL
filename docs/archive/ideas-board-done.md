@@ -32,6 +32,12 @@ Moved from the [ideas board](../active/ideas-board.md) on 2026-10-24 (user: remo
 | 4 | **Untangle `srm-hard`**: one run that changes only the k/bpp mix (keep 40/40/20 photos), or only the photo shares | `srm-hard` changed both; we cannot tell which caused the small k=1 gain and the higher ALASKA false alarms | vs SRM-30: hard k1 low+noisy AUC standard .905 vs .882, LSDIR .671 vs .651; ALASKA seen P_E 21.95 vs 20.03 | 1 G4 run, ~$3 | To review **Dropped (user 2026-10-24).** |
 | 5 | **Seed repeats** (e.g. SRM-e50 x 2 extra seeds) | Several model gaps are under 1 point; one seed cannot show whether they are real | Pending since 2026-10-17. Declined for the architecture tests (user 2026-10-19); single-seed results need a minimum gain instead (D6) | 2 G4 runs, ~$6-9 | To review **Dropped (user 2026-10-24).** |
 
+Route by processing history (old #15), dropped by the user 2026-10-24 ("probably won't do it"):
+
+| # | Idea | Question it answers | Evidence | First steps | State |
+| ---: | --- | --- | --- | --- | --- |
+| 15 | **Route by processing history** (user idea, 2026-10-21): a front-end classifier (decompressed JPEG with quality/table estimate, JPEG then resized, never compressed, synthetic) sends each photo to an expert (JPEG-compatibility, resampling-aware, the current noise CNN), with soft mixture weights. The router must use features that survive embedding (block grid, table estimate) | Would routing help on real JPEG-origin uploads? | Our weakest panel (ALASKA) is never compressed, so routing would not change it. DIV2K/LSDIR may be JPEG-origin (not checked) | First checks if resumed: a history audit of the sources, and a JPEG-origin stress test of run 13 (about 1 h on the PC) | **Dropped for now (user)** **Dropped (user 2026-10-24).** |
+
 ## Merged (2026-10-24)
 
 Old #6, merged into #18 on the board (user 2026-10-24):
