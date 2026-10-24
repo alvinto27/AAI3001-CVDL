@@ -4,9 +4,13 @@ Updated 2026-10-21 for the standard-256 / hard-256 tests. Read [status](status.m
 
 **Terms.** *P_E* = overall error, the mean of the false-alarm rate (FA, clean tiles called stego) and the miss rate (stego tiles called clean). Each model uses **its own cut-off, chosen on validation** before the test. *AUC* = how well the scores rank stego above clean, independent of the cut-off (1.0 = perfect, 0.5 = guessing). *Standard* = RAISE + DIV2K, 10,944 pairs. *Hard target* = k=1, low bpp, contiguous payloads on ALASKA seen/unseen + LSDIR. *Interval* = 95% photo-bootstrap range.
 
-## Submission model (user, 2026-10-21)
+## Submission model (user, 2026-10-24)
 
-**Run 13, `srm-cell-aux-20261021T054704Z-6997`, `last.ckpt`** (SHA-256 `4dc9ab8e...78b9`), evaluation `ea32a4be0e2ce3597fbd`. One checkpoint gives both the tile score and the cell heatmap (a trained 1x1 cell head on the 8x8 feature map; one cell = 32 px step, 48x48 px view). The user chose it over the frozen standard guard, which it misses by 0.07 points. SRM-e50 stays the best score-only model.
+**Run 18, `srm-cell-aux-curriculum50-paired-20261023T133537Z-1366`, `last.ckpt`** (SHA-256 `eee9c63a...0b80`), evaluation `b3d9a49137b5dbd7bd5a`, tile cut-off .5094 (own `60da`, train-matched). It is run 13's recipe with paired batches, started from the Curriculum50 paired best. Standard P_E 2.62% (run 13 2.97%, R2 2.43%); cell head mean per-tile AUC .867 (run 13 .863, R2 .860); cell FA 4.2% at its own 5% validation cut-off. It failed its frozen rule against R2 (cell +.007 [-.002, +.016]; standard +.19 points [-.06, +.42]); the user chose it for now. The photo-verdict rule (c) and the deploy bundle on `pipeline` are still fitted to run 13. Pending: re-fit for run 18.
+
+## ~~Submission model (user, 2026-10-21)~~ (superseded 2026-10-24)
+
+~~**Run 13, `srm-cell-aux-20261021T054704Z-6997`, `last.ckpt`** (SHA-256 `4dc9ab8e...78b9`), evaluation `ea32a4be0e2ce3597fbd`. One checkpoint gives both the tile score and the cell heatmap (a trained 1x1 cell head on the 8x8 feature map; one cell = 32 px step, 48x48 px view). The user chose it over the frozen standard guard, which it misses by 0.07 points. SRM-e50 stays the best score-only model.~~
 
 ## Standard-256 ledger
 
@@ -25,7 +29,11 @@ P_E % at each model's own validation cut-off (standard / ALASKA seen / ALASKA un
 | run 10 curriculum | low-bpp curriculum from SRM-e50 | 3.10 | — | — | — | .9964 | [plan, result](active/plan-low-bpp-curriculum.md) |
 | run 11 control | SRM-e50 + 15 epochs, same recipe | 2.65 | 18.81 | 16.52 | 9.31 | .9964 | [plan, result](active/plan-low-bpp-curriculum.md) |
 | run 12 delayed pooling | arm A architecture | 3.43 | — | — | — | .9930 | [plan, result](active/plan-architecture-tests.md) |
-| **run 13 cell head** | run 11 + cell head and cell loss | 2.97 | 18.95 | 16.21 | 9.26 | .9962 | [plan, result](active/plan-cell-training-256.md) |
+| run 13 cell head | run 11 + cell head and cell loss | 2.97 | 18.95 | 16.21 | 9.26 | .9962 | [plan, result](active/plan-cell-training-256.md) |
+| R1 paired | SRM-e50 with paired batches | 2.55 | 18.99 | 15.58 | 8.84 | .9964 | [10-23](journal/2026-10-23/README.md) |
+| R2 paired cell | run 13 recipe + paired, from R1 | 2.43 | 19.10 | 15.83 | 9.08 | .9965 | [10-23](journal/2026-10-23/README.md) |
+| Curriculum50 paired | R1 + 50-epoch low-bpp curriculum | 2.57 | 19.72 | 16.68 | 9.35 | .9967 | [10-23](journal/2026-10-23/README.md) |
+| **run 18 cell (submission)** | R2 recipe, from Curriculum50 | 2.62 | 18.82 | 15.85 | 9.16 | .9963 | [10-23](journal/2026-10-23/README.md) |
 
 ## Cell heatmap (run 13)
 
