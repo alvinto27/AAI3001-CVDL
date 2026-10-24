@@ -40,7 +40,32 @@ def seed_key(record, partition, variant, stream):
         tile_row=0, tile_col=0, variant=variant, stream=stream, carrier='photo').entropy
 
 
-def selection():
+def model_inputs(checkpoint=None, tile_calibration=None, cell_summary=None):
+    """Keep legacy defaults; a new model must declare both own cutoff sources."""
+    supplied=(checkpoint is not None,tile_calibration is not None,cell_summary is not None)
+    if not any(supplied):
+        return dict(checkpoint=ROOT/'runs'/RUN/'checkpoints'/RUN/'last.ckpt',
+            tile_cutoff=TILE_CUTOFF,head_cutoff=HEAD_CUTOFF,cutoff_sources=None)
+    if not all(supplied):raise ValueError('checkpoint, tile calibration and cell summary are required together')
+    checkpoint=Path(checkpoint);tile_calibration=Path(tile_calibration);cell_summary=Path(cell_summary)
+    sha=hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+    tile=json.loads(tile_calibration.read_text());cell=json.loads(cell_summary.read_text())
+    if tile['checkpoint_sha256']!=sha or not tile['deployment'] or tile['quick']:
+        raise ValueError('tile calibration must be complete and match the checkpoint SHA')
+    if tile['geometry']!=dict(tile_size=256,grid='overlap_last'):
+        raise ValueError('photo verdict requires the frozen 256 overlap_last geometry')
+    head=cell['maps']['aux']
+    if not 0<=head['validation_FA']<=.05 or head['validation_negative_cells']<=0:
+        raise ValueError('cell cutoff must use the own validation 5% aux operating point')
+    values=(float(tile['cutoff']),float(head['cutoff']))
+    if not all(np.isfinite(v) and 0<=v<=1 for v in values):raise ValueError('invalid probability cutoff')
+    sources={name:dict(path=str(path),sha256=hashlib.sha256(path.read_bytes()).hexdigest())
+        for name,path in (('tile_calibration',tile_calibration),('cell_summary',cell_summary))}
+    sources['tile_threshold_id']=tile['threshold_id']
+    return dict(checkpoint=checkpoint,tile_cutoff=values[0],head_cutoff=values[1],cutoff_sources=sources)
+
+
+def selection(tile_cutoff=TILE_CUTOFF,head_cutoff=HEAD_CUTOFF):
     from lsb_train_grid import axes
     excluded = sorted(r['photo_id'] for r in photo_selection())
     manifests = {}
@@ -76,12 +101,12 @@ def selection():
     if val_ids & test_ids:
         raise ValueError('validation/TEST overlap')
     return dict(selection_seed=20261021, split_seed=20261121, group_numbering='zero-based; four val sources then five TEST panels',
-        excluded_demos=excluded, tile_cutoff=TILE_CUTOFF, head_cutoff=HEAD_CUTOFF,
+        excluded_demos=excluded, tile_cutoff=tile_cutoff, head_cutoff=head_cutoff,
         manifest_hashes={s:hashlib.sha256((ROOT/f'data/{s}/photo_manifest.csv').read_bytes()).hexdigest() for s in manifests},
         config_sha256=hashlib.sha256((ROOT/'configs/train-k1to4.yaml').read_bytes()).hexdigest(), photos=photos)
 
 
-def collect(output, frozen):
+def collect(output, frozen, checkpoint=None, cutoff_sources=None):
     from scripts.pc_safety import own_process_group, available_gb, kill_group, check_workers
     own_process_group()
     check_workers(0)
@@ -101,10 +126,14 @@ def collect(output, frozen):
     from lsb_settings import draw_otf_settings
     from lsb_batch import read_config
     from lsb_engine import embed_fast
-    checkpoint=ROOT/'runs'/RUN/'checkpoints'/RUN/'last.ckpt'
+    checkpoint=Path(checkpoint) if checkpoint is not None else ROOT/'runs'/RUN/'checkpoints'/RUN/'last.ckpt'
+    tile_cutoff=frozen['tile_cutoff'];head_cutoff=frozen['head_cutoff']
     identity=dict(selection_sha256=hashlib.sha256((output/'photo-list.json').read_bytes()).hexdigest(),
         checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(), batch_size=8,workers=0,
-        tile_cutoff=TILE_CUTOFF,head_cutoff=HEAD_CUTOFF)
+        tile_cutoff=tile_cutoff,head_cutoff=head_cutoff)
+    if cutoff_sources is not None:
+        identity.update(checkpoint=str(checkpoint),run_name=checkpoint.parent.name,
+            cutoff_sources=cutoff_sources,rocm_conv1_fix=False)
     identity_path=output/'cache-identity.json'
     if identity_path.exists() and json.loads(identity_path.read_text())!=identity:
         raise ValueError('cache identity mismatch')
@@ -137,7 +166,7 @@ def collect(output, frozen):
                 kwargs['rng']=np.random.default_rng(np.random.SeedSequence(version['embedding_seed']))
                 photo,_,_=embed_fast(clean,**kwargs)
             origins,scores,maps=infer_photo(network,photo,record,'cuda',8)
-            values,counts=features(scores,maps[0],TILE_CUTOFF,HEAD_CUTOFF)
+            values,counts=features(scores,maps[0],tile_cutoff,head_cutoff)
             rows.append(dict(photo_id=record['photo_id'],panel=selected['panel'],partition=partition,
                 camera=record['camera_model'],height=int(clean.shape[0]),width=int(clean.shape[1]),
                 variant=variant,label=int(variant>0),k=version['k'],placement=version['placement'],
@@ -148,6 +177,13 @@ def collect(output, frozen):
         # Do not print TEST features or scores while collecting.
         print(json.dumps(dict(completed=number,total=len(frozen['photos']),partition=partition,
             photo_id=record['photo_id'],elapsed_minutes=round((time.monotonic()-started)/60,2))),flush=True)
+    if hashlib.sha256(checkpoint.read_bytes()).hexdigest()!=identity['checkpoint_sha256']:
+        raise ValueError('checkpoint changed during cache build')
+    if cutoff_sources is not None:
+        for name in ('tile_calibration','cell_summary'):
+            source=cutoff_sources[name]
+            if hashlib.sha256(Path(source['path']).read_bytes()).hexdigest()!=source['sha256']:
+                raise ValueError('cutoff source changed during cache build')
     stop.set();thread.join()
     print('CACHE COMPLETE',flush=True)
 
@@ -158,10 +194,16 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output',type=Path,default=OUTPUT)
     parser.add_argument('--select-only',action='store_true')
+    parser.add_argument('--checkpoint',type=Path)
+    parser.add_argument('--tile-calibration',type=Path)
+    parser.add_argument('--cell-summary',type=Path)
     args=parser.parse_args()
+    inputs=model_inputs(args.checkpoint,args.tile_calibration,args.cell_summary)
+    if inputs['cutoff_sources'] is not None and args.output.resolve()==OUTPUT.resolve():
+        raise ValueError('new model requires a distinct output; preserve the run13 evidence')
     args.output.mkdir(parents=True,exist_ok=True)
     path=args.output/'photo-list.json'
-    frozen=selection()
+    frozen=selection(inputs['tile_cutoff'],inputs['head_cutoff'])
     if path.exists():
         if json.loads(path.read_text())!=frozen:raise ValueError('frozen selection differs')
     else:dump(path,frozen)
@@ -169,7 +211,7 @@ def main():
     for partition in ('fit','calibration','test'):
         photos=[p for p in frozen['photos'] if p['partition']==partition]
         print(partition,len(photos),sum(p['tiles'] for p in photos),flush=True)
-    if not args.select_only:collect(args.output,frozen)
+    if not args.select_only:collect(args.output,frozen,inputs['checkpoint'],inputs['cutoff_sources'])
 
 
 if __name__=='__main__':

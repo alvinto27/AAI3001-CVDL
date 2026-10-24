@@ -1,5 +1,6 @@
 """CPU checks for frozen whole-photo aggregation."""
 import json
+import hashlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -122,6 +123,61 @@ class PhotoVerdictTests(unittest.TestCase):
                 self.assertEqual(frozen['fit_photos'],224)
                 self.assertTrue(frozen['rules']['c']['calibration_clean_FA']<=.05)
                 with self.assertRaises(ValueError):fit(output)
+
+    def test_legacy_selection_hash_and_new_cutoffs_keep_every_photo_split_and_seed(self):
+        from scripts.photo_verdict_cache import selection,TILE_CUTOFF,HEAD_CUTOFF
+        legacy=selection()
+        self.assertEqual(hashlib.sha256((json.dumps(legacy,indent=2)+'\n').encode()).hexdigest(),
+            'c0219972978362096e5759ce0cdb9b2eb720b6b9923e70beb6d672fc1b35a2da')
+        expected=dict(legacy,tile_cutoff=.5094263553619385,head_cutoff=.1966136991977692)
+        self.assertEqual(selection(expected['tile_cutoff'],expected['head_cutoff']),expected)
+        self.assertEqual((legacy['tile_cutoff'],legacy['head_cutoff']),(TILE_CUTOFF,HEAD_CUTOFF))
+        for partition,count,tiles in (('fit',224,15802),('calibration',224,15993),('test',576,33023)):
+            photos=[p for p in legacy['photos'] if p['partition']==partition]
+            self.assertEqual((len(photos),sum(p['tiles'] for p in photos)),(count,tiles))
+
+    def test_own_cutoff_sources_unrounded_and_checkpoint_bound_no_partial_fallback(self):
+        from scripts.photo_verdict_cache import model_inputs,TILE_CUTOFF,HEAD_CUTOFF
+        legacy=model_inputs();self.assertEqual((legacy['tile_cutoff'],legacy['head_cutoff']),(TILE_CUTOFF,HEAD_CUTOFF))
+        self.assertIsNone(legacy['cutoff_sources'])
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);checkpoint=root/'last.ckpt';checkpoint.write_bytes(b'weights')
+            tile=root/'calibration.json';cell=root/'summary.json'
+            data=dict(checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(),deployment=True,quick=False,
+                geometry=dict(tile_size=256,grid='overlap_last'),cutoff=.5094263553619385,threshold_id='own')
+            aux=dict(cutoff=.1966136991977692,validation_FA=.049962105754095494,validation_negative_cells=17153)
+            tile.write_text(json.dumps(data));cell.write_text(json.dumps(dict(maps=dict(aux=aux))))
+            values=model_inputs(checkpoint,tile,cell)
+            self.assertEqual(values['tile_cutoff'],data['cutoff']);self.assertEqual(values['head_cutoff'],aux['cutoff'])
+            self.assertEqual(values['cutoff_sources']['cell_summary']['sha256'],hashlib.sha256(cell.read_bytes()).hexdigest())
+            with self.assertRaises(ValueError):model_inputs(checkpoint)
+            checkpoint.write_bytes(b'other weights')
+            with self.assertRaisesRegex(ValueError,'checkpoint SHA'):model_inputs(checkpoint,tile,cell)
+            checkpoint.write_bytes(b'weights');data['quick']=True;tile.write_text(json.dumps(data))
+            with self.assertRaises(ValueError):model_inputs(checkpoint,tile,cell)
+            data['quick']=False;tile.write_text(json.dumps(data));aux['validation_FA']=.06
+            cell.write_text(json.dumps(dict(maps=dict(aux=aux))))
+            with self.assertRaisesRegex(ValueError,'5%'):model_inputs(checkpoint,tile,cell)
+
+    def test_collect_uses_new_model_own_cutoffs_and_frozen_serial_batch(self):
+        from scripts.photo_verdict_cache import collect,dump
+        with tempfile.TemporaryDirectory() as folder:
+            output=Path(folder);checkpoint=output/'last.ckpt';checkpoint.write_bytes(b'weights')
+            frozen=dict(tile_cutoff=.5094263553619385,head_cutoff=.1966136991977692,
+                photos=[dict(partition='fit',panel='unit',record=dict(photo_id='unit',camera_model='unit'),
+                    versions=[dict(variant=0,k=0,placement='clean')])])
+            dump(output/'photo-list.json',frozen)
+            with patch('scripts.pc_safety.own_process_group'),patch('scripts.pc_safety.check_workers'), \
+                 patch('lsb_source.load_photo',return_value=np.zeros((256,256,3),np.uint8)), \
+                 patch('cvdl.standardtest.load_network') as network, \
+                 patch('scripts.photo_verdict_cache.infer_photo',return_value=([(0,0)],[.51],np.array([[[.2]],[[0.]]]))) as infer:
+                collect(output,frozen,checkpoint)
+            network.assert_called_once_with(checkpoint,'cuda');self.assertEqual(infer.call_args.args[-1],8)
+            row=json.loads((output/'features/fit/unit.json').read_text())['rows'][0]
+            self.assertEqual(row['counts']['tiles_above'],1);self.assertEqual(row['features']['cell_fraction'],1.)
+            identity=json.loads((output/'cache-identity.json').read_text())
+            self.assertEqual((identity['batch_size'],identity['workers']),(8,0))
+            self.assertEqual((identity['tile_cutoff'],identity['head_cutoff']),(frozen['tile_cutoff'],frozen['head_cutoff']))
 
     def test_score_refuses_unfrozen_test(self):
         from scripts.photo_verdict_fit import score
