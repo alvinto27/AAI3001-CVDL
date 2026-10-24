@@ -19,6 +19,7 @@ COPY cvdl/__init__.py cvdl/models.py cvdl/pixels.py cvdl/photo_inference.py cvdl
 COPY cvdl/pipeline/*.py /app/cvdl/pipeline/
 COPY LSB-Dataset-Generator/lsb_train_grid.py LSB-Dataset-Generator/lsb_source.py LSB-Dataset-Generator/lsb_raw.py /app/LSB-Dataset-Generator/
 COPY deploy/run13-rule-c-v1/ /app/deploy/run13-rule-c-v1/
+COPY deploy/run18-rule-c-v1/ /app/deploy/run18-rule-c-v1/
 
 USER 10001:10001
 EXPOSE 8000

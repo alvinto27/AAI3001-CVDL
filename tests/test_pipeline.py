@@ -135,9 +135,10 @@ class PipelineBundleTests(unittest.TestCase):
         json.dumps(result,allow_nan=False)
         self.assertEqual(result['heatmap']['shape'],[9,10])
         self.assertEqual([r['box'] for r in result['tiles']],[[0,0,256,256],[33,0,289,256],[0,1,256,257],[33,1,289,257]])
-        self.assertEqual(result['tile_cutoff'],.5116998553)
-        self.assertEqual(result['heatmap']['cutoff'],.3110628426)
-        self.assertEqual(result['photo_rule']['cutoff'],.16645031654738587)
+        self.assertEqual(result['tile_cutoff'],.5094263553619385)
+        self.assertEqual(result['heatmap']['cutoff'],.1966136991977692)
+        self.assertEqual(result['photo_rule']['cutoff'],-.05636374639150742)
+        self.assertEqual(result['bundle']['name'],'run18-rule-c')
         grid=np.asarray(result['heatmap']['values'])
         np.testing.assert_array_equal(result['heatmap']['flagged'],grid>=result['heatmap']['cutoff'])
         self.assertEqual(result['features']['cell_fraction'],float((grid>=result['heatmap']['cutoff']).mean()))
@@ -161,7 +162,8 @@ assert not set(('lightning','pytorch_lightning','pandas','yaml','torchvision')) 
             folder=Path(directory)/'alternate';toy_bundle(folder)
             with patch.dict(os.environ,{'CVDL_BUNDLE':str(folder)}):
                 alternate=load_pipeline()
-                self.assertEqual(load_pipeline(BUNDLE).identity,self.pipeline.identity)
+                self.assertEqual(load_pipeline(BUNDLE).identity['name'],'run13-rule-c')
+                self.assertNotEqual(load_pipeline(BUNDLE).identity,self.pipeline.identity)
             pixels=np.zeros((256,256,3),np.uint8)
             result=alternate.analyze(pixels)
             cam,head,tile=cell_maps(alternate._network,evaluation_tensor(pixels).unsqueeze(0).float())
@@ -200,7 +202,7 @@ assert not set(('lightning','pytorch_lightning','pandas','yaml','torchvision')) 
             command=[sys.executable,'-B','-m','cvdl.pipeline',str(photo),'--output',str(folder/'result.json'),'--overlay',str(folder/'overlay.png')]
             subprocess.run(command,cwd=ROOT,env=env,check=True,capture_output=True,timeout=60)
             result=json.loads((folder/'result.json').read_text())
-            self.assertEqual(result['bundle']['name'],'run13-rule-c')
+            self.assertEqual(result['bundle']['name'],'run18-rule-c')
             with Image.open(folder/'overlay.png') as overlay:self.assertEqual(overlay.size,(256,256))
 
     def test_builder_headless_with_own_validation_and_fit(self):
@@ -228,12 +230,64 @@ assert not set(('lightning','pytorch_lightning','pandas','yaml','torchvision')) 
             exported=load_pipeline(folder/'export')
             self.assertEqual(exported.analyze(np.zeros((256,256,3),np.uint8))['photo_rule']['logit'],2.)
             self.assertEqual(exported._config['map']['kind'],'cam')
+            self.assertEqual(exported._config['source']['identity_route'],'pipeline_native')
             with self.assertRaisesRegex(ValueError,'map/evaluation'):
                 build_bundle(run,'new-evaluation',fit_path,cells,folder/'wrong',map_kind='trained_head')
             calibration['cutoff']=.123
             (evaluation/'validation/calibration.json').write_text(json.dumps(calibration))
             with self.assertRaisesRegex(ValueError,'thresholds'):
                 build_bundle(run,'new-evaluation',fit_path,cells,folder/'wrong',map_kind='cam')
+
+    def test_builder_yx_cutoff_sources_and_each_mismatch_existing_routes_unchanged(self):
+        import copy
+        from scripts import build_deploy_bundle as builder
+        with tempfile.TemporaryDirectory() as directory:
+            folder=Path(directory);config=json.loads((BUNDLE/'deploy.json').read_text())
+            run=folder/'own-run';run.mkdir();model=model_from_hparams(config['architecture'])
+            checkpoint=run/'last.ckpt'
+            torch.save(dict(hyper_parameters=config['architecture'],state_dict={'net.'+k:v for k,v in model.state_dict().items()}),checkpoint)
+            sha=file_hash(checkpoint);evaluation=run/'evaluation/standard-256-v1/own-eval'
+            (evaluation/'validation').mkdir(parents=True)
+            calibration=dict(checkpoint_sha256=sha,deployment=True,quick=False,
+                geometry=dict(tile_size=256,grid='overlap_last'),cutoff=.43,threshold_id='own-threshold')
+            cal_path=evaluation/'validation/calibration.json';cal_path.write_text(json.dumps(calibration))
+            (evaluation/'evaluation_settings.json').write_text(json.dumps(dict(quick=False,checkpoint_sha256=sha,evaluation_id='own-eval')))
+            cells=folder/'cells.json';cell_data=dict(maps=dict(aux=dict(cutoff=.2)))
+            cells.write_text(json.dumps(cell_data))
+            identity=dict(checkpoint_sha256=sha,tile_cutoff=.43,head_cutoff=.2,
+                cutoff_sources=dict(tile_threshold_id='own-threshold',cell_summary=dict(sha256=file_hash(cells))))
+            fit=dict(cache_identity=identity,tile_cutoff=.43,head_cutoff=.2,rules={'c':config['photo_rule']})
+            fit_path=folder/'fit.json';fit_path.write_text(json.dumps(fit));original=fit_path.read_bytes()
+            exported=builder.build_bundle(run,'own-eval',fit_path,cells,folder/'yx',map_kind='trained_head')
+            self.assertEqual(exported['source']['identity_route'],'yx_cutoff_sources')
+            self.assertEqual(load_pipeline(folder/'yx')._config,exported)
+            self.assertEqual((folder/'yx').stat().st_mode&0o777,0o755)
+            self.assertEqual(fit_path.read_bytes(),original)
+            for mismatch in ('checkpoint','threshold_id','threshold_value','cells_hash','cell_cutoff','cam','partial_map','partial_eval'):
+                with self.subTest(mismatch=mismatch):
+                    changed=copy.deepcopy(fit);cal=copy.deepcopy(calibration);cs=copy.deepcopy(cell_data);kind='trained_head'
+                    if mismatch=='checkpoint':changed['cache_identity']['checkpoint_sha256']='0'*64
+                    elif mismatch=='threshold_id':changed['cache_identity']['cutoff_sources']['tile_threshold_id']='wrong'
+                    elif mismatch=='threshold_value':cal['cutoff']=.44
+                    elif mismatch=='cells_hash':changed['cache_identity']['cutoff_sources']['cell_summary']['sha256']='0'*64
+                    elif mismatch=='cell_cutoff':cs['maps']['aux']['cutoff']=.21
+                    elif mismatch=='cam':kind='cam'
+                    elif mismatch=='partial_map':changed['cache_identity']['map_kind']='trained_head'
+                    else:changed['cache_identity']['evaluation_id']='own-eval'
+                    cells.write_text(json.dumps(cs));cal_path.write_text(json.dumps(cal))
+                    if mismatch=='cell_cutoff':changed['cache_identity']['cutoff_sources']['cell_summary']['sha256']=file_hash(cells)
+                    fit_path.write_text(json.dumps(changed));out=folder/('bad-'+mismatch)
+                    with self.assertRaises(ValueError):builder.build_bundle(run,'own-eval',fit_path,cells,out,map_kind=kind)
+                    self.assertFalse(out.exists())
+            cells.write_text(json.dumps(cell_data));cal_path.write_text(json.dumps(calibration))
+            native=copy.deepcopy(fit);native['cache_identity'].pop('cutoff_sources')
+            native['cache_identity'].update(map_kind='trained_head',evaluation_id='own-eval');fit_path.write_text(json.dumps(native))
+            self.assertEqual(builder.build_bundle(run,'own-eval',fit_path,cells,folder/'native')['source']['identity_route'],'pipeline_native')
+            legacy=copy.deepcopy(fit);legacy['cache_identity'].pop('cutoff_sources');fit_path.write_text(json.dumps(legacy))
+            with patch.object(builder,'LEGACY_RUN13',sha):
+                self.assertEqual(builder.build_bundle(run,'own-eval',fit_path,cells,folder/'legacy')['source']['identity_route'],'legacy_run13')
+                with self.assertRaisesRegex(ValueError,'trained-head only'):
+                    builder.build_bundle(run,'own-eval',fit_path,cells,folder/'legacy-cam',map_kind='cam')
 
     def test_builder_rejects_other_checkpoint_rule_before_export(self):
         from scripts.build_deploy_bundle import build_bundle

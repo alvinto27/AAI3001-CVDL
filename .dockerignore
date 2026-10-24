@@ -27,3 +27,7 @@ deploy/**
 deploy/run13-rule-c-v1/**
 !deploy/run13-rule-c-v1/deploy.json
 !deploy/run13-rule-c-v1/weights.pt
+!deploy/run18-rule-c-v1/
+deploy/run18-rule-c-v1/**
+!deploy/run18-rule-c-v1/deploy.json
+!deploy/run18-rule-c-v1/weights.pt

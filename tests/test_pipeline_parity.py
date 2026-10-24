@@ -11,7 +11,8 @@ from cvdl.photo_verdict import FEATURES, features, predict
 from scripts.photo_heatmap import infer_photo
 
 ROOT=Path(__file__).resolve().parents[1]
-OUTPUT=ROOT/'runs/verification/photo-verdict-run13-2026-10-21'
+OUTPUT=ROOT/'runs/verification/photo-verdict-run18-2026-10-24'
+REFERENCE_SELECTION=ROOT/'runs/verification/photo-verdict-run13-2026-10-21/photo-list.json'
 
 
 class PipelineValidationParityTests(unittest.TestCase):
@@ -20,6 +21,8 @@ class PipelineValidationParityTests(unittest.TestCase):
         from lsb_source import load_photo
         from lsb_engine import embed_fast
         selection=json.loads((OUTPUT/'photo-list.json').read_text())
+        if REFERENCE_SELECTION.exists():
+            self.assertEqual(selection['photos'],json.loads(REFERENCE_SELECTION.read_text())['photos'])
         chosen=[]
         for source in ('div2k','alaska','lsdir'):
             candidates=[p for p in selection['photos'] if p['partition']=='fit' and p['record']['source']==source
@@ -62,7 +65,12 @@ class PipelineValidationParityTests(unittest.TestCase):
                         [[cached[variant]['features'][f] for f in FEATURES]])[0])
                     self.assertAlmostEqual(logit,saved_logit,delta=1e-5)
                     self.assertEqual(logit>=frozen['rules']['c']['cutoff'],saved_logit>=frozen['rules']['c']['cutoff'])
-                    print('Validation parity:',record['photo_id'],'variant',variant,'tiles',len(scores))
+                    print('Validation parity:',record['photo_id'],'variant',variant,'tiles',len(scores),
+                        'max_tile_delta',float(np.max(np.abs(np.asarray([r['probability'] for r in result['tiles']])-scores))),
+                        'max_cached_feature_delta',float(np.max(np.abs(np.asarray([values[f] for f in FEATURES])-
+                            np.asarray([cached[variant]['features'][f] for f in FEATURES])))),
+                        'cached_logit_delta',abs(logit-saved_logit),'logit',logit,
+                        'probability',result['photo_rule']['probability'],'verdict',result['photo_verdict'])
 
 
 if __name__=='__main__':unittest.main()

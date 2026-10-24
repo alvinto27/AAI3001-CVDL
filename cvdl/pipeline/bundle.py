@@ -77,8 +77,11 @@ def validate_config(config):
                 raise ValueError('invalid logistic vector')
         if min(model['scale'])<=0:raise ValueError('scales must be positive')
         source=config['source']
-        if set(source)!={'checkpoint_sha256','evaluation_id','threshold_id','photo_fit_sha256'}:
+        fields={'checkpoint_sha256','evaluation_id','threshold_id','photo_fit_sha256'}
+        if set(source) not in (fields,fields|{'identity_route'}):
             raise ValueError('invalid source identity')
+        if 'identity_route' in source and source['identity_route'] not in ('legacy_run13','pipeline_native','yx_cutoff_sources'):
+            raise ValueError('invalid source identity route')
         for value,length in ((source['checkpoint_sha256'],64),(source['photo_fit_sha256'],64),(config['weights_sha256'],64)):
             if not isinstance(value,str) or len(value)!=length or any(c not in '0123456789abcdef' for c in value):
                 raise ValueError('invalid source/weights hash')
@@ -90,7 +93,7 @@ def validate_config(config):
 
 
 def load_bundle(bundle_dir=None, *, device='cpu'):
-    folder=Path(bundle_dir or os.environ.get('CVDL_BUNDLE') or Path(__file__).resolve().parents[2]/'deploy/run13-rule-c-v1')
+    folder=Path(bundle_dir or os.environ.get('CVDL_BUNDLE') or Path(__file__).resolve().parents[2]/'deploy/run18-rule-c-v1')
     try:
         config=json.loads((folder/'deploy.json').read_text())
         validate_config(config)

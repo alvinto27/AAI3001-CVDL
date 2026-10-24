@@ -38,12 +38,28 @@ def build_bundle(run,evaluation_id,photo_rule,cells_summary,output,*,map_kind='t
     if identity['checkpoint_sha256']!=checkpoint_sha:
         raise ValueError('photo rule belongs to another checkpoint')
     # Older accepted run-13 artifacts predate explicit map/evaluation fields.
-    # Other fits must carry them, so a head rule cannot masquerade as CAM.
+    # Other fits need those fields or the checked yx cutoff-source identity.
     legacy=checkpoint_sha==LEGACY_RUN13 and 'map_kind' not in identity
     if legacy:
         if map_kind!='trained_head':raise ValueError('legacy run-13 rule is trained-head only')
+        identity_route='legacy_run13'
+    elif 'map_kind' not in identity and 'evaluation_id' not in identity:
+        # yx freezes explicit, hashed cutoff sources rather than map/eval fields.
+        # Do not rewrite that immutable fit or grant other fits a legacy bypass.
+        sources=identity.get('cutoff_sources',{})
+        if (map_kind!='trained_head' or not isinstance(sources,dict) or
+                sources.get('tile_threshold_id')!=calibration['threshold_id'] or
+                identity.get('tile_cutoff')!=calibration['cutoff'] or
+                fit['tile_cutoff']!=calibration['cutoff'] or
+                not isinstance(sources.get('cell_summary'),dict) or
+                sources['cell_summary'].get('sha256')!=file_hash(cells_summary) or
+                identity.get('head_cutoff')!=cells.get('maps',{}).get('aux',{}).get('cutoff') or
+                fit['head_cutoff']!=cells.get('maps',{}).get('aux',{}).get('cutoff')):
+            raise ValueError('yx photo-rule cutoff-source identity mismatch')
+        identity_route='yx_cutoff_sources'
     elif identity.get('map_kind')!=map_kind or identity.get('evaluation_id')!=evaluation_id:
         raise ValueError('photo-rule map/evaluation identity mismatch')
+    else:identity_route='pipeline_native'
     if map_kind not in ('trained_head','cam'):raise ValueError('unsupported map kind')
     geometry=calibration['geometry']
     if geometry!={'grid':'overlap_last','tile_size':256}:raise ValueError('unsupported evaluated geometry')
@@ -70,7 +86,8 @@ def build_bundle(run,evaluation_id,photo_rule,cells_summary,output,*,map_kind='t
         photo_rule=dict(type='logistic_v1',features=copy.deepcopy(fitted['features']),
             model={k:copy.deepcopy(fitted['model'][k]) for k in ('mean','scale','coefficients','intercept')},cutoff=fitted['cutoff']),
         source=dict(checkpoint_sha256=checkpoint_sha,evaluation_id=evaluation_id,
-            threshold_id=calibration['threshold_id'],photo_fit_sha256=file_hash(photo_rule)),weights_sha256='0'*64)
+            threshold_id=calibration['threshold_id'],photo_fit_sha256=file_hash(photo_rule),
+            identity_route=identity_route),weights_sha256='0'*64)
     validate_config(config)
     output.parent.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.bundle-',dir=output.parent) as directory:
@@ -79,6 +96,9 @@ def build_bundle(run,evaluation_id,photo_rule,cells_summary,output,*,map_kind='t
         config['weights_sha256']=file_hash(temporary/'weights.pt')
         (temporary/'deploy.json').write_text(json.dumps(config,indent=2,allow_nan=False)+'\n')
         load_bundle(temporary,device='cpu')
+        # TemporaryDirectory is private (0700); the published bundle must be
+        # traversable by the non-root serving user after COPY into the image.
+        temporary.chmod(0o755)
         temporary.rename(output)
     return config
 
