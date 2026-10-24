@@ -1,6 +1,6 @@
 # G4 resume after a spot preemption (ideas #19)
 
-**Status: approved by the user 2026-10-23 as the SLIM version below; built `58aa081` (FULL 458 pass); **installed on the VM 2026-10-23 12:09Z** (installed SHA-256 match `58aa081`; ~~install on the VM pending~~ (a maintenance boot: `install -m755` of `scripts/g4/job.sh` to `~/.local/lib/cvdl-g4/job.sh` and `job_run.sh` to `job_run.last-good`; exact commands in `runs/.scratch/g4-resume-impl-2026-10-23/README.md`)). Worker_2's full plan follows for reference (the slim list wins where they differ).**
+**Status: approved by the user 2026-10-23 as the SLIM version below; built `58aa081` (FULL 458 pass); **Pi watchdog approved by the user 2026-10-24** (plan `runs/.scratch/pi-watchdog-plan-2026-10-24/PLAN.md`; implementation in progress). **installed on the VM 2026-10-23 12:09Z** (installed SHA-256 match `58aa081`; ~~install on the VM pending~~ (a maintenance boot: `install -m755` of `scripts/g4/job.sh` to `~/.local/lib/cvdl-g4/job.sh` and `job_run.sh` to `job_run.last-good`; exact commands in `runs/.scratch/g4-resume-impl-2026-10-23/README.md`)). Worker_2's full plan follows for reference (the slim list wins where they differ).**
 
 | Part | Slim version (approved) |
 | --- | --- |

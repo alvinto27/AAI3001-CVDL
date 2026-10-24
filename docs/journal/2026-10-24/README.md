@@ -91,4 +91,10 @@ Primary aggregate (k=1, random, 0.05 + 0.15 bpp, mean AUC over the 10 source/noi
 ### Next (2026-10-25)
 
 - Check run 19 attempt 3 (B36): if delivered, copy from the Pi (Pi = PC SHA, readable modes), add its calibration mapping entry (`60da`, `post_hoc_256`), evaluate standard + hard, run `training_decision.py --rule wiser_b` vs R1, and re-score the #11 panel as context. If preempted: `submit.sh resume <job>` (user decision on the spend).
-- Later: the Pi watchdog for automatic resume (needs `gcloud` on the Pi and the user's `sudo`).
+- ~~Later: the Pi watchdog for automatic resume (needs `gcloud` on the Pi and the user's `sudo`).~~ Started tonight, see below.
+
+## Pi watchdog (#19 follow-up)
+
+- User asked to set up the Pi as the G4 watchdog (automatic resume after a spot preemption). Worker_4 plan (`runs/.scratch/pi-watchdog-plan-2026-10-24/PLAN.md`): Pi is Debian 13 arm64, Python 3.13, systemd 257, `rpi400` Linger=yes; no gcloud yet. 60 s polling; a resume only on the authoritative Compute `compute.instances.preempted` zonal operation for the current boot; the same `submit.sh resume`; never new jobs or code-failure retries.
+- Found: a repeated `submit.sh resume` after a stockout increments the attempt counter again, so the VM's exactly-next check would refuse it; fix: a pending request that reuses the same attempt. The full preflight needs Torch on the Pi; fix: a resume-only identity check (the VM still checks the full recipe).
+- **User approved** all six decisions: resume-only Pi check; the pending-request fix; caps 3 resumes / 15 start calls / 240 s / $20 per job; one guarded inspection boot for an unknown stopped state; a dedicated service user with instance-scoped control and a key file, after a read-only audit of the VM's own service account; future jobs only. Worker_4: implementation (no Pi or cloud changes); the user then runs the IAM commands on the PC and the `sudo` commands on the Pi. About 6-10 h; not ready for tonight's run.
