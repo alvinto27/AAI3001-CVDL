@@ -30,6 +30,9 @@
 - `pipeline` `bfbbdcc`: builder route `yx_cutoff_sources` (accepted only if checkpoint SHA, tile threshold ID and value, cells-summary hash and cell cut-off all match; one refusal test per mismatch); **run 18 bundle `deploy/run18-rule-c-v1/` is the shipped default** (`deploy.json` `81723296...3dcb`, `weights.pt` `fb8d1957...0650`); the run 13 bundle stays selectable with `--bundle`. FULL 411 pass.
 - Checks: an independent rebuild is byte-identical; 6 validation photos give the same verdicts as the frozen run 18 values (max rule-logit difference 2e-6); the fresh CPU container answers `/analyze` on DIV2K 0281 with `not_detected`, as the reference.
 
+- Cause of the format mismatch: the photo scripts were made general twice, separately (`pipeline` `0968a34` on 2026-10-21; `yx` `0a5f417` today), because the re-fit task went to `yx` without pointing at `pipeline`'s version. User chose to unify now.
+- Worker_3 unified them: `pipeline` `9adb589`, then `yx` `c05f5c0`. Six files are byte-identical on both branches (`cvdl/photo_inference.py`, `cvdl/pixels.py`, `scripts/photo_heatmap.py`, `scripts/photo_verdict_cache.py`, `scripts/photo_verdict_fit.py`, `tests/test_photo_verdict.py`), based on `pipeline`'s version: `--run` + `--evaluation-id` replace `--tile-calibration`; new caches keep the native identity fields and add the hashed cut-off sources; a local SHA helper removes the `cvdl.pipeline` import. pipeline FULL 415 pass; yx FAST 436 pass. On both branches the run 13 and run 18 photo lists reproduce byte for byte (select-only, CPU); frozen rules, both bundles and the builder are unchanged.
+
 ### Next
 
-- Later: merge `yx` / `pipeline` into `main` (the two branches now have different versions of the photo scripts; settle them at the merge).
+- Later: merge `yx` / `pipeline` into `main`.
