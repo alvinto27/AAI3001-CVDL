@@ -81,3 +81,4 @@ Primary aggregate (k=1, random, 0.05 + 0.15 bpp, mean AUC over the 10 source/noi
 
 - Ideas board clean-up: #11 moved to done; #15 and #14 dropped (user). Open: #20, #12 (on hold), #18 (shelved), #13, report topics #7 and #8.
 - User: work on #20 now. Worker_3: read-only plan for arm B (conv1 per colour, mixing from conv2), R1's recipe, frozen rule vs R1.
+- #20 arm B plan (Worker_3; Worker_3 then stopped responding): B36, 12 learned maps per colour in a grouped conv1, mixing from conv2 (B18 = 53% compute, B48 = 127%). **User approved** with: width 36; rule `wiser_b` = both `paired_r1` routes vs R1 (the plan had only the hard route); #11 panel re-scored as context. Native grouped conv1 on ROCm (the conv1 workaround supports groups=1 only). Worker_4: implementation, FULL, PC pilot; stop before the G4.
