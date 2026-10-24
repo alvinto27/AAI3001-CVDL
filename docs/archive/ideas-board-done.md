@@ -39,3 +39,9 @@ Old #6, merged into #18 on the board (user 2026-10-24):
 | # | Idea | Why | Evidence / risk | Cost | State |
 | ---: | --- | --- | --- | --- | --- |
 | 6 | Front-end upgrade / BF16 / longer training | Older pending items. Arm A (2026-10-19) costs 2.3x compute, so BF16 matters for heavier models | Hold until item 5 is settled; front-end ladder in the [architecture plan](../active/plan-architecture-tests.md) | - | On hold |
+
+## Done 2026-10-24
+
+| # | Idea | Why | Evidence / risk | Cost | State |
+| ---: | --- | --- | --- | --- | --- |
+| 11 | **RGB channel analysis**: embed in R only, G only, B only, and spread over RGB at the same total bpp; test whether explicit cross-channel features help | Our payload is spread over 3 channels (~1.7% of values per channel at 0.05 bpp); unknown whether the model uses cross-channel relations | Needs a new frozen test panel (generator channel option to check) and inference; pairs well with item 1's per-channel statistics | Build + GPU inference ~15 min per model | **Done 2026-10-24 (`9361d8b`): EFFECT.** Run 18 AUC: R only .660, G only .775, B only .662 vs same-pixel RGB .725; same pattern for R1 and SRM-e50. Red/blue-only messages are a blind spot (miss +5-6 points). Does not decide #20 ([journal](../journal/2026-10-24/README.md)) |
