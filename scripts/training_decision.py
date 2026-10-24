@@ -20,10 +20,12 @@ RULES=('paired_r1','curriculum50','paired_r2','wiser_b')
 WISER_REFERENCE='runs/srm-e50-paired-20261023T022339Z-4518/evaluation/standard-256-v1/6ef349895655136bef90'
 WISER_REFERENCE_SHA='b00cd4b6d1f4c3648580691c9cf0e2a4bd83c55740a3cf2a7a561a8adf12f180'
 WISER_NOTEBOOK=ROOT/'notebooks/experiments/srm-e50-paired-coloursep36.ipynb'
-WISER_NOTEBOOK_SHA='c49e8b80233a5cfd51cf47495a78d9b16e3c9b8956c0ec8c127ffbdc5d03968b'
+WISER_NOTEBOOK_SHA='744d8cabfabd4e2e9664427b4d00e724d8e846ff76692c92e7e7707f440738ca'
 WISER_APPROVAL=dict(arm='ideas20-B36',date='2026-10-24',routes='paired_r1: a OR b',
     original_plan_sha256='6d1ff40e574bc55f504265cb136959082dbe4733a6e8f7c81527a3c5df76b48f',
     approved_override='both paired_r1 routes; no cell or minimum selected-epoch gate',
+    evaluation_batch_amendment=dict(date='2026-10-24',val_batch_images=64,
+        reason='evaluation-only cap; avoid native SRM output INT32 overflow at 512px'),
     model='xunet_wide_coloursep36',selection='full scratch50 capped best',
     reference=WISER_REFERENCE,reference_sha256=WISER_REFERENCE_SHA,notebook_sha256=WISER_NOTEBOOK_SHA)
 LIMITS=dict(standard_pe_route_a_point_max=-.002,standard_pe_route_a_upper_strict_max=0.,
@@ -128,7 +130,7 @@ def wiser_identity(folders, metadata):
     values=json.loads(record.read_text())['values']
     for key,value in expected.items():
         if key in ('name','run_name') or (SCHEMA[key].machine and key not in ('precision','channels_last','quick','compile','workers','eval_workers','main_threads',
-            'prefetch_images','pack_blocks','prime_next_epoch')):continue
+            'prefetch_images','pack_blocks','prime_next_epoch','val_batch_images')):continue
         actual=values.get(key)
         if key=='train_yaml':
             # Different machine roots are not experiment differences.
@@ -150,6 +152,8 @@ def wiser_identity(folders, metadata):
             raise ValueError('wiser_b training data YAML identity mismatch')
         data['settings']['settings_yaml']='configs/train-k1to4.yaml'
         records.append(data)
+    if 'val_batch_images' in records[0] or records[1].pop('val_batch_images',None)!=64:
+        raise ValueError('wiser_b requires only the approved evaluation-only val_batch_images=64 amendment')
     if records[0]!=records[1]:raise ValueError('wiser_b saved training data recipe/selection mismatch')
     for key in ('init_checkpoint','embedding_schedule','cell_supervision','pilot'):
         if values.get(key) not in (None,False,'off'):
@@ -168,7 +172,8 @@ def wiser_identity(folders, metadata):
     h=saved.get('hyper_parameters',{})
     required=dict(model='xunet_wide_coloursep36',front_end='srm',norm='none',width=4,clip_t=3.,
         paired_batches=True,max_epochs=50,batch_size=128,precision='32',lr=3e-4,weight_decay=1e-4,
-        warmup_epochs=1,grad_clip=1.,lr_drops=[[8,.3],[33,.1]],steps_per_epoch=2813)
+        warmup_epochs=1,grad_clip=1.,lr_drops=[[8,.3],[33,.1]],steps_per_epoch=2813,
+        val_batch_images=64,effective_val_batch_images=64)
     for key,value in required.items():
         if json.dumps(h.get(key))!=json.dumps(value):raise ValueError('wiser_b checkpoint identity mismatch: '+key)
         if json.dumps(completed.get('hyper_parameters',{}).get(key))!=json.dumps(value):

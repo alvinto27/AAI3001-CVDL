@@ -87,14 +87,17 @@ class ArchitectureTests(unittest.TestCase):
         with torch.autocast('cpu',dtype=torch.bfloat16):module.net(batch[0].float())
         hook.remove();self.assertEqual(observed,[torch.float32])
 
-    def test_notebook_exact_two_lines_and_effective_parity(self):
+    def test_notebook_exact_three_lines_and_effective_parity(self):
         a=BASE.read_text();b=NEW.read_text()
-        self.assertEqual(b,a.replace('name=\\"srm-e50-paired\\"','name=\\"srm-e50-paired-coloursep36\\"').replace("model='xunet_wide',","model='xunet_wide_coloursep36',",1))
+        self.assertEqual(b.count('val_batch_images=64'),1)
+        uncapped=b.replace('    "    val_batch_images=64,\\n",\n','',1)
+        self.assertEqual(uncapped,a.replace('name=\\"srm-e50-paired\\"','name=\\"srm-e50-paired-coloursep36\\"').replace("model='xunet_wide',","model='xunet_wide_coloursep36',",1))
         self.assertEqual(len([x for x in difflib.ndiff(a.splitlines(),b.splitlines()) if x.startswith('- ')]),2)
         for profile in ('pc','g4'):
             values=[plain(load(environ={},_profile=machine_profile(profile,device='cpu'),**top_values(json.loads(p.read_text()))).values) for p in (BASE,NEW)]
-            difference={k for k in values[0] if values[0][k]!=values[1].get(k)}
-            self.assertEqual(difference,{'name','model','run_name'})
+            difference={k for k in values[0].keys()|values[1].keys() if values[0].get(k)!=values[1].get(k)}
+            self.assertEqual(difference,{'name','model','run_name','val_batch_images'})
+            self.assertEqual(values[1]['val_batch_images'],64)
             self.assertEqual(values[1]['checkpoint_validation'],'capped')
             self.assertEqual(values[1]['batch_size'],128)
 
@@ -142,7 +145,8 @@ class RuleTests(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             path=Path(tmp)/'best-epoch01.ckpt'
             h=dict(H,clip_t=3.,paired_batches=True,max_epochs=50,batch_size=128,precision='32',lr=3e-4,
-                weight_decay=1e-4,warmup_epochs=1,grad_clip=1.,lr_drops=[[8,.3],[33,.1]],steps_per_epoch=2813)
+                weight_decay=1e-4,warmup_epochs=1,grad_clip=1.,lr_drops=[[8,.3],[33,.1]],steps_per_epoch=2813,
+                val_batch_images=64,effective_val_batch_images=64)
             torch.save(dict(epoch=0,hyper_parameters=h),path)
             torch.save(dict(epoch=49,global_step=140650,hyper_parameters=h),path.parent/'last.ckpt')
             from scripts.training_decision import sha
@@ -153,6 +157,7 @@ class RuleTests(unittest.TestCase):
             reference=json.loads((ROOT/WISER_REFERENCE/'evaluation_settings.json').read_text())
             refpath=checkpoint_path(reference)
             data=json.loads((refpath.parent/'data_run_settings.json').read_text())
+            data['val_batch_images']=64
             (path.parent/'data_run_settings.json').write_text(json.dumps(data))
             folders=[ROOT/WISER_REFERENCE,Path(tmp)]
             self.assertEqual(wiser_identity(folders,[reference,meta])[0],1)
@@ -162,10 +167,12 @@ class RuleTests(unittest.TestCase):
             torch.save(dict(epoch=49,global_step=140650,hyper_parameters=dict(h,model='xunet_wide')),lastpath)
             with self.assertRaisesRegex(ValueError,'completed checkpoint identity'):wiser_identity(folders,[reference,meta])
             torch.save(dict(epoch=49,global_step=140650,hyper_parameters=h),lastpath)
-            for change in (dict(model='xunet_wide'),dict(init_checkpoint='foo'),dict(checkpoint_validation='train_matched'),dict(paired_batches=False),dict(epochs=49),dict(seed=1),dict(run_seed=1),dict(precision='bf16-mixed'),dict(channels_last=True),dict(compile='off')):
+            for change in (dict(model='xunet_wide'),dict(init_checkpoint='foo'),dict(checkpoint_validation='train_matched'),dict(paired_batches=False),dict(epochs=49),dict(seed=1),dict(run_seed=1),dict(precision='bf16-mixed'),dict(channels_last=True),dict(compile='off'),dict(val_batch_images=None),dict(val_batch_images=32)):
                 record.write_text(json.dumps(dict(values=dict(values,**change))))
                 with self.assertRaises(ValueError):wiser_identity(folders,[reference,meta])
             record.write_text(json.dumps(dict(values=values)))
+            (path.parent/'data_run_settings.json').write_text(json.dumps(dict(data,val_batch_images=32)))
+            with self.assertRaisesRegex(ValueError,'evaluation-only'):wiser_identity(folders,[reference,meta])
             (path.parent/'data_run_settings.json').write_text(json.dumps(dict(data,train_photo_selection=['drift'])))
             with self.assertRaisesRegex(ValueError,'training data recipe/selection'):wiser_identity(folders,[reference,meta])
             (path.parent/'data_run_settings.json').write_text(json.dumps(data))

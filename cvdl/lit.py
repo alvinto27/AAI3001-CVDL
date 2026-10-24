@@ -23,16 +23,20 @@ def v4_lr_factor(step: int, steps_per_epoch: int, max_epochs: int, warmup_epochs
 class SteganalysisModule(L.LightningModule):
     """Lightning wrapper for paired or unpaired image batches."""
 
-    def __init__(self, lr: float = 3e-4, max_epochs: int = 20, weight_decay: float = 1e-4, paired_batches: bool = False, clip_t=3.0, norm="none", steps_per_epoch: int = 1, warmup_epochs: int = 1, grad_clip: float = 1.0, lr_drops=None, batch_size: int = 32, precision: str = "32", model: str = "xunet", width: int = 4, front_end: str = "kv", *, validation_data=None, conv1_factory=None, cell_supervision='off', cell_loss_weight=0.2, channels_last: bool = False):
+    def __init__(self, lr: float = 3e-4, max_epochs: int = 20, weight_decay: float = 1e-4, paired_batches: bool = False, clip_t=3.0, norm="none", steps_per_epoch: int = 1, warmup_epochs: int = 1, grad_clip: float = 1.0, lr_drops=None, batch_size: int = 32, precision: str = "32", model: str = "xunet", width: int = 4, front_end: str = "kv", *, validation_data=None, conv1_factory=None, cell_supervision='off', cell_loss_weight=0.2, channels_last: bool = False, val_batch_images: int | None = None):
         super().__init__()
         if lr_drops is None:
             lr_drops = ((max_epochs // 2 + 1, 0.1),)
         # front_end is saved only when it is not the default, so KV checkpoints keep their old hyper_parameters.
         if cell_supervision not in ('off','changed_cells_v1') or not np.isfinite(cell_loss_weight) or cell_loss_weight <= 0:
             raise ValueError('invalid cell supervision/loss weight')
-        self.save_hyperparameters(ignore=["validation_data", "conv1_factory", *(["front_end"] if front_end == "kv" else []),
+        if val_batch_images is not None and (type(val_batch_images) is not int or val_batch_images<2 or val_batch_images%2):
+            raise ValueError('val_batch_images must be a positive even image count')
+        self.save_hyperparameters(ignore=["validation_data", "conv1_factory", *(['val_batch_images'] if val_batch_images is None else []), *(["front_end"] if front_end == "kv" else []),
             *(['cell_supervision','cell_loss_weight'] if cell_supervision=='off' else []),
             *(['channels_last'] if not channels_last else [])])
+        if val_batch_images is not None:
+            self.hparams['effective_val_batch_images']=min(batch_size,val_batch_images)
         self.validation_data = validation_data
         self.net = model_from_hparams(dict(model=model, clip_t=clip_t, norm=norm, width=width, front_end=front_end,
             **(dict(cell_supervision=cell_supervision) if cell_supervision!='off' else {})))

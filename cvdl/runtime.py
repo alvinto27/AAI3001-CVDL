@@ -74,7 +74,8 @@ def create_loaders(s, otf, tables):
     if otf is not None:
         loaders = data.build_otf_loaders(otf, **kwargs, prefetch=s.prefetch,
             prefetch_images=s.prefetch_images, prime_next_epoch=s.prime_next_epoch,
-            pack_blocks=s.pack_blocks)
+            pack_blocks=s.pack_blocks,
+            **({'val_batch_images':s.val_batch_images} if getattr(s,'val_batch_images',None) is not None else {}))
         clean, stego, _ = otf.fixed_train[0]
         byte_images, _, _ = next(iter(loaders.val))
         assert byte_images.dtype == torch.uint8
@@ -172,6 +173,9 @@ def create_training(s, otf_data, loaders, *, trainer_options=None):
                           "weight_decay": 1e-4, "lr_drops": s.lr_drops,
                           "batch_size": s.batch_size, "precision": s.precision, "model": s.model, "width": s.width, "persistent_validation_workers": s.persistent_workers,
                           "train_yaml": s.train_yaml, "extra_tests": s.extra_tests}
+    if getattr(s,'val_batch_images',None) is not None:
+        model_run_settings.update(val_batch_images=s.val_batch_images,
+            effective_val_batch_images=min(s.batch_size,s.val_batch_images))
     if s.model=='xunet_wide_coloursep36':
         model_run_settings.update(conv1_backend='native_grouped',rocm_conv1_fix_active=False,
             rocm_conv1_fix_reason='dense-only unfold workaround excluded for groups3')
@@ -244,7 +248,8 @@ def create_training(s, otf_data, loaders, *, trainer_options=None):
     training_started = time.perf_counter()
     assert trainer.checkpoint_callbacks == [checkpoint_callback], "only one best-and-last checkpoint callback is allowed"
     lightning_model = SteganalysisModule(clip_t=s.clip_t, norm=s.norm, validation_data=otf_data, conv1_factory=conv1_factory(s), lr=s.lr, max_epochs=s.epochs, paired_batches=s.paired_batches, channels_last=s.channels_last, steps_per_epoch=len(train_loader), warmup_epochs=s.warmup_epochs, grad_clip=s.grad_clip, lr_drops=s.lr_drops, batch_size=s.batch_size, precision=s.precision, model=s.model, width=s.width, front_end=s.front_end,
-        **(dict(cell_supervision=s.cell_supervision,cell_loss_weight=s.cell_loss_weight) if getattr(s,'cell_supervision','off')!='off' else {}))
+        **(dict(cell_supervision=s.cell_supervision,cell_loss_weight=s.cell_loss_weight) if getattr(s,'cell_supervision','off')!='off' else {}),
+        **({'val_batch_images':s.val_batch_images} if getattr(s,'val_batch_images',None) is not None else {}))
     if starting:
         from .curriculum import initialize
         initialization=initialize(s,lightning_model,checkpoint_dir,resuming)

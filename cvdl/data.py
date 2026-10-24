@@ -227,10 +227,18 @@ class Loaders:
 
 def build_otf_loaders(data, *, batch_size, workers, eval_workers, pin_memory,
                       prefetch=None, prefetch_images=128, eval_persistent_workers=False,
-                      prime_next_epoch=False, pack_blocks=1):
+                      prime_next_epoch=False, pack_blocks=1, val_batch_images=None):
+    if val_batch_images is not None and (type(val_batch_images) is not int or val_batch_images<2 or val_batch_images%2):
+        raise ValueError('val_batch_images must be a positive even image count')
     train, val, test, train_eval = data.loaders(batch_size, workers, pin_memory, prefetch,
         eval_workers=eval_workers, prefetch_images=prefetch_images,
         eval_persistent_workers=eval_persistent_workers, pack_blocks=pack_blocks)
+    if val_batch_images is not None:
+        # OrderedPairLoader joins photo tasks into pairs; only its evaluation
+        # batch boundaries change. Training/worker tasks and row order do not.
+        effective_pairs=min(max(1,batch_size//2),val_batch_images//2)
+        for loader in (val,test,train_eval):loader.batch_size=effective_pairs
+        data.record['val_batch_images']=2*effective_pairs
     if prime_next_epoch:
         train = PrimedTrainingLoader(train)
     return Loaders(train, val, test, train_eval, data.fixed_train.frame, data.val.frame, data.test.frame)

@@ -55,6 +55,13 @@ def top_values(notebook):
     return values
 
 
+def validation_srm_elements(values):
+    """Largest evaluation SRM tensor for an explicit image-batch cap."""
+    if values.get('val_batch_images') is None or values.get('front_end')!='srm':return None
+    tile=(values.get('train_tile_size') or values['tile_size']) if values.get('checkpoint_validation')=='train_matched' else values['tile_size']
+    return min(values['batch_size'],values['val_batch_images'])*90*tile*tile
+
+
 def preflight(notebook_path, commit, *, root=ROOT, speed_env=None):
     """Use settings code/configs FROM the selected commit in an isolated snapshot."""
     notebook = validate_notebook(notebook_path,commit=commit,root=root)
@@ -100,6 +107,8 @@ print(json.dumps(dict(values=plain(settings.values), sources=plain(settings.prov
             return value.replace(str(snapshot),'<checkout>') if isinstance(value,str) else value
         report = display(report)
     report.update(commit=commit,notebook=notebook_path)
+    elements=validation_srm_elements(report['values'])
+    if elements is not None:report['largest_validation_srm_output_elements']=elements
     return report
 
 

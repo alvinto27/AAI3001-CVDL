@@ -129,6 +129,9 @@ SCHEMA = MappingProxyType({
     'quick': Definition('bool', boolean, True, 'bool', 'Small trial mode.', env='QUICK', legacy_global='QUICK', machine=True),
     'workers': Definition('int', integer, 6, '>=0', 'Training workers.', lambda v:v>=0, 'V3_WORKERS', 'OTF_WORKERS', True),
     'eval_workers': Definition('int', integer, 4, '>=0', 'Evaluation workers.', lambda v:v>=0, 'V3_EVAL_WORKERS', 'EVAL_WORKERS', True),
+    'val_batch_images': Definition('int?', lambda x:None if x is None or str(x).lower()=='none' else integer(x), None,
+        'None or positive even image count', 'Opt-in evaluation-only image-batch cap; training is unchanged.',
+        lambda v:v is None or (v>=2 and v%2==0), env='V3_VAL_BATCH_IMAGES', machine=True),
     'diag_workers': Definition('int', integer, lambda c:c['eval_workers'], '>=0', 'Diagnostic photo workers.', lambda v:v>=0, 'V3_DIAG_WORKERS', machine=True),
     'headless': Definition('bool', boolean, False, 'bool', 'Compact headless progress.', env='CVDL_HEADLESS_LOG', machine=True),
     'main_threads': Definition('int', integer, 1, '>0', 'Main PyTorch threads.', lambda v:v>0, 'V3_MAIN_THREADS', 'MAIN_THREADS', True),
@@ -361,6 +364,8 @@ class Settings:
         dirty = bool(subprocess.check_output(['git','status','--porcelain'],cwd=self.root,text=True).strip())
         record = dict(values=plain(self.values), sources=plain(self.provenance), profile=self.profile,
                       overrides=plain(self.overrides), git=dict(commit=commit,dirty=dirty))
+        if getattr(self,'val_batch_images',None) is not None:
+            record['effective_val_batch_images']=min(self.batch_size,self.val_batch_images)
         (folder/'run_settings.json').write_text(json.dumps(record,indent=2)+'\n')
         return record
 
@@ -433,7 +438,9 @@ def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_v
         put(name,value,'profile')
     for name,value in notebook_values.items():
         resolved = canonical(name)
-        if SCHEMA[resolved].machine:
+        # Evaluation batching is a machine limit that can be pinned explicitly
+        # in a notebook; all other machine-owned notebook controls stay refused.
+        if SCHEMA[resolved].machine and resolved!='val_batch_images':
             raise ValueError(f'setting {name!r} is machine-owned; use the automatic profile or a one-off override, not the notebook')
         put(name,value,'notebook')
     explicit_overrides = [(canonical(name), value) for name,value in override_pairs]
@@ -553,6 +560,8 @@ def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_v
         raise ValueError('cell_loss_weight needs enabled cell supervision')
     # Opt-ins must not add keys to historical effective settings or run records.
     absent=[]
+    if c['val_batch_images'] is None:absent+=['val_batch_images']
+    elif c['data']!='otf':raise ValueError('val_batch_images requires OTF OrderedPairLoader evaluation')
     if c['cell_supervision']=='off':absent+=['cell_supervision','cell_loss_weight']
     if not c['pilot']:absent+=['pilot']
     if c['init_checkpoint'] is None:absent+=['init_checkpoint','init_checkpoint_sha256']
