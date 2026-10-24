@@ -31,7 +31,8 @@ def configure(settings):
 
 def conv1_factory(settings):
     # This workaround is for XuNet's dense 5x5 conv1, not GBRAS's 1x1 adapter.
-    if settings.model!='gbras' and settings.rocm_conv1_fix and settings.rocm and settings.device == 'cuda':
+    # Colour-separated conv1 uses native grouped convolution; unfold is dense-only.
+    if settings.model not in {'gbras','xunet_wide_coloursep36'} and settings.rocm_conv1_fix and settings.rocm and settings.device == 'cuda':
         from notebooks.rocm_conv1_wgrad import UnfoldWgradConv2d
         return UnfoldWgradConv2d.from_conv
     return None
@@ -171,6 +172,9 @@ def create_training(s, otf_data, loaders, *, trainer_options=None):
                           "weight_decay": 1e-4, "lr_drops": s.lr_drops,
                           "batch_size": s.batch_size, "precision": s.precision, "model": s.model, "width": s.width, "persistent_validation_workers": s.persistent_workers,
                           "train_yaml": s.train_yaml, "extra_tests": s.extra_tests}
+    if s.model=='xunet_wide_coloursep36':
+        model_run_settings.update(conv1_backend='native_grouped',rocm_conv1_fix_active=False,
+            rocm_conv1_fix_reason='dense-only unfold workaround excluded for groups3')
     if scratch50:
         from .curriculum import scratch50_record
         model_run_settings['embedding_schedule_identity']=scratch50_record(s.tiles_per_epoch)

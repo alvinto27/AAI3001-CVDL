@@ -16,7 +16,16 @@ from scripts.architecture_decision import (join_predictions, auc_intervals, rate
     PANELS, TARGETS, SEED, REPLICATES)
 
 NAMES=('reference','candidate')
-RULES=('paired_r1','curriculum50','paired_r2')
+RULES=('paired_r1','curriculum50','paired_r2','wiser_b')
+WISER_REFERENCE='runs/srm-e50-paired-20261023T022339Z-4518/evaluation/standard-256-v1/6ef349895655136bef90'
+WISER_REFERENCE_SHA='b00cd4b6d1f4c3648580691c9cf0e2a4bd83c55740a3cf2a7a561a8adf12f180'
+WISER_NOTEBOOK=ROOT/'notebooks/experiments/srm-e50-paired-coloursep36.ipynb'
+WISER_NOTEBOOK_SHA='c49e8b80233a5cfd51cf47495a78d9b16e3c9b8956c0ec8c127ffbdc5d03968b'
+WISER_APPROVAL=dict(arm='ideas20-B36',date='2026-10-24',routes='paired_r1: a OR b',
+    original_plan_sha256='6d1ff40e574bc55f504265cb136959082dbe4733a6e8f7c81527a3c5df76b48f',
+    approved_override='both paired_r1 routes; no cell or minimum selected-epoch gate',
+    model='xunet_wide_coloursep36',selection='full scratch50 capped best',
+    reference=WISER_REFERENCE,reference_sha256=WISER_REFERENCE_SHA,notebook_sha256=WISER_NOTEBOOK_SHA)
 LIMITS=dict(standard_pe_route_a_point_max=-.002,standard_pe_route_a_upper_strict_max=0.,
     hard_auc_guard_lower_min=-.01,hard_auc_gain_point_min=.01,hard_auc_gain_lower_strict_min=0.,
     standard_pe_guard_upper_max=.0025,curriculum_selected_epoch_one_based_min=8,
@@ -102,9 +111,61 @@ def selected_epoch(meta):
     return epoch+1,path
 
 
+def wiser_identity(folders, metadata):
+    """Verify the fixed reference and scratch/best recipe before reading scores."""
+    import torch
+    from scripts.g4.preflight import top_values
+    if Path(folders[0]).resolve()!=(ROOT/WISER_REFERENCE).resolve() or metadata[0]['checkpoint_sha256']!=WISER_REFERENCE_SHA:
+        raise ValueError('wiser_b requires the frozen R1 reference')
+    if sha(WISER_NOTEBOOK)!=WISER_NOTEBOOK_SHA:raise ValueError('wiser_b frozen recipe fingerprint changed')
+    from cvdl.settings import load,machine_profile,plain,SCHEMA
+    expected=plain(load(environ={},_profile=machine_profile('g4'),
+        **top_values(json.loads(WISER_NOTEBOOK.read_text()))).values)
+    path=checkpoint_path(metadata[1])
+    record=path.parent/'run_settings.json'
+    if not record.is_file():raise ValueError('missing original training settings')
+    values=json.loads(record.read_text())['values']
+    for key,value in expected.items():
+        if key in ('name','run_name') or (SCHEMA[key].machine and key not in ('precision','channels_last','quick','compile','workers','eval_workers','main_threads',
+            'prefetch_images','pack_blocks','prime_next_epoch')):continue
+        actual=values.get(key)
+        if key=='train_yaml':
+            # Different machine roots are not experiment differences.
+            if not actual or Path(actual).parts[-2:]!=('configs','train-k1to4.yaml'):
+                raise ValueError('wiser_b recipe mismatch: train_yaml')
+            continue
+        if json.dumps(actual,sort_keys=True)!=json.dumps(value,sort_keys=True):
+            raise ValueError('wiser_b recipe mismatch: '+key)
+    for key in ('model','front_end','norm','width','clip_t'):
+        if metadata[1].get('values',{}).get(key)!=expected[key]:
+            raise ValueError('wiser_b evaluated model mismatch: '+key)
+    for key in ('init_checkpoint','embedding_schedule','cell_supervision','pilot'):
+        if values.get(key) not in (None,False,'off'):
+            raise ValueError('wiser_b forbids '+key)
+    if not path.name.startswith('best-') or values.get('evaluation_checkpoint','best')!='best' or metadata[1].get('values',{}).get('evaluation_checkpoint','best')!='best':
+        raise ValueError('wiser_b requires selected best checkpoint')
+    if sha(path)!=metadata[1]['checkpoint_sha256']:raise ValueError('evaluated checkpoint SHA mismatch')
+    from cvdl.lit import select_best_checkpoint
+    if Path(select_best_checkpoint(None,path.parent)).resolve()!=path.resolve():raise ValueError('not selected best checkpoint')
+    last=path.parent/'last.ckpt'
+    if not last.is_file():raise ValueError('wiser_b needs completed scratch50 last checkpoint evidence')
+    completed=torch.load(last,map_location='cpu',weights_only=False)
+    if completed.get('epoch') not in (49,50) or completed.get('global_step')!=140650:
+        raise ValueError('wiser_b requires full 50-epoch fit evidence')
+    saved=torch.load(path,map_location='cpu',weights_only=False)
+    h=saved.get('hyper_parameters',{})
+    for key,value in dict(model='xunet_wide_coloursep36',front_end='srm',norm='none',width=4,paired_batches=True,max_epochs=50).items():
+        if h.get(key)!=value:raise ValueError('wiser_b checkpoint identity mismatch: '+key)
+    epoch=saved.get('epoch')
+    if type(epoch) is not int or not 0<=epoch<50:raise ValueError('invalid checkpoint epoch')
+    return epoch+1,path
+
+
 def rule_checks(rule, hard, standard, *, epoch=None, cells=None):
     """Candidate minus reference. Literal boundary directions are intentional."""
     if rule not in RULES:raise ValueError('unknown frozen rule')
+    if rule=='wiser_b':
+        return rule_checks('paired_r1',hard,standard)
     if rule=='paired_r1':
         a=dict(standard_pe_gain_at_least_002=standard['point']<=-.002,
             standard_pe_upper_below_zero=standard['high']<0,
@@ -218,6 +279,16 @@ def summarize(reference, candidate, output, rule, *, reference_cells=None, candi
     paths=[p for folder in folders for p in evaluation_inputs(folder)]
     paths+=[PLAN,CURRICULUM_PLAN,Path(__file__),ROOT/'scripts/architecture_decision.py',
         ROOT/'cvdl/cell_metrics.py',ROOT/'cvdl/metrics.py',ROOT/'cvdl/curriculum.py']
+    if rule=='wiser_b':
+        paths.extend([WISER_NOTEBOOK,*[ROOT/p for p in ('cvdl/models.py','cvdl/settings.py','cvdl/runtime.py',
+            'cvdl/lit.py','configs/train-k1to4.yaml','configs/test-256-v1.yaml',
+            'configs/evaluation-calibration-v1.json')]])
+        paths.extend(sorted((ROOT/'data/val/60da4391043e8ce48ff2').glob('*')))
+        # Resolve and hash before any score joins or bootstrap work.
+        raw=[json.loads((p/'evaluation_settings.json').read_text()) for p in folders]
+        wiser_epoch,wiser_path=wiser_identity(folders,raw)
+        paths.extend([wiser_path,*[wiser_path.parent/p for p in ('last.ckpt','run_settings.json',
+            'model_run_settings.json','data_run_settings.json')]])
     if rule=='paired_r2':
         if not reference_cells or not candidate_cells:raise ValueError('paired_r2 needs both saved cell folders')
         paths.extend(cell_inputs(reference_cells)+cell_inputs(candidate_cells))
@@ -258,7 +329,7 @@ def summarize(reference, candidate, output, rule, *, reference_cells=None, candi
             context[key],draws[key]=auc_intervals(low[low[field]==value],names=NAMES)
     for condition in ('noisy','low_noisy'):
         context[condition],draws[condition]=auc_intervals(hard[hard.panel.isin(TARGETS)&(hard.k==1)&(hard.condition==condition)],names=NAMES)
-    epoch=None;cells=None
+    epoch=wiser_epoch if rule=='wiser_b' else None;cells=None
     if rule=='curriculum50':
         epoch,path=selected_epoch(metadata[1]);paths.append(path)
         # The checkpoint was hashed/verified against the already snapshotted meta.
@@ -276,6 +347,9 @@ def summarize(reference, candidate, output, rule, *, reference_cells=None, candi
         input_sha256=before,input_sha256_after=after,inputs_unchanged=True,
         threshold_metadata=dict(zip(NAMES,thresholds)),pooled_hard_auc=main,standard_pe=guard,
         standard_panels=panels,context_hard_auc=context,selected_epoch_one_based=epoch,cells=cells)
+    if rule=='wiser_b':
+        result['approved_identity']=WISER_APPROVAL
+        result['approved_identity_sha256']=hashlib.sha256(json.dumps(WISER_APPROVAL,sort_keys=True).encode()).hexdigest()
     output.mkdir(parents=True,exist_ok=True)
     (output/'evidence.json').write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')
     np.savez_compressed(output/'bootstrap-replicates.npz',**draws)
