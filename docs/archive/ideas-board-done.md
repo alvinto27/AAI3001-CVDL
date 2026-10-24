@@ -38,6 +38,12 @@ Route by processing history (old #15), dropped by the user 2026-10-24 ("probably
 | ---: | --- | --- | --- | --- | --- |
 | 15 | **Route by processing history** (user idea, 2026-10-21): a front-end classifier (decompressed JPEG with quality/table estimate, JPEG then resized, never compressed, synthetic) sends each photo to an expert (JPEG-compatibility, resampling-aware, the current noise CNN), with soft mixture weights. The router must use features that survive embedding (block grid, table estimate) | Would routing help on real JPEG-origin uploads? | Our weakest panel (ALASKA) is never compressed, so routing would not change it. DIV2K/LSDIR may be JPEG-origin (not checked) | First checks if resumed: a history audit of the sources, and a JPEG-origin stress test of run 13 (about 1 h on the PC) | **Dropped for now (user)** **Dropped (user 2026-10-24).** |
 
+Compile-guard tests (old #14), dropped by the user 2026-10-24. Only real risk: a change to `torch.compile(net)` would add an `_orig_mod.` prefix to checkpoint keys; add a small key-name test if the compile code ever changes:
+
+| # | Idea | Why | State |
+| ---: | --- | --- | --- |
+| 14 | **Test the current compile guards** (added 2026-10-20 from the test audit): add direct tests, with mocked compile and backend calls, for the compile and cache checks in `cvdl/settings.py` and the in-place compile placement in `cvdl/runtime.py` | The G4 runs with `compile=default`, but only frozen notebook 04's compile snippets have tests (`tests/test_notebook_compile.py`); the current guards have none | To review (user: keep on the board for now) **Dropped (user 2026-10-24).** |
+
 ## Merged (2026-10-24)
 
 Old #6, merged into #18 on the board (user 2026-10-24):
