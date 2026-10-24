@@ -117,6 +117,7 @@ def wiser_identity(folders, metadata):
     from scripts.g4.preflight import top_values
     if Path(folders[0]).resolve()!=(ROOT/WISER_REFERENCE).resolve() or metadata[0]['checkpoint_sha256']!=WISER_REFERENCE_SHA:
         raise ValueError('wiser_b requires the frozen R1 reference')
+    if sha(checkpoint_path(metadata[0]))!=WISER_REFERENCE_SHA:raise ValueError('wiser_b reference checkpoint SHA mismatch')
     if sha(WISER_NOTEBOOK)!=WISER_NOTEBOOK_SHA:raise ValueError('wiser_b frozen recipe fingerprint changed')
     from cvdl.settings import load,machine_profile,plain,SCHEMA
     expected=plain(load(environ={},_profile=machine_profile('g4'),
@@ -139,6 +140,17 @@ def wiser_identity(folders, metadata):
     for key in ('model','front_end','norm','width','clip_t'):
         if metadata[1].get('values',{}).get(key)!=expected[key]:
             raise ValueError('wiser_b evaluated model mismatch: '+key)
+    # The architecture-only arm must retain the actual selected photos, grids,
+    # capped validation bytes, packing and keyed-data settings, not just names.
+    records=[]
+    for checkpoint in (checkpoint_path(metadata[0]),path):
+        data=json.loads((checkpoint.parent/'data_run_settings.json').read_text())
+        yaml=data['settings']['settings_yaml']
+        if not yaml or Path(yaml).parts[-2:]!=('configs','train-k1to4.yaml'):
+            raise ValueError('wiser_b training data YAML identity mismatch')
+        data['settings']['settings_yaml']='configs/train-k1to4.yaml'
+        records.append(data)
+    if records[0]!=records[1]:raise ValueError('wiser_b saved training data recipe/selection mismatch')
     for key in ('init_checkpoint','embedding_schedule','cell_supervision','pilot'):
         if values.get(key) not in (None,False,'off'):
             raise ValueError('wiser_b forbids '+key)
@@ -154,8 +166,15 @@ def wiser_identity(folders, metadata):
         raise ValueError('wiser_b requires full 50-epoch fit evidence')
     saved=torch.load(path,map_location='cpu',weights_only=False)
     h=saved.get('hyper_parameters',{})
-    for key,value in dict(model='xunet_wide_coloursep36',front_end='srm',norm='none',width=4,paired_batches=True,max_epochs=50).items():
-        if h.get(key)!=value:raise ValueError('wiser_b checkpoint identity mismatch: '+key)
+    required=dict(model='xunet_wide_coloursep36',front_end='srm',norm='none',width=4,clip_t=3.,
+        paired_batches=True,max_epochs=50,batch_size=128,precision='32',lr=3e-4,weight_decay=1e-4,
+        warmup_epochs=1,grad_clip=1.,lr_drops=[[8,.3],[33,.1]],steps_per_epoch=2813)
+    for key,value in required.items():
+        if json.dumps(h.get(key))!=json.dumps(value):raise ValueError('wiser_b checkpoint identity mismatch: '+key)
+        if json.dumps(completed.get('hyper_parameters',{}).get(key))!=json.dumps(value):
+            raise ValueError('wiser_b completed checkpoint identity mismatch: '+key)
+    if h.get('channels_last',False) or h.get('cell_supervision','off')!='off' or h.get('embedding_schedule_identity') is not None:
+        raise ValueError('wiser_b checkpoint has unapproved precision/cell/curriculum controls')
     epoch=saved.get('epoch')
     if type(epoch) is not int or not 0<=epoch<50:raise ValueError('invalid checkpoint epoch')
     return epoch+1,path
@@ -287,8 +306,9 @@ def summarize(reference, candidate, output, rule, *, reference_cells=None, candi
         # Resolve and hash before any score joins or bootstrap work.
         raw=[json.loads((p/'evaluation_settings.json').read_text()) for p in folders]
         wiser_epoch,wiser_path=wiser_identity(folders,raw)
-        paths.extend([wiser_path,*[wiser_path.parent/p for p in ('last.ckpt','run_settings.json',
-            'model_run_settings.json','data_run_settings.json')]])
+        reference_path=checkpoint_path(raw[0])
+        paths.extend([wiser_path,reference_path,*[folder/p for folder in (wiser_path.parent,reference_path.parent)
+            for p in ('run_settings.json','model_run_settings.json','data_run_settings.json')],wiser_path.parent/'last.ckpt'])
     if rule=='paired_r2':
         if not reference_cells or not candidate_cells:raise ValueError('paired_r2 needs both saved cell folders')
         paths.extend(cell_inputs(reference_cells)+cell_inputs(candidate_cells))

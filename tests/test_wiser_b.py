@@ -141,20 +141,34 @@ class RuleTests(unittest.TestCase):
         values=plain(load(environ={},_profile=machine_profile('g4'),**top_values(json.loads(NEW.read_text()))).values)
         with TemporaryDirectory() as tmp:
             path=Path(tmp)/'best-epoch01.ckpt'
-            h=dict(H,paired_batches=True,max_epochs=50)
+            h=dict(H,clip_t=3.,paired_batches=True,max_epochs=50,batch_size=128,precision='32',lr=3e-4,
+                weight_decay=1e-4,warmup_epochs=1,grad_clip=1.,lr_drops=[[8,.3],[33,.1]],steps_per_epoch=2813)
             torch.save(dict(epoch=0,hyper_parameters=h),path)
             torch.save(dict(epoch=49,global_step=140650,hyper_parameters=h),path.parent/'last.ckpt')
             from scripts.training_decision import sha
             record=path.parent/'run_settings.json';record.write_text(json.dumps(dict(values=values)))
             # Real evaluation changes inference batch/compile, never the training recipe.
             meta=dict(values=dict(values,batch_size=32,compile='off'),checkpoint=str(path),checkpoint_sha256=sha(path))
-            reference=dict(checkpoint_sha256=WISER_REFERENCE_SHA)
+            from scripts.training_decision import checkpoint_path
+            reference=json.loads((ROOT/WISER_REFERENCE/'evaluation_settings.json').read_text())
+            refpath=checkpoint_path(reference)
+            data=json.loads((refpath.parent/'data_run_settings.json').read_text())
+            (path.parent/'data_run_settings.json').write_text(json.dumps(data))
             folders=[ROOT/WISER_REFERENCE,Path(tmp)]
             self.assertEqual(wiser_identity(folders,[reference,meta])[0],1)
+            lastpath=path.parent/'last.ckpt'
+            torch.save(dict(epoch=48,global_step=140650,hyper_parameters=h),lastpath)
+            with self.assertRaisesRegex(ValueError,'full 50-epoch'):wiser_identity(folders,[reference,meta])
+            torch.save(dict(epoch=49,global_step=140650,hyper_parameters=dict(h,model='xunet_wide')),lastpath)
+            with self.assertRaisesRegex(ValueError,'completed checkpoint identity'):wiser_identity(folders,[reference,meta])
+            torch.save(dict(epoch=49,global_step=140650,hyper_parameters=h),lastpath)
             for change in (dict(model='xunet_wide'),dict(init_checkpoint='foo'),dict(checkpoint_validation='train_matched'),dict(paired_batches=False),dict(epochs=49),dict(seed=1),dict(run_seed=1),dict(precision='bf16-mixed'),dict(channels_last=True),dict(compile='off')):
                 record.write_text(json.dumps(dict(values=dict(values,**change))))
                 with self.assertRaises(ValueError):wiser_identity(folders,[reference,meta])
             record.write_text(json.dumps(dict(values=values)))
+            (path.parent/'data_run_settings.json').write_text(json.dumps(dict(data,train_photo_selection=['drift'])))
+            with self.assertRaisesRegex(ValueError,'training data recipe/selection'):wiser_identity(folders,[reference,meta])
+            (path.parent/'data_run_settings.json').write_text(json.dumps(data))
             with self.assertRaises(ValueError):wiser_identity([ROOT/'wrong',Path(tmp)],[reference,meta])
             with self.assertRaises(ValueError):wiser_identity(folders,[reference,dict(meta,checkpoint_sha256='0'*64)])
             last=path.with_name('last.ckpt');last.write_bytes(path.read_bytes())
