@@ -49,7 +49,25 @@ The model gives an 8x8 grid of cell scores per 256 tile. Frozen diagnostic set: 
 - At a strict cell cut-off (5% false cells on validation; 3.8% on test) every map finds about **16%** of the changed cells. Training improved the ranking inside a tile, not the count above a strict cut-off.
 - Figure: `runs/verification/cell-run13-2026-10-21/cells/cells.png` (git-ignored run output).
 
-## Photo verdict (rule c, accepted by the user 2026-10-21)
+## Photo verdict for run 18 (rule c, re-fitted 2026-10-24)
+
+The same frozen method as for run 13 (same photos, splits, 8 features, fit and calibration on 448 validation photos, frozen before the test), with run 18's own cut-offs (tile .5094, cell .1966). Frozen rule SHA-256 `05d61c52...9bf61a`; code `0a5f417`. Record: `runs/verification/photo-verdict-run18-2026-10-24/REPORT.md` and `COMPARISON.md`; [2026-10-24 journal](journal/2026-10-24/README.md).
+
+| TEST photos (576), run 13 -> run 18 | Clean photos flagged | Messages missed | P_E | AUC |
+| --- | ---: | ---: | ---: | ---: |
+| All | 8.5 -> 8.7% | 9.3 -> 8.4% | 8.9 -> **8.5%** | .960 -> .965 |
+| RAISE | 2.1 -> 0.0% | 1.7 -> 0.9% | 1.9 -> 0.4% | — |
+| DIV2K | 9.4 -> 10.4% | 2.3 -> 1.5% | 5.9 -> 5.9% | — |
+| ALASKA seen | 9.4 -> 9.4% | 20.8 -> 19.7% | 15.1 -> 14.5% | — |
+| ALASKA unseen | 17.2 -> **16.4%** | 14.0 -> 12.5% | 15.6 -> 14.5% | — |
+| LSDIR | 3.1 -> 5.5% | 4.2 -> 3.7% | 3.6 -> 4.6% | — |
+| Hard: k=1, 0.05-0.15 bpp | 7.8 -> 8.1% | 38.1 -> **33.0%** | 23.0 -> **20.5%** | .872 -> .884 |
+
+- Frozen marks, as for run 13: FA <= 7% **failed** (8.7%, 50 of 576; run 13 49 of 576); hard P_E <= 25% passed (20.5%).
+- Tile scores still add value over cell features alone: P_E -1.7 points [-2.5, -0.8]; -6.3 points on hard k=1.
+- The run 13 -> run 18 differences are point estimates, not a tested claim. The camera false alarms on ALASKA unseen (16%) stay the main weakness.
+
+## ~~Photo verdict (rule c, accepted by the user 2026-10-21)~~ (run 13; superseded by the run 18 re-fit)
 
 A whole photo is cut into 256 tiles; a small logistic rule reads 8 summary numbers (4 from the cell-head map, such as the largest connected group of flagged cells, and 4 from the tile scores) and gives one yes/no. Fitted and calibrated on 448 validation photos; frozen before the test. Record: `runs/verification/photo-verdict-run13-2026-10-21/REPORT.md`; [2026-10-21 journal](journal/2026-10-21/README.md).
 
