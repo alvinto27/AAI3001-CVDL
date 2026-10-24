@@ -6,7 +6,7 @@ Updated 2026-10-21 for the standard-256 / hard-256 tests. Read [status](status.m
 
 ## Submission model (user, 2026-10-24)
 
-**Run 18, `srm-cell-aux-curriculum50-paired-20261023T133537Z-1366`, `last.ckpt`** (SHA-256 `eee9c63a...0b80`), evaluation `b3d9a49137b5dbd7bd5a`, tile cut-off .5094 (own `60da`, train-matched). It is run 13's recipe with paired batches, started from the Curriculum50 paired best. Standard P_E 2.62% (run 13 2.97%, R2 2.43%); cell head mean per-tile AUC .867 (run 13 .863, R2 .860); cell FA 4.2% at its own 5% validation cut-off. It failed its frozen rule against R2 (cell +.007 [-.002, +.016]; standard +.19 points [-.06, +.42]); the user chose it for now. The photo-verdict rule (c) and the deploy bundle on `pipeline` are still fitted to run 13. Pending: re-fit for run 18.
+**Run 18, `srm-cell-aux-curriculum50-paired-20261023T133537Z-1366`, `last.ckpt`** (SHA-256 `eee9c63a...0b80`), evaluation `b3d9a49137b5dbd7bd5a`, tile cut-off .5094 (own `60da`, train-matched). It is run 13's recipe with paired batches, started from the Curriculum50 paired best. Standard P_E 2.62% (run 13 2.97%, R2 2.43%); cell head mean per-tile AUC .867 (run 13 .863, R2 .860); cell FA 4.2% at its own 5% validation cut-off. It failed its frozen rule against R2 (cell +.007 [-.002, +.016]; standard +.19 points [-.06, +.42]); the user chose it for now. Its photo verdict rule (c) was re-fitted (below), and its bundle `deploy/run18-rule-c-v1/` is the `pipeline` default (`bfbbdcc`).
 
 ## ~~Submission model (user, 2026-10-21)~~ (superseded 2026-10-24)
 

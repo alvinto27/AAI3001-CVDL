@@ -26,6 +26,10 @@
 
 - Marks as for run 13: FA <= 7% fails (50 of 576), hard P_E <= 25% passes. Tile scores still add value over cell features (P_E -1.7 points [-2.5, -0.8]). Differences between the models are point estimates only.
 
+- Bundle step: the `pipeline` builder refused the yx-written photo rule (its identity record has checked cut-off sources instead of `map_kind` / `evaluation_id`). Orchestrator chose a small builder change over a re-fit, so the tested rule stays exactly the same. Worker_2 stopped responding during this work; Worker_3 reviewed the uncommitted work and finished it.
+- `pipeline` `bfbbdcc`: builder route `yx_cutoff_sources` (accepted only if checkpoint SHA, tile threshold ID and value, cells-summary hash and cell cut-off all match; one refusal test per mismatch); **run 18 bundle `deploy/run18-rule-c-v1/` is the shipped default** (`deploy.json` `81723296...3dcb`, `weights.pt` `fb8d1957...0650`); the run 13 bundle stays selectable with `--bundle`. FULL 411 pass.
+- Checks: an independent rebuild is byte-identical; 6 validation photos give the same verdicts as the frozen run 18 values (max rule-logit difference 2e-6); the fresh CPU container answers `/analyze` on DIV2K 0281 with `not_detected`, as the reference.
+
 ### Next
 
-- Worker_2: build the run 18 deploy bundle on `pipeline` and make it the shipped default (run 13 bundle stays selectable).
+- Later: merge `yx` / `pipeline` into `main` (the two branches now have different versions of the photo scripts; settle them at the merge).
