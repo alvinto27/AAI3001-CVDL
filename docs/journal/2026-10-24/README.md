@@ -36,3 +36,8 @@
 ### Next
 
 - Later: merge `yx` / `pipeline` into `main`.
+
+## Ideas board clean-up and next item
+
+- Ideas board: done items moved to `docs/archive/ideas-board-done.md`; #15 copied from `pipeline`; #4 and #5 dropped (user); #6 merged into #18 (user); #20 added: separate-then-reunion colour front end (WISERNet, Zeng et al. 2019), kept as a viable try. The board is identical on both branches.
+- User: do #11 (RGB channel analysis, test only) first, before #20. Worker_3: read-only plan.
