@@ -17,6 +17,7 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Nothing
 - [Architecture tests: delayed pooling and GBRAS-Net (idea 10) — approved 2026-10-19; arm A no gain, arm G waits for the user](active/plan-architecture-tests.md)
 - [Low-bpp curriculum from SRM-e50 (idea 9) — done 2026-10-19: small real gain, rule not met, not adopted](active/plan-low-bpp-curriculum.md)
 - [Ideas board — checks and experiments; each needs a user decision](active/ideas-board.md)
+- [Ideas board: done and closed items (moved 2026-10-24)](archive/ideas-board-done.md)
 - [Report notebook readability — revisions 1-3 built](active/plan-report-readability.md)
 - [One deployment threshold from validation — built `68e4f0b` (work list #4)](active/plan-validation-threshold.md)
 - [Hard test at 256 — built `a56c275` (work list #3)](active/plan-hard-test-256.md)
