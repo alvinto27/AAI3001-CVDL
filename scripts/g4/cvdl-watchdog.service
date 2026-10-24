@@ -1,0 +1,53 @@
+[Unit]
+Description=CVDL bounded G4 Spot resume watchdog
+Wants=network-online.target tailscaled.service
+After=network-online.target tailscaled.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=cvdl-watchdog
+Group=cvdl-watchdog
+WorkingDirectory=/opt/cvdl-watchdog/repo
+StateDirectory=cvdl-watchdog
+StateDirectoryMode=0700
+RuntimeDirectory=cvdl-watchdog
+RuntimeDirectoryMode=0700
+UMask=0077
+LoadCredential=gcp-key.json:/etc/cvdl-watchdog/gcp-key.json
+Environment=HOME=/var/lib/cvdl-watchdog
+Environment=PATH=/opt/cvdl-watchdog/google-cloud-sdk/bin:/usr/bin:/bin
+Environment=CLOUDSDK_CONFIG=/var/lib/cvdl-watchdog/gcloud
+Environment=CLOUDSDK_CORE_PROJECT=personal-compute-511601
+Environment=CLOUDSDK_COMPUTE_ZONE=us-central1-c
+Environment=CLOUDSDK_CORE_DISABLE_PROMPTS=true
+Environment=CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
+Environment=CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=%d/gcp-key.json
+Environment=CLOUDSDK_PYTHON=/usr/bin/python3
+Environment=CVDL_G4_CONTROLLER_PYTHON=/usr/bin/python3
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=GIT_OPTIONAL_LOCKS=0
+Environment=GIT_CONFIG_COUNT=1
+Environment=GIT_CONFIG_KEY_0=safe.directory
+Environment=GIT_CONFIG_VALUE_0=/opt/cvdl-watchdog/repo
+ExecStart=/usr/bin/python3 /opt/cvdl-watchdog/repo/scripts/g4/watchdog.py --config /etc/cvdl-watchdog/watchdog.json --state /var/lib/cvdl-watchdog/state.json
+Restart=on-failure
+RestartSec=30
+RestartPreventExitStatus=75
+TimeoutStopSec=40
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/cvdl-watchdog /run/cvdl-watchdog
+StandardOutput=journal
+StandardError=journal
+LogRateLimitIntervalSec=60s
+LogRateLimitBurst=120
+
+[Install]
+WantedBy=multi-user.target

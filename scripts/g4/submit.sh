@@ -13,7 +13,14 @@ RESUME_JOB=
 if [[ $ACTION == resume ]]; then
     RESUME_JOB=${1:?resume needs a job ID}; shift
     [[ $RESUME_JOB =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,100}$ && $RESUME_JOB != *..* ]] || exit 2
-    for option in "$@"; do [[ $option == --dry-run ]] || { echo 'resume reuses the original record; only --dry-run is allowed' >&2; exit 2; }; done
+    tail_args=("$@")
+    for ((i=0;i<${#tail_args[@]};i++)); do
+        case "${tail_args[i]}" in
+            --dry-run) ;;
+            --request-file|--start-limit) i=$((i+1)); [[ $i -lt ${#tail_args[@]} ]] || exit 2 ;;
+            *) echo 'resume accepts only --dry-run, --request-file and --start-limit' >&2; exit 2 ;;
+        esac
+    done
 fi
 NOTEBOOK=
 ENV_FILE=
@@ -21,6 +28,8 @@ COMMIT=HEAD
 TIMEOUT=100
 MAX_RUN=120
 DRY=0
+REQUEST_FILE=
+START_LIMIT=15
 while (($#)); do
     case "$1" in
         --notebook) NOTEBOOK=${2:?missing notebook}; shift 2 ;;
@@ -29,11 +38,27 @@ while (($#)); do
         --timeout-min) TIMEOUT=${2:?missing timeout}; shift 2 ;;
         --max-run-minutes) MAX_RUN=${2:?missing maximum}; shift 2 ;;
         --dry-run) DRY=1; shift ;;
+        --request-file) REQUEST_FILE=${2:?missing request file}; shift 2 ;;
+        --start-limit) START_LIMIT=${2:?missing start limit}; shift 2 ;;
         *) echo "Unknown argument: $1" >&2; exit 2 ;;
     esac
 done
 ROOT=$(git -C "$(dirname "${BASH_SOURCE[0]}")/../.." rev-parse --show-toplevel)
 cd "$ROOT"
+if [[ -n ${CVDL_G4_CONTROLLER_PYTHON:-} ]]; then
+    [[ $CVDL_G4_CONTROLLER_PYTHON == /* && ( $ACTION == resume || $ACTION == status ) ]] || {
+        echo 'native controller is resume/status only' >&2; exit 2;
+    }
+fi
+if [[ -n $REQUEST_FILE ]]; then
+    [[ $ACTION == resume && -n ${CVDL_G4_CONTROLLER_PYTHON:-} ]] || {
+        echo 'pending requests require explicit native resume controller' >&2; exit 2;
+    }
+    extra=(); (( DRY )) && extra+=(--dry-run)
+    exec "$CVDL_G4_CONTROLLER_PYTHON" scripts/g4/resume_request.py "$RESUME_JOB" \
+        --request-file "$REQUEST_FILE" --start-limit "$START_LIMIT" "${extra[@]}"
+fi
+[[ $START_LIMIT == 15 ]] || { echo '--start-limit requires --request-file' >&2; exit 2; }
 INSTANCE=rtx6000pro
 ZONE=us-central1-c
 TEMP_ENV=
@@ -45,7 +70,11 @@ if [[ $ACTION == resume ]]; then
     command -v gcloud >/dev/null || { echo 'Install and authenticate gcloud first' >&2; exit 2; }
     TEMP_META=$(mktemp); TEMP_FIELDS=$(mktemp)
     gcloud compute instances describe "$INSTANCE" --zone="$ZONE" --format=json > "$TEMP_META"
-    podman exec -i -w /work aai3001 python scripts/g4/resume.py metadata "$RESUME_JOB" < "$TEMP_META" > "$TEMP_FIELDS"
+    if [[ -n ${CVDL_G4_CONTROLLER_PYTHON:-} ]]; then
+        "$CVDL_G4_CONTROLLER_PYTHON" scripts/g4/resume.py metadata "$RESUME_JOB" < "$TEMP_META" > "$TEMP_FIELDS"
+    else
+        podman exec -i -w /work aai3001 python scripts/g4/resume.py metadata "$RESUME_JOB" < "$TEMP_META" > "$TEMP_FIELDS"
+    fi
     mapfile -t retained < "$TEMP_FIELDS"
     [[ ${#retained[@]} == 5 ]] || exit 2
     COMMIT=${retained[0]}; NOTEBOOK=${retained[1]}; TIMEOUT=${retained[2]}; MAX_RUN=${retained[3]}; ATTEMPT=${retained[4]}
@@ -74,7 +103,11 @@ if [[ $ACTION == run || $ACTION == resume ]]; then
     else
         [[ -n $NOTEBOOK ]] || { echo 'run needs --notebook PATH' >&2; exit 2; }
         # Python, including validation in --dry-run, runs only in the ROCm container.
-        podman exec -w /work aai3001 python scripts/g4/preflight.py --commit "$COMMIT" --notebook "$NOTEBOOK"
+        if [[ -n ${CVDL_G4_CONTROLLER_PYTHON:-} ]]; then
+            "$CVDL_G4_CONTROLLER_PYTHON" scripts/g4/preflight.py --commit "$COMMIT" --notebook "$NOTEBOOK" --resume-identity-only
+        else
+            podman exec -w /work aai3001 python scripts/g4/preflight.py --commit "$COMMIT" --notebook "$NOTEBOOK"
+        fi
         label=$(basename "$NOTEBOOK" .ipynb)
         label=$(printf '%s' "$label" | tr -cs 'A-Za-z0-9_-' '-' | cut -c1-50)
         [[ $label =~ ^[A-Za-z0-9] ]] || label="nb-$label"

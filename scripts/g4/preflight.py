@@ -55,6 +55,23 @@ def top_values(notebook):
     return values
 
 
+def resume_identity(notebook_path, commit, *, root=ROOT):
+    """Resume-only identity check, without importing training dependencies.
+
+    This is not the full resolved-settings report. The pinned VM runner still
+    checks the complete saved recipe and checkpoint before training.
+    """
+    import hashlib
+    from cvdl.settings import validate_notebook_name
+    notebook=validate_notebook(notebook_path,commit=commit,root=root)
+    values=top_values(notebook)
+    validate_notebook_name(notebook_path,values)
+    refuse_pilot(values)
+    raw=subprocess.check_output(['git','show',f'{commit}:{notebook_path}'],cwd=root)
+    return dict(validation='resume-identity-only',commit=commit,notebook=notebook_path,
+        notebook_sha256=hashlib.sha256(raw).hexdigest())
+
+
 def validation_srm_elements(values):
     """Largest evaluation SRM tensor for an explicit image-batch cap."""
     if values.get('val_batch_images') is None or values.get('front_end')!='srm':return None
@@ -146,6 +163,7 @@ def main():
     parser.add_argument('--commit',default='HEAD')
     parser.add_argument('--root',type=Path,default=ROOT)
     parser.add_argument('--check-path-only',action='store_true')
+    parser.add_argument('--resume-identity-only',action='store_true')
     args=parser.parse_args()
     if not (args.notebook or args.job_env or args.speed_env_stdin):
         parser.error('choose --notebook, --job-env or --speed-env-stdin')
@@ -160,6 +178,8 @@ def main():
             print(json.dumps(preflight(env['V3_NOTEBOOK'],args.commit,root=args.root,speed_env=env),indent=2))
         elif args.job_env:
             print(validate_job_env(args.job_env,args.job_id,root=args.root,commit=args.commit))
+        elif args.resume_identity_only:
+            print(json.dumps(resume_identity(args.notebook,args.commit,root=args.root),indent=2))
         elif args.check_path_only:
             validate_notebook(args.notebook,commit=args.commit,root=args.root)
         else:

@@ -1,0 +1,12 @@
+{
+  "armed": false,
+  "job": null,
+  "audit_approved": false,
+  "max_resumes": 3,
+  "max_start_calls": 15,
+  "retry_seconds": 240,
+  "budget_usd": 20.0,
+  "hourly_rate_usd": 2.0,
+  "margin_usd": 0.5,
+  "poll_seconds": 60
+}
