@@ -76,3 +76,8 @@ Primary aggregate (k=1, random, 0.05 + 0.15 bpp, mean AUC over the 10 source/noi
 ### Decided
 
 - Blind spot to report: hiding only in red or blue raises the miss rate by about 5-6 points for all three models. No model or threshold change from this check.
+
+## #20 started
+
+- Ideas board clean-up: #11 moved to done; #15 and #14 dropped (user). Open: #20, #12 (on hold), #18 (shelved), #13, report topics #7 and #8.
+- User: work on #20 now. Worker_3: read-only plan for arm B (conv1 per colour, mixing from conv2), R1's recipe, frozen rule vs R1.
