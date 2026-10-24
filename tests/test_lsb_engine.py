@@ -449,5 +449,68 @@ class EngineTests(unittest.TestCase):
         self.assertTrue(np.array_equal(first[2].units, second[2].units))
 
 
+class ExplicitUnitTests(unittest.TestCase):
+    def test_prechange_rgb_byte_metadata_extraction_and_rng_golden(self):
+        # Captured BEFORE adding replace_at_units, 2026-10-24. Never regenerate
+        # to bless a changed default. Covers all k, partial fields and boundaries.
+        import hashlib
+        import json
+        digest = hashlib.sha256()
+        carrier = np.arange(8*9*3, dtype=np.uint8).reshape(8, 9, 3)
+        carrier.flat[:4] = [0, 1, 254, 255]
+        for mode in ('lowest', 'plane'):
+            for method in ('replace', 'match'):
+                for placement in ('contiguous', 'stride', 'random'):
+                    for k in range(1, 9):
+                        for payload in ('random_bytes', 'letters'):
+                            kwargs = dict(bit_mode=mode, k=k, method=method, placement=placement,
+                                payload=payload, payload_bytes=5, stride=2 if placement=='stride' else 1,
+                                start=0 if placement!='random' else None)
+                            random = np.random.default_rng(20261024)
+                            stego, mask, result = lsb_engine.embed(carrier, rng=random, **kwargs)
+                            other = np.random.default_rng(20261024)
+                            fast, meta, changed = lsb_engine.embed_fast(carrier, rng=other,
+                                return_changed_units=True, **kwargs)
+                            np.testing.assert_array_equal(stego, fast)
+                            self.assertEqual(random.bit_generator.state, other.bit_generator.state)
+                            for value in (stego.tobytes(), mask.tobytes(), changed.astype('<i8').tobytes(),
+                                    lsb_engine.extract(stego, result), json.dumps(meta, sort_keys=True).encode(),
+                                    json.dumps(random.bit_generator.state, sort_keys=True).encode(),
+                                    np.asarray(random.integers(0, 2**32, size=4, dtype=np.uint32), dtype='<u4').tobytes()):
+                                digest.update(value)
+        self.assertEqual(digest.hexdigest(), '21949240a8365bda54faddd6b1c11677fea2df869d4fedd9b84933d006e94d36')
+
+    def test_explicit_units_preserve_other_values_bits_and_report_actual_changes(self):
+        carrier = np.arange(8*9*3, dtype=np.uint8).reshape(8, 9, 3)
+        for k in (1, 2):
+            units = np.arange(8//k)*3+1
+            stego, meta, changed = lsb_engine.replace_at_units(carrier, b'\xa5', k, units)
+            mask = np.zeros(carrier.size, dtype=bool);mask[units] = True
+            np.testing.assert_array_equal(carrier.reshape(-1)[~mask], stego.reshape(-1)[~mask])
+            np.testing.assert_array_equal(carrier & (255-((1<<k)-1)), stego & (255-((1<<k)-1)))
+            np.testing.assert_array_equal(changed, np.flatnonzero(carrier.reshape(-1) != stego.reshape(-1)))
+            self.assertFalse(changed.flags.writeable)
+            self.assertEqual(meta['embedded_bits'], 8)
+            self.assertEqual(meta['units_changed'], len(changed))
+            fields = stego.reshape(-1)[units] & ((1<<k)-1)
+            bits = ((fields[:, None] >> np.arange(k-1, -1, -1)) & 1).reshape(-1)
+            self.assertEqual(np.packbits(bits).tobytes(), b'\xa5')
+        np.testing.assert_array_equal(carrier, np.arange(8*9*3, dtype=np.uint8).reshape(8, 9, 3))
+
+    def test_explicit_unit_validation_capacity_and_no_global_rng_draw(self):
+        image = np.zeros((2, 2, 3), dtype=np.uint8)
+        state = np.random.get_state()
+        lsb_engine.replace_at_units(image, b'x', 1, np.arange(8))
+        after = np.random.get_state()
+        for first, second in zip(state, after):
+            if isinstance(first, np.ndarray):np.testing.assert_array_equal(first, second)
+            else:self.assertEqual(first, second)
+        for payload, k, units in ((b'', 1, np.arange(8)), (b'x', 3, np.arange(8)),
+                (b'xx', 1, np.arange(16)), (b'x', 1, np.zeros(8, dtype=int)),
+                (b'x', 1, np.arange(8)-1), (b'x', 1, np.arange(8)+5),
+                (b'x', 1, np.arange(8, dtype=float))):
+            with self.assertRaises(ValueError):lsb_engine.replace_at_units(image, payload, k, units)
+
+
 if __name__ == "__main__":
     unittest.main()
