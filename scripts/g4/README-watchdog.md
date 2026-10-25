@@ -98,6 +98,7 @@ Set `W` to the **reviewed/pushed watchdog commit SHA from the handoff**, not HEA
 The official ARM64 590.0.1 archive/hash below was checked on 2026-10-24. Recheck
 Google's versioned listing before installation; stop on mismatch. Debian13's
 Python3.13 is supported. Do not run uv or install Torch.
+The unversioned file changes with each Google release; if the check fails, re-read the published hash at https://cloud.google.com/sdk/docs/downloads-versioned-archives and never skip the check.
 
 ```sh
 (
@@ -106,7 +107,7 @@ W=REVIEWED_WATCHDOG_COMMIT_SHA
 umask 077
 cd "$HOME/.cache/cvdl-watchdog-setup"
 curl -fL --retry 3 -o gcloud-arm.tar.gz \
-  https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-590.0.1-linux-arm.tar.gz
+  https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-arm.tar.gz
 printf '%s  gcloud-arm.tar.gz\n' c9e8618c9257b3289deb7cb5483479230d5d96230bd68a80fce17f592d0d3012 | sha256sum -c -
 sudo useradd --system --user-group --create-home --home-dir /var/lib/cvdl-watchdog --shell /usr/sbin/nologin cvdl-watchdog
 sudo chmod 700 /var/lib/cvdl-watchdog
