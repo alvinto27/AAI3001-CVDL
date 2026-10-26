@@ -18,8 +18,8 @@ On 2026-10-20 the full CPU suite took 8.2 min (424 tests) and the golden compare
 
 ```sh
 podman exec -w /work aai3001 python -B scripts/required_test_level.py           # which checks this change needs
-podman exec -w /work aai3001 python -B scripts/test_cpu.py --level fast         # about 2.7 min
-podman exec -w /work aai3001 python -B scripts/test_cpu.py                      # full (default), about 8.3 min
+podman exec -w /work aai3001 python -B scripts/test_cpu.py --level fast         # ~~about 2.7 min~~ about 4.7 min (2026-10-26)
+podman exec -w /work aai3001 python -B scripts/test_cpu.py                      # full (default), ~~about 8.3 min~~ about 16 min (2026-10-26)
 ```
 
 - `test_cpu.py` sets the CPU-only environment (no GPU, 1 thread) itself. The fast level skips the whole `test_lsb_torch` module with the visible reason `full level only: ...`. The full level runs every test.
@@ -86,3 +86,10 @@ The user decided that strict before/after enforcement does not suit a project th
 
 Measured: full 360 run, 474.9 s; fast 331 run + 29 skipped, 141.6 s. No full-only rule depended on the golden, so the levels select the same tests as before.
 
+## 2026-10-26: replays to FULL, clean-FULL evidence (`e1add75`)
+
+From the process audit (user approved B1 + B3). Before: FAST 640.3 s (561 run, 31 skipped; saved run on an earlier revision); FULL about 16 min (569 run, 970.7 s).
+
+- **B1:** FAST also skips four historical multiworker replay methods (unpaired loader replay, curriculum first-seven-epochs replay, legacy run 10/11 replay, B36 full-panel worker replay). They still run in FULL and in focused runs. A change to their listed direct inputs (`REPLAY_FULL_FILES`, `tests/fixtures/`, the #11 recipe folder in `scripts/required_test_level.py`) requires FULL. After: one serial FAST 280.5 s (592 total, 35 skipped), about 6 min shorter. Times are observations, not limits.
+- **B3:** a complete FULL that passes on a checkout clean at start and end writes local evidence keyed by the HEAD tree, the SHA-256 of the `REQUIRED_FIXTURES` files and the Python / torch versions. When the key matches, `required_test_level.py` prints `FAST satisfied by matching FULL evidence`. FAST and focused runs never write it; FULL evidence never removes a FULL requirement. A FULL before a G4 launch is still required.
+- **B2** (`91f1bf8`): all suites go through `scripts/test_cpu.py` (one container-wide lock; see the list above).
