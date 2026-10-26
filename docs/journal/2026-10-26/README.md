@@ -19,4 +19,6 @@
 
 ### Next
 
-- Worker_4: implementation, PC probes, FULL. Pending.
+- ~~Worker_4: implementation, PC probes, FULL. Pending.~~ Done: `c0412e0` (12 paths; notebook diff vs R1 = name + model + `val_batch_images=64`). FAST 556, FULL 556 pass. The resume guard refuses a same-shaped R1 checkpoint (no SRM Adam state) before records are overwritten.
+- PC probe (`runs/verification/learn-srm-pc-pilot-2026-10-26/pilot.json`): FP64 errors ≤ 6.5e-6 (limit 1e-4) for the SRM weight gradient and the ROCm workaround; compiled and reloaded models match, and the bank stays trainable. Start loss identical to R1 (.693317); the bank moves (max .0047 after 128 steps). PC speed at batch 16: 11.76 vs R1 14.58 steps/s (0.81x; no G4 claim).
+- Run 20 launch by Run_Supervisor, with the Pi watchdog armed for this job (first real use). Pending.
