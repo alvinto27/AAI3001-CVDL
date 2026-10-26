@@ -139,6 +139,10 @@ a=[str(root/x[6:]) if x.startswith('/work/') else x for x in a]
 a[0]=sys.executable
 raise SystemExit(subprocess.call(a,cwd=root))
 ''');wrapper.chmod(0o755)
+        # Boot fixtures never query the host's system manager.
+        systemctl=tools/'systemctl'
+        systemctl.write_text('#!/bin/sh\ncase "$*" in *--property=LoadState*) echo masked;; *--property=ActiveState*) echo inactive;; *) exit 99;; esac\n')
+        systemctl.chmod(0o755)
         cloud=tools/'gcloud';cloud.write_text('#!/bin/sh\necho UNEXPECTED_CLOUD_CALL >&2\nexit 99\n');cloud.chmod(0o755)
         cls.marker=parent/'runner-called'
         cls.env={**os.environ,'PATH':str(tools)+os.pathsep+os.environ['PATH'],

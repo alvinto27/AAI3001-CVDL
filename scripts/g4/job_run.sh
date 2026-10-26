@@ -194,6 +194,24 @@ ATTEMPT=0
 ENV_SHA=
 OWN_JOB=0
 RESUMING=0
+FAILURE_REASON=
+check_update_units() {
+    local unit load active bad=()
+    for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service unattended-upgrades.service; do
+        if ! load=$(systemctl show "$unit" --property=LoadState --value); then load=query-failed; fi
+        if ! active=$(systemctl show "$unit" --property=ActiveState --value); then active=query-failed; fi
+        if [[ $load != masked || $active != inactive ]]; then
+            bad+=("$unit(LoadState=$load,ActiveState=$active)")
+        fi
+    done
+    if ((${#bad[@]})); then
+        FAILURE_REASON="automatic-update policy refused: ${bad[*]}"
+        note "$FAILURE_REASON"
+        printf '%s %s\n' "$(stamp)" "$FAILURE_REASON" >> "$STATE_ROOT/logs/$JOB_ID-run.log"
+        return 1
+    fi
+    note 'Automatic-update units are masked and inactive'
+}
 cleanup() {
     local rc=$?
     trap - EXIT
@@ -210,15 +228,18 @@ cleanup() {
         local out="$ROOT/runs-out/$JOB_ID" finished
         mkdir -p "$out"
         # Notebook 05 keeps the full cell output only in run.log. Preserve a
-        # small console record only if the runner failed before run.log existed.
-        if [[ $NOTEBOOK == notebooks/04_baseline_kv_xunet_v3.ipynb || ! -f $out/run.log ]]; then
+        # small console record only if the runner failed before run.log existed,
+        # or a pre-run policy refusal occurred (resume can have an old run.log).
+        if [[ $NOTEBOOK == notebooks/04_baseline_kv_xunet_v3.ipynb || ! -f $out/run.log || -n $FAILURE_REASON ]]; then
             [[ -f "$STATE_ROOT/logs/$JOB_ID-run.log" ]] && cp "$STATE_ROOT/logs/$JOB_ID-run.log" "$out/job-console.log"
         fi
         [[ -n $RUN_ENV && -f $RUN_ENV ]] && cp "$RUN_ENV" "$out/job.env"
         finished=$(stamp)
-        local training
+        local training reason
         training=$(helper outcome "$out" "$EXIT_CODE") || training=failed
-        helper attempt "$STATE_ROOT/jobs/$JOB_ID.attempts.jsonl" "$out" "$JOB_ID" "$ATTEMPT" end "$training exit=$EXIT_CODE" || true
+        reason="$training exit=$EXIT_CODE"
+        [[ -z $FAILURE_REASON ]] || reason+="; $FAILURE_REASON"
+        helper attempt "$STATE_ROOT/jobs/$JOB_ID.attempts.jsonl" "$out" "$JOB_ID" "$ATTEMPT" end "$reason" || true
         [[ -f "$STATE_ROOT/jobs/$JOB_ID.attempts.jsonl" ]] && cp --remove-destination "$STATE_ROOT/jobs/$JOB_ID.attempts.jsonl" "$out/attempts.jsonl"
         if deliver "$JOB_ID"; then
             write_record "$JOB_ID" delivered "$STARTED" "$finished" "$EXIT_CODE" yes "$training"
@@ -290,6 +311,9 @@ if ! write_record "$JOB_ID" starting "$STARTED" '' '' no starting; then note 'Ca
 if (( RESUMING )) && ! helper attempt "$STATE_ROOT/jobs/$JOB_ID.attempts.jsonl" "$ROOT/runs-out/$JOB_ID" "$JOB_ID" "$ATTEMPT" start "$JOB_MODE"; then
     note 'Could not record attempt start'; exit 2
 fi
+# The attempt is now ours. Refuse before checkout/package work or training;
+# EXIT cleanup must still record, deliver and shut down this failed attempt.
+if ! check_update_units; then exit 2; fi
 if (( RESUMING )) && ! helper checkpoint "$ROOT/runs-out/$JOB_ID" > "$STATE_ROOT/jobs/$JOB_ID-checkpoint-in.json"; then
     note 'Resume needs a readable full last checkpoint; refuse fresh start'; exit 2
 fi
