@@ -19,7 +19,8 @@ RUNS=(WIDE,MIX,'tiling-overlap-20261016T135926Z-8501','tiling-trim-20261016T1441
  'srm-e50-paired-20261023T022339Z-4518',
  'srm-e50-curriculum50-paired-20261023T090435Z-3325',
  'srm-e50-paired-coloursep36-20261024T115642Z-1325',
- 'srm-e50-paired-learn-srm-20261026T022114Z-0923')
+ 'srm-e50-paired-learn-srm-20261026T022114Z-0923',
+ 'srm-e50-paired-gapcov32-20261026T115421Z-1917')
 
 
 def build(root=ROOT):
