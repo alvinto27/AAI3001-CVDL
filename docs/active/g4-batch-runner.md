@@ -5,7 +5,8 @@
 The Spot VM `rtx6000pro` is in `us-central1-c`. It has one RTX PRO 6000.
 Its external IP changes at boot. The machine costs about $1.63 per hour when
 running. **Do not start it just to test these scripts.** Its GCE maximum run
-duration is 120 minutes from boot, with action **Stop**. Maintenance mode does
+duration is ~~120 minutes~~ 18000 s (300 minutes, since 2026-10-22) from boot,
+with action **Stop**. Change it only while the VM is TERMINATED. Maintenance mode does
 not bypass that limit.
 
 The boot service is enabled only after setup. It reads **instance** metadata
