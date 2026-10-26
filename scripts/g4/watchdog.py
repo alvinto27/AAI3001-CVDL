@@ -80,7 +80,11 @@ class Engine:
         env=dict(os.environ,CVDL_G4_CONTROLLER_PYTHON=sys.executable)
         done=subprocess.run(['bash',str(self.root/'scripts/g4/submit.sh'),'resume',job,
             '--request-file',str(request),'--start-limit',str(limit)],cwd=self.root,env=env,
-            capture_output=True,text=True,timeout=150,check=True)
+            capture_output=True,text=True,timeout=150)
+        # Expose only our named check results, not arbitrary cloud stderr.
+        for line in done.stderr.splitlines():
+            if line.startswith('launch gate '): print(line,file=sys.stderr)
+        done.check_returncode()
         return json.loads(done.stdout)
     def status(self,phase,reason='',**fields):
         doc=getattr(self,'document',{})

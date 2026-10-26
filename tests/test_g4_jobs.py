@@ -101,6 +101,7 @@ class SubmissionTests(unittest.TestCase):
         cls.temp=tempfile.TemporaryDirectory(prefix='cvdl-g4-tests-')
         parent=Path(cls.temp.name);cls.root=parent/'repo';cls.root.mkdir()
         paths=git(ROOT,'ls-files').splitlines()+[
+            'scripts/g4/launch_gate.py','scripts/g4/launch_probe.sh','scripts/g4/pi_launch_check.sh',
             'scripts/g4/preflight.py','scripts/g4/tensor_limits.py','scripts/g4/resume.py','cvdl/checkpoint_io.py','cvdl/file_io.py','notebooks/newdata-1.ipynb','notebooks/wide-1.ipynb',
             'scripts/g4/jobs/archive/newdata-1.env','scripts/g4/jobs/archive/wide-1.env',
             'scripts/g4/jobs/archive/README.md']
@@ -143,7 +144,11 @@ raise SystemExit(subprocess.call(a,cwd=root))
         systemctl=tools/'systemctl'
         systemctl.write_text('#!/bin/sh\ncase "$*" in *--property=LoadState*) echo masked;; *--property=ActiveState*) echo inactive;; *) exit 99;; esac\n')
         systemctl.chmod(0o755)
-        cloud=tools/'gcloud';cloud.write_text('#!/bin/sh\necho UNEXPECTED_CLOUD_CALL >&2\nexit 99\n');cloud.chmod(0o755)
+        ssh=tools/'ssh'
+        ssh.write_text('#!/bin/sh\nprintf "%s\\n" mount_source=1 filesystem_rw=1 upload_owner_write=1 srv_search=1 results_search=1\n');ssh.chmod(0o755)
+        cloud=tools/'gcloud'
+        cloud.write_text('#!/bin/sh\nif [ "$1 $2 $3" = "compute instances describe" ]; then echo \'{"scheduling":{"maxRunDuration":{"seconds":"18000"},"instanceTerminationAction":"STOP"}}\'; else echo UNEXPECTED_CLOUD_CALL >&2; exit 99; fi\n')
+        cloud.chmod(0o755)
         cls.marker=parent/'runner-called'
         cls.env={**os.environ,'PATH':str(tools)+os.pathsep+os.environ['PATH'],
                  'TEST_REPO':str(cls.root),'RUN_MARKER':str(cls.marker)}

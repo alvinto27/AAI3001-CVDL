@@ -9,6 +9,7 @@ import time
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 from scripts.g4.preflight import resume_identity
+from scripts.g4.launch_gate import check_launch
 from scripts.g4.watchdog_common import (Cloud,STOPPED,atomic,capacity,identity,lock,matches_operation,
     metadata,read_json,scheduling,timestamp)
 
@@ -34,6 +35,9 @@ def step(path,job,*,cloud=None,now=None,start_limit=15,root=ROOT,dry=False):
     """One reconciled transition; at most one start, only after prepared metadata."""
     cloud=cloud or Cloud();now=time.time() if now is None else now;path=Path(path)
     if type(start_limit) is not int or not 1<=start_limit<=15:raise ValueError('invalid start limit')
+    # Same unprivileged Pi/GCE gate as direct submit, before receipts or writes.
+    # It prints only to stderr: watchdog stdout remains one JSON object.
+    check_launch()
     document=cloud.describe();scheduling(document);ident=identity(document)
     if ident['job']!=job:raise ValueError('retained job mismatch')
     proof=validate_checkout(root,ident)

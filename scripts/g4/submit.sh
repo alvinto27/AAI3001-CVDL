@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Validate locally, then submit one pinned metadata job. Resume dry-run reads GCE metadata only.
+# Validate locally and check Pi/GCE read-only, then submit one pinned metadata job.
 set -euo pipefail
 ACTION=${1:-}
 [[ $ACTION == run || $ACTION == resume || $ACTION == maintenance || $ACTION == off || $ACTION == status ]] || {
@@ -64,8 +64,9 @@ ZONE=us-central1-c
 TEMP_ENV=
 TEMP_META=
 TEMP_FIELDS=
+TEMP_GATE=
 ATTEMPT=0
-trap 'rm -f -- ${TEMP_ENV:+"$TEMP_ENV"} ${TEMP_META:+"$TEMP_META"} ${TEMP_FIELDS:+"$TEMP_FIELDS"}' EXIT
+trap 'rm -f -- ${TEMP_ENV:+"$TEMP_ENV"} ${TEMP_META:+"$TEMP_META"} ${TEMP_FIELDS:+"$TEMP_FIELDS"} ${TEMP_GATE:+"$TEMP_GATE"}' EXIT
 if [[ $ACTION == resume ]]; then
     command -v gcloud >/dev/null || { echo 'Install and authenticate gcloud first' >&2; exit 2; }
     TEMP_META=$(mktemp); TEMP_FIELDS=$(mktemp)
@@ -122,6 +123,17 @@ if [[ $ACTION == run || $ACTION == resume ]]; then
         while IFS= read -r line; do printf '  %s\n' "$line"; done < "$ENV_FILE"
     fi
     printf 'job-id=%s\njob-commit=%s\n' "$JOB_ID" "$COMMIT"
+fi
+if [[ $ACTION == run || $ACTION == resume ]]; then
+    # Query on the host: its existing admin SSH and gcloud credentials stay there.
+    # Python parsing runs in the container, or natively for the Pi controller.
+    TEMP_GATE=$(mktemp)
+    if ! bash scripts/g4/launch_probe.sh > "$TEMP_GATE"; then : > "$TEMP_GATE"; fi
+    if [[ -n ${CVDL_G4_CONTROLLER_PYTHON:-} ]]; then
+        "$CVDL_G4_CONTROLLER_PYTHON" scripts/g4/launch_gate.py < "$TEMP_GATE"
+    else
+        podman exec -i -w /work aai3001 python scripts/g4/launch_gate.py < "$TEMP_GATE"
+    fi
 fi
 command_line() { printf '+ '; printf '%q ' "$@"; printf '\n'; }
 execute() { if (( DRY )); then command_line "$@"; else "$@"; fi; }

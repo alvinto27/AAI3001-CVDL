@@ -53,6 +53,7 @@ class PendingTests(unittest.TestCase):
     def setUp(self):
         self.temp=TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.path=Path(self.temp.name)/'request.json';self.cloud=FakeCloud();self.cloud.doc['status']='TERMINATED'
+        gate=patch.object(request,'check_launch');gate.start();self.addCleanup(gate.stop)
         self.proof=patch.object(request,'validate_checkout',return_value=PROOF);self.proof.start();self.addCleanup(self.proof.stop)
     def step(self,now=BASE+200,**kw):return request.step(self.path,'unit-job',cloud=self.cloud,now=now,**kw)
     def test_prepare_then_start_and_repeated_pending_never_increment_twice(self):
@@ -145,6 +146,7 @@ class EngineTests(unittest.TestCase):
         self.temp=TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name);self.path=self.root/'state/state.json';self.cloud=FakeCloud();self.now=BASE
         self.config=dict(w.DEFAULTS,armed=True,audit_approved=True,job='unit-job')
+        gate=patch.object(request,'check_launch');gate.start();self.addCleanup(gate.stop)
         self.patcher=patch.object(w,'validate_checkout',return_value=PROOF);self.patcher.start();self.addCleanup(self.patcher.stop)
         self.calls=[]
         self.engine=self.engine_new()
@@ -325,6 +327,14 @@ class NativeShellTests(unittest.TestCase):
         tools=Path(cls.env['PATH'].split(os.pathsep)[0])
         (tools/'podman').write_text('#!/bin/sh\necho UNEXPECTED_PODMAN >&2\nexit 99\n')
         (tools/'ssh').write_text('#!/bin/sh\necho UNEXPECTED_SSH >&2\nexit 99\n');(tools/'ssh').chmod(0o755)
+        # Native Pi path checks local unprivileged metadata; never admin SSH.
+        for name,text in {
+            'hostname':'echo rpi400-server',
+            'awk':'echo "/dev/sda1 rw,noatime"',
+            'id':'echo 1001',
+            'stat':'case "$*" in */srv/cvdl-results) echo "41ed 1001 1001";; *) echo "41ed 1000 1000";; esac',
+        }.items():
+            tool=tools/name;tool.write_text('#!/bin/sh\n'+text+'\n');tool.chmod(0o755)
         cloud=tools/'gcloud'
         cloud.write_text('''#!'''+sys.executable+'''
 import json,os,sys

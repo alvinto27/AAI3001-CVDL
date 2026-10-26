@@ -282,7 +282,8 @@ with open(os.environ['RSYNC_MARKER'],'a') as f:f.write(json.dumps(sys.argv[1:])+
 
     def test_submit_resume_reads_stopped_metadata_only_and_reuses_published_identity(self):
         f=self.prepare();cloud=f.area/'cloud';data=f.area/'instance.json'
-        document=dict(status='TERMINATED',metadata=dict(items=[dict(key=k,value=v) for k,v in {
+        document=dict(status='TERMINATED',scheduling=dict(maxRunDuration=dict(seconds='18000'),instanceTerminationAction='STOP'),
+            metadata=dict(items=[dict(key=k,value=v) for k,v in {
             'job-id':f.job,'job-commit':self.commit,'job-env':f.envfile.read_text(),'job-timeout-min':'100',
             'max-run-minutes':'120','job-protocol':'resume-v1','job-attempt':'0'}.items()]))
         data.write_text(json.dumps(document))
