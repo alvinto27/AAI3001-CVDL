@@ -101,7 +101,7 @@ A whole photo is cut into 256 tiles; a small logistic rule reads 8 summary numbe
 
 | Question | Status |
 | --- | --- |
-| Can a model separate k=1 low-bpp payloads in noisy ALASKA photos? | Open; all tests so far near chance |
+| Can a model separate k=1 low-bpp payloads in noisy ALASKA photos? | Open; all CNNs so far near chance (best, run 21: AUC .53-.61). WS reached .66-.69 there (check 1), so the signal exists; [ideas board](active/ideas-board.md) #24 (parity-aware input) targets it |
 | Does a GBRAS-Net style front end (arm G) help? | On hold (user, 2026-10-21) |
 | Does a heavier cell-loss weight or a cell-only cut-off improve recall at a strict cut-off? | Not tested |
 | Do the gains hold across seeds? | Not tested; every run is one seed |

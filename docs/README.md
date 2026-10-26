@@ -3,6 +3,7 @@
 This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Nothing runs without a user decision**; approved G4 runs are in the [run queue](active/run-queue.md), ideas on the [ideas board](active/ideas-board.md). Read [status](status.md) before acting, [findings](findings.md) for older run comparisons (512-era; see its note), and the [dated journal](journal/README.md) for the original records.
 
 ## Current references (`active/` means kept for use, not permission to run)
+- [2026-10-26 session handoff — read first next session](active/handoff-2026-10-26.md)
 - [50-epoch low-bpp curriculum from scratch (ideas #17) — approved plan (2026-10-22)](active/plan-curriculum50.md)
 - [Paired training (ideas #16): R1 SRM-e50 paired, R2 cell model paired — approved plan (2026-10-22)](active/plan-paired-training.md)
 - [Test levels and the changed-path rule — fast/full/none tests; golden retired 2026-10-21 (built `891aefe`, 2026-10-20)](active/test-levels.md)
