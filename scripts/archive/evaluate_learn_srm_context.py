@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Freeze, score or report GAP+covariance on original #11 bytes in a new sibling."""
+"""Freeze, score or report learn-SRM on original #11 bytes in a new sibling."""
 from pathlib import Path
 import argparse
 import sys
-ROOT=Path(__file__).resolve().parents[1]
+ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 
 
 def main():
-    from cvdl import gapcov_context as context
+    from cvdl import learn_srm_context as context
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command',choices=('freeze','score','report','check'))
     parser.add_argument('--output',type=Path,required=True)

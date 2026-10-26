@@ -18,7 +18,7 @@ import time
 
 os.environ.setdefault("TORCHINDUCTOR_COMPILE_THREADS", "4")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "LSB-Dataset-Generator"))
 import lightning as L
 import numpy as np

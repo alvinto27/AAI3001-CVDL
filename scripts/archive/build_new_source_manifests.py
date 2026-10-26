@@ -15,6 +15,8 @@ from pathlib import Path, PurePosixPath
 import re
 import sys
 
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'scripts'))
 from build_manifests import PHOTO_FIELDS, SPLIT_FIELDS
 
 SELECTION_FIELDS = {
@@ -138,7 +140,7 @@ if __name__=='__main__':
     parser.add_argument('--source',choices=('alaska','lsdir'),required=True)
     parser.add_argument('--selection',type=Path,required=True)
     parser.add_argument('--output-root',type=Path,required=True)
-    parser.add_argument('--repo-root',type=Path,default=Path(__file__).resolve().parents[1])
+    parser.add_argument('--repo-root',type=Path,default=ROOT)
     parser.add_argument('--no-verify-files',action='store_true',help='dry run only; do not use for final manifest')
     args=parser.parse_args()
     print(json.dumps(build(args.source,args.selection,args.output_root,args.repo_root,
