@@ -16,7 +16,7 @@ from scripts.architecture_decision import (join_predictions, auc_intervals, rate
     PANELS, TARGETS, SEED, REPLICATES)
 
 NAMES=('reference','candidate')
-RULES=('paired_r1','curriculum50','paired_r2','wiser_b')
+RULES=('paired_r1','curriculum50','paired_r2','wiser_b','learn_srm')
 WISER_REFERENCE='runs/srm-e50-paired-20261023T022339Z-4518/evaluation/standard-256-v1/6ef349895655136bef90'
 WISER_REFERENCE_SHA='b00cd4b6d1f4c3648580691c9cf0e2a4bd83c55740a3cf2a7a561a8adf12f180'
 WISER_NOTEBOOK=ROOT/'notebooks/experiments/srm-e50-paired-coloursep36.ipynb'
@@ -28,6 +28,16 @@ WISER_APPROVAL=dict(arm='ideas20-B36',date='2026-10-24',routes='paired_r1: a OR 
         reason='evaluation-only cap; avoid native SRM output INT32 overflow at 512px'),
     model='xunet_wide_coloursep36',selection='full scratch50 capped best',
     reference=WISER_REFERENCE,reference_sha256=WISER_REFERENCE_SHA,notebook_sha256=WISER_NOTEBOOK_SHA)
+LEARN_NOTEBOOK=ROOT/'notebooks/experiments/srm-e50-paired-learn-srm.ipynb'
+LEARN_NOTEBOOK_SHA='610c0422c767a6e3e58eae882aa34aff94947173e7d42cd85840f797ed82be74'
+LEARN_APPROVAL=dict(arm='ideas20-learn-srm',date='2026-10-26',routes='paired_r1: a OR b',
+    original_plan_sha256='e3f962f604f7bb2ba6ffe395d3f9d6d0dab22d5447d371df6266d67ef25e9452',
+    approved_override='both paired_r1 routes; no cell or minimum selected-epoch gate',
+    speed_gate=dict(after_epoch=3,measured_epochs=[2,3],train_steps_per_second_min=10.5,projected_fit_minutes_max=250),
+    timeout_minutes=270,max_run_minutes=285,
+    model='xunet_wide_learn_srm',selection='full scratch50 capped best',val_batch_images=64,
+    reference=WISER_REFERENCE,reference_sha256=WISER_REFERENCE_SHA,notebook_sha256=LEARN_NOTEBOOK_SHA,
+    model_source_sha256='54222e17ce10387684e1ebc200ecb60cc7648e5a516e238c20f523a0a8ac36b2')
 LIMITS=dict(standard_pe_route_a_point_max=-.002,standard_pe_route_a_upper_strict_max=0.,
     hard_auc_guard_lower_min=-.01,hard_auc_gain_point_min=.01,hard_auc_gain_lower_strict_min=0.,
     standard_pe_guard_upper_max=.0025,curriculum_selected_epoch_one_based_min=8,
@@ -114,16 +124,47 @@ def selected_epoch(meta):
 
 
 def wiser_identity(folders, metadata):
-    """Verify the fixed reference and scratch/best recipe before reading scores."""
+    return _srm_identity(folders,metadata,notebook=WISER_NOTEBOOK,notebook_sha=WISER_NOTEBOOK_SHA,
+        model='xunet_wide_coloursep36')
+
+
+def learn_srm_identity(folders, metadata):
+    import torch
+    epoch,path=_srm_identity(folders,metadata,notebook=LEARN_NOTEBOOK,notebook_sha=LEARN_NOTEBOOK_SHA,
+        model='xunet_wide_learn_srm')
+    if sha(ROOT/'cvdl/models.py')!=LEARN_APPROVAL['model_source_sha256']:
+        raise ValueError('learn_srm model source drift')
+    start=json.loads((path.parent/'training_start.json').read_text())
+    original=json.loads((path.parent/'run_settings.json').read_text())['values']
+    if start.get('initialization')!='random' or start.get('weights_only') is not False:
+        raise ValueError('learn_srm requires a recorded random scratch start')
+    from cvdl.settings import SCHEMA
+    expected_start={k:v for k,v in original.items() if not SCHEMA[k].machine}
+    expected_start['train_yaml_sha256']=sha(ROOT/'configs/train-k1to4.yaml')
+    if start.get('settings')!=expected_start:raise ValueError('learn_srm start/training settings mismatch')
+    record=json.loads((path.parent/'model_run_settings.json').read_text())
+    if record.get('model')!='xunet_wide_learn_srm' or record.get('srm_trainable') is not True:
+        raise ValueError('learn_srm original model/trainability record mismatch')
+    for checkpoint in (path,path.parent/'last.ckpt'):
+        saved=torch.load(checkpoint,map_location='cpu',weights_only=False);h=saved['hyper_parameters']
+        if (h.get('channels_last',False) or h.get('cell_supervision','off')!='off'
+                or h.get('embedding_schedule_identity') is not None):raise ValueError('learn_srm unapproved controls')
+        if saved.get('global_step')!=(saved['epoch']+1)*2813:
+            raise ValueError('learn_srm checkpoint step/epoch mismatch')
+    return epoch,path
+
+
+def _srm_identity(folders, metadata, *, notebook, notebook_sha, model):
+    """Shared strict recipe checks; each public rule supplies its frozen identity."""
     import torch
     from scripts.g4.preflight import top_values
     if Path(folders[0]).resolve()!=(ROOT/WISER_REFERENCE).resolve() or metadata[0]['checkpoint_sha256']!=WISER_REFERENCE_SHA:
         raise ValueError('wiser_b requires the frozen R1 reference')
     if sha(checkpoint_path(metadata[0]))!=WISER_REFERENCE_SHA:raise ValueError('wiser_b reference checkpoint SHA mismatch')
-    if sha(WISER_NOTEBOOK)!=WISER_NOTEBOOK_SHA:raise ValueError('wiser_b frozen recipe fingerprint changed')
+    if sha(notebook)!=notebook_sha:raise ValueError('frozen recipe fingerprint changed')
     from cvdl.settings import load,machine_profile,plain,SCHEMA
     expected=plain(load(environ={},_profile=machine_profile('g4'),
-        **top_values(json.loads(WISER_NOTEBOOK.read_text()))).values)
+        **top_values(json.loads(notebook.read_text()))).values)
     path=checkpoint_path(metadata[1])
     record=path.parent/'run_settings.json'
     if not record.is_file():raise ValueError('missing original training settings')
@@ -170,7 +211,7 @@ def wiser_identity(folders, metadata):
         raise ValueError('wiser_b requires full 50-epoch fit evidence')
     saved=torch.load(path,map_location='cpu',weights_only=False)
     h=saved.get('hyper_parameters',{})
-    required=dict(model='xunet_wide_coloursep36',front_end='srm',norm='none',width=4,clip_t=3.,
+    required=dict(model=model,front_end='srm',norm='none',width=4,clip_t=3.,
         paired_batches=True,max_epochs=50,batch_size=128,precision='32',lr=3e-4,weight_decay=1e-4,
         warmup_epochs=1,grad_clip=1.,lr_drops=[[8,.3],[33,.1]],steps_per_epoch=2813,
         val_batch_images=64,effective_val_batch_images=64)
@@ -188,7 +229,7 @@ def wiser_identity(folders, metadata):
 def rule_checks(rule, hard, standard, *, epoch=None, cells=None):
     """Candidate minus reference. Literal boundary directions are intentional."""
     if rule not in RULES:raise ValueError('unknown frozen rule')
-    if rule=='wiser_b':
+    if rule in ('wiser_b','learn_srm'):
         return rule_checks('paired_r1',hard,standard)
     if rule=='paired_r1':
         a=dict(standard_pe_gain_at_least_002=standard['point']<=-.002,
@@ -303,17 +344,19 @@ def summarize(reference, candidate, output, rule, *, reference_cells=None, candi
     paths=[p for folder in folders for p in evaluation_inputs(folder)]
     paths+=[PLAN,CURRICULUM_PLAN,Path(__file__),ROOT/'scripts/architecture_decision.py',
         ROOT/'cvdl/cell_metrics.py',ROOT/'cvdl/metrics.py',ROOT/'cvdl/curriculum.py']
-    if rule=='wiser_b':
-        paths.extend([WISER_NOTEBOOK,*[ROOT/p for p in ('cvdl/models.py','cvdl/settings.py','cvdl/runtime.py',
+    if rule in ('wiser_b','learn_srm'):
+        paths.extend([WISER_NOTEBOOK if rule=='wiser_b' else LEARN_NOTEBOOK,*[ROOT/p for p in ('cvdl/models.py','cvdl/settings.py','cvdl/runtime.py',
             'cvdl/lit.py','configs/train-k1to4.yaml','configs/test-256-v1.yaml',
             'configs/evaluation-calibration-v1.json')]])
         paths.extend(sorted((ROOT/'data/val/60da4391043e8ce48ff2').glob('*')))
         # Resolve and hash before any score joins or bootstrap work.
         raw=[json.loads((p/'evaluation_settings.json').read_text()) for p in folders]
-        wiser_epoch,wiser_path=wiser_identity(folders,raw)
+        identity=wiser_identity if rule=='wiser_b' else learn_srm_identity
+        wiser_epoch,wiser_path=identity(folders,raw)
         reference_path=checkpoint_path(raw[0])
         paths.extend([wiser_path,reference_path,*[folder/p for folder in (wiser_path.parent,reference_path.parent)
             for p in ('run_settings.json','model_run_settings.json','data_run_settings.json')],wiser_path.parent/'last.ckpt'])
+        if rule=='learn_srm':paths.append(wiser_path.parent/'training_start.json')
     if rule=='paired_r2':
         if not reference_cells or not candidate_cells:raise ValueError('paired_r2 needs both saved cell folders')
         paths.extend(cell_inputs(reference_cells)+cell_inputs(candidate_cells))
@@ -354,7 +397,7 @@ def summarize(reference, candidate, output, rule, *, reference_cells=None, candi
             context[key],draws[key]=auc_intervals(low[low[field]==value],names=NAMES)
     for condition in ('noisy','low_noisy'):
         context[condition],draws[condition]=auc_intervals(hard[hard.panel.isin(TARGETS)&(hard.k==1)&(hard.condition==condition)],names=NAMES)
-    epoch=wiser_epoch if rule=='wiser_b' else None;cells=None
+    epoch=wiser_epoch if rule in ('wiser_b','learn_srm') else None;cells=None
     if rule=='curriculum50':
         epoch,path=selected_epoch(metadata[1]);paths.append(path)
         # The checkpoint was hashed/verified against the already snapshotted meta.
@@ -372,9 +415,10 @@ def summarize(reference, candidate, output, rule, *, reference_cells=None, candi
         input_sha256=before,input_sha256_after=after,inputs_unchanged=True,
         threshold_metadata=dict(zip(NAMES,thresholds)),pooled_hard_auc=main,standard_pe=guard,
         standard_panels=panels,context_hard_auc=context,selected_epoch_one_based=epoch,cells=cells)
-    if rule=='wiser_b':
-        result['approved_identity']=WISER_APPROVAL
-        result['approved_identity_sha256']=hashlib.sha256(json.dumps(WISER_APPROVAL,sort_keys=True).encode()).hexdigest()
+    if rule in ('wiser_b','learn_srm'):
+        approval=WISER_APPROVAL if rule=='wiser_b' else LEARN_APPROVAL
+        result['approved_identity']=approval
+        result['approved_identity_sha256']=hashlib.sha256(json.dumps(approval,sort_keys=True).encode()).hexdigest()
     output.mkdir(parents=True,exist_ok=True)
     (output/'evidence.json').write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')
     np.savez_compressed(output/'bootstrap-replicates.npz',**draws)

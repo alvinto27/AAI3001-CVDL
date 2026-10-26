@@ -92,7 +92,7 @@ def create_loaders(s, otf, tables):
 
 
 def model_checks(s, clean_batch, stego_batch):
-    """Count parameters and check frozen KV weights, preserving both allocations."""
+    """Count parameters and check front-end trainability, preserving allocations."""
     def model():
         return models.model_from_hparams(dict(model=s.model, clip_t=s.clip_t, norm=s.norm,
                                              width=s.width, front_end=s.front_end,
@@ -110,9 +110,14 @@ def model_checks(s, clean_batch, stego_batch):
     optimizer.zero_grad(set_to_none=True)
     loss = F.cross_entropy(probe(images), targets)
     loss.backward()
+    learn_srm = s.model == 'xunet_wide_learn_srm'
+    if learn_srm:
+        gradient = probe.kv.conv.weight.grad
+        assert gradient is not None and torch.isfinite(gradient).all() and gradient.abs().max() > 0
     optimizer.step()
-    assert torch.equal(before, probe.kv.conv.weight.detach())
-    print(f'Probe loss: {loss.item():.5f}; KV weights unchanged: True')
+    unchanged = torch.equal(before, probe.kv.conv.weight.detach())
+    assert unchanged != learn_srm
+    print(f'Probe loss: {loss.item():.5f}; KV weights unchanged: {unchanged}')
 
 
 def finish_training(s, bundle, loaders):
@@ -147,8 +152,10 @@ def create_training(s, otf_data, loaders, *, trainer_options=None):
     starting=getattr(s,'init_checkpoint',None) is not None
     scratch50=getattr(s,'embedding_schedule',None)=='low_bpp50_v1'
     resuming=False; prior_model={}
-    if starting or scratch50:
+    learn_srm=s.model=='xunet_wide_learn_srm'
+    if starting or scratch50 or learn_srm:
         from .curriculum import check_start
+        if learn_srm:from .learn_srm_training import check_start
         resuming=check_start(s,checkpoint_dir)
         if resuming:prior_model=json.loads((checkpoint_dir/'model_run_settings.json').read_text())
     model_run_settings = {"compile_mode": s.compile,
@@ -179,6 +186,9 @@ def create_training(s, otf_data, loaders, *, trainer_options=None):
     if s.model=='xunet_wide_coloursep36':
         model_run_settings.update(conv1_backend='native_grouped',rocm_conv1_fix_active=False,
             rocm_conv1_fix_reason='dense-only unfold workaround excluded for groups3')
+    if s.model=='xunet_wide_learn_srm':
+        model_run_settings.update(srm_trainable=True,srm_coefficients=2250,srm_groups=3,
+            srm_initialization='existing_SRM_ARRAY_float32',conv1_backend='unfold_wgrad' if conv1_factory(s) else 'native_dense')
     if scratch50:
         from .curriculum import scratch50_record
         model_run_settings['embedding_schedule_identity']=scratch50_record(s.tiles_per_epoch)
@@ -259,6 +269,10 @@ def create_training(s, otf_data, loaders, *, trainer_options=None):
         from .curriculum import initialize_scratch50
         initialize_scratch50(s,checkpoint_dir,resuming)
         lightning_model.hparams['embedding_schedule_identity']=model_run_settings['embedding_schedule_identity']
+        model_run_settings['initialization']='random'
+    if learn_srm:
+        from .curriculum import initialize_scratch50
+        initialize_scratch50(s,checkpoint_dir,resuming)
         model_run_settings['initialization']='random'
     if s.name or scratch50:
         import hashlib

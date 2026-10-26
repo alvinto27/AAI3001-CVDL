@@ -208,6 +208,15 @@ class XuNetWideColourSep36(XuNetWide):
             self.conv2 = nn.Conv2d(36, 64, 5, padding=2)
 
 
+class XuNetWideLearnSRM(XuNetWide):
+    """R1 graph and initialization; only the existing SRM bank is unfrozen."""
+    def __init__(self, clip_t=3.0, norm='none', width=4, front_end='srm'):
+        if (front_end, norm, width, clip_t) != ('srm', 'none', 4, 3.0):
+            raise ValueError('learn_srm requires SRM, norm none, width4 and clip_t3')
+        super().__init__(clip_t=clip_t, norm=norm, width=width, front_end=front_end)
+        self.kv.conv.weight.requires_grad_(True)
+
+
 def model_from_hparams(hparams):
     model = hparams.get('model', 'xunet')
     clip_t, norm = hparams.get('clip_t', 3.0), hparams.get('norm', 'group')
@@ -220,6 +229,8 @@ def model_from_hparams(hparams):
         network = XuNetWideDelayed(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
     elif model == 'xunet_wide_coloursep36':
         network = XuNetWideColourSep36(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
+    elif model == 'xunet_wide_learn_srm':
+        network = XuNetWideLearnSRM(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
     elif model == 'gbras':
         from .gbras import GBRASNet
         network = GBRASNet(clip_t=clip_t, norm=norm, front_end=front_end)
