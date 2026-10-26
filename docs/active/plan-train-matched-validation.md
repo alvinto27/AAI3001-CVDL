@@ -128,7 +128,7 @@ and 2-worker loaders. The old 8,035-pair capped validation hash is unchanged.
 Initial metadata build times were 1.093 s (SRM) and 1.896 s (SRM-hard); these
 are not inference or validation-pass timings.
 
-- `podman exec -w /work aai3001 python -B scripts/test_cpu.py` passes (270 before).
+- `podman exec -w /work aai3001 python -m unittest discover -s tests` passes (270 before).
 - `podman exec -w /work aai3001 python scripts/refactor_golden.py compare` prints ALL EQUAL.
 - Builder `--check` twice gives identical files; old capped hash unchanged.
 - CPU replay: a few pairs of each new list through the loader with 0 and 2 workers give identical bytes.

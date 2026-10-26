@@ -58,5 +58,5 @@ Report notebook (#5), the rescoring runs themselves (#6), the 7 earlier models, 
 - Checkpoints and original run records unchanged (SHA before and after).
 - Reference thresholds per source, no DIV2K; QUICK identity separate.
 - New wide-R2 list: builder `--check` byte-identical twice; shares match its training records.
-- Full `scripts/test_cpu.py` passes; `refactor_golden.py compare` ALL EQUAL (GPU visible, on approval); legacy-512 unchanged.
+- Full `unittest discover` passes; `refactor_golden.py compare` ALL EQUAL (GPU visible, on approval); legacy-512 unchanged.
 - Timed inference pilot only with separate approval.
