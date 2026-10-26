@@ -101,7 +101,7 @@ class SubmissionTests(unittest.TestCase):
         cls.temp=tempfile.TemporaryDirectory(prefix='cvdl-g4-tests-')
         parent=Path(cls.temp.name);cls.root=parent/'repo';cls.root.mkdir()
         paths=git(ROOT,'ls-files').splitlines()+[
-            'scripts/g4/preflight.py','scripts/g4/resume.py','cvdl/checkpoint_io.py','cvdl/file_io.py','notebooks/newdata-1.ipynb','notebooks/wide-1.ipynb',
+            'scripts/g4/preflight.py','scripts/g4/tensor_limits.py','scripts/g4/resume.py','cvdl/checkpoint_io.py','cvdl/file_io.py','notebooks/newdata-1.ipynb','notebooks/wide-1.ipynb',
             'scripts/g4/jobs/archive/newdata-1.env','scripts/g4/jobs/archive/wide-1.env',
             'scripts/g4/jobs/archive/README.md']
         copied=[]
@@ -202,12 +202,15 @@ raise SystemExit(subprocess.call(a,cwd=root))
 
     def test_pinned_commit_not_working_tree_is_preflight_source(self):
         path=self.root/'notebooks/newdata-1.ipynb';before=path.read_bytes()
-        path.write_text('bad JSON in working tree')
+        model=self.root/'cvdl/models.py';model_before=model.read_bytes()
+        path.write_text('bad JSON in working tree');model.write_text('invalid live Python source!')
         try:
             report=preflight('notebooks/newdata-1.ipynb',self.commit,root=self.root)
             self.assertTrue(report['run_name'].endswith('wide-w4_mixr2'))
             self.assertEqual(report['values']['quick'],False)
-        finally:path.write_bytes(before)
+            self.assertGreater(report['tensor_limits']['stages']['training']['tensor_outputs'],0)
+        finally:
+            path.write_bytes(before);model.write_bytes(model_before)
 
     def test_old_commit_metadata_incompatibility_fails_before_boot(self):
         source=(self.root/'cvdl/settings.py').read_text()

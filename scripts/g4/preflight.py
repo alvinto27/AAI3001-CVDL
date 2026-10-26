@@ -106,11 +106,20 @@ if getattr(settings,'train_grid','recorded')!='recorded':
     for source in settings.sources:
         records.extend(csv.DictReader((Path(settings.root)/f'data/{source}/photo_manifest.csv').open()))
     summary(settings.root,records,getattr(settings,'train_tile_size',None) or settings.tile_size,settings.train_grid)
+# The gate is current controller policy; model imports come from this pinned
+# snapshot, including for historical commits that predate the gate helper.
+from runpy import run_path
+try:
+    sizes = run_path(sys.argv[4])['check_tensors'](plain(settings.values))
+except ValueError as error:
+    print(str(error), file=sys.stderr)
+    raise SystemExit(2)
 print(json.dumps(dict(values=plain(settings.values), sources=plain(settings.provenance),
     profile=settings.profile, run_name=settings.run_name, globals=settings.legacy_globals(),
-    run_settings=asdict(settings.to_run_settings()))))
+    run_settings=asdict(settings.to_run_settings()), tensor_limits=sizes)))
 '''
-        done = subprocess.run([sys.executable,'-c',script,json.dumps(values),json.dumps(profile),json.dumps(speed_env or {})],
+        checker = Path(__file__).with_name('tensor_limits.py').resolve()
+        done = subprocess.run([sys.executable,'-c',script,json.dumps(values),json.dumps(profile),json.dumps(speed_env or {}),str(checker)],
                               cwd=snapshot,capture_output=True,text=True)
         if done.returncode:
             raise ValueError('G4 pre-flight failed before boot:\n'+done.stderr.strip())
