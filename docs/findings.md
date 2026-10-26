@@ -35,6 +35,7 @@ P_E % at each model's own validation cut-off (standard / ALASKA seen / ALASKA un
 | Curriculum50 paired | R1 + 50-epoch low-bpp curriculum | 2.57 | 19.72 | 16.68 | 9.35 | .9967 | [10-23](journal/2026-10-23/README.md) |
 | **run 18 cell (submission)** | R2 recipe, from Curriculum50 | 2.62 | 18.82 | 15.85 | 9.16 | .9963 | [10-23](journal/2026-10-23/README.md) |
 | run 19 B36 colour-split | R1 recipe, conv1 per colour (#20 arm B) | 3.66 | — | — | — | .9928 | [10-25](journal/2026-10-25/README.md) |
+| run 20 learnable SRM | R1 recipe, SRM kernels trainable (#20 arm A) | 3.34 | — | — | — | .9937 | [10-26](journal/2026-10-26/README.md) |
 
 ## Cell heatmap (run 13)
 
@@ -86,6 +87,7 @@ A whole photo is cut into 256 tiles; a small logistic rule reads 8 summary numbe
 
 - **Colour matters (2026-10-24, #11).** At the same pixels and payload, a message only in green is found more easily than RGB-spread (run 18 AUC .775 vs .725), and only in red or blue less easily (.660 / .662), for all three models tested. Red/blue-only hiding is a blind spot (miss +5-6 points). [Journal](journal/2026-10-24/README.md).
 - **Keeping colours apart in conv1 hurts (2026-10-25, #20 arm B).** B36 (conv1 per colour, mixing from conv2; WISERNet idea) vs R1 on the same recipe: standard P_E 3.66% vs 2.55% (+1.11 points [+0.80, +1.44]); hard k=1 low AUC .693 vs .757 (−.064 [−.072, −.055]); rule `wiser_b` FAIL on both routes. It also ran 1.5x slower on the G4 (12.0 vs 17.8-18.4 steps/s). It did not close the red/blue blind spot of #11 (red/green/blue-only AUC .614/.730/.594 vs run 18 .660/.775/.662). Early colour mixing helps our LSB detector. [Journal](journal/2026-10-25/README.md).
+- **Learning the SRM kernels hurts (2026-10-26, #20 arm A).** Run 20 (R1 with the 90 SRM kernels trainable from their SRM values) vs R1 on the same recipe: standard P_E 3.34% vs 2.55% (+0.79 points [+0.50, +1.09]); hard k=1 low AUC .691 vs .757 (−.067 [−.074, −.060]); rule `learn_srm` FAIL on both routes. The kernels did move (relative change .117 at the best epoch, beyond weight decay), so the learned bank is worse, not stuck. With arm B, #20 is closed: fixed SRM kernels and early colour mixing stay. It was 0.62x R1's speed on the G4 (11.3 steps/s). [Journal](journal/2026-10-26/README.md).
 - **256 training tiles beat 512**, and overlap-last tiling beats trim and pad at both sizes (overlap-256 3.43% vs overlap-512 5.61%).
 - **The SRM front end is the largest single gain** (SRM-30 3.07% vs KV overlap-256 3.43%; better on every panel). 50 epochs improve it further (2.54%).
 - **Low-bpp k=1 is the hard core.** Every model is near chance on ALASKA k1 low+noisy (AUC .51-.52 at the 10-18 rescore). Training tricks aimed at it move the threshold more than the ranking: srm-hard (misses down, false alarms up), the curriculum (+.019 hard AUC, +0.56 pts standard P_E), the cell head (+.005 hard AUC, +0.32 pts).
