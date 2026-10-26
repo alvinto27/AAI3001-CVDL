@@ -75,6 +75,8 @@ instead. `setup.sh base` installs it only when setting up a new VM. A future
 change to `job.sh` itself needs a maintenance install; that is not part of this
 workflow.
 
+**Automatic-update gate (`499296a`, 2026-10-26):** in run and resume modes, after the owned attempt start is recorded and before package work or training, `job_run.sh` requires the five units from `setup.sh freeze-updates` (`apt-daily.timer`, `apt-daily-upgrade.timer`, `apt-daily.service`, `apt-daily-upgrade.service`, `unattended-upgrades.service`) to be masked and inactive. A failed query, a blank or unknown state, or an unmasked or active unit refuses the attempt (exit 2): the console and the attempt-end reason name each unit, then normal delivery and shutdown follow. The gate is read-only (no repair, no stop of a package transaction). Maintenance and off modes are unchanged. Cause: run 20 was stopped by `apt-daily-upgrade` on 2026-10-26 ([journal](../journal/2026-10-26/README.md)); `freeze-updates` was applied to the VM that day (`17b5aac`).
+
 ## First boot (person, maintenance mode)
 
 Get the current external IP from the Google Cloud console. Install the PC
