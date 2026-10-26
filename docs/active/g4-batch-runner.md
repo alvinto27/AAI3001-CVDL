@@ -393,7 +393,16 @@ A recorded ID never runs twice. Use a new ID for a new attempt.
 3. Run the exact notebook + SHA command with `--dry-run`. Review effective
    settings, RUN_NAME, job ID, timeout and the two-line metadata env.
 4. Only after explicit user approval, repeat without `--dry-run`.
-5. Check delivered `status.json`, `executed.ipynb`, `run_settings.json`,
+5. **Post-flight (`e46fc91`, 2026-10-26):** on the PC host,
+   `bash scripts/g4/postflight_probe.sh "$JOB" > frame` and then
+   `podman exec -i -w /work aai3001 python -B scripts/g4/postflight.py "$JOB" --remote-stdin < frame`.
+   Read-only, one table; exit non-zero on any FAIL or unavailable check. It checks: every file in the checkpoint
+   tree Pi = PC (SHA-256) and readable (octal modes); `status.json` and `attempts.jsonl` identical on both sides;
+   delivered status done / exit 0; contiguous attempts ending done / exit 0 (interrupted predecessors allowed);
+   the current VM job-id and job-mode (default `run`, `--expected-job-mode`); a fresh watchdog phase / armed / job
+   (default UNARMED / false). The runner record is VM-only: an INFO row, not read. Do not restore metadata only to
+   make it pass. First live use (run 20): 30 PASS, 1 FAIL (job-mode was `resume` after the resume), 1 INFO.
+   Also check delivered `status.json`, `executed.ipynb`, `run_settings.json`,
    `boot.log` checkout-script evidence and final VM stop. The write-only inbox
    key cannot inspect results; use the Pi admin account.
 
