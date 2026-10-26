@@ -38,8 +38,13 @@ class SteganalysisModule(L.LightningModule):
         if val_batch_images is not None:
             self.hparams['effective_val_batch_images']=min(batch_size,val_batch_images)
         self.validation_data = validation_data
+        head_identity={}
+        if model=='xunet_wide_gapcov32':
+            from .cov_pool import SPEC
+            head_identity=dict(cov_pool_identity=dict(SPEC))
+            self.hparams.update(head_identity)
         self.net = model_from_hparams(dict(model=model, clip_t=clip_t, norm=norm, width=width, front_end=front_end,
-            **(dict(cell_supervision=cell_supervision) if cell_supervision!='off' else {})))
+            **(dict(cell_supervision=cell_supervision) if cell_supervision!='off' else {}),**head_identity))
         if conv1_factory is not None:
             self.net.conv1 = conv1_factory(self.net.conv1)
         self.channels_last = channels_last
@@ -49,6 +54,12 @@ class SteganalysisModule(L.LightningModule):
         self.validation_labels = []
         self.validation_sources = []
         self.validation_losses = []
+
+    def on_load_checkpoint(self, checkpoint):
+        if self.hparams.get('model')=='xunet_wide_gapcov32':
+            from .cov_pool import SPEC
+            if checkpoint.get('hyper_parameters',{}).get('cov_pool_identity')!=SPEC:
+                raise ValueError('gapcov32 checkpoint head identity mismatch')
 
     def transfer_batch_to_device(self, batch, device, dataloader_idx):
         batch = super().transfer_batch_to_device(batch, device, dataloader_idx)

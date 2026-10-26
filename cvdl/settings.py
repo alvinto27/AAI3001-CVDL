@@ -177,7 +177,7 @@ SCHEMA = MappingProxyType({
     'name': Definition('str?', optional_string, None, 'notebook stem or None', 'Short experiment notebook name.'),
     'extra_tests': Definition('str', str, 'test-bpp1', 'none/test-bpp1/source-panels or both panels', 'Extra evaluation panels.', lambda v:set(v.split(','))<={'none','test-bpp1','source-panels'} and ('none' not in v or v=='none'), 'V3_EXTRA_TESTS', 'EXTRA_TESTS'),
     'front_end': Definition('str', str, 'kv', 'kv/srm', 'Fixed first-layer residual filters: KV or the 30 SRM filters.', lambda v:v in {'kv','srm'}),
-    'model': Definition('str', str, 'xunet', 'xunet/xunet_wide/xunet_wide_delayed/xunet_wide_coloursep36/xunet_wide_learn_srm/gbras', 'Network architecture.', lambda v:v in {'xunet','xunet_wide','xunet_wide_delayed','xunet_wide_coloursep36','xunet_wide_learn_srm','gbras'}, 'V3_MODEL', 'MODEL'),
+    'model': Definition('str', str, 'xunet', 'xunet/xunet_wide/xunet_wide_delayed/xunet_wide_coloursep36/xunet_wide_learn_srm/xunet_wide_gapcov32/gbras', 'Network architecture.', lambda v:v in {'xunet','xunet_wide','xunet_wide_delayed','xunet_wide_coloursep36','xunet_wide_learn_srm','xunet_wide_gapcov32','gbras'}, 'V3_MODEL', 'MODEL'),
     'width': Definition('int', integer, 4, '1..8', 'Wide network multiplier.', lambda v:1<=v<=8, 'V3_WIDTH', 'WIDTH'),
     'batch_size': Definition('int', integer, lambda c:8 if c['quick'] else 32, 'positive multiple of 4', 'Training images per batch.', lambda v:v>0 and v%4==0, 'V3_BATCH_SIZE', 'BATCH_SIZE'),
     'source': Definition('str', str, 'decode', 'decode/cache', 'Photo input path.', lambda v:v in {'decode','cache'}, 'V3_SOURCE', 'OTF_SOURCE'),
@@ -407,6 +407,7 @@ def _run_name(c, explicit):
     if c['model']=='xunet_wide': prefix += f"_wide-w{c['width']}"
     if c['model']=='xunet_wide_coloursep36': prefix += '_wide-w4_coloursep36'
     if c['model']=='xunet_wide_learn_srm': prefix += '_wide-w4_learn-srm'
+    if c['model']=='xunet_wide_gapcov32': prefix += '_wide-w4_gapcov32'
     if c['model']=='xunet_wide_delayed': prefix += f"_wide-w{c['width']}_delayed"
     if c['model']=='gbras': prefix += '_gbras-adapter90to30'
     if c['batch_size'] != (8 if c['quick'] else 32): prefix += f"_b{c['batch_size']}"
@@ -531,6 +532,8 @@ def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_v
         raise ValueError('coloursep36 requires SRM, norm none, width4, clip_t3 and no cell supervision')
     if c['model']=='xunet_wide_learn_srm' and (c['front_end'],c['norm'],c['width'],c['clip_t'],c['cell_supervision'])!=('srm','none',4,3.0,'off'):
         raise ValueError('learn_srm requires SRM, norm none, width4, clip_t3 and no cell supervision')
+    if c['model']=='xunet_wide_gapcov32' and (c['front_end'],c['norm'],c['width'],c['clip_t'],c['cell_supervision'])!=('srm','none',4,3.0,'off'):
+        raise ValueError('gapcov32 requires SRM, norm none, width4, clip_t3 and no cell supervision')
     if c['model']=='gbras' and (c['front_end']!='srm' or c['norm']!='batch' or c['clip_t']!=3.0):
         raise ValueError('GBRAS arm requires front_end=srm, intrinsic norm=batch and clip_t=3')
     if bool(c['init_checkpoint']) != bool(c['init_checkpoint_sha256']):

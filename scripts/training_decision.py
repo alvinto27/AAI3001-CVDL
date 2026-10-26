@@ -16,7 +16,7 @@ from scripts.architecture_decision import (join_predictions, auc_intervals, rate
     PANELS, TARGETS, SEED, REPLICATES)
 
 NAMES=('reference','candidate')
-RULES=('paired_r1','curriculum50','paired_r2','wiser_b','learn_srm')
+RULES=('paired_r1','curriculum50','paired_r2','wiser_b','learn_srm','cov_pool')
 WISER_REFERENCE='runs/srm-e50-paired-20261023T022339Z-4518/evaluation/standard-256-v1/6ef349895655136bef90'
 WISER_REFERENCE_SHA='b00cd4b6d1f4c3648580691c9cf0e2a4bd83c55740a3cf2a7a561a8adf12f180'
 WISER_NOTEBOOK=ROOT/'notebooks/experiments/srm-e50-paired-coloursep36.ipynb'
@@ -38,6 +38,20 @@ LEARN_APPROVAL=dict(arm='ideas20-learn-srm',date='2026-10-26',routes='paired_r1:
     model='xunet_wide_learn_srm',selection='full scratch50 capped best',val_batch_images=64,
     reference=WISER_REFERENCE,reference_sha256=WISER_REFERENCE_SHA,notebook_sha256=LEARN_NOTEBOOK_SHA,
     model_source_sha256='54222e17ce10387684e1ebc200ecb60cc7648e5a516e238c20f523a0a8ac36b2')
+COV_NOTEBOOK=ROOT/'notebooks/experiments/srm-e50-paired-gapcov32.ipynb'
+COV_NOTEBOOK_SHA='bb67c346c1886a94af2e8dee43c953747a25fc1c0ce8d772182c56253e825fcd'
+COV_ATTRIBUTION=('D_j = GAP linear cell margin + M * grad_Hj(covariance margin) dot (Hj-mean(H)); '
+    'signed attribution, not a cell probability or exact tile decomposition; classifier bias is tile-only. '
+    'Cell AUC measures alignment with changed cells, not a trained cell detector. Tile-global context.')
+COV_APPROVAL=dict(arm='ideas21-gapcov32',date='2026-10-26',routes='paired_r1: a OR b',
+    original_plan_sha256='645d2ed6baee5d8d187ea6d43b9d7bde1c2a7a4e6a3d2ff9c7dc23aaca80c3f0',
+    approved_override='EXTEND R1: GAP256 plus covariance528, default Linear784 init, no calibration/scaling',
+    model='xunet_wide_gapcov32',selection='full scratch50 capped best',val_batch_images=64,
+    speed_gate=dict(after_epoch=3,measured_epochs=[2,3],train_steps_per_second_min=14.,projected_fit_minutes_max=205),
+    timeout_minutes=230,max_run_minutes=260,reference=WISER_REFERENCE,reference_sha256=WISER_REFERENCE_SHA,
+    notebook_sha256=COV_NOTEBOOK_SHA,
+    model_source_sha256='09d3e41599a7cd28c167dacf95a67ce91ec2bca95b1ecfb5e73a491289a432bb',
+    math_source_sha256='31cf8ecb4eb7f36c12b789f669f7c13f23ff51f0fdb8be46d6e33ecdaeb6ea28')
 LIMITS=dict(standard_pe_route_a_point_max=-.002,standard_pe_route_a_upper_strict_max=0.,
     hard_auc_guard_lower_min=-.01,hard_auc_gain_point_min=.01,hard_auc_gain_lower_strict_min=0.,
     standard_pe_guard_upper_max=.0025,curriculum_selected_epoch_one_based_min=8,
@@ -154,6 +168,58 @@ def learn_srm_identity(folders, metadata):
     return epoch,path
 
 
+def cov_pool_identity(folders, metadata):
+    import torch
+    from cvdl.cov_pool import MODEL,SPEC
+    from cvdl.models import SRM_ARRAY
+    from cvdl.settings import SCHEMA
+    epoch,path=_srm_identity(folders,metadata,notebook=COV_NOTEBOOK,notebook_sha=COV_NOTEBOOK_SHA,model=MODEL)
+    if (sha(ROOT/'cvdl/models.py')!=COV_APPROVAL['model_source_sha256'] or
+            sha(ROOT/'cvdl/cov_pool.py')!=COV_APPROVAL['math_source_sha256']):raise ValueError('cov_pool source drift')
+    original=json.loads((path.parent/'run_settings.json').read_text())['values']
+    start=json.loads((path.parent/'training_start.json').read_text())
+    expected={k:v for k,v in original.items() if not SCHEMA[k].machine}
+    expected['train_yaml_sha256']=sha(ROOT/'configs/train-k1to4.yaml')
+    if start.get('initialization')!='random' or start.get('weights_only') is not False or start.get('settings')!=expected:
+        raise ValueError('cov_pool requires matched random scratch start')
+    record=json.loads((path.parent/'model_run_settings.json').read_text())
+    if (record.get('model')!=MODEL or record.get('cov_pool_identity')!=SPEC or record.get('srm_trainable') is not False
+            or record.get('tf32_matmul') is not False):raise ValueError('cov_pool original head/precision identity mismatch')
+    fingerprint=record.get('initial_weights_sha256','')
+    if not isinstance(fingerprint,str) or len(fingerprint)!=64 or any(c not in '0123456789abcdef' for c in fingerprint):
+        raise ValueError('cov_pool missing original initialization fingerprint')
+    bank=torch.from_numpy(SRM_ARRAY).unsqueeze(1).repeat(3,1,1,1)
+    for checkpoint in (path,path.parent/'last.ckpt'):
+        saved=torch.load(checkpoint,map_location='cpu',weights_only=False);h=saved['hyper_parameters']
+        if h.get('cov_pool_identity')!=SPEC:raise ValueError('cov_pool saved head identity mismatch')
+        if h.get('channels_last',False) or h.get('cell_supervision','off')!='off' or h.get('embedding_schedule_identity') is not None:
+            raise ValueError('cov_pool unapproved controls')
+        if not 0<=saved['epoch']<50 or saved.get('global_step')!=(saved['epoch']+1)*2813:raise ValueError('cov_pool step/epoch mismatch')
+        state=saved['state_dict']
+        if state['net.classifier.weight'].shape!=(2,784) or state['net.cov_reduce.weight'].shape!=(32,256,1,1):
+            raise ValueError('cov_pool head shape mismatch')
+        if not torch.equal(state['net.kv.conv.weight'],bank):raise ValueError('cov_pool SRM must remain frozen')
+    return epoch,path
+
+
+def noisy_clean_context(hard,cutoffs,*,replicates=REPLICATES):
+    """Distinct noisy-clean union; paired photo draws, no success/failure guard."""
+    import numpy as np
+    frame=hard[(hard.label==0)&hard.panel.isin(TARGETS)&hard.condition.isin(('noisy','low_noisy'))].drop_duplicates('cover_id')
+    if frame.empty:raise ValueError('no noisy clean tiles')
+    names,cluster=np.unique(frame.source_photo,return_inverse=True)
+    alarms=np.stack([(frame[n].to_numpy()>=cutoffs[n]).astype(float) for n in NAMES],1)
+    point=alarms.mean(0);rng=np.random.default_rng(SEED);samples=[]
+    for _ in range(replicates):
+        counts=np.bincount(rng.integers(len(names),size=len(names)),minlength=len(names));w=counts[cluster]
+        samples.append((alarms*w[:,None]).sum(0)/w.sum())
+    samples=np.asarray(samples);delta=samples[:,1]-samples[:,0];lo,hi=np.quantile(delta,[.025,.975])
+    return dict(context_only=True,main_rule_affected=False,distinct_tiles=len(frame),source_photos=len(names),
+        scope='target noisy/low_noisy, both k; distinct cover_id union; first recorded score retained',
+        models=dict(zip(NAMES,map(float,point))),difference=dict(point=float(point[1]-point[0]),low=float(lo),high=float(hi)),
+        bootstrap=dict(seed=SEED,replicates=replicates,unit='source_photo',interval='paired percentile95')),samples
+
+
 def _srm_identity(folders, metadata, *, notebook, notebook_sha, model):
     """Shared strict recipe checks; each public rule supplies its frozen identity."""
     import torch
@@ -229,7 +295,7 @@ def _srm_identity(folders, metadata, *, notebook, notebook_sha, model):
 def rule_checks(rule, hard, standard, *, epoch=None, cells=None):
     """Candidate minus reference. Literal boundary directions are intentional."""
     if rule not in RULES:raise ValueError('unknown frozen rule')
-    if rule in ('wiser_b','learn_srm'):
+    if rule in ('wiser_b','learn_srm','cov_pool'):
         return rule_checks('paired_r1',hard,standard)
     if rule=='paired_r1':
         a=dict(standard_pe_gain_at_least_002=standard['point']<=-.002,
@@ -344,19 +410,20 @@ def summarize(reference, candidate, output, rule, *, reference_cells=None, candi
     paths=[p for folder in folders for p in evaluation_inputs(folder)]
     paths+=[PLAN,CURRICULUM_PLAN,Path(__file__),ROOT/'scripts/architecture_decision.py',
         ROOT/'cvdl/cell_metrics.py',ROOT/'cvdl/metrics.py',ROOT/'cvdl/curriculum.py']
-    if rule in ('wiser_b','learn_srm'):
-        paths.extend([WISER_NOTEBOOK if rule=='wiser_b' else LEARN_NOTEBOOK,*[ROOT/p for p in ('cvdl/models.py','cvdl/settings.py','cvdl/runtime.py',
+    if rule in ('wiser_b','learn_srm','cov_pool'):
+        paths.extend([{'wiser_b':WISER_NOTEBOOK,'learn_srm':LEARN_NOTEBOOK,'cov_pool':COV_NOTEBOOK}[rule],*[ROOT/p for p in ('cvdl/models.py','cvdl/settings.py','cvdl/runtime.py',
             'cvdl/lit.py','configs/train-k1to4.yaml','configs/test-256-v1.yaml',
             'configs/evaluation-calibration-v1.json')]])
         paths.extend(sorted((ROOT/'data/val/60da4391043e8ce48ff2').glob('*')))
         # Resolve and hash before any score joins or bootstrap work.
         raw=[json.loads((p/'evaluation_settings.json').read_text()) for p in folders]
-        identity=wiser_identity if rule=='wiser_b' else learn_srm_identity
+        identity={'wiser_b':wiser_identity,'learn_srm':learn_srm_identity,'cov_pool':cov_pool_identity}[rule]
         wiser_epoch,wiser_path=identity(folders,raw)
         reference_path=checkpoint_path(raw[0])
         paths.extend([wiser_path,reference_path,*[folder/p for folder in (wiser_path.parent,reference_path.parent)
             for p in ('run_settings.json','model_run_settings.json','data_run_settings.json')],wiser_path.parent/'last.ckpt'])
-        if rule=='learn_srm':paths.append(wiser_path.parent/'training_start.json')
+        if rule in ('learn_srm','cov_pool'):paths.append(wiser_path.parent/'training_start.json')
+        if rule=='cov_pool':paths.extend([ROOT/'cvdl/cov_pool.py',ROOT/'cvdl/cov_training.py'])
     if rule=='paired_r2':
         if not reference_cells or not candidate_cells:raise ValueError('paired_r2 needs both saved cell folders')
         paths.extend(cell_inputs(reference_cells)+cell_inputs(candidate_cells))
@@ -397,7 +464,7 @@ def summarize(reference, candidate, output, rule, *, reference_cells=None, candi
             context[key],draws[key]=auc_intervals(low[low[field]==value],names=NAMES)
     for condition in ('noisy','low_noisy'):
         context[condition],draws[condition]=auc_intervals(hard[hard.panel.isin(TARGETS)&(hard.k==1)&(hard.condition==condition)],names=NAMES)
-    epoch=wiser_epoch if rule in ('wiser_b','learn_srm') else None;cells=None
+    epoch=wiser_epoch if rule in ('wiser_b','learn_srm','cov_pool') else None;cells=None
     if rule=='curriculum50':
         epoch,path=selected_epoch(metadata[1]);paths.append(path)
         # The checkpoint was hashed/verified against the already snapshotted meta.
@@ -406,6 +473,7 @@ def summarize(reference, candidate, output, rule, *, reference_cells=None, candi
         cells,cell_draws=compare_cells(reference_cells,candidate_cells)
         draws.update({'cell_'+k:v for k,v in cell_draws.items()})
     verdict=rule_checks(rule,main['difference'],guard['difference'],epoch=epoch,cells=cells)
+    if rule=='cov_pool':noisy,draws['noisy_clean_false_alarms']=noisy_clean_context(hard,cutoffs)
     after=snapshot()
     if before!=after:raise RuntimeError('saved inputs changed during decision')
     result=dict(rule_set=rule,rule_parameters=LIMITS,**verdict,model_order=NAMES,evaluations=dict(zip(NAMES,map(str,folders))),
@@ -415,10 +483,13 @@ def summarize(reference, candidate, output, rule, *, reference_cells=None, candi
         input_sha256=before,input_sha256_after=after,inputs_unchanged=True,
         threshold_metadata=dict(zip(NAMES,thresholds)),pooled_hard_auc=main,standard_pe=guard,
         standard_panels=panels,context_hard_auc=context,selected_epoch_one_based=epoch,cells=cells)
-    if rule in ('wiser_b','learn_srm'):
-        approval=WISER_APPROVAL if rule=='wiser_b' else LEARN_APPROVAL
+    if rule in ('wiser_b','learn_srm','cov_pool'):
+        approval={'wiser_b':WISER_APPROVAL,'learn_srm':LEARN_APPROVAL,'cov_pool':COV_APPROVAL}[rule]
         result['approved_identity']=approval
         result['approved_identity_sha256']=hashlib.sha256(json.dumps(approval,sort_keys=True).encode()).hexdigest()
+    if rule=='cov_pool':
+        result['noisy_clean_false_alarms']=noisy
+        result['attribution_context_definition']=COV_ATTRIBUTION
     output.mkdir(parents=True,exist_ok=True)
     (output/'evidence.json').write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')
     np.savez_compressed(output/'bootstrap-replicates.npz',**draws)
@@ -449,6 +520,14 @@ def write_report(result,output):
         '','## Context only','','| Scope | ΔAUC [95%] |','| --- | --- |']
     for key,item in result['context_hard_auc'].items():lines.append(f'| {key} | {number(item["difference"])} |')
     for key,item in result['standard_panels'].items():lines.append(f'| standard/{key} | {number(item["difference"])} |')
+    if 'noisy_clean_false_alarms' in result:
+        noise=result['noisy_clean_false_alarms']
+        lines+=['','### Noisy-clean union FA (context only)',
+            f'Distinct clean tiles: {noise["distinct_tiles"]}; photos: {noise["source_photos"]}.',
+            f'Reference FA: {noise["models"]["reference"]:.8f}; candidate FA: {noise["models"]["candidate"]:.8f}.',
+            'Candidate-minus-reference FA [95%]: '+number(noise['difference']),
+            'No noisy-FA or cell-attribution condition changes the verdict.','',
+            '### Cell map meaning (context only)',result['attribution_context_definition']]
     lines+=['','All numbers, input hashes and frozen threshold metadata: `evidence.json`. Shared draws: `bootstrap-replicates.npz`.']
     (output/'report.md').write_text('\n'.join(lines)+'\n')
 

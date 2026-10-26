@@ -189,7 +189,9 @@ class ContextTests(unittest.TestCase):
         from cvdl.channel_analysis import file_hash
         self.assertEqual(__import__('hashlib').sha256(subprocess.check_output(['git','show','3ac965d:cvdl/models.py'],cwd=ROOT)).hexdigest(),MODEL_SHA)
         from cvdl.learn_srm_context import MODEL_SHA as LEARN_MODEL_SHA
-        self.assertEqual(file_hash(ROOT/'cvdl/models.py'),LEARN_MODEL_SHA)
+        self.assertEqual(__import__('hashlib').sha256(subprocess.check_output(['git','show','c0412e0:cvdl/models.py'],cwd=ROOT)).hexdigest(),LEARN_MODEL_SHA)
+        from cvdl.gapcov_context import MODEL_SHA as CURRENT_MODEL_SHA
+        self.assertEqual(file_hash(ROOT/'cvdl/models.py'),CURRENT_MODEL_SHA)
         old=ast.parse(subprocess.check_output(['git','show',ORIGINAL_COMMIT+':cvdl/models.py'],cwd=ROOT,text=True))
         new=ast.parse((ROOT/'cvdl/models.py').read_text())
         old_nodes={n.name:ast.dump(n) for n in old.body if isinstance(n,(ast.ClassDef,ast.FunctionDef))}
@@ -207,7 +209,7 @@ class ContextTests(unittest.TestCase):
 
     def test_frozen_full_panel_replay_workers_zero_four(self):
         from cvdl.channel_analysis import ChannelDataset,digest
-        from cvdl.learn_srm_context import validate_original
+        from cvdl.gapcov_context import validate_original
         panel=ROOT/'runs/verification/rgb-channel-analysis-2026-10-24'
         _,base,variants=validate_original(ROOT,panel)
         results=[]
@@ -247,15 +249,17 @@ class ContextTests(unittest.TestCase):
             with self.assertRaises((ValueError,KeyError)):ctx.checked(root,out)
 
     def test_original_validation_and_code_drift(self):
-        from cvdl.learn_srm_context import validate_original
+        from cvdl.gapcov_context import validate_original
         panel=ROOT/'runs/verification/rgb-channel-analysis-2026-10-24'
         recipe,base,variants=validate_original(ROOT,panel)
         self.assertEqual(len(base)+len(variants),29280)
-        with patch('cvdl.learn_srm_context.MODEL_SHA','0'*64):
+        with patch('cvdl.gapcov_context.MODEL_SHA','0'*64):
             with self.assertRaisesRegex(ValueError,'undeclared code drift'):validate_original(ROOT,panel)
         # The historical B36 scope must NOT silently approve the new source hash.
         from cvdl.channel_context import validate_original as b36_original
         with self.assertRaisesRegex(ValueError,'undeclared code drift'):b36_original(ROOT,panel)
+        from cvdl.learn_srm_context import validate_original as learn_original
+        with self.assertRaisesRegex(ValueError,'undeclared code drift'):learn_original(ROOT,panel)
 
 
 if __name__=='__main__':unittest.main()

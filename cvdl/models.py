@@ -217,6 +217,67 @@ class XuNetWideLearnSRM(XuNetWide):
         self.kv.conv.weight.requires_grad_(True)
 
 
+class XuNetWideGAPCov32(XuNetWide):
+    """R1 GAP extended with 32-feature covariance; signed attribution, not CAM."""
+    cell_map_kind = 'attribution'
+    cell_map_label = 'GAP + covariance gradient attribution (not a cell probability)'
+    cell_receptive_field = 256  # Diagnostic256 tiles: covariance gives global context.
+
+    def __init__(self, clip_t=3.0, norm='none', width=4, front_end='srm'):
+        if (front_end, norm, width, clip_t) != ('srm', 'none', 4, 3.0):
+            raise ValueError('gapcov32 requires SRM, norm none, width4 and clip_t3')
+        super().__init__(clip_t=clip_t, norm=norm, width=width, front_end=front_end)
+        with torch.random.fork_rng(devices=[]):
+            self.cov_reduce = nn.Conv2d(256, 32, 1, bias=False)
+            # Data-free default fan-in784 init; no branch scaling/calibration.
+            self.classifier = nn.Linear(784, 2)
+
+    def pooled_parts(self, features):
+        from .cov_pool import descriptor
+        with torch.autocast(device_type=features.device.type, enabled=False):
+            features = features.float()
+            return features.mean((-2, -1)), descriptor(self.cov_reduce(features))
+
+    def forward(self, x, *, return_aux=False):
+        if return_aux:
+            raise ValueError('gapcov32 has no trained cell head')
+        gap, cov = self.pooled_parts(self.features(x))
+        with torch.autocast(device_type=x.device.type, enabled=False):
+            return self.classifier(torch.cat((gap, cov), 1))
+
+    def cell_logits(self, x):
+        raise ValueError('gapcov32 has attribution scores, not local class logits; use class_score_cells')
+
+    def class_score_cells(self, x):
+        """GAP linear cells + M times centred covariance gradient contribution.
+
+        Mean GAP cells equals the GAP tile margin (without bias). M matches the
+        map's mean-over-cells convention; covariance attribution is NOT promised
+        to average to the covariance margin. The classifier bias is tile-only.
+        No model/body gradient, mode change or parameter-gradient accumulation.
+        """
+        from .cov_pool import descriptor
+        with torch.inference_mode(), torch.autocast(device_type=x.device.type, enabled=False):
+            features = self.features(x.float()).float()
+            gap = features.mean((-2, -1))
+            reduced = self.cov_reduce(features)
+            gap_cells = F.conv2d(features, self.classifier.weight[:, :256, None, None])
+        # enable_grad alone is insufficient inside a caller's inference_mode.
+        with torch.inference_mode(False), torch.enable_grad(), torch.autocast(device_type=x.device.type, enabled=False):
+            h = reduced.clone().requires_grad_(True)
+            wc = self.classifier.weight[:, 256:].detach().clone()
+            cov = descriptor(h)
+            cov_logits = F.linear(cov, wc)
+            gradient = torch.autograd.grad((cov_logits[:, 1]-cov_logits[:, 0]).sum(), h)[0]
+            with torch.no_grad():
+                centred = h-h.mean((-2, -1), keepdim=True)
+                m = h.shape[-2]*h.shape[-1]
+                score = (gap_cells[:, 1]-gap_cells[:, 0]).clone()+m*(gradient*centred).sum(1)
+                logits = F.linear(torch.cat((gap.clone(), cov.detach()), 1),
+                    self.classifier.weight.detach().clone(), self.classifier.bias.detach().clone())
+                return torch.stack((torch.zeros_like(score), score), 1), logits
+
+
 def model_from_hparams(hparams):
     model = hparams.get('model', 'xunet')
     clip_t, norm = hparams.get('clip_t', 3.0), hparams.get('norm', 'group')
@@ -231,6 +292,11 @@ def model_from_hparams(hparams):
         network = XuNetWideColourSep36(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
     elif model == 'xunet_wide_learn_srm':
         network = XuNetWideLearnSRM(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
+    elif model == 'xunet_wide_gapcov32':
+        from .cov_pool import SPEC
+        if hparams.get('cov_pool_identity') != SPEC:
+            raise ValueError('gapcov32 requires its exact saved head identity')
+        network = XuNetWideGAPCov32(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
     elif model == 'gbras':
         from .gbras import GBRASNet
         network = GBRASNet(clip_t=clip_t, norm=norm, front_end=front_end)

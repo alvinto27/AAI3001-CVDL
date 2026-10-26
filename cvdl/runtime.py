@@ -23,6 +23,8 @@ def configure(settings):
     """Apply machine limits/backend choice, then seed in the original order."""
     torch.set_num_threads(settings.main_threads)
     torch.backends.cudnn.benchmark = torch.version.cuda is not None
+    if settings.model=='xunet_wide_gapcov32':
+        torch.backends.cuda.matmul.allow_tf32=False  # Match R1; covariance uses full FP32 products.
     random.seed(settings.seed)
     np.random.seed(settings.seed)
     torch.manual_seed(settings.seed)
@@ -94,9 +96,13 @@ def create_loaders(s, otf, tables):
 def model_checks(s, clean_batch, stego_batch):
     """Count parameters and check front-end trainability, preserving allocations."""
     def model():
+        head_identity={}
+        if s.model=='xunet_wide_gapcov32':
+            from .cov_pool import SPEC
+            head_identity=dict(cov_pool_identity=dict(SPEC))
         return models.model_from_hparams(dict(model=s.model, clip_t=s.clip_t, norm=s.norm,
                                              width=s.width, front_end=s.front_end,
-                                             **({'cell_supervision':s.cell_supervision} if getattr(s,'cell_supervision','off')!='off' else {})))
+                                             **({'cell_supervision':s.cell_supervision} if getattr(s,'cell_supervision','off')!='off' else {}),**head_identity))
     counted = model()
     print(f'Total parameters: {sum(p.numel() for p in counted.parameters()):,}')
     print(f'Output shape for one batch: {tuple(counted(clean_batch[:1]).shape)}')
@@ -153,9 +159,11 @@ def create_training(s, otf_data, loaders, *, trainer_options=None):
     scratch50=getattr(s,'embedding_schedule',None)=='low_bpp50_v1'
     resuming=False; prior_model={}
     learn_srm=s.model=='xunet_wide_learn_srm'
-    if starting or scratch50 or learn_srm:
+    gapcov=s.model=='xunet_wide_gapcov32'
+    if starting or scratch50 or learn_srm or gapcov:
         from .curriculum import check_start
         if learn_srm:from .learn_srm_training import check_start
+        if gapcov:from .cov_training import check_start
         resuming=check_start(s,checkpoint_dir)
         if resuming:prior_model=json.loads((checkpoint_dir/'model_run_settings.json').read_text())
     model_run_settings = {"compile_mode": s.compile,
@@ -189,6 +197,11 @@ def create_training(s, otf_data, loaders, *, trainer_options=None):
     if s.model=='xunet_wide_learn_srm':
         model_run_settings.update(srm_trainable=True,srm_coefficients=2250,srm_groups=3,
             srm_initialization='existing_SRM_ARRAY_float32',conv1_backend='unfold_wgrad' if conv1_factory(s) else 'native_dense')
+    if gapcov:
+        from .cov_pool import SPEC
+        model_run_settings.update(cov_pool_identity=dict(SPEC),srm_trainable=False,
+            conv1_backend='unfold_wgrad' if conv1_factory(s) else 'native_dense')
+        model_run_settings['amp_boundaries']['gap_covariance_head']='float32_autocast_disabled'
     if scratch50:
         from .curriculum import scratch50_record
         model_run_settings['embedding_schedule_identity']=scratch50_record(s.tiles_per_epoch)
@@ -270,7 +283,7 @@ def create_training(s, otf_data, loaders, *, trainer_options=None):
         initialize_scratch50(s,checkpoint_dir,resuming)
         lightning_model.hparams['embedding_schedule_identity']=model_run_settings['embedding_schedule_identity']
         model_run_settings['initialization']='random'
-    if learn_srm:
+    if learn_srm or gapcov:
         from .curriculum import initialize_scratch50
         initialize_scratch50(s,checkpoint_dir,resuming)
         model_run_settings['initialization']='random'
