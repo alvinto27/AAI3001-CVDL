@@ -38,7 +38,9 @@ class CompileSwitchTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,"Unset MIOPEN"):
                 exec(guard,base.copy())
         for name,value in [("TORCHINDUCTOR_CACHE_DIR","relative-cache"),
-                           ("TRITON_CACHE_DIR",str(root / "Datasets/generated/otf-cache/v1"))]:
+                           # Datasets can link outside an isolated worktree. Use a
+                           # physically in-checkout path to test this actual guard.
+                           ("TRITON_CACHE_DIR",str(root / "notebooks/triton-test-cache"))]:
             with self.subTest(name=name),patch.dict(os.environ,{name:value},clear=True):
                 with self.assertRaisesRegex(ValueError,"absolute path outside"):
                     exec(guard,base.copy())

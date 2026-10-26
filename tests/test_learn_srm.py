@@ -18,6 +18,31 @@ ROOT=Path(__file__).resolve().parents[1]
 H=dict(model='xunet_wide_learn_srm',front_end='srm',norm='none',width=4,clip_t=3.)
 
 
+def historical_learn_sources(test):
+    """Exercise the old rule against its REAL approved source, not a fake hash.
+
+    The live cov32 checkout intentionally fails the old source guard. Keep the
+    old valid-provenance fixture useful without broadening that frozen scope.
+    """
+    import functools
+    @functools.wraps(test)
+    def wrapped(*args,**kwargs):
+        import subprocess
+        original=ROOT
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            for name in ('configs','data','runs','notebooks','scripts','LSB-Dataset-Generator'):
+                (root/name).symlink_to(original/name,target_is_directory=True)
+            (root/'cvdl').mkdir()
+            for p in (original/'cvdl').glob('*.py'):
+                if p.name=='models.py':(root/'cvdl'/p.name).write_bytes(subprocess.check_output(['git','show','c0412e0:cvdl/models.py'],cwd=original))
+                else:(root/'cvdl'/p.name).symlink_to(p)
+            gitdir=subprocess.check_output(['git','rev-parse','--absolute-git-dir'],cwd=original,text=True).strip()
+            (root/'.git').write_text('gitdir: '+gitdir+'\n')
+            with patch(__name__+'.ROOT',root),patch('scripts.training_decision.ROOT',root):return test(*args,**kwargs)
+    return wrapped
+
+
 class ModelTests(unittest.TestCase):
     def test_only_trainability_diff_and_invalid_choices(self):
         torch.manual_seed(7);base=XuNetWide(front_end='srm',norm='none');rng=torch.get_rng_state()
@@ -138,6 +163,7 @@ class IdentityTests(unittest.TestCase):
         self.assertFalse(rule_checks('learn_srm',dict(h,low=0.),s)['passed'])
         self.assertFalse(rule_checks('learn_srm',h,dict(s,high=np.nextafter(.0025,1.)))['passed'])
 
+    @historical_learn_sources
     def test_same_shaped_wrong_tag_and_incomplete_provenance_rejected(self):
         values=plain(load(environ={},_profile=machine_profile('g4'),**top_values(json.loads(LEARN_NOTEBOOK.read_text()))).values)
         reference=json.loads((ROOT/WISER_REFERENCE/'evaluation_settings.json').read_text())
@@ -173,6 +199,7 @@ class IdentityTests(unittest.TestCase):
 
 
 class ContextAndMovementTests(unittest.TestCase):
+    @historical_learn_sources
     def test_scoped_context_and_drift_guards(self):
         from cvdl import learn_srm_context as ctx
         panel=ROOT/'runs/verification/rgb-channel-analysis-2026-10-24'

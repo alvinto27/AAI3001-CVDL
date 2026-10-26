@@ -40,14 +40,19 @@ def stitch_cells(shape,origins,maps):
 
 
 def infer_photo(network,photo,record,device,batch_size,*,map_kinds=('trained_head','cam')):
-    """Existing demo path, parameterized for a trained head or headless CAM."""
+    """Photo stitching with explicit trained-head, CAM or signed attribution maps."""
     import torch
     from lsb_train_grid import axes,crop
     from .pixels import evaluation_tensor
     from .cell_diagnostics import cell_maps
     if type(batch_size) is not int or batch_size<1:raise ValueError('batch size must be positive')
-    if not map_kinds or any(k not in ('trained_head','cam') for k in map_kinds):
+    if not map_kinds or any(k not in ('trained_head','cam','attribution') for k in map_kinds):
         raise ValueError('unsupported map kind')
+    attribution=getattr(network,'cell_map_kind',None)=='attribution'
+    if attribution and any(k!='attribution' for k in map_kinds):
+        raise ValueError('this model requires attribution, not CAM or trained-head maps')
+    if not attribution and 'attribution' in map_kinds:
+        raise ValueError('attribution map requires a GAP+covariance model')
     if 'trained_head' in map_kinds and not hasattr(network,'cell_head'):
         raise ValueError('trained-head map requested from a headless model')
     ys,xs=axes(record,256,'overlap_last')
@@ -61,7 +66,7 @@ def infer_photo(network,photo,record,device,batch_size,*,map_kinds=('trained_hea
             tensors.append(evaluation_tensor(pixels));origins.append(origin)
         images=torch.stack(tensors).to(device=device,dtype=torch.float32)
         cam,aux,tile=cell_maps(network,images)
-        available={'trained_head':aux,'cam':cam}
+        available={'trained_head':aux,'cam':cam,'attribution':cam if attribution else None}
         maps.append(np.stack([available[k].cpu().numpy() for k in map_kinds],axis=1))
         scores.extend(tile.cpu().numpy().astype(float))
     return origins,scores,stitch_cells(photo.shape[:2],origins,np.concatenate(maps))

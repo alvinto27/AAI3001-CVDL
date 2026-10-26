@@ -90,6 +90,15 @@ def report(val_rows,test_rows,val,test,*,replicates=REPLICATES):
     return result
 
 
+def describe_map(summary,network):
+    if getattr(network,'cell_map_kind',None)=='attribution':
+        from scripts.training_decision import COV_ATTRIBUTION
+        summary.update(context_only=True,main_rule_affected=False,map_kind='attribution',
+            map_storage_key='class_score',map_label=network.cell_map_label,map_definition=COV_ATTRIBUTION)
+    elif hasattr(network,'class_score_cells'):
+        summary['map_definition']='class_score: post-ELU/BN two-class margin, native stride16 averaged to32; not a CAM'
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('checkpoint',type=Path)
@@ -132,8 +141,7 @@ def main():
     val,_=score(network,ROOT,val_rows,device=args.device,workers=args.workers,batch_pairs=args.batch_pairs)
     test,corpus=score(network,ROOT,test_rows,device=args.device,workers=args.workers,batch_pairs=args.batch_pairs)
     summary=report(val_rows,test_rows,val,test,replicates=args.replicates)
-    if hasattr(network,'class_score_cells'):
-        summary['map_definition']='class_score: post-ELU/BN two-class margin, native stride16 averaged to32; not a CAM'
+    describe_map(summary,network)
     for split,rows,arrays in (('val',val_rows,val),('test',test_rows,test)):
         pd.DataFrame(rows).to_csv(args.output/f'{split}-pairs.csv',index=False)
         np.savez_compressed(args.output/f'{split}-scores.npz',**arrays)
