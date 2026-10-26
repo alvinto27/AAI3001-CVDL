@@ -386,6 +386,7 @@ A recorded ID never runs twice. Use a new ID for a new attempt.
 2. Commit/push the intended notebook and code; fetch `origin/yx` on the PC.
    On that commit, full tests (`scripts/test_cpu.py`) must pass ([test levels](test-levels.md)).
    ~~and the golden compare~~ (golden retired 2026-10-21).
+   **Tensor-size check (`2054c99`, 2026-10-26):** full preflight runs the production model with fake (meta-backed) CPU tensors: training forward + backward and checkpoint-validation forward, capped or not. It reports the largest op outputs per stage and **refuses** any tensor over 2,147,483,647 elements (exactly that passes); an op without fake support also refuses, by name. No GPU, real allocation or compilation. It checks logical tensor sizes only, not VRAM, backend workspaces, kernel compatibility or speed. R1's uncapped notebook now refuses (SRM conv `[128,90,512,512]` = 3,019,898,880); cap 64 passes. `--resume-identity-only` stays an identity check.
 3. Run the exact notebook + SHA command with `--dry-run`. Review effective
    settings, RUN_NAME, job ID, timeout and the two-line metadata env.
 4. Only after explicit user approval, repeat without `--dry-run`.
