@@ -89,16 +89,16 @@ class CalibrationTests(unittest.TestCase):
             self.assertTrue(pd.read_csv(Path(t)/'reference.csv').empty)
 
     def test_mapping_is_pinned_and_exact_roster(self):
-        entries=C.mapping(ROOT);self.assertEqual(len(entries),13)
-        self.assertEqual(sum(e['recipe_id']=='60da4391043e8ce48ff2' for e in entries.values()),12)
-        # Removing only B36 must reproduce the old twelve-entry mapping exactly.
+        entries=C.mapping(ROOT);self.assertEqual(len(entries),14)
+        self.assertEqual(sum(e['recipe_id']=='60da4391043e8ce48ff2' for e in entries.values()),13)
+        # Removing only learn-SRM must reproduce the old thirteen-entry mapping exactly.
         raw=(ROOT/C.MAPPING).read_bytes()
         old=json.loads(raw);appended=old['entries'].pop()
         old_raw=(V.canonical(old)+'\n').encode()
-        self.assertEqual(V.digest(old_raw),'14f2674478b765f957f6bd7e6b9843201229e4a9adfdd06776b456e9647a5275')
+        self.assertEqual(V.digest(old_raw),'d233ee8e0ac04af136f9fc92cc920b939ec714b5462e3b98580a1b2ca0a04a6b')
         prefix=old_raw[:old_raw.index(b'],"version"')]
         self.assertEqual(raw[:len(prefix)],prefix)
-        self.assertEqual(appended['checkpoint_sha256'],'2f45fb4d20203d690a6a074ac3cbf8d45dae08a82713f0a504148b3ca450f0d5')
+        self.assertEqual(appended['checkpoint_sha256'],'6201ad87013e5ddfffdec4a08e4d683d67cc7e0231c8314b30cbced6195d04e4')
         baseline=entries['bf64848a49bdc6e20b7fcdba47cb8eee0ed247b909a928cc45e4a4102db9f076']
         paired=entries['b00cd4b6d1f4c3648580691c9cf0e2a4bd83c55740a3cf2a7a561a8adf12f180']
         self.assertEqual(paired,dict(baseline,run_name='srm-e50-paired-20261023T022339Z-4518',
@@ -112,6 +112,10 @@ class CalibrationTests(unittest.TestCase):
         self.assertEqual(b36,dict(baseline,run_name='srm-e50-paired-coloursep36-20261024T115642Z-1325',
             checkpoint_file='best-epoch48-val_pe0.0572-val_auc0.9860.ckpt',
             checkpoint_sha256='2f45fb4d20203d690a6a074ac3cbf8d45dae08a82713f0a504148b3ca450f0d5'))
+        learned=entries['6201ad87013e5ddfffdec4a08e4d683d67cc7e0231c8314b30cbced6195d04e4']
+        self.assertEqual(learned,dict(baseline,run_name='srm-e50-paired-learn-srm-20261026T022114Z-0923',
+            checkpoint_file='best-epoch40-val_pe0.0538-val_auc0.9884.ckpt',
+            checkpoint_sha256='6201ad87013e5ddfffdec4a08e4d683d67cc7e0231c8314b30cbced6195d04e4'))
         with tempfile.TemporaryDirectory() as t:
             p=Path(t)/C.MAPPING;p.parent.mkdir();p.write_bytes((ROOT/C.MAPPING).read_bytes()+b' ')
             with self.assertRaisesRegex(ValueError,'mapping SHA'):C.mapping(t)
