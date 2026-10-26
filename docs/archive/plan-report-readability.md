@@ -1,6 +1,6 @@
 # Plan: report notebook readability (work list #5, revision 1)
 
-Status: revisions 2 (`c1ca714`) and 3 (`675c712`) built 2026-10-19. Revision 1 **built** in `fa17f25` (2026-10-18; Worker_2, finished by Worker_3). Approved to try (user, 2026-10-18); waiting for the user's review. Revises the first template (`716b2cd`, guide [report-notebook.md](report-notebook.md)). The user will review the result and may change it.
+Status: revisions 2 (`c1ca714`) and 3 (`675c712`) built 2026-10-19. Revision 1 **built** in `fa17f25` (2026-10-18; Worker_2, finished by Worker_3). Approved to try (user, 2026-10-18); waiting for the user's review. Revises the first template (`716b2cd`, guide [report-notebook.md](../active/report-notebook.md)). The user will review the result and may change it.
 
 ## Problem (user feedback on the demo reports)
 
@@ -33,7 +33,7 @@ Each section starts with **the question it answers** and a **"Look at: ..."** li
 - New first section **"What does the data look like?"**, before section 0. One figure, **built once** by a small script and saved as a tracked image; every report embeds the same image (reports still read saved files only).
 - Content, from **real tiles in the frozen test lists** with their recorded embedding settings: (1) one test photo per source (RAISE, DIV2K, ALASKA, LSDIR) with the 256 px tile grid drawn on top; (2) one clean tile and its stego version side by side; (3) amplified change maps for k=1 low bpp: contiguous, random, stride; (4) the same for one noisy ALASKA tile.
 - Plain titles and labels; say that the change map is amplified and the stego tile looks identical to the clean one.
-- **Not now:** where the model looks (cell scores on the tile). User: add it later together with cell-level training ([ideas board](ideas-board.md) item 3).
+- **Not now:** where the model looks (cell scores on the tile). User: add it later together with cell-level training ([ideas board](../active/ideas-board.md) item 3).
 
 ## Presentation rules
 

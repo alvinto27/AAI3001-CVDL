@@ -26,10 +26,10 @@ P_E % at each model's own validation cut-off (standard / ALASKA seen / ALASKA un
 | SRM-30 | SRM front end, 30 epochs | 3.07 | 20.03 | 17.31 | 9.63 | — | [10-18](journal/2026-10-18/README.md) |
 | **SRM-e50** | SRM, 50 epochs | **2.54** | 19.42 | 16.30 | 9.39 | .9964 | [10-18](journal/2026-10-18/README.md) |
 | srm-hard | hard data mix | 3.10 | 21.95 | 19.16 | 9.77 | — | [10-18](journal/2026-10-18/README.md) |
-| run 10 curriculum | low-bpp curriculum from SRM-e50 | 3.10 | — | — | — | .9964 | [plan, result](active/plan-low-bpp-curriculum.md) |
-| run 11 control | SRM-e50 + 15 epochs, same recipe | 2.65 | 18.81 | 16.52 | 9.31 | .9964 | [plan, result](active/plan-low-bpp-curriculum.md) |
+| run 10 curriculum | low-bpp curriculum from SRM-e50 | 3.10 | — | — | — | .9964 | [plan, result](archive/plan-low-bpp-curriculum.md) |
+| run 11 control | SRM-e50 + 15 epochs, same recipe | 2.65 | 18.81 | 16.52 | 9.31 | .9964 | [plan, result](archive/plan-low-bpp-curriculum.md) |
 | run 12 delayed pooling | arm A architecture | 3.43 | — | — | — | .9930 | [plan, result](active/plan-architecture-tests.md) |
-| run 13 cell head | run 11 + cell head and cell loss | 2.97 | 18.95 | 16.21 | 9.26 | .9962 | [plan, result](active/plan-cell-training-256.md) |
+| run 13 cell head | run 11 + cell head and cell loss | 2.97 | 18.95 | 16.21 | 9.26 | .9962 | [plan, result](archive/plan-cell-training-256.md) |
 | R1 paired | SRM-e50 with paired batches | 2.55 | 18.99 | 15.58 | 8.84 | .9964 | [10-23](journal/2026-10-23/README.md) |
 | R2 paired cell | run 13 recipe + paired, from R1 | 2.43 | 19.10 | 15.83 | 9.08 | .9965 | [10-23](journal/2026-10-23/README.md) |
 | Curriculum50 paired | R1 + 50-epoch low-bpp curriculum | 2.57 | 19.72 | 16.68 | 9.35 | .9967 | [10-23](journal/2026-10-23/README.md) |
@@ -149,7 +149,7 @@ This table carries the hypotheses from the [archived checklist](archive/research
 | Scattered low-BPP k1 is noise-limited | Supported, not causal | About 25 changes per 32 px cell at .05 BPP in a prior map; check B found noise linked to both errors | Match tile noise and changed-pixel counts across repeated seeds |
 | Model ignores periodic stride and payload structure | Supported | Similar or worse stride miss than random at equal BPP; small subgroup counts | Equal-photo, matched effective-BPP stride/payload checks |
 | `map(raw) − map(denoised)` cancels clean hot spots | Untested | A denoised reference may also remove real cover noise; about two inference passes | Compare clean FA, cell AUC and k1 P_E with validation calibration |
-| Per-cell training removes clean hot spots | ~~Untested; design on hold~~ Tested at 256 (run 13, see above) | Current cell map is not supervised; [plan written, not approved](active/plan-per-cell-training.md) | Only after approval: opt-in cell labels, unchanged tile tests and cell validation |
+| Per-cell training removes clean hot spots | ~~Untested; design on hold~~ Tested at 256 (run 13, see above) | Current cell map is not supervised; [plan written, not approved](archive/plan-per-cell-training.md) | Only after approval: opt-in cell labels, unchanged tile tests and cell validation |
 | LSDIR shrink can teach an easy-source shortcut | Weakened, not isolated | Mixed source uses LSDIR 20%; its separate test P_E is .06635, not near zero | Controlled with/without-LSDIR runs, not approved |
 | R2 k1–4 improvement came from k-range rather than LR | Untested | R2 changed both factors | Factorial controls with the same data and seed |
 | Source diversity helps unseen cameras | Partly supported; one seed | Unseen ALASKA AUC .79818 → .93403 and corrected FA improvement; standard test and k1 misses regress | Separate held-out cameras and seed repeats with fair controls |

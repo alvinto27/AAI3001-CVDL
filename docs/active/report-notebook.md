@@ -4,7 +4,7 @@ Use the shared template, `notebooks/templates/report.ipynb`.
 The generator writes and executes `runs/<run>/report.ipynb` on the CPU.
 It does not run a model, fit a threshold, or export HTML.
 No additional package is required in the `aai3001` container.
-The [readability plan](plan-report-readability.md) specifies this presentation.
+The [readability plan](../archive/plan-report-readability.md) specifies this presentation.
 
 ## Generate a report
 
