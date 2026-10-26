@@ -2,6 +2,8 @@
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import fcntl
+import hashlib
+from importlib.metadata import PackageNotFoundError, version
 import json
 import math
 import os
@@ -9,6 +11,7 @@ from pathlib import Path
 import stat
 import subprocess
 import sys
+from tempfile import NamedTemporaryFile
 import time
 
 # Container-local, independent of checkout/worktree. Never remove this inode.
@@ -98,3 +101,78 @@ def check_fixtures(root, *, required=REQUIRED_FIXTURES):
     if errors:
         raise ValueError('CPU suite fixture check refused; fix paths manually (no files changed):\n  '
                          + '\n  '.join(errors))
+
+
+def evidence_path(root):
+    return Path(root) / 'runs/.scratch/full-suite-evidence.json'
+
+
+def runtime_identity():
+    # Distribution metadata avoids importing torch (and touching GPU state).
+    return dict(python=sys.version, torch=version('torch'))
+
+
+def full_evidence_key(root):
+    """None on dirty/unreadable inputs; byte hashes, never size/mtime shortcuts."""
+    root = Path(root)
+    def git(*args):
+        return subprocess.check_output(['git', *args], cwd=root, stderr=subprocess.PIPE).strip()
+    try:
+        if git('status', '--porcelain', '--untracked-files=all'):
+            return None
+        tree = git('rev-parse', 'HEAD^{tree}').decode('ascii')
+        hashes = []
+        for name in REQUIRED_FIXTURES:
+            with (root / name).open('rb') as stream:
+                hashes.append((name, hashlib.file_digest(stream, 'sha256').hexdigest()))
+        key = dict(tree=tree, fixtures_sha256=hashlib.sha256(
+            json.dumps(hashes, separators=(',', ':')).encode()).hexdigest(), runtime=runtime_identity())
+        if git('status', '--porcelain', '--untracked-files=all'):
+            return None
+        return key
+    except (OSError, ValueError, subprocess.CalledProcessError, PackageNotFoundError):
+        return None
+
+
+def record_full_pass(root, before, result):
+    """Called only by a complete FULL run; failed/focused/dirty runs never qualify."""
+    if before is None or not result.wasSuccessful() or result.testsRun <= 0:
+        return False
+    after = full_evidence_key(root)
+    if after != before:
+        return False
+    path = evidence_path(root)
+    # Refuse evidence locations that would dirty this checkout themselves.
+    relative = path.relative_to(root)
+    ignored = subprocess.run(['git', 'check-ignore', '-q', '--', str(relative)], cwd=root,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if ignored.returncode:
+        return False
+    payload = dict(version=1, level='full', passed=True, key=after,
+                   tests=result.testsRun, skipped=len(result.skipped))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = None
+    try:
+        with NamedTemporaryFile('w', dir=path.parent, prefix='.full-evidence-', delete=False) as stream:
+            temp = Path(stream.name)
+            json.dump(payload, stream, indent=2)
+            stream.write('\n')
+        os.replace(temp, path)
+    finally:
+        if temp is not None and temp.exists():
+            temp.unlink()
+    return True
+
+
+def matching_full_evidence(root):
+    """Read-only local reuse; never changes the classifier's required level."""
+    try:
+        evidence = json.loads(evidence_path(root).read_text())
+        if (not isinstance(evidence, dict) or evidence.get('version') != 1 or evidence.get('level') != 'full'
+                or evidence.get('passed') is not True or type(evidence.get('tests')) is not int
+                or evidence['tests'] <= 0):
+            return False
+        current = full_evidence_key(root)
+        return current is not None and evidence.get('key') == current
+    except (OSError, ValueError, TypeError):
+        return False

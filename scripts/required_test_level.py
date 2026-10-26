@@ -5,8 +5,10 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 KNOWN_AREAS = ('cvdl/', 'scripts/', 'notebooks/', 'configs/', 'data/', 'tests/', 'docs/',
                'LSB-Dataset-Generator/')
 KNOWN_FILES = frozenset({'README.md', 'AGENTS.md', 'CHANGELOG.md', 'pyproject.toml', 'uv.lock'})
@@ -29,6 +31,19 @@ DOCUMENTATION_INPUTS = frozenset({
 })
 ROOT_MARKDOWN = frozenset({'README.md', 'AGENTS.md', 'CHANGELOG.md'})
 REMINDER = 'Before a G4 launch: always FULL tests.'
+# Direct inputs/helpers of the four FULL-only historical replay methods.
+REPLAY_FULL_FILES = frozenset({
+    'tests/test_paired_training.py', 'tests/test_curriculum50.py',
+    'tests/test_wiser_b.py', 'tests/test_cell_training.py',
+    'cvdl/curriculum.py', 'cvdl/data.py', 'cvdl/settings.py', 'cvdl/models.py',
+    'cvdl/channel_analysis.py', 'cvdl/gapcov_context.py', 'cvdl/cov_pool.py',
+    'cvdl/metrics.py', 'cvdl/cell_diagnostics.py', 'cvdl/pixels.py',
+    'scripts/build_rgb_channel_panel.py', 'scripts/evaluate_rgb_channel_panel.py',
+    'scripts/test_cpu.py', 'scripts/test_support.py', 'configs/train-k1to4.yaml',
+    'notebooks/experiments/srm-low-bpp-control.ipynb',
+    'notebooks/experiments/srm-low-bpp-curriculum.ipynb',
+})
+REPLAY_FULL_PREFIXES = ('tests/fixtures/', 'runs/verification/rgb-channel-analysis-2026-10-24/')
 
 
 def dependency_path(path):
@@ -45,6 +60,8 @@ def path_reasons(path):
         full = 'runtime dependencies or container build'
     elif path.startswith('LSB-Dataset-Generator/'):
         full = 'exhaustive loader dependency'
+    elif path in REPLAY_FULL_FILES or path.startswith(REPLAY_FULL_PREFIXES):
+        full = 'historical multiworker replay dependency'
     elif path in FULL_FILES:
         full = 'exhaustive loader test or fixture dependency'
     elif path in FIGURE_FULL_FILES or path.startswith(FIGURE_FULL_PREFIXES):
@@ -122,6 +139,11 @@ def main(argv=None):
     except (OSError, subprocess.CalledProcessError, ValueError, UnicodeError):
         reason = f'cannot inspect changes against {args.base!r} (fail closed)'
         lines = ['TESTS: FULL — ' + reason, REMINDER]
+    # Keep the requirement visible; FULL evidence can discharge FAST, not FULL.
+    if lines[0].startswith('TESTS: FAST'):
+        from scripts.test_support import matching_full_evidence
+        if matching_full_evidence(ROOT):
+            lines.insert(1, 'FAST satisfied by matching FULL evidence')
     print('\n'.join(lines))
     return 0
 

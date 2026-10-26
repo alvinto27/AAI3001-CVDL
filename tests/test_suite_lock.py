@@ -134,6 +134,8 @@ class RunnerLockTests(unittest.TestCase):
                 events.append(('lock',kw['timeout']));yield;events.append(('release',))
             def loaded(*a,**kw):events.append(('load',));return unittest.TestSuite()
             with patch.object(runner,'suite_lock',side_effect=locked), \
+                 patch.object(runner,'full_evidence_key',return_value=None), \
+                 patch.object(runner,'record_full_pass',return_value=False), \
                  patch.object(runner,'check_fixtures',side_effect=lambda root:events.append(('fixtures',))) as fixtures, \
                  patch.object(runner.unittest.defaultTestLoader,'discover',side_effect=loaded) as discover, \
                  patch.object(runner.unittest.defaultTestLoader,'loadTestsFromNames',side_effect=loaded) as focus, \

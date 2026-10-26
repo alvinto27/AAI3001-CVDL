@@ -27,7 +27,7 @@ class PathPolicyTests(unittest.TestCase):
 
     def test_docs_plus_code_keeps_fast_full_rules(self):
         for path, tests in [
-            ('scripts/test_cpu.py', 'FAST'), ('cvdl/models.py', 'FAST'),
+            ('scripts/test_cpu.py', 'FULL'), ('cvdl/models.py', 'FULL'),
             ('LSB-Dataset-Generator/lsb_torch.py', 'FULL'), ('unknown.txt', 'FULL'),
         ]:
             with self.subTest(path=path):
@@ -66,11 +66,11 @@ class PathPolicyTests(unittest.TestCase):
                 self.assertTrue(policy.decisions(['docs/guide.md', path])[0].startswith('TESTS: FULL'))
 
     def test_known_areas_are_fast(self):
-        for path in ('cvdl/models.py', 'scripts/test_cpu.py', 'notebooks/new-experiment.ipynb',
+        for path in ('cvdl/reporting.py', 'scripts/cell_eval.py', 'notebooks/new-experiment.ipynb',
                      'configs/new-experiment.yaml', 'data/new-test/pairs.csv',
                      'tests/test_cpu_levels.py', 'docs/runbook.md', 'README.md',
                      'AGENTS.md', 'CHANGELOG.md', 'scripts/required_test_level.py',
-                     'cvdl/metrics.py', 'tests/test_cvdl_metrics.py',
+                     'cvdl/plotting.py', 'tests/test_cvdl_metrics.py',
                      'tests/test_notebook_compile.py', 'tests/test_notebook_diagnostics.py',
                      'notebooks/04_baseline_kv_xunet_v3.ipynb',
                      'docs/figures/report/data-sample.png.backup',
@@ -81,11 +81,11 @@ class PathPolicyTests(unittest.TestCase):
                 self.assertIsNone(policy.path_reasons(path))
 
     def test_former_comparison_inputs_keep_independent_test_levels(self):
-        for path in ('cvdl/models.py', 'scripts/run_notebook.py', 'scripts/speed_matrix.py',
+        for path in ('cvdl/reporting.py', 'scripts/run_notebook.py', 'scripts/speed_matrix.py',
                      'scripts/map_demo.py', 'scripts/host_monitor.py', 'scripts/pc_safety.py',
                      'scripts/g4/preflight.py', 'scripts/g4/jobs/archive/newdata-1.env',
                      'scripts/g4/jobs/archive/wide-1.env', 'scripts/g4/jobs/speed-1.env',
-                     'tests/test_model_copy_parity.py', 'configs/train-k1to4.yaml',
+                     'tests/test_model_copy_parity.py', 'configs/train-hard-v1.yaml',
                      'notebooks/05_xunet_v4_nonorm.ipynb',
                      'notebooks/04_baseline_kv_xunet_v3.ipynb',
                      'notebooks/archive/05_baseline_kv_xunet_v4_pre-cvdl.ipynb',
@@ -124,9 +124,9 @@ class PathPolicyTests(unittest.TestCase):
             policy.parse_name_status(b'R100\0old\0')
 
     def test_decisions_show_inspected_paths_and_exact_reminder(self):
-        lines = policy.decisions(['cvdl/models.py'])
+        lines = policy.decisions(['cvdl/reporting.py'])
         self.assertTrue(lines[0].startswith('TESTS: FAST'))
-        self.assertIn('cvdl/models.py', lines[0])
+        self.assertIn('cvdl/reporting.py', lines[0])
         self.assertEqual(lines[1:], ['Before a G4 launch: always FULL tests.'])
         self.assertEqual(policy.decisions([])[1], policy.REMINDER)
 
@@ -242,6 +242,8 @@ class RunnerSelectionTests(unittest.TestCase):
 
     def test_full_is_default_and_does_not_add_skips(self):
         with patch.object(runner, 'suite_lock', return_value=nullcontext()), \
+             patch.object(runner, 'full_evidence_key', return_value=None), \
+             patch.object(runner, 'record_full_pass', return_value=False), \
              patch.object(runner, 'check_fixtures'), \
              patch.object(runner.unittest.defaultTestLoader, 'discover', return_value=unittest.TestSuite()), \
              patch.object(runner.unittest, 'TextTestRunner') as text_runner, \
