@@ -23,7 +23,9 @@ podman exec -w /work aai3001 python -B scripts/test_cpu.py                      
 ```
 
 - `test_cpu.py` sets the CPU-only environment (no GPU, 1 thread) itself. The fast level skips the whole `test_lsb_torch` module with the visible reason `full level only: ...`. The full level runs every test.
-- A plain `python -B -m unittest discover -s tests` is unchanged and runs every test.
+- Use the shared runner for all suites. Do not bypass it with raw unittest. Focused example: `podman exec -w /work aai3001 python -B scripts/test_cpu.py --tests tests.test_cpu_levels tests.test_suite_lock`.
+- The runner takes one kernel file lock at container `/tmp/cvdl-cpu-test-suite.lock` before discovery or focused imports. Other checkouts use the same lock. It prints the owner PID, checkout and selection on contention. Default wait: 120 s; use `--lock-timeout SECONDS` to change it or `--no-wait` to refuse at once. Exit/crash releases the kernel lock. Never delete the lock file.
+- Before FAST/FULL discovery, a read-only path check verifies the container Git pointer, known metadata/published-kernel/historical fixtures and the physically in-checkout compile-cache fixture path. External data links are allowed; missing/dangling fixtures or an escaped cache path refuse before the long suite. This is a small path smoke check, not complete dataset/hash verification. It never creates or repairs links. Focused checks can test fixture setup without needing all long-suite fixtures.
 - `required_test_level.py` is read-only (no fetch). It compares `merge-base(origin/yx, HEAD)` to HEAD, plus staged, unstaged and untracked files, ~~and prints `TESTS: FAST|FULL` and `GOLDEN: REQUIRED|NOT REQUIRED` with the matched paths. If it cannot read the changes, it prints FULL and REQUIRED.~~ Since `72f51b5` (2026-10-21) it prints two lines: `TESTS: NONE|FAST|FULL` with the matched paths, then `Before a G4 launch: always FULL tests.` If it cannot read the changes, it prints FULL.
 
 ## Rule

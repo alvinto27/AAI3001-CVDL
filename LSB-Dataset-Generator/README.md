@@ -449,11 +449,11 @@ A non-zero failure count returns exit code 2.
 All tests live in the repository's `tests/` folder. Run them from the repository root:
 
 ```sh
-python -m unittest discover -s tests            # whole project, includes the v6 generator tests
-python -m unittest discover -s tests -p "test_lsb_[bep]*.py" -v   # v6 generator only: batch, engine, prepare
+podman exec -w /work aai3001 python -B scripts/test_cpu.py  # full project
+podman exec -w /work aai3001 python -B scripts/test_cpu.py --tests tests.test_lsb_batch tests.test_lsb_engine tests.test_lsb_prepare
 ```
 
 The retired Mode 2 modules are in `archive/`; their tests are in `tests/archive/` and are not run by default.
 
-The suite uses synthetic photos.
-It does not require a downloaded RAW file.
+The focused generator tests use synthetic photos. They do not need downloaded RAW files.
+Use the shared runner for every suite, including focused checks. It holds one container-wide lock; do not bypass it with raw unittest.

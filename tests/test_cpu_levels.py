@@ -1,5 +1,5 @@
 """Fast checks for CPU-level selection and the read-only changed-path policy."""
-from contextlib import redirect_stdout
+from contextlib import nullcontext, redirect_stdout
 import io
 import os
 from pathlib import Path
@@ -241,7 +241,9 @@ class RunnerSelectionTests(unittest.TestCase):
             self.assertFalse(getattr(replay, '__unittest_skip__', False))
 
     def test_full_is_default_and_does_not_add_skips(self):
-        with patch.object(runner.unittest.defaultTestLoader, 'discover', return_value=unittest.TestSuite()), \
+        with patch.object(runner, 'suite_lock', return_value=nullcontext()), \
+             patch.object(runner, 'check_fixtures'), \
+             patch.object(runner.unittest.defaultTestLoader, 'discover', return_value=unittest.TestSuite()), \
              patch.object(runner.unittest, 'TextTestRunner') as text_runner, \
              patch.object(runner.os, 'chdir'), patch.dict(os.environ, {}, clear=True), \
              patch.object(sys, 'path', sys.path.copy()), patch.object(sys, 'dont_write_bytecode', False), \

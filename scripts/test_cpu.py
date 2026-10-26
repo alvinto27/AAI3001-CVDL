@@ -10,6 +10,9 @@ import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.test_support import check_fixtures, suite_lock
+
 FULL_ONLY_MODULES = frozenset({'test_lsb_torch'})
 FULL_ONLY_CLASSES = frozenset({('test_data_figure', 'DataFigureReplayTests')})
 SKIP_REASON = 'full level only: exhaustive loader order, worker-process and resume checks'
@@ -58,17 +61,33 @@ def select_level(suite, level):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--level', choices=('fast', 'full'), default='full')
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument('--level', choices=('fast', 'full'), default='full')
+    selection.add_argument('--tests', nargs='+', metavar='TEST',
+                           help='focused dotted module/class/method names; no level skips')
+    parser.add_argument('--lock-timeout', type=float, default=120., metavar='SECONDS',
+                        help='bounded suite-lock wait (default: 120 seconds)')
+    parser.add_argument('--no-wait', action='store_true', help='refuse immediately if a suite holds the lock')
     args = parser.parse_args(argv)
     # Set limits before discovery imports torch, NumPy or any test module.
     os.environ.update(CPU_ENV)
     sys.dont_write_bytecode = True
     sys.path.insert(0, str(ROOT))
     os.chdir(ROOT)
-    suite = unittest.defaultTestLoader.discover(str(ROOT / 'tests'))
-    with select_level(suite, args.level):
-        result = unittest.TextTestRunner(verbosity=2, durations=20).run(suite)
-    return 0 if result.wasSuccessful() else 1
+    try:
+        with suite_lock(ROOT, args.tests or args.level,
+                        timeout=0. if args.no_wait else args.lock_timeout):
+            if args.tests:
+                suite = unittest.defaultTestLoader.loadTestsFromNames(args.tests)
+            else:
+                check_fixtures(ROOT)
+                suite = unittest.defaultTestLoader.discover(str(ROOT / 'tests'))
+            with select_level(suite, 'full' if args.tests else args.level):
+                result = unittest.TextTestRunner(verbosity=2, durations=20).run(suite)
+        return 0 if result.wasSuccessful() else 1
+    except (OSError, ValueError) as error:
+        print(f'CPU suite refused: {error}', file=sys.stderr)
+        return 2
 
 
 if __name__ == '__main__':

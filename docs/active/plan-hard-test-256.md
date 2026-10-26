@@ -53,4 +53,4 @@ Threshold code (#4), report notebook (#5), rescoring (#6), any G4 run, any GPU u
 - Noise extraction: pilot timing, then full scan; recompute check on a sample matches the frozen values.
 - Builder `--check` twice byte-identical; tampered inputs rejected.
 - CPU replay of a few pairs per panel at 0 and 2 workers byte-identical.
-- Full `unittest discover` passes; `refactor_golden.py compare` ALL EQUAL (GPU visible, on approval); hard v1 and `legacy-512` unchanged.
+- Full `scripts/test_cpu.py` passes; `refactor_golden.py compare` ALL EQUAL (GPU visible, on approval); hard v1 and `legacy-512` unchanged.

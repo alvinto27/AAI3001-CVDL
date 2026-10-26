@@ -58,6 +58,6 @@ Per panel: k 1-4 each one quarter. Within each source and k, the 24 combinations
 - Builder `--check` twice byte-identical; lists independent of seed, model, epoch, workers and hardware; changed inputs or lists are rejected.
 - Higher-k maps 1:1 to the same tiles and slots with k + 4; main results unchanged whether it is on or off.
 - No overwrite; training-record SHA unchanged; the three metric families are distinct on synthetic data.
-- Full `unittest discover` passes; `refactor_golden.py compare` ALL EQUAL without recapture; old capped validation hash unchanged; `--test-suite legacy-512` output unchanged.
+- Full `scripts/test_cpu.py` passes; `refactor_golden.py compare` ALL EQUAL without recapture; old capped validation hash unchanged; `--test-suite legacy-512` output unchanged.
 - CPU replay of a few pairs at 0 and 2 workers byte-identical; a CPU 256 forward pass with a 512-trained checkpoint.
 - Only after GPU approval: one timed full evaluation of one model (per-panel and total wall time), then process and memory cleanup checks.
