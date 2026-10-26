@@ -2,6 +2,15 @@
 
 This is a record of system changes on the Raspberry Pi 400 data host (`rpi400@rpi400-server`). The Pi holds the 1 TB USB SSD at `/srv`, the ALASKA and LSDIR masters, and `/srv/cvdl-results`.
 
+## 2026-10-26: USB SSD errors; UAS turned off for the enclosure
+
+| Item | State |
+| --- | --- |
+| Symptom | after a clean power-off (about 23:05 on 10-25) and a boot at 09:01 on 10-26, the USB SSD (Ugreen enclosure, Realtek `0bda:9201`) gave UAS read aborts (`uas_eh_abort_handler`, `data cmplt err -75`); `/srv` was not mounted (`nofail`, 5 s device timeout), so `/srv/cvdl-results` did not exist and run 20's delivery failed. One manual `mount /srv` hit write errors (JBD2 journal abort); EXT4 shut down and the whole USB bus dropped. |
+| Change | `/boot/firmware/cmdline.txt`: added `usb-storage.quirks=0bda:9201:u` at the start (backup `/boot/firmware/cmdline.txt.bak-2026-10-26`); reboot. |
+| Result | kernel: "UAS is ignored for this device, using usb-storage instead"; `/srv` mounted at boot without errors; filesystem state clean; 35 result folders present; 472 GB free; no I/O errors in `dmesg`. Throttling flags 0 (no undervoltage). |
+| Open | a full offline `e2fsck` (needs `/srv` unmounted) after the journal abort; watch `dmesg` for new errors. Undo: restore the backup line and reboot. |
+
 ## 2026-10-25: G4 watchdog service (unarmed)
 
 Installed by the user with `sudo` from `scripts/g4/README-watchdog.md` section 3 (watchdog commit `3ac965d`). Plan: `runs/.scratch/pi-watchdog-plan-2026-10-24/PLAN.md`.
