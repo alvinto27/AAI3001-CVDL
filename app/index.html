@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LSB Inspector</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="logo" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 17.5h7M17.5 14v7"/></svg>
+    </div>
+    <div>LSB Inspector<small>Hidden-data check for PNG images</small></div>
+  </div>
+  <div class="status checking" id="status" role="status"><span class="dot"></span><span id="status-text">Checking API…</span></div>
+</header>
+
+<main>
+  <div class="banner" id="offline-banner" hidden>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+    <div><b id="offline-title">Can't reach the analysis API</b><p id="offline-text"></p></div>
+    <button class="btn small act" id="retry">Retry</button>
+  </div>
+
+  <section id="upload">
+    <div class="hero">
+      <h1>Check a PNG for hidden data</h1>
+      <p>Upload an image to see whether it likely carries an LSB-embedded message, and where.</p>
+    </div>
+    <div class="drop" id="drop">
+      <div class="icon" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+      </div>
+      <h2 id="drop-title">Drop a PNG here</h2>
+      <p id="drop-sub">or choose a file from your computer</p>
+      <button class="btn primary" id="choose">Choose file</button>
+      <input type="file" id="file-input" accept="image/png,.png" hidden>
+      <div class="reqs">
+        <span class="chip">PNG, 8-bit RGB</span>
+        <span class="chip">At least 256 px per side</span>
+        <span class="chip">Up to 32 megapixels</span>
+      </div>
+    </div>
+    <div class="banner field-error" id="file-error" role="alert" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+      <div><b id="file-error-title"></b><p id="file-error-text"></p></div>
+    </div>
+    <p class="foot">Checks one image at a time. Images aren't stored after the check.</p>
+  </section>
+
+  <section id="result" class="result" hidden>
+    <div class="card viewer">
+      <div class="viewer-head">
+        <div class="file">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7a8494" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
+          <span class="name" id="file-name"></span>
+          <span class="meta" id="file-meta"></span>
+        </div>
+        <button class="btn small" id="new-top">New image</button>
+      </div>
+      <div class="canvas-wrap">
+        <div class="stack" id="stack">
+          <img id="photo" alt="Uploaded image">
+          <canvas id="heat"></canvas>
+          <div class="loading-veil" id="veil" hidden>
+            <div><div class="spinner"></div>Analysing image…<div class="veil-sub">Usually a few seconds</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="controls" id="controls">
+        <div class="slider">
+          <label for="strength">Heatmap strength</label>
+          <input type="range" id="strength" min="0" max="100" step="1" value="55">
+          <output id="strength-out" for="strength">55%</output>
+        </div>
+        <div class="legend"><span>Low</span><span class="ramp"></span><span>High</span></div>
+      </div>
+      <div class="caption">Each square covers a 32 × 32 pixel area. It shows where the model is suspicious, not exact message pixels.</div>
+    </div>
+
+    <div class="side">
+      <div class="card verdict" id="verdict">
+        <span class="tag" id="tag"></span>
+        <h2 id="v-title"></h2>
+        <p class="sub" id="v-sub"></p>
+        <div class="score">
+          <div class="score-top"><span>Detection score</span><b id="score-val"></b></div>
+          <div class="bar"><div class="fill" id="fill"></div><div class="cut" id="cut"></div></div>
+          <div class="bar-scale"><span class="lo">0</span><span class="mid" id="cut-label">cutoff</span><span class="hi">1</span></div>
+        </div>
+        <p class="note" id="v-note"></p>
+      </div>
+
+      <div class="card verdict" id="verdict-skel" hidden>
+        <div class="skel" style="width:90px;height:22px"></div>
+        <div class="skel" style="width:70%;height:26px;margin-top:14px"></div>
+        <div class="skel" style="width:90%;height:14px;margin-top:10px"></div>
+        <div class="skel" style="width:100%;height:8px;margin-top:26px"></div>
+      </div>
+
+      <details class="card" id="details">
+        <summary>Details
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <dl id="details-list"></dl>
+      </details>
+
+      <div class="actions" id="actions">
+        <button class="btn primary" id="again">Check another image</button>
+        <button class="btn" id="download">Download heatmap</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
