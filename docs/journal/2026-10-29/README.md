@@ -266,4 +266,27 @@ Rerun32-update replay of one real batch (48,621 changed pixels), through shared 
 
 ### Next
 
-- **Pending:** terminal done/exit0 and15epochs/42,195steps, VM off, Pi-PC best/last/status/attempts identity, DONE capture then safe disarm/freshUNARMED/final postflight. Evidence in ignored `runs/verification/run22-supervision-2026-10-29/`. Report any real interruption/failure instead of assuming completion.
+- **Pending at supervision start:** terminal completion/collection/postflight, completed below. Evidence in ignored `runs/verification/run22-supervision-2026-10-29/`.
+
+## Run22 — terminal collection and postflight
+
+### Did
+
+- Supervised same authorized job at roughly5min intervals; no preemption/resume, nonfinite or prolonged stall observed. **Done/exit0, one attempt,15epochs/42,195steps**, selected launchc031fca. Notebook08:28:12.181800–09:16:39.619966Z (**2907.438166s**). VM boot08:27:45.243Z, stop09:17:32.399Z (**2987.156s**); confirmed TERMINATED.
+- Captured watchdog DONE/actualjob before safe existing-CLI disarm. FreshUNARMED after restart, actualjob retained, counters/policy preserved. No new start/submit/resume, metadata, recipe, hardware, pricing or controller-policy change by this supervision task.
+- Collected Pi folder to `runs/srm-cell-aux-paired-gapcov32-20261029T063502Z-5452/`. Standard default postflight **exit0,29PASS/0FAIL/1INFO** (VM-only runner record). Pi-PC inventory explicit **27files,10directories,30,072,207bytes,mismatches[]**; byte SHA/modes/readability, status and single done attempt verified.
+
+### Found
+
+- Original rsync exited23: ONLY132-byte mode600 `job.env` unreadable to ordinary Pi admin. Stopped/reported; after explicit narrow authorization, sudo-n read source stat/SHA and exact file, validated approved notebook/job two lines and source=local SHA, atomic local rename at mode600, temporary removed. **No remote permission/ownership/ACL repair or broad elevated rsync.** Original rsync23/log retained. An initial local inventory invocation omitted stdin forwarding and produced empty output; reported and repeated correctly, yielding nonempty structured proof above.
+- **Own train-matched validation, not test accuracy:** best epoch12(one-based) P_E **.08905555307865143**, AUC **.9762953519821167**; last P_E **.09002777934074402**, AUC **.9759882688522339**. Final CE.187950000166893/BCE.30841630697250366/total.249633327126503. All saved scalars and best/last tensors finite; head257, SRM equals original source, SPEC/v2 intact.
+- Best SHA **`7c1f33fcfe34e5a32527a0176e7254d9d371295b7221bb4dcc5d3a58148cf24c`**; last SHA **`6be0ec8f722c5e4c0de80cea961f61e7295b37b4aa927555562467f94b3c6f48`**. Watchdog estimated compute **$1.670662** at policy$2/h, **not measured billing**.
+
+### Decided
+
+- Keep original checkpoints/bytes/modes and private metadata unchanged. [Plan result](../../active/plan-run21-cell-heatmap.md#run22--delivered-collected-and-postflight-complete) links local git-ignored result-summary, inventory proof and postflight table. Raw metadata remains600 inside700 folder, not published.
+- Selected launchc031fca/source pins unchanged; later docs HEAD not claimed FULL-tested. No evaluation/adoption or extra GPU task; run18 submission/`pipeline` unchanged.
+
+### Next
+
+- **Pending (user):** detector/cell/photo evaluation and two-reference numeric comparison. Numeric guards still PROPOSED, no frozen pass/adoption. Commit/push documentation-only results, report and standby for review.

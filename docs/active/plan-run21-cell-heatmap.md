@@ -2,7 +2,7 @@
 
 ## State — 2026-10-29
 
-The user approved the implementation and recipe, then explicitly said **“make the paid run.”** Run22 is **running** after the separately approved supervised retry; startup proof is recorded below. The separately approved, bounded local correctness pilot completed below. FULL CPU verification and read-only preflight are complete on selected launch revision `c031fca3511f7e66d4df35bc10bdf23b0ef5087e`, recorded below. Actual VM initializer SHA and finite first-checkpoint startup are verified below; terminal results remain pending. No automatic staging is provided. Proposed evaluation guards and adoption remain **Pending (user)**. No candidate accuracy result exists. Run 18 remains the submission and `pipeline` default.
+The user approved the implementation and recipe, then explicitly said **“make the paid run.”** Run22 **completed and was collected**,15epochs/42,195steps, exit0; default postflight29PASS/0FAIL/1INFO. Terminal record below; evaluation/adoption pending. The separately approved, bounded local correctness pilot completed below. FULL CPU verification and read-only preflight are complete on selected launch revision `c031fca3511f7e66d4df35bc10bdf23b0ef5087e`, recorded below. Actual VM initializer SHA, finite startup and terminal results are verified below. No automatic staging is provided. Proposed evaluation guards and adoption remain **Pending (user)**. No candidate accuracy result exists. Run 18 remains the submission and `pipeline` default.
 
 The detector reference is run 21. The trained heatmap reference is run 18. These are different roles; do not substitute one for the other.
 
@@ -213,4 +213,27 @@ User explicitly requested **“try again using the supervising guard.”** The s
 
 VM checkout is the selected **c031fca**, checkout runner rather than last-good fallback; automatic-update gate PASS. Actual VM initializer exists and SHA matches `4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf`. Weights-only base fingerprint matches; optimizer/scheduler fresh, frozen SRM and covariance SPEC retained. First saved checkpoint epoch0/global step2813 has257 head parameters and all finite tensors; training CE.193456471, BCE.425405830, total.278537720. Source v2, full G4 recipe15 epochs/42,195 steps, train128/val64 verified. No Traceback/OOM/NaN in startup snapshot. This is startup proof, not test accuracy or adoption.
 
-Evidence is local/ignored `runs/verification/run21-cell-supervised-retry-2026-10-29/`. Completion supervision/collection evidence will use `runs/verification/run22-supervision-2026-10-29/`; terminal results remain pending. Supervise only this run, then collect delivered bytes/modes/hashes and standard postflight after VM off/watchdog disarm. No new experiment or GPU evaluation is authorized. Numeric comparison guards remain **PROPOSED / Pending (user)**; run18 remains default. Selected launch c031fca stays fixed; later documentation HEAD is not claimed FULL-tested.
+Evidence is local/ignored `runs/verification/run21-cell-supervised-retry-2026-10-29/`. Completion supervision/collection evidence uses `runs/verification/run22-supervision-2026-10-29/`; the terminal result follows. No new experiment or GPU evaluation is authorized. Numeric guards remain PROPOSED/Pending(user), run18 default; launchc031fca stays fixed, later docs HEAD is not claimed FULL-tested.
+
+## Run22 — delivered, collected and postflight complete
+
+Same job `srm-cell-aux-paired-gapcov32-20261029T063502Z-5452`, selected launch **c031fca3511f7e66d4df35bc10bdf23b0ef5087e**: **done/exit0, one attempt, no resumes,15epochs/42,195steps**. Notebook08:28:12.181800–09:16:39.619966Z: **2907.438166s**. Actual VM boot08:27:45.243Z, stop09:17:32.399Z: **2987.156s (49.786min)**. Watchdog estimated compute **$1.670662** under unchanged$2/h policy; this is a planning estimate, **not measured billing**.
+
+Saved metrics below are the run's own train-matched validation, **not standard/hard-test accuracy or comparison evidence**:
+
+| Checkpoint | Epoch(one-based) | Own validation P_E | Own validation AUC | Own validation loss |
+| --- | --- | --- | --- | --- |
+| Best by validation P_E | 12 | .08905555307865143 | .9762953519821167 | .18975208699703217 |
+| Last (evaluation target) | 15 | .09002777934074402 | .9759882688522339 | .19205862283706665 |
+
+Last training CE **.187950000166893**, cell BCE **.30841630697250366**, total **.249633327126503**. All saved scalars and best/last state tensors finite; head257, frozen SRM equals original source, covariance SPEC and source v2 preserved.
+
+- Best `best-epoch11-val_pe0.0891-val_auc0.9763.ckpt` SHA **`7c1f33fcfe34e5a32527a0176e7254d9d371295b7221bb4dcc5d3a58148cf24c`**.
+- Last `last.ckpt` SHA **`6be0ec8f722c5e4c0de80cea961f61e7295b37b4aa927555562467f94b3c6f48`**.
+- PC artifact root: `runs/srm-cell-aux-paired-gapcov32-20261029T063502Z-5452/`, copied from Pi using existing admin access, preserving bytes/modes. Full Pi-PC inventory matches **27files,10directories,30,072,207bytes**, mismatches[]. Checkpoint/status/attempt identities/readability pass.
+- Original admin rsync exited23 because only **132-byte job.env** was private(mode600). Retained the diagnostic. After explicit authorization, read only that file through existing adminSSH+sudo-n; source mode/size/SHA and exact approved two lines verified, streamed to an atomic local temporary, renamed at mode600 and temporary removed. **No Pi ownership/mode/ACL change or broad elevated rsync.**
+- Captured watchdog **DONE** for actualjob with VM **TERMINATED** before disarm. Existing CLI disarmed safely; fresh **UNARMED**, actualjob, counters/policy preserved. Standard **default** postflight exited0: **29PASS/0FAIL/1INFO** (VM-only runner record). No checker or metadata change to obtain this result.
+
+Evidence below is local/git-ignored and absent from a fresh checkout: [result summary](../../runs/verification/run22-supervision-2026-10-29/result-summary.json), [full inventory proof](../../runs/verification/run22-supervision-2026-10-29/complete-inventory-check.json), [default postflight table](../../runs/verification/run22-supervision-2026-10-29/postflight.md). Original rsync23 and private-file retrieval evidence remain alongside them; raw GCE metadata stays600 inside700 folder, not published.
+
+**Pending:** separately authorized detector/cell/photo evaluation and two-reference numeric comparison; proposed guards remain **PROPOSED / Pending (user)**, with no frozen pass/adoption. No extra GPU evaluation, refit or submission change occurred; run18 remains default. Selected launchc031fca/source hashes stay unchanged; later docs HEAD is not claimed FULL-tested.
