@@ -1,0 +1,143 @@
+@import "tailwindcss";
+
+/* Graphite workstation. One analytical accent (teal) for interaction; the heatmap
+   owns the warm, saturated colours (--color-signal is its anchor). */
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+
+  --color-ground: #121417;
+  --color-surface: #181b1f;
+  --color-raised: #1f2328;
+  --color-line: #2a2f36;
+  --color-line-strong: #3b424b;
+  --color-ink: #eceef1;
+  --color-ink-2: #a9b0b9;
+  --color-ink-3: #7f8791;
+  --color-accent: #5cbab2;
+  --color-accent-ink: #0d1514;
+  --color-signal: #f08e2c;
+  --color-caution: #d9c06a;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  button {
+    cursor: pointer;
+    font: inherit;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+  input[type="range"] {
+    accent-color: var(--color-accent);
+  }
+  details > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  details > summary::-webkit-details-marker {
+    display: none;
+  }
+}
+
+@layer components {
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 2rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-raised);
+    color: var(--color-ink);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    border-radius: 2px;
+    transition: background-color 120ms, border-color 120ms, transform 80ms;
+  }
+  .btn:hover:not(:disabled) {
+    background: #272c33;
+    border-color: #4c545f;
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  .btn:disabled {
+    opacity: 0.45;
+  }
+  .btn-primary {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: var(--color-accent-ink);
+    font-weight: 600;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #74c7c0;
+    border-color: #74c7c0;
+  }
+  .section-title {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-ink-2);
+  }
+  .dl-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.3125rem 0;
+  }
+  .dl-row + .dl-row {
+    border-top: 1px solid var(--color-line);
+  }
+}
+
+/* Analysis progress: an indeterminate bar and a scan line over the image. */
+@keyframes sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+@keyframes scan {
+  from { transform: translateY(-4%); }
+  to { transform: translateY(104%); }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.anim-sweep { animation: sweep 1.3s ease-in-out infinite; }
+.anim-scan { animation: scan 2.4s linear infinite; }
+.anim-rise { animation: rise 260ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-sweep, .anim-scan, .anim-rise {
+    animation: none;
+  }
+}
