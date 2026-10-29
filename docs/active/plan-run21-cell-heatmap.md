@@ -2,7 +2,7 @@
 
 ## State — 2026-10-29
 
-The user approved the implementation and the recipe below. **No paid/cloud launch is authorized by this record.** The separately approved, bounded local correctness pilot completed below. FULL CPU verification and read-only preflight are complete on selected launch revision `c031fca3511f7e66d4df35bc10bdf23b0ef5087e`, recorded below. Full training, remote staging, proposed evaluation guards and adoption remain **Pending (user)**. No candidate accuracy result exists. Run 18 remains the submission and `pipeline` default.
+The user approved the implementation and recipe, then explicitly said **“make the paid run.”** Run22 is approved but **queued, capacity blocked**; no boot or training started. The separately approved, bounded local correctness pilot completed below. FULL CPU verification and read-only preflight are complete on selected launch revision `c031fca3511f7e66d4df35bc10bdf23b0ef5087e`, recorded below. Training results and actual VM initializer verification remain pending; no automatic staging is provided. Proposed evaluation guards and adoption remain **Pending (user)**. No candidate accuracy result exists. Run 18 remains the submission and `pipeline` default.
 
 The detector reference is run 21. The trained heatmap reference is run 18. These are different roles; do not substitute one for the other.
 
@@ -193,4 +193,16 @@ The permitted read-only launch probe and container validator returned **7 PASS**
 
 The actual initializer file on the terminated VM is **unverified**. On a separately authorized boot, `curriculum.initialize` resolves the exact notebook `runs-out/` path under the VM checkout; `weights_only` checks pinned SHA, architecture/SPEC, frozen SRM and exact keys/shapes before strict copying and optimization. Missing/wrong bytes fail closed. There is **no automatic staging or alternate source search**. This does not assert an OS/package-update gate or that the remote file currently exists.
 
-No canonical submit dry-run, push/publish, paid launch or boot authorization has occurred. Proposed evaluation guards remain **Pending (user)**; run18 remains submission/`pipeline` default. This documentation task performs no tests, remote/network actions, source changes or launch.
+At this earlier preflight milestone, canonical submit dry-run, push and paid authorization were pending. The approved attempt below supersedes that authorization state. Proposed evaluation guards remain **Pending (user)**; run18 remains submission/`pipeline` default.
+
+## Run22 — paid authorization, capacity blocked
+
+The user explicitly said **“make the paid run.”** The orchestrator pushed/fetched `yx` through documentation commit9805d09, verified FULL against selected launch commit **`c031fca3511f7e66d4df35bc10bdf23b0ef5087e`** and its tested tree/fixtures/runtime (later changes documentation only), and ran the canonical submit dry-run: **7 gates PASS**. The selected actual launch commit is unchanged.
+
+Job **`srm-cell-aux-paired-gapcov32-20261029T063502Z-5452`** set metadata to run, commitc031fca, timeout90min, maximum120min, protocolresume-v1, attempt0. The initial start plus2 manual retries at240-second intervals all returned **STOCKOUT** for `g4-standard-48` / `nvidia-rtx-pro-6000` in `us-central1-c`. No boot was accepted; VM remains **TERMINATED**, with old lastStartTimestamp2026-10-26. No training/compute launched, accuracy result or measured billing is claimed.
+
+Watchdog read-only status reported **UNARMED**, armed=false, audit_approved=true, service active. This supersedes the earlier unobserved state; it was not armed for this job. Actual initializer availability/SHA on the terminated VM remains **unverified**. Strict source verification still occurs before optimization on the approved boot, with no automatic staging.
+
+Local git-ignored logs: `runs/verification/run21-cell-paid-launch-2026-10-29/{dry-run.log,submit.log,submit-exit-status,retry-1.log,retry-1-exit-status,retry-2.log,retry-2-exit-status}`. Raw probe metadata stays mode600 in a mode700 folder; do not publish it. This bookkeeping records orchestrator-reported launch actions, not new worker network activity.
+
+**Next:** manually retry the **same approved job** when capacity is available. No automatic/pending retry is running, and no alternate hardware, zone, pricing or recipe was selected. Numeric comparison gates remain **PROPOSED / Pending (user)**, not a frozen pass/adoption rule; run18 remains submission default.

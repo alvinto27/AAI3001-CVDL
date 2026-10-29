@@ -221,3 +221,27 @@ Rerun32-update replay of one real batch (48,621 changed pixels), through shared 
 
 - **Pending (user):** publish/push permission and separate boot/training/resource decision; actual VM source verification/approved staging if needed; watchdog-state review when authorized; later quality/adoption decisions.
 - Documentation-only record commit, then stand down. No tests, network/remote actions, boot, GPU, push or implementation changes in this final task.
+
+## Run22 — paid authorization and capacity blocker
+
+### Did
+
+- Recorded the user's explicit **“make the paid run”** authorization. Orchestrator pushed/fetched `yx` through9805d09, checked selected launch commit **c031fca3511f7e66d4df35bc10bdf23b0ef5087e** against its FULL tree/fixtures/runtime and later docs-only changes, and passed canonical submit dry-run7 gates.
+- Actual submit job **srm-cell-aux-paired-gapcov32-20261029T063502Z-5452** set metadata run/commitc031fca/timeout90min/max120min/protocolresume-v1/attempt0. Initial start plus2 manual retries at240-second intervals all returned STOCKOUT for `g4-standard-48` / `nvidia-rtx-pro-6000` in `us-central1-c`.
+- Added [queue run22](../../active/run-queue.md) as **queued (capacity blocked)**. This worker task only records orchestrator-reported actions; it does not launch or monitor anything.
+
+### Found
+
+- No accepted boot or training/compute launch. VM remains TERMINATED, with old lastStartTimestamp2026-10-26. No accuracy/cost result or measured billing is claimed.
+- Read-only watchdog status: service active, **UNARMED**, armed=false, audit_approved=true. Actual VM initializer file availability/SHA remains unverified. Strict source verification on the approved boot precedes optimization; no automatic staging.
+- Local ignored evidence: `runs/verification/run21-cell-paid-launch-2026-10-29/{dry-run.log,submit.log,submit-exit-status,retry-1.log,retry-1-exit-status,retry-2.log,retry-2-exit-status}`. Raw probe metadata remains protected600 in directory700, not published.
+
+### Decided
+
+- Paid authorization is now approved; selected fully tested actual launch commit **c031fca** is unchanged. No alternate hardware, zone, pricing or recipe, and no automatic/pending retry running.
+- Numeric comparison gates remain **PROPOSED / Pending (user)**; no frozen pass/adoption. Run18 submission/`pipeline` unchanged.
+
+### Next
+
+- Manually retry the same approved job when capacity is available. Actual VM source verification and later training/evaluation results remain pending.
+- Commit documentation only and stand down. No push, network/VM commands, Python, GPU, tests or source changes in this bookkeeping task.
