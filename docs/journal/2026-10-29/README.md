@@ -178,7 +178,7 @@ Rerun32-update replay of one real batch (48,621 changed pixels), through shared 
 - **Pending:** full-suite evidence on intended launch revision, paid/cloud launch/resource decision, real training stability, evaluation guards and adoption.
 - No additional GPU probe, full training, paid/cloud/remote operation, dependency change, commit or push in the pilot task. Report completion and stop.
 
-## Local launch-preparation revision — FULL check scheduled
+## Local launch-preparation revision — FULL check scheduled (historical snapshot)
 
 ### Did
 
@@ -197,3 +197,27 @@ Rerun32-update replay of one real batch (48,621 changed pixels), through shared 
 
 - **Pending at this documentation snapshot:** FULL result, actual counts/skips/duration, clean start/end and local evidence-key checks, process/shm cleanup. Report any failure before implementation edits; preserve its log.
 - Paid/cloud launch, remote operations/push, additional GPU probes and adoption are not authorized.
+
+## Completed FULL verification and read-only preflight
+
+### Did
+
+- Selected launch commit **`c031fca3511f7e66d4df35bc10bdf23b0ef5087e`**, tree **`a1b39dd403e6586643544b53e6c2d17d143156fc`**. Ran the container test-level helper and exactly one serial default FULL under the shared lock: **exit0, 658 tests, 656 passed, 2 existing GPU-only skips, 1007.620 s**. Skips were GBRAS full-body GPU backward and BF16/channels-last GPU smoke; no CPU/full-only replay skipped.
+- Verified clean start/end and matching local FULL evidence at that selected revision. Code/fixture/runtime evidence records Python3.12.3 and torch2.14.0+rocm10.1.0; fixture key is `fe5004cc35c74a240e9edea70283348cc9ea545593040669b537480009659f88`. Original checkpoint/source hashes unchanged. No worker/compiler/GPU processes remained; shm92KiB, RAM27GiB available, GPU428MB baseline.
+- Ran pinned-notebook local G4 preflight and only the authorized read-only launch probe/validator: **exit0, all7 checks PASS**. Resolved quick=false, pilot=false, full source-photo selection1.0, train128/val64 images, 15×2,813=42,195 steps, exact cell-aux-v2 and257-parameter new head. Tensor maxima754,974,720 training and377,487,360 validation elements are below2,147,483,647; fake CPU only, no real GPU memory/speed claim.
+
+### Found
+
+- VM observed **TERMINATED**, with18,000-second STOP backstop. Pi mount/read-write/upload ownership and directory-search checks all passed. Watchdog service/armed state is **unverified**, outside the permitted probe.
+- Actual initializer existence/SHA on the terminated VM is **unverified**. On authorized boot the runner resolves the exact notebook runs-out path under checkout root and verifies pinned SHA, SPEC, frozen SRM, keys and shapes before optimization; missing/wrong source fails closed. No automatic staging or alternate lookup. No remote-file existence claim.
+- Logs, exit statuses, source/recipe/tensor summaries, clean-state records and copied FULL key are in git-ignored `runs/verification/run21-cell-launch-readiness-2026-10-29/` and `runs/verification/run21-cell-readonly-preflight-2026-10-29/`. [Plan evidence links](../../active/plan-run21-cell-heatmap.md#selected-launch-revision--full-and-read-only-preflight-complete) are local-only and absent from fresh checkout. Raw GCE metadata remains mode600 in directory700, not published.
+
+### Decided
+
+- Keep **c031fca** as launch target. This later documentation-only record does not replace that target with docs HEAD or claim current-HEAD-tree FULL matching. The saved FULL log/key remains bound to the selected commit's code, fixtures and runtime.
+- No canonical submit dry-run, push or paid-launch authorization yet. Proposed evaluation gates remain **Pending (user)**; run18 submission/`pipeline` is unchanged.
+
+### Next
+
+- **Pending (user):** publish/push permission and separate boot/training/resource decision; actual VM source verification/approved staging if needed; watchdog-state review when authorized; later quality/adoption decisions.
+- Documentation-only record commit, then stand down. No tests, network/remote actions, boot, GPU, push or implementation changes in this final task.

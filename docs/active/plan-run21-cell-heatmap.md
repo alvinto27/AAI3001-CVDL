@@ -2,7 +2,7 @@
 
 ## State — 2026-10-29
 
-The user approved the implementation and the recipe below. **No paid/cloud launch is authorized by this record.** The separately approved, bounded local correctness pilot completed below. Full training, full tests, remote staging, proposed evaluation guards and adoption remain **Pending (user)**. No candidate accuracy result exists. Run 18 remains the submission and `pipeline` default.
+The user approved the implementation and the recipe below. **No paid/cloud launch is authorized by this record.** The separately approved, bounded local correctness pilot completed below. FULL CPU verification and read-only preflight are complete on selected launch revision `c031fca3511f7e66d4df35bc10bdf23b0ef5087e`, recorded below. Full training, remote staging, proposed evaluation guards and adoption remain **Pending (user)**. No candidate accuracy result exists. Run 18 remains the submission and `pipeline` default.
 
 The detector reference is run 21. The trained heatmap reference is run 18. These are different roles; do not substitute one for the other.
 
@@ -74,7 +74,7 @@ Result: **1 test FAIL**. Current `cvdl/models.py` SHA-256 is `403023c538d217f243
 
 Pending follow-ups:
 
-- User review of the proposed gates and launch decision; later full CPU tests on the launch revision.
+- User review of the proposed gates and paid launch decision. FULL CPU tests passed on the selected launch revision below; the evidence does not cover a different source revision.
 - Historical source-approval handling is resolved below. The narrow two-reference numeric report is implemented in the evaluation follow-up below; it is not a frozen decision/adoption route.
 - Photo CLI map choices, labels and identity checks were completed in the evaluation follow-up below. Real candidate photo scoring and its quality remain Pending.
 - The bounded local pilot below verified the native initializer override. G4 staging, full training stability, accuracy, heatmap quality and adoption remain Pending.
@@ -174,10 +174,23 @@ Replay took **6.322 s**. Total loss falls; auxiliary BCE rises slightly. This do
 - Peak GPU allocated **11,452,424,192 bytes**, reserved **15,378,415,616 bytes**. Minimum available RAM **21.961 GiB**, above12GiB throughout.
 - External cleanup: no GPU/Python/worker/compiler processes, GPU VRAM back to **428MB used /15,876MB free**, RAM **27GiB available**, `/dev/shm` **92KiB**. No temporary directories or checkpoints remain. Original BEST and last SHA values and v2 source pins remain unchanged.
 
-**Pending:** full-suite evidence on the intended launch revision, paid/cloud launch/resource decision, real training stability and all detector/heatmap quality/adoption decisions. The pilot supplies correctness evidence only.
+**Pending after the pilot:** paid/cloud launch/resource decision, real training stability and all detector/heatmap quality/adoption decisions. FULL evidence was completed later on the selected revision below. The pilot supplies correctness evidence only.
 
-## Local launch-preparation freeze — next authorized check
+## Selected launch revision — FULL and read-only preflight complete
 
-Implementation is committed locally on `yx` as `3d35a02`. This documentation commit freezes the intended clean revision for exactly one serial FULL CPU suite. Before the suite, run `python -B scripts/required_test_level.py`; then run `python -B scripts/test_cpu.py` with its default FULL selection and shared lock, both inside container `aai3001`. No FAST/focused check runs concurrently. Full results are **Pending at this documentation snapshot**.
+**Selected launch commit remains `c031fca3511f7e66d4df35bc10bdf23b0ef5087e`; tree `a1b39dd403e6586643544b53e6c2d17d143156fc`.** Implementation commit is `3d35a02`. This later documentation-only record does not change the launch target to documentation HEAD. FULL evidence is bound to code, fixtures and runtime tested at the selected commit, not to the later documentation tree; matching current-HEAD FULL evidence is not claimed after this record commit.
 
-Keep start/end Git status, commit/tree IDs, complete helper/suite logs, exit status and local FULL evidence key under ignored `runs/verification/run21-cell-launch-readiness-2026-10-29/`. Record actual results there first; do not edit this launch-tested tree immediately after the check. A failure must be reported before any implementation edit. This authorizes no GPU, remote/push, paid/cloud launch, adoption or superproject change.
+Exactly one serial default `python -B scripts/test_cpu.py`, after `python -B scripts/required_test_level.py`, ran inside container `aai3001` under the shared lock: **exit0, 658 tests, 656 passed, 2 existing GPU-only skips, 1007.620 s**. Skips: GBRAS full-body GPU backward and BF16/channels-last GPU smoke. No CPU/full-only replay was skipped. Start/end were clean and unchanged; local FULL matching was verified before this documentation change. Fixture key: `fe5004cc35c74a240e9edea70283348cc9ea545593040669b537480009659f88`; Python3.12.3, torch2.14.0+rocm10.1.0. Original checkpoint/source hashes stayed unchanged and workers/shm/GPU returned to baseline.
+
+Local evidence links below refer to **git-ignored outputs**, not committed records; they are absent from a fresh checkout:
+
+- [Complete FULL log](../../runs/verification/run21-cell-launch-readiness-2026-10-29/full.log), [copied FULL key](../../runs/verification/run21-cell-launch-readiness-2026-10-29/local-full-evidence-after.json), [cleanup](../../runs/verification/run21-cell-launch-readiness-2026-10-29/cleanup.txt).
+- [Read-only preflight report](../../runs/verification/run21-cell-readonly-preflight-2026-10-29/REPORT.md), [resolved recipe/tensors](../../runs/verification/run21-cell-readonly-preflight-2026-10-29/resolved-summary.json), [seven launch checks](../../runs/verification/run21-cell-readonly-preflight-2026-10-29/launch-gate.log).
+
+Pinned-notebook local preflight exited0: G4 quick=false, pilot=false, full training-photo selection1.0, train128/validation64 images, 15×2,813=42,195 steps, FP32, original embedding schedule, LR3e-5/warmup1, source weights.4/.2/.4, train-matched recipe60da4391043e8ce48ff2, new head257 parameters, exact source `cell-aux-v2`. Fake CPU production forward/backward passed the2,147,483,647-element limit: training maximum754,974,720, validation377,487,360. This does not measure real GPU memory or G4 speed.
+
+The permitted read-only launch probe and container validator returned **7 PASS**: Pi mount source, read-write filesystem, upload ownership/write bits, /srv search, results-directory search, GCE18,000-second duration and STOP action. VM state was **TERMINATED**. Raw GCE metadata is kept locally at mode600 in a mode700 ignored directory; it is not linked or published here. Watchdog service/armed state is **unverified**: the allowed probe does not query it.
+
+The actual initializer file on the terminated VM is **unverified**. On a separately authorized boot, `curriculum.initialize` resolves the exact notebook `runs-out/` path under the VM checkout; `weights_only` checks pinned SHA, architecture/SPEC, frozen SRM and exact keys/shapes before strict copying and optimization. Missing/wrong bytes fail closed. There is **no automatic staging or alternate source search**. This does not assert an OS/package-update gate or that the remote file currently exists.
+
+No canonical submit dry-run, push/publish, paid launch or boot authorization has occurred. Proposed evaluation guards remain **Pending (user)**; run18 remains submission/`pipeline` default. This documentation task performs no tests, remote/network actions, source changes or launch.
