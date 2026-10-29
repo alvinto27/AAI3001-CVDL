@@ -2,7 +2,7 @@
 
 ## State — 2026-10-29
 
-The user approved the implementation and recipe, then explicitly said **“make the paid run.”** Run22 **completed and was collected**,15epochs/42,195steps, exit0; default postflight29PASS/0FAIL/1INFO. Terminal record below; evaluation/adoption pending. The separately approved, bounded local correctness pilot completed below. FULL CPU verification and read-only preflight are complete on selected launch revision `c031fca3511f7e66d4df35bc10bdf23b0ef5087e`, recorded below. Actual VM initializer SHA, finite startup and terminal results are verified below. No automatic staging is provided. Proposed evaluation guards and adoption remain **Pending (user)**. No candidate accuracy result exists. Run 18 remains the submission and `pipeline` default.
+The user approved the implementation and recipe, then explicitly said **“make the paid run.”** Run22 **completed and was collected**,15epochs/42,195steps, exit0; default postflight29PASS/0FAIL/1INFO. Terminal and evaluation records below. Detector and trained-head evaluations are complete; photo evaluation and adoption remain pending. The separately approved, bounded local correctness pilot completed below. FULL CPU verification and read-only preflight are complete on selected launch revision `c031fca3511f7e66d4df35bc10bdf23b0ef5087e`, recorded below. Actual VM initializer SHA, finite startup and terminal results are verified below. No automatic staging is provided. Proposed evaluation guards and adoption remain **Pending (user)**. Results are mixed: standard detector errors increased, hard-test ranking improved, and no clear primary localization gain was found. Run 18 remains the submission and `pipeline` default.
 
 The detector reference is run 21. The trained heatmap reference is run 18. These are different roles; do not substitute one for the other.
 
@@ -72,7 +72,7 @@ podman exec -w /work aai3001 python -B scripts/test_cpu.py --tests tests.test_ga
 
 Result: **1 test FAIL**. Current `cvdl/models.py` SHA-256 is `403023c538d217f243b7f5f6c1de8f567928e7d2ab572ac105429315acd63c5d`; historical approved hash is `09d3e41599a7cd28c167dacf95a67ce91ec2bca95b1ecfb5e73a491289a432bb`. The old `cov_pool` decision route also refused changed model source. Historical approval constants are unchanged. The source-versioning blocker was then resolved by the explicit policy below, not by refreshing old hashes. The historical test now checks actual pinned bytes; separate tests require live historical-route refusal. FAST/FULL have not been run and are not claimed green.
 
-Pending follow-ups:
+Historical follow-ups at the core milestone (later completion/evaluation below):
 
 - User review of the proposed gates and paid launch decision. FULL CPU tests passed on the selected launch revision below; the evidence does not cover a different source revision.
 - Historical source-approval handling is resolved below. The narrow two-reference numeric report is implemented in the evaluation follow-up below; it is not a frozen decision/adoption route.
@@ -213,7 +213,7 @@ User explicitly requested **“try again using the supervising guard.”** The s
 
 VM checkout is the selected **c031fca**, checkout runner rather than last-good fallback; automatic-update gate PASS. Actual VM initializer exists and SHA matches `4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf`. Weights-only base fingerprint matches; optimizer/scheduler fresh, frozen SRM and covariance SPEC retained. First saved checkpoint epoch0/global step2813 has257 head parameters and all finite tensors; training CE.193456471, BCE.425405830, total.278537720. Source v2, full G4 recipe15 epochs/42,195 steps, train128/val64 verified. No Traceback/OOM/NaN in startup snapshot. This is startup proof, not test accuracy or adoption.
 
-Evidence is local/ignored `runs/verification/run21-cell-supervised-retry-2026-10-29/`. Completion supervision/collection evidence uses `runs/verification/run22-supervision-2026-10-29/`; the terminal result follows. No new experiment or GPU evaluation is authorized. Numeric guards remain PROPOSED/Pending(user), run18 default; launchc031fca stays fixed, later docs HEAD is not claimed FULL-tested.
+Evidence is local/ignored `runs/verification/run21-cell-supervised-retry-2026-10-29/`. Completion supervision/collection evidence uses `runs/verification/run22-supervision-2026-10-29/`; the terminal result follows. At that startup milestone, no further experiment or GPU evaluation was authorized. The later user-approved detector/cell evaluation is recorded below. Numeric guards remain PROPOSED/Pending(user), run18 default; launchc031fca stays fixed, later docs HEAD is not claimed FULL-tested.
 
 ## Run22 — delivered, collected and postflight complete
 
@@ -236,4 +236,93 @@ Last training CE **.187950000166893**, cell BCE **.30841630697250366**, total **
 
 Evidence below is local/git-ignored and absent from a fresh checkout: [result summary](../../runs/verification/run22-supervision-2026-10-29/result-summary.json), [full inventory proof](../../runs/verification/run22-supervision-2026-10-29/complete-inventory-check.json), [default postflight table](../../runs/verification/run22-supervision-2026-10-29/postflight.md). Original rsync23 and private-file retrieval evidence remain alongside them; raw GCE metadata stays600 inside700 folder, not published.
 
-**Pending:** separately authorized detector/cell/photo evaluation and two-reference numeric comparison; proposed guards remain **PROPOSED / Pending (user)**, with no frozen pass/adoption. No extra GPU evaluation, refit or submission change occurred; run18 remains default. Selected launchc031fca/source hashes stay unchanged; later docs HEAD is not claimed FULL-tested.
+**At collection:** evaluation was pending. The user then authorized local evaluation, completed below. Photo evaluation and adoption remain pending; run18 remains default. Selected launchc031fca/source hashes stay unchanged; later docs HEAD is not claimed FULL-tested.
+
+## Run22 — detector and trained-head evaluation complete
+
+**Conclusion: mixed, not a clear upgrade.** Standard detector errors increased; hard-test ranking improved; the primary localization difference is uncertain. No frozen verdict or adoption. Run18 remains the submission/`pipeline` default. Photos/HEIC inputs have not been evaluated.
+
+### Exact identities
+
+| Role | Identity |
+| --- | --- |
+| Candidate | Run `srm-cell-aux-paired-gapcov32-20261029T063502Z-5452`, **LAST only**; SHA `6be0ec8f722c5e4c0de80cea961f61e7295b37b4aa927555562467f94b3c6f48` |
+| Candidate detector evaluation | `a1ab2faad8f27bca309e`, suite `standard-256-v1`; executing code `edfb200`, unchanged source from launch `c031fca3511f7e66d4df35bc10bdf23b0ef5087e`, exact `cell-aux-v2` |
+| Detector reference | Run21 BEST, `srm-e50-paired-gapcov32-20261026T115421Z-1917`, evaluation `cdc91a4b6d63a1517064`; SHA `4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf` |
+| Trained-head reference | Run18 LAST, `srm-cell-aux-curriculum50-paired-20261023T133537Z-1366`; SHA `eee9c63a0bd9a91b63758dfc4ddfcca37e47a2a621fbb663557c37bec4b00b80`; all seven saved artifact hashes pinned by `configs/run21-cell-comparison-v1.json` |
+
+### Test results and paired uncertainty
+
+Differences are **candidate minus reference**. P_E is error at each model's own frozen validation cutoff, not the minimum on test. A percentage point (pp) is an absolute difference between percentages.
+
+| Test metric | Reference | Run22 | Difference, paired 95% interval |
+| --- | ---: | ---: | --- |
+| Standard P_E | 2.151864% | 2.544773% | **+0.392909 pp [+0.216105, +0.577668]** |
+| Standard AUC | .997244754 | .997083070 | −.000161683 [−.000387384, +.000034447] |
+| Hard k1-low pooled AUC | .786527664 | .798277799 | **+.011750135 [+.008984228, +.014637394]** |
+| Primary trained-head localization AUC | .866946462 | .863511789 | **−.003434672 [−.015250877, +.008352589]** |
+| Secondary pooled-cell AUC | .866370941 | .873496248 | Descriptive secondary metric; not a primary gain claim |
+
+- Standard: **10,944 pairs / 249 photos**. Other standard panels: ALASKA seen2,688, unseen3,168, LSDIR5,280 pairs; all22,080 pairs scored.
+- Hard: **32,256 pairs**; primary comparison uses **3,024 k1-low pairs / 2,335 photos**, pooled ALASKA seen/unseen and LSDIR.
+- Cell primary: mean per eligible stego-tile AUC on **128 contiguous test tiles / 128 photos**; not a pooled-pixel AUC.
+- **2,000 shared paired source-photo resamples**, percentile95 intervals; detector seed **20261019**, cell seed **20261021**. Repeated paired rows are retained; this is photo-sample uncertainty, not training-seed uncertainty.
+
+### Calibration is separate from test
+
+| Calibration | Reference | Run22 |
+| --- | --- | --- |
+| Detector cutoff | .49069544672966003 (`post_hoc_256`) | .5245211124420166 (`train_matched`) |
+| Detector validation P_E / AUC | .0902777778 / .9758331235 | .0900277778 / .9759860432 |
+| Cell logit cutoff | .1966136991977692 | .3114905655384064 |
+| Cell validation FA | 4.996211% | 4.996211% |
+| Own validation 1%–99% aux colors | [−6.098598957, 7.086827993] | [−5.986734271, 5.976934552] |
+
+Detector calibration uses identical frozen18,000-pair recipe `60da4391043e8ce48ff2`, list SHA `e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d`,256 `overlap_last`, and min-P_E/tie policy. Each model fits its own cutoff on validation **before test**, never 5%-FA for the detector. Cells independently use their own validation 5%-FA cutoff on17,153 negative cells. No borrowed/test-fitted cutoff or color range.
+
+### False alarms, misses and localization limits
+
+Detector FA / miss percentages at each model's own global cutoff:
+
+| Source/panel | Reference FA → Run22 FA | Reference miss → Run22 miss |
+| --- | --- | --- |
+| RAISE | 1.5161 → 1.8152 | 1.7430 → 1.7120 |
+| DIV2K | **7.6122 → 13.3013** | 4.8077 → 3.9263 |
+| ALASKA seen | 13.0952 → 12.4256 | 21.9122 → 22.8051 |
+| ALASKA unseen | 11.2689 → 10.8586 | 19.4760 → 18.8763 |
+| LSDIR | 3.8636 → 5.6818 | 11.6477 → 9.5076 |
+
+Cell test results at own validation5%-FA cutoffs:
+
+| Cell metric | Run18 | Run22 |
+| --- | ---: | ---: |
+| Pooled FA | 4.208083% | 4.514603% |
+| Pooled changed-cell recall | 16.139308% | 16.691442% |
+| Contiguous recall | 51.549755% | 52.365416% |
+| Random recall | 10.839844% | 11.352539% |
+
+- Fixed selected diagnostic fixture, **192 validation / 256 test pairs**, not whole-photo performance. Validation:64 each RAISE/ALASKA/LSDIR; test:64 each RAISE/ALASKA seen/ALASKA unseen/LSDIR. Each panel has32 contiguous +32 random examples, distinct photos.
+- No selected empty changed tiles. Test masks: **9,418 positive cells,6,453 eligible stego-negative cells,513 excluded halo cells**; with clean cells,22,837 test negatives. Targets/masks match the reference exactly.
+- All **128 contiguous tiles are eligible**. All **128 random tiles have all64 cells positive**, so within-tile localization AUC is undefined there; recall/FA can still be reported. Do not generalize the contiguous AUC to random placement.
+- Run22 cell FA differs by source: RAISE1.28%, ALASKA seen**7.74%**, unseen6.70%, LSDIR2.31%. Pooled FA below7% does not guarantee that every source is below7%.
+- Trained aux: **48×48 receptive field, stride32**, logits, not pixel probabilities or causal masks. Signed `class_score` attribution is separate, **256 tile-global context**, stride32; it is not the trained head.
+
+### Execution, evidence and remaining decisions
+
+- Existing full `evaluate_run.py`: **exit0,233.940093s**, FP32 ROCm,32 images,4 workers, convolution workaround off; no quick/pilot, alternate checkpoint or reference inference.
+- Existing full `cell_eval.py --figure`: **exit0,66.024941s**, FP32 CUDA-name/ROCm,4 pairs,2 workers. Published **unmodified** `compare_run21_cells.py`: **exit0**. Its detector results exactly equal the accepted detector-only report.
+- Cell output:9 files; combined output:3 files,4 finite bootstrap arrays each2000×2; **40 input hashes unchanged**. Source/head/checkpoint/manifest/score bindings, strict complete row joins/duplicates, targets, own cutoffs/colors and validation/test photo separation pass. No production checker relaxation; GPU compute processes absent after completion; tracked tree unchanged before this documentation task.
+- Retained operational diagnostics: detector preflight initially used absent `settings.pilot`; corrected the inspection to the existing mapping convention. The first one-off CPU comparison added an unpublished literal `split='test'` assertion; stopped/reported. Both models and frozen files actually match `test`, `test_seen`, `test_unseen`. Authorized r2 removed **only that extra assertion**, preserving all published checks and failed helper/logs. No inference rerun or production change. The subsequent full published cell/combined flows succeeded without correction.
+
+**Local/git-ignored evidence; not guaranteed on a fresh checkout:**
+
+| Evidence | Repository-relative path |
+| --- | --- |
+| Canonical detector scores/calibration | `runs/srm-cell-aux-paired-gapcov32-20261029T063502Z-5452/evaluation/standard-256-v1/a1ab2faad8f27bca309e/` |
+| Detector comparison + exact commands/logs/exits/diagnostics | `runs/verification/run22-detector-eval-2026-10-29/comparison.json`, `bootstrap-replicates.npz`, `REPORT.md`, and command/log files in that same folder |
+| Full cell scores/bindings + fixed three-example figure | `runs/verification/run22-cell-eval-2026-10-29/cells/` (`cells.png`, `cells.json`) |
+| Combined published comparison | `runs/verification/run22-cell-eval-2026-10-29/comparison/comparison.json`, `bootstrap-replicates.npz`, `REPORT.md` in that same folder |
+| Explicit success/counts/coverage + command records | `runs/verification/run22-cell-eval-2026-10-29/verified-summary.json`, `own-cutoffs-recall-summary.json`, `cell-command.sh`, `combined-command.sh`, logs/PIDs/exits in that same folder |
+| Original pinned detector / heatmap artifacts | `runs/srm-e50-paired-gapcov32-20261026T115421Z-1917/evaluation/standard-256-v1/cdc91a4b6d63a1517064/`; `runs/verification/cell-curriculum50-paired-2026-10-23/cells/` |
+
+**Proposals only:** standard ΔP_E upper .005776684 exceeds proposed .0025; hard ΔAUC lower +.008984228 meets proposed ≥−.01; pooled cell FA .045146035 meets proposed ≤.07. These are **PROPOSED / Pending (user)**, not frozen pass/fail/adoption rules. No extra +.02 localization-gain rule. Photo/HEIC evaluation and adoption remain pending; no photo CLI run, refit, paid VM, submission/default change, or later-HEAD FULL claim.

@@ -289,4 +289,36 @@ Rerun32-update replay of one real batch (48,621 changed pixels), through shared 
 
 ### Next
 
-- **Pending (user):** detector/cell/photo evaluation and two-reference numeric comparison. Numeric guards still PROPOSED, no frozen pass/adoption. Commit/push documentation-only results, report and standby for review.
+- **At collection:** detector/cell/photo evaluation and comparison were pending. The user subsequently authorized local evaluation, recorded below; proposals/adoption were not frozen.
+
+## Run22 — detector and trained-head evaluation
+
+### Did
+
+- Evaluated exact LAST SHA `6be0ec8f722c5e4c0de80cea961f61e7295b37b4aa927555562467f94b3c6f48`; canonical detector ID **`a1ab2faad8f27bca309e`**. Existing full evaluator exit0/**233.940093s**; existing full cell evaluator+figure exit0/**66.024941s**; unmodified published combined wrapper exit0.
+- Detector reference: run21 BEST, evaluation `cdc91a4b6d63a1517064`; trained-head reference: run18 LAST, pinned saved cell artifacts. [Exact reference hashes and full result](../../active/plan-run21-cell-heatmap.md#run22--detector-and-trained-head-evaluation-complete).
+- Scored18,000 validation pairs,22,080 standard-panel pairs,32,256 hard pairs. Primary hard scope:3,024 k1-low ALASKA seen/unseen+LSDIR pairs. Full cell fixture:192val/256test pairs;128contiguous test tiles eligible,128random all-positive with no within-tile AUC. No selected empty changed tiles;513halo cells excluded from negative eligibility.
+- Reused own validation min-P_E detector cutoffs and own cell validation5%-FA cutoffs/colors; no test fitting, borrowed threshold, alternate checkpoint or reference inference. Paired source-photo bootstrap2,000 replicates/percentile95; detector seed20261019,cell seed20261021, not training-seed uncertainty.
+
+### Found
+
+| Test result | Reference → Run22 | Paired difference,95% interval |
+| --- | --- | --- |
+| Standard P_E | 2.151864% → 2.544773% | **+0.392909pp [+0.216105,+0.577668]** |
+| Hard k1-low AUC | .786527664 → .798277799 | **+.011750135 [+.008984228,+.014637394]** |
+| Primary contiguous tile AUC | .866946462 → .863511789 | **−.003434672 [−.015250877,+.008352589]** |
+| Cell pooled FA,own val5% cutoffs | 4.208083% → 4.514603% | Operating-point result, not a paired AUC |
+
+- DIV2K detector FA **7.61→13.30%**; LSDIR FA3.86→5.68% while misses11.65→9.51%. Run22 cell FA: RAISE1.28%,ALASKA seen7.74%,unseen6.70%,LSDIR2.31%. Pooled rates do not guarantee source rates.
+- Trained-head contiguous recall51.55→52.37%; random10.84→11.35%. Changed-cell diagnostic only: trained auxRF48/stride32 is not a pixel-probability/causal mask. Signed class_score attribution has256tile-global context and is not interchangeable with aux.
+- Detector-only operational diagnostics retained: preflight absent `settings.pilot` attribute corrected as inspection only; initial one-off comparison's unpublished literal `test` assertion failed on legitimate `test_seen`/`test_unseen`. Stopped/reported, verified both models=frozen split domains, then removed **only extra assertion** with approval. Original helper/logs retained; no production edit/checker relaxation/inference rerun. Full published cell/combined flows succeeded unchanged.
+- Explicit nonempty proof:9cell files/3combined files,40input hashes unchanged,4finite bootstrap arrays2000×2. Source/head/checkpoint/manifest/score/row/target/cutoff/photo-disjoint checks pass; combined detector numbers exactly match accepted detector-only results. GPU compute processes absent at finish.
+
+### Decided
+
+- **Mixed, not a clear upgrade:** standard errors worse, hard ranking better, no clear primary localization gain. Proposed standard-error guard not met; proposed hard-AUC and pooled-cell-FA guards met. Still **PROPOSED / Pending (user)**, not frozen pass/fail/adoption; no added+.02gain rule. Run18 submission/`pipeline` remains default.
+- Evidence is local/git-ignored, not guaranteed on fresh checkout: `runs/verification/run22-detector-eval-2026-10-29/` and `runs/verification/run22-cell-eval-2026-10-29/`; exact commands/logs/exits, structured results and `cells/cells.png`. Full paths/scopes in linked plan. Original checkpoints/reference artifacts, source/config/notebooks/tests unchanged; selected launchc031fca still fixed, no later-HEAD FULL claim.
+
+### Next
+
+- **Pending (user):** photos/HEIC evaluation and adoption decision. No photo CLI inference or user HEIC files were available. Documentation-only explicit-path commit; no push authorized for this task, then standby.
