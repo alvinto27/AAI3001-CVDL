@@ -17,6 +17,9 @@ ROOT=Path(__file__).resolve().parents[1]
 BASE=ROOT/'notebooks/experiments/srm-e50-paired.ipynb'
 NEW=ROOT/'notebooks/experiments/srm-e50-paired-coloursep36.ipynb'
 H=dict(model='xunet_wide_coloursep36',front_end='srm',norm='none',width=4)
+from cvdl.gapcov_provenance import ORIGINAL_REVISION
+from tests.frozen_sources import historical_sources
+historical_gapcov_sources=historical_sources(ORIGINAL_REVISION)
 
 
 class ArchitectureTests(unittest.TestCase):
@@ -183,6 +186,7 @@ class RuleTests(unittest.TestCase):
 
 
 class ContextTests(unittest.TestCase):
+    @historical_gapcov_sources
     def test_model_only_declared_addition_and_original_blob(self):
         import ast,subprocess
         from cvdl.channel_context import MODEL_SHA,ORIGINAL_COMMIT
@@ -207,6 +211,7 @@ class ContextTests(unittest.TestCase):
         factory=next(n for n in ast.parse(text[:start]+text[end:]).body if isinstance(n,ast.FunctionDef) and n.name=='model_from_hparams')
         self.assertEqual(ast.dump(factory),old_nodes['model_from_hparams'])
 
+    @historical_gapcov_sources
     def test_frozen_full_panel_replay_workers_zero_four(self):
         from cvdl.channel_analysis import ChannelDataset,digest
         from cvdl.gapcov_context import validate_original
@@ -248,6 +253,7 @@ class ContextTests(unittest.TestCase):
             (out/'manifest.json').write_text('{}')
             with self.assertRaises((ValueError,KeyError)):ctx.checked(root,out)
 
+    @historical_gapcov_sources
     def test_original_validation_and_code_drift(self):
         from cvdl.gapcov_context import validate_original
         panel=ROOT/'runs/verification/rgb-channel-analysis-2026-10-24'

@@ -16,7 +16,10 @@ METHOD='gapcov32-rgb-context-v1'
 
 
 def validate_original(root,panel):
+    from .gapcov_provenance import validate_sources,HISTORICAL
     root,panel=Path(root),Path(panel)
+    # This v1 context is not an approval to execute the cell-aux extension.
+    validate_sources(root,HISTORICAL)
     recipe=json.loads((panel/'recipe.json').read_text())
     if old.digest(old.canonical(recipe).encode())!=RECIPE_SHA or (panel/'recipe.sha256').read_text().strip()!=RECIPE_SHA:
         raise ValueError('original recipe changed')

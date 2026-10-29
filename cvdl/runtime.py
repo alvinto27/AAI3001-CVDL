@@ -278,12 +278,20 @@ def create_training(s, otf_data, loaders, *, trainer_options=None):
         initialization=initialize(s,lightning_model,checkpoint_dir,resuming)
         model_run_settings['initialization_checkpoint_sha256']=initialization['checkpoint_sha256']
         model_run_settings['evaluation_checkpoint']=getattr(s,'evaluation_checkpoint','best')
+        if gapcov:
+            model_run_settings.update(initialization='weights_only',cell_supervision=s.cell_supervision,
+                cell_loss_weight=s.cell_loss_weight,initial_cell_head_sha256=initialization['initial_cell_head_sha256'],
+                source_provenance=initialization['source_provenance'])
+            lightning_model.hparams['source_provenance']=initialization['source_provenance']
+            for key in ('initial_weights_sha256','initial_cell_head_sha256'):
+                lightning_model.hparams[key]=initialization[key]
+            lightning_model.hparams['initialization_checkpoint_sha256']=initialization['checkpoint_sha256']
     if scratch50:
         from .curriculum import initialize_scratch50
         initialize_scratch50(s,checkpoint_dir,resuming)
         lightning_model.hparams['embedding_schedule_identity']=model_run_settings['embedding_schedule_identity']
         model_run_settings['initialization']='random'
-    if learn_srm or gapcov:
+    if learn_srm or (gapcov and not starting):
         from .curriculum import initialize_scratch50
         initialize_scratch50(s,checkpoint_dir,resuming)
         model_run_settings['initialization']='random'

@@ -532,8 +532,8 @@ def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_v
         raise ValueError('coloursep36 requires SRM, norm none, width4, clip_t3 and no cell supervision')
     if c['model']=='xunet_wide_learn_srm' and (c['front_end'],c['norm'],c['width'],c['clip_t'],c['cell_supervision'])!=('srm','none',4,3.0,'off'):
         raise ValueError('learn_srm requires SRM, norm none, width4, clip_t3 and no cell supervision')
-    if c['model']=='xunet_wide_gapcov32' and (c['front_end'],c['norm'],c['width'],c['clip_t'],c['cell_supervision'])!=('srm','none',4,3.0,'off'):
-        raise ValueError('gapcov32 requires SRM, norm none, width4, clip_t3 and no cell supervision')
+    if c['model']=='xunet_wide_gapcov32' and (c['front_end'],c['norm'],c['width'],c['clip_t'])!=('srm','none',4,3.0):
+        raise ValueError('gapcov32 requires SRM, norm none, width4 and clip_t3')
     if c['model']=='gbras' and (c['front_end']!='srm' or c['norm']!='batch' or c['clip_t']!=3.0):
         raise ValueError('GBRAS arm requires front_end=srm, intrinsic norm=batch and clip_t=3')
     if bool(c['init_checkpoint']) != bool(c['init_checkpoint_sha256']):
@@ -559,7 +559,7 @@ def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_v
             raise ValueError('embedding schedule needs OTF source mix, batch divisible by8, tiles divisible by4, train_yaml, weights start, and three complete stages; paired mode needs original schedule')
     if c['cell_supervision']!='off':
         if (c['embedding_schedule']!='original' or c['train_tile_size']!=256 or c['train_grid']!='overlap_last' or
-                c['model']!='xunet_wide' or c['width']!=4 or c['front_end']!='srm' or c['norm']!='none' or
+                c['model'] not in {'xunet_wide','xunet_wide_gapcov32'} or c['width']!=4 or c['front_end']!='srm' or c['norm']!='none' or
                 c['checkpoint_validation']!='train_matched' or c['validation_recipe']!='60da4391043e8ce48ff2'):
             raise ValueError('cell supervision needs original schedule, SRM wide-w4 norm none, 256 overlap_last and validation 60da')
     elif 'cell_loss_weight' in supplied:

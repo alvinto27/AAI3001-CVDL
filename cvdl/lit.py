@@ -58,8 +58,17 @@ class SteganalysisModule(L.LightningModule):
     def on_load_checkpoint(self, checkpoint):
         if self.hparams.get('model')=='xunet_wide_gapcov32':
             from .cov_pool import SPEC
-            if checkpoint.get('hyper_parameters',{}).get('cov_pool_identity')!=SPEC:
+            saved=checkpoint.get('hyper_parameters',{})
+            if saved.get('cov_pool_identity')!=SPEC:
                 raise ValueError('gapcov32 checkpoint head identity mismatch')
+            if saved.get('cell_supervision','off')!=self.hparams.get('cell_supervision','off'):
+                raise ValueError('gapcov32 checkpoint cell supervision mismatch')
+            if self.hparams.get('cell_supervision','off')!='off':
+                if saved.get('cell_loss_weight')!=self.hparams.cell_loss_weight:
+                    raise ValueError('gapcov32 checkpoint cell loss mismatch')
+                for key in ('initialization_checkpoint_sha256','initial_weights_sha256','initial_cell_head_sha256','source_provenance'):
+                    if key in self.hparams and saved.get(key)!=self.hparams[key]:
+                        raise ValueError('gapcov32 checkpoint initialization mismatch: '+key)
 
     def transfer_batch_to_device(self, batch, device, dataloader_idx):
         batch = super().transfer_batch_to_device(batch, device, dataloader_idx)

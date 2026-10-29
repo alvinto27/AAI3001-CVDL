@@ -39,6 +39,8 @@ def run(folder,output,*,device='cpu',batch_images=32,workers=4):
     checkpoints=[Path(select_best_checkpoint('',folder)),folder/'last.ckpt']
     if sha(ROOT/'cvdl/models.py')!=COV_APPROVAL['model_source_sha256'] or sha(ROOT/'cvdl/cov_pool.py')!=COV_APPROVAL['math_source_sha256']:
         raise ValueError('usage head source drift')
+    from cvdl.gapcov_provenance import validate_sources,HISTORICAL
+    validate_sources(ROOT,HISTORICAL)
     rid='60da4391043e8ce48ff2';frame,recipe,summary,_=load_recipe(ROOT,rid)
     if set(frame.split)!={'val'} or recipe['tile_size']!=256 or frame.cover_id.duplicated().any():raise ValueError('expected unique256px validation tiles')
     inputs=[*checkpoints,Path(__file__),ROOT/'cvdl/cov_usage.py',ROOT/'cvdl/models.py',ROOT/'cvdl/cov_pool.py',

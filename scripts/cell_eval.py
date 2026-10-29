@@ -77,7 +77,8 @@ def report(val_rows,test_rows,val,test,*,replicates=REPLICATES):
                 take=np.array([(panel=='pooled' or r['diagnostic_panel']==panel) and r['placement']==placement for r in rows])
                 scores=np.stack([arrays[name][take,1].reshape(-1,64) for name in maps],axis=1)
                 item=localization(arrays['counts'][take],arrays['valid_negative'][take],scores,
-                    [r['source_photo'] for r,t in zip(rows,take) if t],replicates=replicates)
+                    [r['source_photo'] for r,t in zip(rows,take) if t],replicates=replicates,
+                    difference_name='aux_minus_class_score' if 'class_score' in maps else 'aux_minus_cam')
                 item['maps']={name:entry for name,entry in zip(maps,item['maps'])}
                 result['localization'].append(dict(split=split,panel=panel,placement=placement,**item))
     from collections import Counter
@@ -93,10 +94,16 @@ def report(val_rows,test_rows,val,test,*,replicates=REPLICATES):
 def describe_map(summary,network):
     if getattr(network,'cell_map_kind',None)=='attribution':
         from scripts.training_decision import COV_ATTRIBUTION
-        summary.update(context_only=True,main_rule_affected=False,map_kind='attribution',
+        summary.update(context_only=not hasattr(network,'cell_head'),main_rule_affected=False,map_kind='attribution',
             map_storage_key='class_score',map_label=network.cell_map_label,map_definition=COV_ATTRIBUTION)
+        if hasattr(network,'cell_head'):summary.pop('auxiliary_target_mark',None)
+        summary.setdefault('map_metadata',{})['class_score']=dict(kind='signed_attribution',context_only=True,
+            receptive_field=256,stride=32,global_context=True,label=network.cell_map_label)
     elif hasattr(network,'class_score_cells'):
         summary['map_definition']='class_score: post-ELU/BN two-class margin, native stride16 averaged to32; not a CAM'
+    if hasattr(network,'cell_head'):
+        summary.setdefault('map_metadata',{})['aux']=dict(kind='trained_head_logit',context_only=False,
+            receptive_field=48,stride=32,global_context=False,label='Trained changed-cell logit; not a pixel probability')
 
 
 def main():
@@ -128,8 +135,13 @@ def main():
     from cvdl.pilot import refuse_run
     refuse_run(args.checkpoint.parent)
     if args.output.exists() and any(args.output.iterdir()):raise ValueError('use an empty output folder')
-    args.output.mkdir(parents=True,exist_ok=True)
     start=time.perf_counter();torch.set_num_threads(1)
+    from cvdl.cell_artifacts import checkpoint_identity,bind_scores
+    identity=checkpoint_identity(args.checkpoint)
+    if identity['model']=='xunet_wide_gapcov32' and identity['cell_supervision']=='changed_cells_v1':
+        from cvdl.gapcov_provenance import validate_sources,CELL_AUX
+        if identity['source_provenance']!=validate_sources(ROOT,CELL_AUX):raise ValueError('cell checkpoint source mismatch')
+    args.output.mkdir(parents=True,exist_ok=True)
     checkpoint=torch.load(args.checkpoint,map_location='cpu',weights_only=False)
     network=model_from_hparams(checkpoint.get('hyper_parameters',{})).eval()
     network.load_state_dict({k.removeprefix('net.'):v for k,v in checkpoint['state_dict'].items()},strict=True)
@@ -156,6 +168,7 @@ def main():
             control_cam=control,control_limits=limits)
     summary['seconds']=time.perf_counter()-start
     (args.output/'summary.json').write_text(json.dumps(summary,indent=2,allow_nan=False)+'\n')
+    bind_scores(args.output,identity,manifest)
     stop.set();watcher.join()
     print(json.dumps(dict(seconds=summary['seconds'],validation_pairs=len(val_rows),test_pairs=len(test_rows),maps=list(summary['maps'])),indent=2))
 

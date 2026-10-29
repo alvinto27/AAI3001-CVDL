@@ -34,7 +34,8 @@ REMINDER = 'Before a G4 launch: always FULL tests.'
 # Direct inputs/helpers of the four FULL-only historical replay methods.
 REPLAY_FULL_FILES = frozenset({
     'tests/test_paired_training.py', 'tests/test_curriculum50.py',
-    'tests/test_wiser_b.py', 'tests/test_cell_training.py',
+    'tests/test_wiser_b.py', 'tests/test_cell_training.py', 'tests/frozen_sources.py',
+    'cvdl/gapcov_provenance.py',
     'cvdl/curriculum.py', 'cvdl/data.py', 'cvdl/settings.py', 'cvdl/models.py',
     'cvdl/channel_analysis.py', 'cvdl/gapcov_context.py', 'cvdl/cov_pool.py',
     'cvdl/metrics.py', 'cvdl/cell_diagnostics.py', 'cvdl/pixels.py',

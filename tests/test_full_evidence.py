@@ -124,6 +124,7 @@ class PolicyTests(unittest.TestCase):
         for test in cases:self.assertNotIn('__unittest_skip__',getattr(type(test),test._testMethodName).__dict__)
 
     def test_direct_dependencies_and_unknown_paths_force_full(self):
+        self.assertTrue({'tests/frozen_sources.py','cvdl/gapcov_provenance.py'}<=policy.REPLAY_FULL_FILES)
         for path in policy.REPLAY_FULL_FILES:
             self.assertTrue(policy.decisions([path])[0].startswith('TESTS: FULL'),path)
         for path in ('tests/fixtures/new.txt','unknown/dependency.py','cvdl-other/new.py'):

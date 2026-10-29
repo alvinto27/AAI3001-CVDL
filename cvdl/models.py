@@ -239,16 +239,18 @@ class XuNetWideGAPCov32(XuNetWide):
             return features.mean((-2, -1)), descriptor(self.cov_reduce(features))
 
     def forward(self, x, *, return_aux=False):
-        if return_aux:
+        if return_aux and not hasattr(self, 'cell_head'):
             raise ValueError('gapcov32 has no trained cell head')
-        gap, cov = self.pooled_parts(self.features(x))
+        features = self.features(x)
+        gap, cov = self.pooled_parts(features)
         with torch.autocast(device_type=x.device.type, enabled=False):
-            return self.classifier(torch.cat((gap, cov), 1))
+            logits = self.classifier(torch.cat((gap, cov), 1))
+        return (logits, self.cell_head(features)) if return_aux else logits
 
     def cell_logits(self, x):
         raise ValueError('gapcov32 has attribution scores, not local class logits; use class_score_cells')
 
-    def class_score_cells(self, x):
+    def class_score_cells(self, x, *, return_aux=False):
         """GAP linear cells + M times centred covariance gradient contribution.
 
         Mean GAP cells equals the GAP tile margin (without bias). M matches the
@@ -262,6 +264,7 @@ class XuNetWideGAPCov32(XuNetWide):
             gap = features.mean((-2, -1))
             reduced = self.cov_reduce(features)
             gap_cells = F.conv2d(features, self.classifier.weight[:, :256, None, None])
+            aux = self.cell_head(features) if return_aux else None
         # enable_grad alone is insufficient inside a caller's inference_mode.
         with torch.inference_mode(False), torch.enable_grad(), torch.autocast(device_type=x.device.type, enabled=False):
             h = reduced.clone().requires_grad_(True)
@@ -275,7 +278,8 @@ class XuNetWideGAPCov32(XuNetWide):
                 score = (gap_cells[:, 1]-gap_cells[:, 0]).clone()+m*(gradient*centred).sum(1)
                 logits = F.linear(torch.cat((gap.clone(), cov.detach()), 1),
                     self.classifier.weight.detach().clone(), self.classifier.bias.detach().clone())
-                return torch.stack((torch.zeros_like(score), score), 1), logits
+                result = torch.stack((torch.zeros_like(score), score), 1), logits
+                return (*result, aux) if return_aux else result
 
 
 def model_from_hparams(hparams):
@@ -304,12 +308,15 @@ def model_from_hparams(hparams):
         raise ValueError(f'unsupported checkpoint model: {model}')
     supervision = hparams.get('cell_supervision', 'off')
     if supervision != 'off':
-        if (supervision != 'changed_cells_v1' or model != 'xunet_wide' or
+        if (supervision != 'changed_cells_v1' or model not in {'xunet_wide', 'xunet_wide_gapcov32'} or
                 front_end != 'srm' or int(hparams.get('width',4)) != 4 or norm != 'none'):
             raise ValueError('cell head requires changed_cells_v1 with SRM wide-w4, norm none')
-        # The new head must not perturb the historical backbone/training RNG.
+        # Both bodies end at 256 channels. Covariance extends the TILE descriptor
+        # to 784 values, not the spatial features used by this local head.
         with torch.random.fork_rng(devices=[]):
-            network.cell_head = nn.Conv2d(network.classifier.in_features, 1, 1)
+            network.cell_head = nn.Conv2d(256, 1, 1)
+        network.aux_map_label = 'Trained changed-cell logit (not a pixel probability)'
+        network.aux_receptive_field = 48
     return network
 
 

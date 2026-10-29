@@ -211,6 +211,20 @@ def weights_only(module,path,expected_sha):
     for key,default in defaults.items():
         if h.get(key,default)!=current.get(key,default):
             raise ValueError('initial checkpoint architecture setting mismatch: '+key)
+    covariance_cells=current.get('model')=='xunet_wide_gapcov32' and current.get('cell_supervision','off')=='changed_cells_v1'
+    if covariance_cells:
+        from .cov_pool import SPEC
+        from .models import SRM_ARRAY
+        bank=torch.from_numpy(SRM_ARRAY).unsqueeze(1).repeat(3,1,1,1)
+        if (h.get('cov_pool_identity')!=SPEC or current.get('cov_pool_identity')!=SPEC or
+                h.get('cell_supervision','off')!='off'):
+            raise ValueError('initial checkpoint covariance identity mismatch')
+        expected_keys={'net.'+key for key in module.net.state_dict() if not key.startswith('cell_head.')}
+        if set(saved['state_dict'])!=expected_keys:
+            raise ValueError('initial checkpoint state architecture mismatch')
+        if (not torch.equal(saved['state_dict'].get('net.kv.conv.weight',torch.empty(0)),bank) or
+                module.net.kv.conv.weight.requires_grad):
+            raise ValueError('initial checkpoint SRM must remain frozen')
     state={key.removeprefix('net.'):value for key,value in saved['state_dict'].items()}
     target=module.net.state_dict()
     head_keys={'cell_head.weight','cell_head.bias'} if current.get('cell_supervision','off')=='changed_cells_v1' else set()
@@ -220,8 +234,20 @@ def weights_only(module,path,expected_sha):
     # Only this explicitly declared new head stays initialized. All other keys
     # have been checked; the final copy remains strict (also for feature off).
     module.net.load_state_dict({**state,**{k:target[k] for k in head_keys}},strict=True)
-    return dict(checkpoint=str(path),checkpoint_sha256=actual,weights_only=True,
+    record=dict(checkpoint=str(path),checkpoint_sha256=actual,weights_only=True,
                 optimizer_restored=False,scheduler_restored=False,source_epoch=int(saved.get('epoch',-1)))
+    if covariance_cells:
+        record.update(initial_weights_sha256=state_sha256(state),
+            initial_cell_head_sha256=state_sha256({k:target[k] for k in sorted(head_keys)}))
+    return record
+
+
+def state_sha256(state):
+    """Tensor identity in state-dict order, matching the historical base digest."""
+    digest=hashlib.sha256()
+    for name,tensor in state.items():
+        digest.update(name.encode());digest.update(tensor.detach().cpu().contiguous().numpy().tobytes())
+    return digest.hexdigest()
 
 
 def start_identity(settings):
@@ -272,6 +298,9 @@ def initialize(settings,module,folder,resume):
     checkpoint=Path(settings.init_checkpoint)
     if not checkpoint.is_absolute():checkpoint=Path(settings.root)/checkpoint
     record=weights_only(module,checkpoint,settings.init_checkpoint_sha256)
+    if settings.model=='xunet_wide_gapcov32' and getattr(settings,'cell_supervision','off')!='off':
+        from .gapcov_provenance import validate_sources,CELL_AUX
+        record['source_provenance']=validate_sources(settings.root,CELL_AUX)
     record['settings']=start_identity(settings)
     path.write_text(json.dumps(record,indent=2)+'\n')
     print('WEIGHTS INIT '+json.dumps({k:v for k,v in record.items() if k!='settings'}),flush=True)

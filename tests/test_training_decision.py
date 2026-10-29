@@ -12,7 +12,7 @@ from cvdl.cell_metrics import localization
 from scripts.architecture_decision import auc_intervals, join_predictions
 from scripts import training_decision as d
 from scripts.cell_eval import report as cell_report
-from test_architecture_decision import fixture
+from tests.test_architecture_decision import fixture
 
 
 def delta(point=0.,low=0.,high=0.):return dict(point=point,low=low,high=high)

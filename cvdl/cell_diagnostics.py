@@ -79,14 +79,27 @@ def replay_cell_pair(corpus, row):
     return clean.copy(),stego,counts,valid
 
 
-def cell_maps(network, images):
-    """XuNet CAM/aux, or GBRAS class-score cells (not a linear-feature CAM)."""
+def cell_maps(network, images, *, include_primary=True):
+    """Return primary map, auxiliary logits and ordinary tile probability.
+
+    The primary covariance map is signed attribution, never a CAM. A head-only
+    request skips that gradient calculation and returns None as the primary.
+    """
     import torch
     from torch.nn import functional as F
     with torch.inference_mode():
+        if not include_primary:
+            if not hasattr(network,'cell_head'):raise ValueError('head-only maps require a trained cell head')
+            logits,aux=network(images.float(),return_aux=True)
+            return None,aux[:,0],logits.softmax(1)[:,1]
         if hasattr(network,'class_score_cells'):
-            cells,logits=network.class_score_cells(images.float())
-            return cells[:,1]-cells[:,0],None,logits.softmax(1)[:,1]
+            if getattr(network,'cell_map_kind',None)=='attribution' and hasattr(network,'cell_head'):
+                cells,logits,aux=network.class_score_cells(images.float(),return_aux=True)
+                aux=aux[:,0]
+            else:
+                cells,logits=network.class_score_cells(images.float())
+                aux=None
+            return cells[:,1]-cells[:,0],aux,logits.softmax(1)[:,1]
         features=network.features(images.float())
         cam=F.conv2d(features,network.classifier.weight[:,:,None,None],network.classifier.bias)
         aux=network.cell_head(features)[:,0] if hasattr(network,'cell_head') else None
@@ -137,7 +150,7 @@ def render_cell_figure(network, corpus, root, output, *, score_limits, manifest=
         for r,c in zip(*np.where((counts==0)&~valid)):
             axes[index,2].add_patch(Rectangle((c-.5,r-.5),1,1,fill=False,hatch='//',edgecolor='gray',linewidth=0))
         maps=[(cam[1],score_limits[primary],getattr(network,'cell_map_label','Tile-head CAM margin'))]
-        if has_aux:maps.append((aux[1],score_limits['aux'],'Trained auxiliary logit'))
+        if has_aux:maps.append((aux[1],score_limits['aux'],getattr(network,'aux_map_label','Trained auxiliary logit')))
         if control_cam is not None:maps.append((control_cam[row['pair_id']],control_limits,'Control CAM margin'))
         for axis,(values,limits,title) in zip(axes[index,3:],maps):
             im=axis.imshow(values,interpolation='nearest',cmap='coolwarm',vmin=limits[0],vmax=limits[1])
@@ -147,9 +160,15 @@ def render_cell_figure(network, corpus, root, output, *, score_limits, manifest=
             bpp=float(row['effective_bpp']),method=row['method'],placement=row['placement'],
             tile_clean_score=float(tile[0]),tile_stego_score=float(tile[1]),counts=counts.tolist(),valid_negative=valid.tolist()))
     rf=getattr(network,'cell_receptive_field',48)
-    label='class-score map' if hasattr(network,'class_score_cells') else 'tile-head CAM'
-    fig.suptitle('Same tiles: changed-cell targets, '+label+(', trained auxiliary head' if has_aux else ' (no auxiliary head)')+f'\n32-pixel spacing; {rf}×{rf} receptive field. Maps are not causal pixel saliency.')
+    label=('signed covariance attribution (context only)' if getattr(network,'cell_map_kind',None)=='attribution'
+           else 'class-score map' if hasattr(network,'class_score_cells') else 'tile-head CAM')
+    geometry=f'32-pixel spacing; {rf}×{rf} receptive field.'
+    if has_aux and getattr(network,'cell_map_kind',None)=='attribution':
+        geometry='32-pixel spacing; attribution has tile-global context; trained head sees 48×48 pixels.'
+    fig.suptitle('Same tiles: changed-cell targets, '+label+(', trained auxiliary head' if has_aux else ' (no auxiliary head)')+'\n'+geometry+' Maps are not causal pixel saliency.')
     fig.tight_layout();output.parent.mkdir(parents=True,exist_ok=True)
     try:fig.savefig(output,dpi=160)
     finally:plt.close(fig)
-    output.with_suffix('.json').write_text(json.dumps(dict(score_limits=score_limits,tiles=records),indent=2)+'\n')
+    geometry={primary:dict(receptive_field=rf,stride=32,global_context=getattr(network,'cell_map_kind',None)=='attribution')}
+    if has_aux:geometry['aux']=dict(receptive_field=48,stride=32,global_context=False)
+    output.with_suffix('.json').write_text(json.dumps(dict(score_limits=score_limits,map_geometry=geometry,tiles=records),indent=2)+'\n')

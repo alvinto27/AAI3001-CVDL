@@ -173,6 +173,10 @@ def cov_pool_identity(folders, metadata):
     from cvdl.cov_pool import MODEL,SPEC
     from cvdl.models import SRM_ARRAY
     from cvdl.settings import SCHEMA
+    from cvdl.gapcov_provenance import validate_sources,HISTORICAL
+    # Saved-score verdict semantics are unchanged; this original approval is
+    # intentionally usable only with the exact historical source checkout.
+    validate_sources(ROOT,HISTORICAL)
     epoch,path=_srm_identity(folders,metadata,notebook=COV_NOTEBOOK,notebook_sha=COV_NOTEBOOK_SHA,model=MODEL)
     if (sha(ROOT/'cvdl/models.py')!=COV_APPROVAL['model_source_sha256'] or
             sha(ROOT/'cvdl/cov_pool.py')!=COV_APPROVAL['math_source_sha256']):raise ValueError('cov_pool source drift')

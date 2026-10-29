@@ -59,7 +59,7 @@ class ModelTests(unittest.TestCase):
                 self.assertEqual(features.shape,(1,256,size//32,size//32))
                 self.assertTrue(torch.equal(gap,features.mean((-2,-1))))
                 self.assertEqual(cov.shape,(1,528))
-        for change in (dict(front_end='kv'),dict(width=3),dict(norm='batch'),dict(clip_t=2),dict(cell_supervision='changed_cells_v1')):
+        for change in (dict(front_end='kv'),dict(width=3),dict(norm='batch'),dict(clip_t=2)):
             with self.assertRaises(ValueError):model_from_hparams(dict(H,cov_pool_identity=SPEC,**change))
             with self.assertRaises(ValueError):load(environ={},_profile=machine_profile('pc',device='cpu'),**dict(H,**change))
         with self.assertRaisesRegex(ValueError,'attribution'):net.cell_logits(torch.zeros(1,3,64,64))

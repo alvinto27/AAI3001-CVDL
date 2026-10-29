@@ -18,29 +18,8 @@ ROOT=Path(__file__).resolve().parents[1]
 H=dict(model='xunet_wide_learn_srm',front_end='srm',norm='none',width=4,clip_t=3.)
 
 
-def historical_learn_sources(test):
-    """Exercise the old rule against its REAL approved source, not a fake hash.
-
-    The live cov32 checkout intentionally fails the old source guard. Keep the
-    old valid-provenance fixture useful without broadening that frozen scope.
-    """
-    import functools
-    @functools.wraps(test)
-    def wrapped(*args,**kwargs):
-        import subprocess
-        original=ROOT
-        with TemporaryDirectory() as tmp:
-            root=Path(tmp)
-            for name in ('configs','data','runs','notebooks','scripts','LSB-Dataset-Generator'):
-                (root/name).symlink_to(original/name,target_is_directory=True)
-            (root/'cvdl').mkdir()
-            for p in (original/'cvdl').glob('*.py'):
-                if p.name=='models.py':(root/'cvdl'/p.name).write_bytes(subprocess.check_output(['git','show','c0412e0:cvdl/models.py'],cwd=original))
-                else:(root/'cvdl'/p.name).symlink_to(p)
-            gitdir=subprocess.check_output(['git','rev-parse','--absolute-git-dir'],cwd=original,text=True).strip()
-            (root/'.git').write_text('gitdir: '+gitdir+'\n')
-            with patch(__name__+'.ROOT',root),patch('scripts.training_decision.ROOT',root):return test(*args,**kwargs)
-    return wrapped
+from tests.frozen_sources import historical_sources
+historical_learn_sources=historical_sources('c0412e0d3686cf32a08e42f15f964253ab9bcb2f')
 
 
 class ModelTests(unittest.TestCase):

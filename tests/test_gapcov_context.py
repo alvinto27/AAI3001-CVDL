@@ -16,9 +16,13 @@ from scripts.training_decision import (rule_checks,cov_pool_identity,checkpoint_
     COV_NOTEBOOK,WISER_REFERENCE,TARGETS,COV_APPROVAL)
 ROOT=Path(__file__).resolve().parents[1]
 H=dict(model=MODEL,front_end='srm',norm='none',width=4,clip_t=3.)
+from cvdl.gapcov_provenance import ORIGINAL_REVISION
+from tests.frozen_sources import historical_sources
+historical_gapcov_sources=historical_sources(ORIGINAL_REVISION)
 
 
 class IdentityTests(unittest.TestCase):
+    @historical_gapcov_sources
     def test_same_literal_routes_and_frozen_source(self):
         for hard in (-.02,-.01,0.,.01,.02):
             for pe in (-.003,-.002,0.,.0025,.003):
@@ -27,6 +31,7 @@ class IdentityTests(unittest.TestCase):
         for key,p in (('model_source_sha256','cvdl/models.py'),('math_source_sha256','cvdl/cov_pool.py'),('notebook_sha256',str(COV_NOTEBOOK))):
             self.assertEqual(sha(ROOT/p),COV_APPROVAL[key])
 
+    @historical_gapcov_sources
     def test_head_scratch_recipe_and_frozen_bank_identity(self):
         values=plain(load(environ={},_profile=machine_profile('g4'),**top_values(json.loads(COV_NOTEBOOK.read_text()))).values)
         reference=json.loads((ROOT/WISER_REFERENCE/'evaluation_settings.json').read_text())
@@ -97,6 +102,14 @@ class IdentityTests(unittest.TestCase):
             root=Path(tmp);folder=root/'ckpts';folder.mkdir()
             for name in ('best-test.ckpt','last.ckpt'):torch.save(saved,folder/name)
             before={p.name:sha(p) for p in folder.iterdir()}
+            # This command performs inference: never lend it historical hashes
+            # through a source-only fixture while it imports the live runtime.
+            if sha(ROOT/'cvdl/models.py')!=COV_APPROVAL['model_source_sha256']:
+                with self.assertRaisesRegex(ValueError,'usage head source drift'):
+                    run(root,root/'output',workers=0,device='cpu')
+                self.assertFalse((root/'output').exists())
+                self.assertEqual(before,{p.name:sha(p) for p in folder.iterdir()})
+                return
             with patch('cvdl.deployment.load_recipe',return_value=(frame,dict(tile_size=256),dict(recipe_sha256='r',pairs_sha256='p'),'')),\
                     patch('lsb_torch.Corpus'),patch('cvdl.validation.MatchedValidationPairs'),patch('lsb_torch.PhotoPairTasks'),\
                     patch('torch.utils.data.DataLoader',return_value=[batch]):
