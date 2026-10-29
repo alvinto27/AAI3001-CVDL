@@ -245,3 +245,25 @@ Rerun32-update replay of one real batch (48,621 changed pixels), through shared 
 
 - Manually retry the same approved job when capacity is available. Actual VM source verification and later training/evaluation results remain pending.
 - Commit documentation only and stand down. No push, network/VM commands, Python, GPU, tests or source changes in this bookkeeping task.
+
+## Run22 — supervised start and completion supervision
+
+### Did
+
+- User requested “try again using the supervising guard.” Same approved job `srm-cell-aux-paired-gapcov32-20261029T063502Z-5452`, selected launchc031fca: first additional guarded call/global start4 succeeded. Actual boot **08:27:45.243Z**, runner08:28:06Z;3 prior starts STOCKOUT. Fresh gates/identity checked; first-start guard exited on success, no further capacity retries.
+- Existing audited Pi controller stopped/fetched/readability checked/armed/restarted per runbook: **OBSERVING**, actual job/boot/commit/notebook/env/90/120 match, policy unchanged. Pi watchdog is sole resume/start owner. No parallel guard, source staging or alternate hardware/zone/pricing/recipe.
+- Verified actual VM source BEST SHA `4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf`; checkoutc031fca/checkout runner, update gate PASS, weights-only base fingerprint matches, optimizer/scheduler fresh, full recipe retained.
+
+### Found
+
+- First checkpoint epoch0/global2813: CE.193456471/BCE.425405830/total.278537720, finite; saved head[1,256,1,1]+bias[1]=257, frozen SRM equals source, SPEC/v2 preserved, all state tensors finite. No startup Traceback/OOM/NaN. Not a test-accuracy/adoption result.
+- Local ignored startup evidence: `runs/verification/run21-cell-supervised-retry-2026-10-29/`. External start count4 is separate from native watchdog counters; no counter/policy reset.
+
+### Decided
+
+- Supervise only the same authorized run to terminal delivery/VM stop, then standard admin collection and postflight. Poll about5min; Pi watchdog alone owns resumes/starts. No new evaluation/experiment/GPU task.
+- Keep launchc031fca/source pins fixed; later docs commits do not create new FULL evidence. Proposed numeric gates/adoption Pending(user); run18 default unchanged.
+
+### Next
+
+- **Pending:** terminal done/exit0 and15epochs/42,195steps, VM off, Pi-PC best/last/status/attempts identity, DONE capture then safe disarm/freshUNARMED/final postflight. Evidence in ignored `runs/verification/run22-supervision-2026-10-29/`. Report any real interruption/failure instead of assuming completion.

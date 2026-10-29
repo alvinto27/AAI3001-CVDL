@@ -2,7 +2,7 @@
 
 ## State — 2026-10-29
 
-The user approved the implementation and recipe, then explicitly said **“make the paid run.”** Run22 is approved but **queued, capacity blocked**; no boot or training started. The separately approved, bounded local correctness pilot completed below. FULL CPU verification and read-only preflight are complete on selected launch revision `c031fca3511f7e66d4df35bc10bdf23b0ef5087e`, recorded below. Training results and actual VM initializer verification remain pending; no automatic staging is provided. Proposed evaluation guards and adoption remain **Pending (user)**. No candidate accuracy result exists. Run 18 remains the submission and `pipeline` default.
+The user approved the implementation and recipe, then explicitly said **“make the paid run.”** Run22 is **running** after the separately approved supervised retry; startup proof is recorded below. The separately approved, bounded local correctness pilot completed below. FULL CPU verification and read-only preflight are complete on selected launch revision `c031fca3511f7e66d4df35bc10bdf23b0ef5087e`, recorded below. Actual VM initializer SHA and finite first-checkpoint startup are verified below; terminal results remain pending. No automatic staging is provided. Proposed evaluation guards and adoption remain **Pending (user)**. No candidate accuracy result exists. Run 18 remains the submission and `pipeline` default.
 
 The detector reference is run 21. The trained heatmap reference is run 18. These are different roles; do not substitute one for the other.
 
@@ -205,4 +205,12 @@ Watchdog read-only status reported **UNARMED**, armed=false, audit_approved=true
 
 Local git-ignored logs: `runs/verification/run21-cell-paid-launch-2026-10-29/{dry-run.log,submit.log,submit-exit-status,retry-1.log,retry-1-exit-status,retry-2.log,retry-2-exit-status}`. Raw probe metadata stays mode600 in a mode700 folder; do not publish it. This bookkeeping records orchestrator-reported launch actions, not new worker network activity.
 
-**Next:** manually retry the **same approved job** when capacity is available. No automatic/pending retry is running, and no alternate hardware, zone, pricing or recipe was selected. Numeric comparison gates remain **PROPOSED / Pending (user)**, not a frozen pass/adoption rule; run18 remains submission default.
+**Historical next action at the stockout milestone:** manually retry the same approved job. No automatic retry was running at that point; the supervised retry below supersedes this state. Numeric gates remain PROPOSED/Pending(user), run18 submission unchanged.
+
+## Run22 — supervised start accepted
+
+User explicitly requested **“try again using the supervising guard.”** The same approved job's global start4 (first additional guarded call) succeeded; actual boot **2026-10-29T08:27:45.243Z**, runner08:28:06Z. The first-start guard exited immediately after success. No further PC start guard runs; the existing audited Pi watchdog is **OBSERVING/armed for the actual job**, sole resume/start owner, with policy unchanged. Its native counters do not include the earlier external capacity calls; those are recorded separately as4 total.
+
+VM checkout is the selected **c031fca**, checkout runner rather than last-good fallback; automatic-update gate PASS. Actual VM initializer exists and SHA matches `4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf`. Weights-only base fingerprint matches; optimizer/scheduler fresh, frozen SRM and covariance SPEC retained. First saved checkpoint epoch0/global step2813 has257 head parameters and all finite tensors; training CE.193456471, BCE.425405830, total.278537720. Source v2, full G4 recipe15 epochs/42,195 steps, train128/val64 verified. No Traceback/OOM/NaN in startup snapshot. This is startup proof, not test accuracy or adoption.
+
+Evidence is local/ignored `runs/verification/run21-cell-supervised-retry-2026-10-29/`. Completion supervision/collection evidence will use `runs/verification/run22-supervision-2026-10-29/`; terminal results remain pending. Supervise only this run, then collect delivered bytes/modes/hashes and standard postflight after VM off/watchdog disarm. No new experiment or GPU evaluation is authorized. Numeric comparison guards remain **PROPOSED / Pending (user)**; run18 remains default. Selected launch c031fca stays fixed; later documentation HEAD is not claimed FULL-tested.
