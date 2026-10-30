@@ -1,6 +1,5 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { HealthState } from '../lib/api';
-import { heatColour } from '../lib/heat';
 import type { Problem } from '../hooks/useSession';
 import { ErrorState } from './ErrorState';
 
@@ -100,68 +99,72 @@ export function UploadWorkspace({ status, problem, dragging, onFile, onDismissPr
   );
 }
 
-const CELL = 10;
-const COLS = 24;
-const ROWS = 14;
+/** Recorded from this app with real run 18 inference on a sample photo; see web/preview-video/README.md. */
+const CLIPS = [
+  {
+    name: 'original',
+    caption: 'Original',
+    label: 'Recording of the inspector zooming into a photo of two parrots, shown unmodified',
+  },
+  {
+    name: 'heatmap',
+    caption: 'Anomaly heatmap, top flagged region outlined',
+    label: 'The same recording with the model anomaly heatmap over the photo and the top flagged region outlined',
+  },
+];
 
-/** Synthetic heat cluster for the illustration only; not produced by the model. */
-const DEMO_CELLS = Array.from({ length: ROWS * COLS }, (_, i) => {
-  const c = i % COLS;
-  const r = Math.floor(i / COLS);
-  const d = Math.hypot((c - 15.5) / 4.6, (r - 6.5) / 3.6);
-  const texture = ((c * 7 + r * 13) % 5) * 0.04;
-  return { c, r, score: Math.max(0, 1 - d) * 1.1 - texture };
-}).filter((cell) => cell.score > 0.3);
-
-function Scene() {
-  return (
-    <>
-      <rect width={COLS * CELL} height={ROWS * CELL} fill="#39414a" />
-      <rect y="92" width={COLS * CELL} height="48" fill="#262c32" />
-      <rect x="20" y="40" width="64" height="52" fill="#4a535d" />
-      <rect x="30" y="52" width="14" height="18" fill="#2b3138" />
-      <rect x="56" y="52" width="14" height="18" fill="#2b3138" />
-      <rect x="120" y="24" width="8" height="68" fill="#58626d" />
-      <rect x="150" y="56" width="70" height="36" fill="#4f5963" />
-      <rect x="166" y="66" width="38" height="12" fill="#6a7580" />
-    </>
-  );
+/** Plays both clips from the same instant so the panels stay in step; reduced motion keeps the poster frames. */
+function useSyncedLoop() {
+  const videos = useRef<(HTMLVideoElement | null)[]>([]);
+  useEffect(() => {
+    const vs = videos.current.filter((v): v is HTMLVideoElement => v !== null);
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let cancelled = false;
+    const ready = (v: HTMLVideoElement) =>
+      v.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA ? Promise.resolve() : new Promise<void>((ok) => v.addEventListener('canplaythrough', () => ok(), { once: true }));
+    void Promise.all(vs.map(ready)).then(() => {
+      if (cancelled) return;
+      for (const v of vs) {
+        v.currentTime = 0;
+        void v.play().catch(() => {});
+      }
+    });
+    return () => {
+      cancelled = true;
+      for (const v of vs) v.pause();
+    };
+  }, []);
+  return videos;
 }
 
-/** Original vs. anomaly heatmap, drawn in code and labelled illustrative so it is never read as a result. */
 function Comparison() {
-  const w = COLS * CELL;
-  const h = ROWS * CELL;
-  const panel = 'relative aspect-[12/7] overflow-hidden lg:aspect-auto lg:min-h-[150px] lg:flex-1';
+  const videos = useSyncedLoop();
+  const panel = 'relative aspect-video overflow-hidden bg-ground lg:aspect-auto lg:min-h-[150px] lg:flex-1';
   return (
-    <figure className="flex min-w-0 flex-col gap-2 bg-surface p-4" aria-label="Illustrative comparison of an original image and an anomaly heatmap">
+    <figure className="flex min-w-0 flex-col gap-2 bg-surface p-4" aria-label="Example comparison of an original image and its anomaly heatmap">
       <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
         <h3 className="text-[0.9375rem] font-semibold text-ink">Inspection preview</h3>
-        <span className="text-sm text-caution">Illustrative example, not a model result</span>
+        <span className="text-sm text-caution">Example: real model output on a sample photo</span>
       </div>
       <div className="flex flex-col gap-3 lg:flex-1">
-        <div className="flex flex-col gap-1 lg:flex-1">
-          <div className={panel}>
-            <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid slice" className="absolute inset-0 size-full" role="img" aria-label="Synthetic scene, unmodified">
-              <Scene />
-            </svg>
+        {CLIPS.map((clip, i) => (
+          <div key={clip.name} className="flex flex-col gap-1 lg:flex-1">
+            <div className={panel}>
+              <video
+                ref={(el) => { videos.current[i] = el; }}
+                src={`/preview/inspection-${clip.name}.mp4`}
+                poster={`/preview/inspection-${clip.name}.jpg`}
+                muted
+                loop
+                playsInline
+                preload="auto"
+                aria-label={clip.label}
+                className="absolute inset-0 size-full object-cover"
+              />
+            </div>
+            <figcaption className="text-sm text-ink-2">{clip.caption}</figcaption>
           </div>
-          <figcaption className="text-sm text-ink-2">Original</figcaption>
-        </div>
-        <div className="flex flex-col gap-1 lg:flex-1">
-          <div className={panel}>
-            <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid slice" className="absolute inset-0 size-full" role="img" aria-label="The same synthetic scene with a cluster of heat cells over one area">
-              <Scene />
-              <rect width={w} height={h} fill="#121417" opacity="0.45" />
-              {DEMO_CELLS.map(({ c, r, score }) => {
-                const [R, G, B, A] = heatColour(Math.min(1, score));
-                return <rect key={`${c}-${r}`} x={c * CELL} y={r * CELL} width={CELL} height={CELL} fill={`rgb(${R | 0} ${G | 0} ${B | 0})`} opacity={A} />;
-              })}
-              <rect x={11 * CELL} y={3 * CELL} width={9 * CELL} height={8 * CELL} fill="none" stroke="#f0f2f4" strokeWidth="1.5" />
-            </svg>
-          </div>
-          <figcaption className="text-sm text-ink-2">Anomaly heatmap with one flagged region</figcaption>
-        </div>
+        ))}
       </div>
     </figure>
   );

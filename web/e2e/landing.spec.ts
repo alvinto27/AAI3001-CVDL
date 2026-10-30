@@ -3,7 +3,7 @@ import { expect, shot, test } from './fixtures';
 test('landing page lays out cleanly', async ({ page }, info) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: /Inspect an image for hidden data/ })).toBeVisible();
-  await expect(page.getByText('Illustrative example, not a model result')).toBeVisible();
+  await expect(page.getByText('Example: real model output on a sample photo')).toBeVisible();
   await expect(page.getByRole('button', { name: /Drop an image here/ })).toBeVisible();
   for (const label of ['Formats', 'Pixels', 'Limits', 'Best input']) await expect(page.getByText(label, { exact: true })).toBeVisible();
   for (const cap of ['LSB inspection', 'Spatial anomaly localization', 'Forensic evidence review']) await expect(page.getByText(cap)).toBeVisible();
