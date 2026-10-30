@@ -48,14 +48,14 @@ export function UploadWorkspace({ status, problem, dragging, onFile, onDismissPr
             <button
               type="button"
               onClick={() => input.current?.click()}
-              className={`group relative flex min-h-[280px] flex-1 flex-col items-start justify-end gap-1.5 overflow-hidden border border-dashed p-6 text-left transition-colors lg:p-8 ${
+              className={`group relative flex min-h-[280px] flex-1 flex-col items-center justify-center gap-1.5 overflow-hidden border border-dashed p-6 text-center transition-colors lg:p-8 ${
                 dragging ? 'border-accent bg-raised' : 'border-line-strong bg-surface hover:border-accent'
               }`}
             >
               <GridBackdrop active={dragging} />
               <span className="relative text-2xl font-semibold text-ink lg:text-3xl">{dragging ? 'Release to stage this image' : 'Drop an image here'}</span>
               <span className="relative text-base text-ink-2">or choose a file from this computer</span>
-              <span className="btn btn-primary pointer-events-none relative mt-4 h-10 px-5 text-sm">Choose Image</span>
+              <span className="btn btn-primary pointer-events-none relative mt-4 h-11 px-6 text-sm lg:h-10">Choose Image</span>
             </button>
 
             <div aria-label="File requirements" className="bg-surface px-4 py-3">
@@ -135,7 +135,7 @@ function Comparison() {
   const panel = 'relative aspect-[12/7] overflow-hidden lg:aspect-auto lg:min-h-[150px] lg:flex-1';
   return (
     <figure className="flex min-w-0 flex-col gap-2 bg-surface p-4" aria-label="Illustrative comparison of an original image and an anomaly heatmap">
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
         <h3 className="text-[0.9375rem] font-semibold text-ink">Inspection preview</h3>
         <span className="text-sm text-caution">Illustrative example, not a model result</span>
       </div>

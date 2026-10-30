@@ -13,7 +13,7 @@ Run this once when a UI task is finished, not after every edit.
    cd web && npm run audit
    ```
    This type-checks nothing by itself; run `npm run typecheck` first if you have not. The audit wipes `web/audit/`, builds the app against the mock API, runs Playwright for three viewports, and writes `web/audit/report.md`. A pass also writes the stamp that releases the Stop hook.
-3. Read `web/audit/report.md`. Open the screenshots in `web/audit/screens/` (`desktop-`, `tablet-`, `mobile-` for landing, verdict-negative, verdict-positive, error-unsupported). Judge them against the rules in `CLAUDE.md`, and for a visual critique use `taste-skill:design-taste-frontend` if it is available.
+3. Read `web/audit/report.md`. Open the screenshots in `web/audit/screens/` (`desktop-`, `tablet-`, `mobile-` for landing, verdict-negative, verdict-positive, error-unsupported). Judge them against the rules in `CLAUDE.md`, and for the visual critique use `ui-ux-pro-max:ui-ux-pro-max` (UX, accessibility, responsive and interaction review) and `taste-skill:design-taste-frontend` (visual taste), when available. Their suggestions never override the rules in `CLAUDE.md`.
 4. Fix failures in the UI layer only (`web/src/components`, `web/src/index.css`). Never edit `web/src/lib/api.ts`, validation, interpretation wording, or the Python service to make a check pass. If a test is wrong because the design deliberately changed, update the test and say why.
 5. Re-run until it passes. Axe findings of impact serious or critical fail the run; minor and moderate ones are listed as advisory, so mention them in your summary.
 6. Report: pass/fail counts, any advisory axe findings, and the paths of the report and screenshots. CI uploads the same files as the `design-audit` artifact.

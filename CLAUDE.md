@@ -10,7 +10,7 @@ Python/ML code lives in `cvdl/`. The Image Integrity Inspector front end lives i
 - Anything illustrative (such as the landing preview) is labelled as an example and never shows invented model scores.
 - Desktop-first at 1920x1080 with no vertical scroll on the landing page; tablet (820) and mobile (390) stack and scroll without clipping or horizontal overflow.
 - Do not change `web/src/lib/api.ts`, `/health` or `/analyze` behaviour, validation rules (`web/src/lib/file.ts`) or inference wording (`web/src/lib/interpret.ts`) as part of a visual change.
-- Available design skills: `taste-skill:design-taste-frontend` (installed plugin). UI/UX Pro Max is not installed; do not claim to have applied it.
+- Design skills: `taste-skill:design-taste-frontend` and `ui-ux-pro-max:ui-ux-pro-max` (both plugins). Use them for the visual critique at the end of a UI task, within the rules above.
 
 ## Verification workflow for UI changes
 

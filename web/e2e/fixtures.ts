@@ -47,6 +47,7 @@ export const upload = (page: Page, name: string, buffer: Buffer = pngBuffer(), m
 
 /** Full-page screenshot into audit/screens, one file per project and state. */
 export async function shot(page: Page, info: TestInfo, state: string) {
+  await page.waitForTimeout(450); // let entrance animations finish so the evidence is not captured mid-fade
   mkdirSync('audit/screens', { recursive: true });
   await page.screenshot({ path: `audit/screens/${info.project.name}-${state}.png`, fullPage: true });
 }
