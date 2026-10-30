@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { HealthState } from '../lib/api';
+import { useGridTrail } from '../hooks/useGridTrail';
 import type { Problem } from '../hooks/useSession';
 import { ErrorState } from './ErrorState';
 
@@ -170,20 +171,22 @@ function Comparison() {
   );
 }
 
-/** The 32 px analysis grid, drawn faintly behind the drop target: the tool's unit of measure. */
+/** The 32 px analysis grid, drawn faintly behind the drop target: the tool's unit of measure. Cells light up and fade along the pointer. */
 function GridBackdrop({ active }: { active: boolean }) {
   const stroke = active ? '#5cbab2' : '#2a2f36';
+  const trail = useRef<HTMLCanvasElement>(null);
+  useGridTrail(trail);
   return (
-    <svg className="pointer-events-none absolute inset-0 size-full" aria-hidden>
-      <defs>
-        <pattern id="upload-cells" width="32" height="32" patternUnits="userSpaceOnUse">
-          <path d="M32 0H0V32" fill="none" stroke={stroke} strokeWidth="1" />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#upload-cells)" />
-      <rect x="96" y="64" width="32" height="32" fill="#f08e2c" opacity={active ? 0.9 : 0.55} />
-      <rect x="128" y="64" width="32" height="32" fill="#d03e76" opacity={active ? 0.7 : 0.4} />
-      <rect x="128" y="96" width="32" height="32" fill="#f08e2c" opacity={active ? 0.6 : 0.3} />
-    </svg>
+    <>
+      <svg className="pointer-events-none absolute inset-0 size-full" aria-hidden>
+        <defs>
+          <pattern id="upload-cells" width="32" height="32" patternUnits="userSpaceOnUse">
+            <path d="M32 0H0V32" fill="none" stroke={stroke} strokeWidth="1" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#upload-cells)" />
+      </svg>
+      <canvas ref={trail} className="pointer-events-none absolute inset-0 size-full" aria-hidden />
+    </>
   );
 }
