@@ -1,0 +1,42 @@
+name: web-design-qa
+
+on:
+  push:
+    paths: ['web/**', '.github/workflows/web-design-qa.yml']
+  pull_request:
+    paths: ['web/**', '.github/workflows/web-design-qa.yml']
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+      - run: node scripts/audit-report.mjs
+        if: always()
+      - name: Summarise
+        if: always()
+        run: cat audit/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: design-audit
+          path: |
+            web/audit/report.md
+            web/audit/screens
+            web/audit/axe
+            web/audit/html
+            web/audit/artifacts
+          if-no-files-found: warn

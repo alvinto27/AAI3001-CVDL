@@ -20,11 +20,9 @@ const REQUIREMENTS: [string, string][] = [
 ];
 
 const CAPABILITIES: [string, string][] = [
-  ['Pixel-level scoring', 'Scores spatial RGB least-significant-bit behaviour across the image.'],
-  ['Anomaly heatmap', 'Maps abnormal tiles over the original on a 32 px analysis grid.'],
-  ['Flagged regions', 'Groups adjacent hot tiles into numbered, zoomable regions.'],
-  ['Category hints', 'Labels a region as steganographic or manipulation-like when the model reports one.'],
-  ['Exportable evidence', 'Saves the heatmap overlay as a PNG for review.'],
+  ['LSB inspection', 'Scores least-significant-bit behaviour in spatial RGB pixels to surface hidden data. JPEG/DCT steganography is not covered.'],
+  ['Spatial anomaly localization', 'Maps abnormal tiles on a 32 px grid and groups neighbouring ones into numbered regions.'],
+  ['Forensic evidence review', 'Zoom the heatmap over the original, read each flagged region, and export the overlay as a PNG.'],
 ];
 
 export function UploadWorkspace({ status, problem, dragging, onFile, onDismissProblem }: Props) {
@@ -32,12 +30,12 @@ export function UploadWorkspace({ status, problem, dragging, onFile, onDismissPr
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 px-4 py-5 sm:px-6 lg:py-6">
+      <div className="mx-auto flex min-h-full w-[92%] max-w-[1600px] flex-col gap-4 py-4 lg:gap-5 lg:py-5">
         <div className="flex flex-col gap-1 lg:flex-row lg:items-baseline lg:justify-between lg:gap-8">
           <h2 className="text-xl font-semibold leading-tight text-ink sm:text-2xl">
             Inspect an image for hidden data and suspicious modifications.
           </h2>
-          <p className="text-sm text-ink-2 lg:text-right">Results are evidence for review, not proof.</p>
+          <p className="text-[0.9375rem] text-ink-2">Results are evidence for review, not proof.</p>
         </div>
 
         {problem && <ErrorState {...problem} onDismiss={onDismissProblem} />}
@@ -45,58 +43,52 @@ export function UploadWorkspace({ status, problem, dragging, onFile, onDismissPr
           <ErrorState title="Analysis service is not reachable" message="Start the inference API, then retry. You can still stage an image." />
         )}
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+        <div className="grid flex-1 gap-5 lg:grid-cols-[minmax(0,58fr)_minmax(0,42fr)]">
           <div className="flex min-w-0 flex-col gap-3">
             <button
               type="button"
               onClick={() => input.current?.click()}
-              className={`group relative flex min-h-[260px] flex-1 flex-col items-start justify-end gap-1 overflow-hidden border border-dashed p-5 text-left transition-colors lg:min-h-[300px] ${
+              className={`group relative flex min-h-[280px] flex-1 flex-col items-start justify-end gap-1.5 overflow-hidden border border-dashed p-6 text-left transition-colors lg:p-8 ${
                 dragging ? 'border-accent bg-raised' : 'border-line-strong bg-surface hover:border-accent'
               }`}
-              aria-label="Choose an image to analyse, or drop one here"
             >
               <GridBackdrop active={dragging} />
-              <span className="relative text-xl font-semibold text-ink">{dragging ? 'Release to stage this image' : 'Drop an image here'}</span>
-              <span className="relative text-ink-2">or choose a file from this computer</span>
-              <span className="btn btn-primary pointer-events-none relative mt-3 h-9 px-4">Choose Image</span>
+              <span className="relative text-2xl font-semibold text-ink lg:text-3xl">{dragging ? 'Release to stage this image' : 'Drop an image here'}</span>
+              <span className="relative text-base text-ink-2">or choose a file from this computer</span>
+              <span className="btn btn-primary pointer-events-none relative mt-4 h-10 px-5 text-sm">Choose Image</span>
             </button>
 
-            <div aria-label="File requirements">
-              <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
+            <div aria-label="File requirements" className="bg-surface px-4 py-3">
+              <dl className="grid gap-x-6 gap-y-2 text-[0.9375rem] sm:grid-cols-2 xl:grid-cols-4">
                 {REQUIREMENTS.map(([k, v]) => (
                   <div key={k} className="min-w-0">
-                    <dt className="text-xs text-ink-3">{k}</dt>
-                    <dd className="text-ink-2">{v}</dd>
+                    <dt className="text-sm font-medium text-ink-2">{k}</dt>
+                    <dd className="text-ink">{v}</dd>
                   </div>
                 ))}
               </dl>
-              <p className="mt-2 text-xs text-ink-3">The service does not retain uploaded files or results.</p>
+              <p className="mt-2 text-sm text-ink-2">The service does not retain uploaded files or results.</p>
             </div>
           </div>
 
-          <div className="flex min-w-0 flex-col gap-4">
-            <section aria-labelledby="capabilities-title" className="bg-surface px-4 py-3.5">
-              <h3 id="capabilities-title" className="section-title mb-1">Analysis capabilities</h3>
-              <dl className="text-sm">
-                {CAPABILITIES.map(([k, v]) => (
-                  <div key={k} className="dl-row flex-col gap-0 sm:flex-row sm:gap-4">
-                    <dt className="w-[8.5rem] shrink-0 font-medium text-ink">{k}</dt>
-                    <dd className="min-w-0 text-left text-ink-2">{v}</dd>
-                  </div>
-                ))}
-              </dl>
-              <p className="mt-2 text-xs text-ink-3">Spatial LSB analysis only. JPEG/DCT steganography is not covered.</p>
-            </section>
-            <Comparison />
-          </div>
+          <Comparison />
         </div>
+
+        <section aria-label="Analysis capabilities" className="grid gap-3 md:grid-cols-3">
+          {CAPABILITIES.map(([k, v]) => (
+            <div key={k} className="bg-surface px-4 py-3">
+              <h3 className="text-[0.9375rem] font-semibold text-ink">{k}</h3>
+              <p className="mt-1 text-[0.9375rem] leading-snug text-ink-2">{v}</p>
+            </div>
+          ))}
+        </section>
       </div>
 
       <input
         ref={input}
         type="file"
         accept=".png,.jpg,.jpeg,.tif,.tiff,image/png,image/jpeg,image/tiff"
-        className="sr-only"
+        aria-label="Image file" className="sr-only"
         tabIndex={-1}
         onChange={(e) => {
           const f = e.target.files?.[0];
@@ -140,30 +132,35 @@ function Scene() {
 function Comparison() {
   const w = COLS * CELL;
   const h = ROWS * CELL;
+  const panel = 'relative aspect-[12/7] overflow-hidden lg:aspect-auto lg:min-h-[150px] lg:flex-1';
   return (
-    <figure className="bg-surface px-4 py-3.5" aria-label="Illustrative comparison of an original image and an anomaly heatmap">
-      <div className="mb-2 flex items-baseline justify-between gap-3">
-        <h3 className="section-title">Original vs. heatmap</h3>
-        <span className="text-xs text-caution">Illustrative, not a model result</span>
+    <figure className="flex min-w-0 flex-col gap-2 bg-surface p-4" aria-label="Illustrative comparison of an original image and an anomaly heatmap">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-[0.9375rem] font-semibold text-ink">Inspection preview</h3>
+        <span className="text-sm text-caution">Illustrative example, not a model result</span>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <svg viewBox={`0 0 ${w} ${h}`} className="block w-full" role="img" aria-label="Synthetic scene, unmodified">
-            <Scene />
-          </svg>
-          <figcaption className="mt-1 text-xs text-ink-3">Original</figcaption>
+      <div className="flex flex-col gap-3 lg:flex-1">
+        <div className="flex flex-col gap-1 lg:flex-1">
+          <div className={panel}>
+            <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid slice" className="absolute inset-0 size-full" role="img" aria-label="Synthetic scene, unmodified">
+              <Scene />
+            </svg>
+          </div>
+          <figcaption className="text-sm text-ink-2">Original</figcaption>
         </div>
-        <div>
-          <svg viewBox={`0 0 ${w} ${h}`} className="block w-full" role="img" aria-label="The same synthetic scene with a cluster of heat cells over one area">
-            <Scene />
-            <rect width={w} height={h} fill="#121417" opacity="0.45" />
-            {DEMO_CELLS.map(({ c, r, score }) => {
-              const [R, G, B, A] = heatColour(Math.min(1, score));
-              return <rect key={`${c}-${r}`} x={c * CELL} y={r * CELL} width={CELL} height={CELL} fill={`rgb(${R | 0} ${G | 0} ${B | 0})`} opacity={A} />;
-            })}
-            <rect x={11 * CELL} y={3 * CELL} width={9 * CELL} height={8 * CELL} fill="none" stroke="#f0f2f4" strokeWidth="1.5" />
-          </svg>
-          <figcaption className="mt-1 text-xs text-ink-3">Anomaly heatmap with a flagged region</figcaption>
+        <div className="flex flex-col gap-1 lg:flex-1">
+          <div className={panel}>
+            <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid slice" className="absolute inset-0 size-full" role="img" aria-label="The same synthetic scene with a cluster of heat cells over one area">
+              <Scene />
+              <rect width={w} height={h} fill="#121417" opacity="0.45" />
+              {DEMO_CELLS.map(({ c, r, score }) => {
+                const [R, G, B, A] = heatColour(Math.min(1, score));
+                return <rect key={`${c}-${r}`} x={c * CELL} y={r * CELL} width={CELL} height={CELL} fill={`rgb(${R | 0} ${G | 0} ${B | 0})`} opacity={A} />;
+              })}
+              <rect x={11 * CELL} y={3 * CELL} width={9 * CELL} height={8 * CELL} fill="none" stroke="#f0f2f4" strokeWidth="1.5" />
+            </svg>
+          </div>
+          <figcaption className="text-sm text-ink-2">Anomaly heatmap with one flagged region</figcaption>
         </div>
       </div>
     </figure>
