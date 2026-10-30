@@ -10,8 +10,8 @@ const report = spawnSync('node', ['scripts/audit-report.mjs'], { stdio: 'inherit
 if (tests === 0 && report === 0) {
   mkdirSync('../.claude', { recursive: true });
   writeFileSync('../.claude/.design-audit-pass', String(Date.now()));
-  console.log('Audit passed. Report: web/audit/report.md');
+  console.log('Audit passed. Report: app/audit/report.md');
 } else {
-  console.log('Audit FAILED. Report: web/audit/report.md');
+  console.log('Audit FAILED. Report: app/audit/report.md');
   process.exitCode = 1;
 }

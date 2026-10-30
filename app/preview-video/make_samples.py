@@ -4,7 +4,7 @@ The stego photo is the clean photo with a random LSB payload embedded by the
 repository's own engine into one rectangle, so the model has a localised
 modification to find. Run from the repository root:
 
-    .venv/Scripts/python web/preview-video/make_samples.py SOURCE.png
+    .venv/Scripts/python app/preview-video/make_samples.py SOURCE.png
 """
 from __future__ import annotations
 

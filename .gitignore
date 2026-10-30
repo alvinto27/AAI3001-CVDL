@@ -18,8 +18,8 @@ runs/**/logs/tb/
 runs-out/
 
 # Design QA pipeline output
-web/audit/
-web/test-results/
-web/playwright-report/
+app/audit/
+app/test-results/
+app/playwright-report/
 .claude/.design-audit-pass
 .claude/.ui-dirty

@@ -99,7 +99,7 @@ export function UploadWorkspace({ status, problem, dragging, onFile, onDismissPr
   );
 }
 
-/** Recorded from this app with real run 18 inference on a sample photo; see web/preview-video/README.md. */
+/** Recorded from this app with real run 18 inference on a sample photo; see app/preview-video/README.md. */
 const CLIPS = [
   {
     name: 'original',

@@ -12,13 +12,13 @@ const input = JSON.parse(await new Promise((res) => {
 }));
 
 const file = String(input.tool_input?.file_path ?? '').replace(/\\/g, '/');
-if (!/\/web\/(src|e2e)\/.+\.(ts|tsx|css)$/.test(file)) process.exit(0);
+if (!/\/app\/(src|e2e)\/.+\.(ts|tsx|css)$/.test(file)) process.exit(0);
 
 mkdirSync(join(root, '.claude'), { recursive: true });
 writeFileSync(join(root, '.claude', '.ui-dirty'), String(Date.now()));
 
-if (!/\/web\/src\//.test(file)) process.exit(0);
-const r = spawnSync('npx tsc --noEmit', { cwd: join(root, 'web'), shell: true, encoding: 'utf8', timeout: 60_000 });
+if (!/\/app\/src\//.test(file)) process.exit(0);
+const r = spawnSync('npx tsc --noEmit', { cwd: join(root, 'app'), shell: true, encoding: 'utf8', timeout: 60_000 });
 if (r.status !== 0) {
   process.stderr.write(`Type-check failed after editing ${file}:\n${(r.stdout + r.stderr).slice(0, 2000)}\n`);
   process.exit(2);

@@ -2,23 +2,23 @@ name: web-design-qa
 
 on:
   push:
-    paths: ['web/**', '.github/workflows/web-design-qa.yml']
+    paths: ['app/**', '.github/workflows/web-design-qa.yml']
   pull_request:
-    paths: ['web/**', '.github/workflows/web-design-qa.yml']
+    paths: ['app/**', '.github/workflows/web-design-qa.yml']
 
 jobs:
   audit:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: web
+        working-directory: app
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: app/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
@@ -34,9 +34,9 @@ jobs:
         with:
           name: design-audit
           path: |
-            web/audit/report.md
-            web/audit/screens
-            web/audit/axe
-            web/audit/html
-            web/audit/artifacts
+            app/audit/report.md
+            app/audit/screens
+            app/audit/axe
+            app/audit/html
+            app/audit/artifacts
           if-no-files-found: warn

@@ -15,6 +15,6 @@ const stamp = (name) => (existsSync(join(dir, name)) ? Number(readFileSync(join(
 if (stamp('.ui-dirty') > stamp('.design-audit-pass')) {
   console.log(JSON.stringify({
     decision: 'block',
-    reason: 'Frontend files changed since the last passing design audit. Run /design-audit (cd web && npm run audit), fix any failures, and report the result before finishing.',
+    reason: 'Frontend files changed since the last passing design audit. Run /design-audit (cd app && npm run audit), fix any failures, and report the result before finishing.',
   }));
 }
