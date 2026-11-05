@@ -1,4 +1,8 @@
-# Project status — 2026-10-29
+# Project status — 2026-11-05
+
+## Run 21 attribution heatmap scored — clearly worse than trained heads
+
+On the frozen cell fixture (128 contiguous test tiles), run 21 BEST signed covariance attribution scores within-tile AUC **.752** [.718, .786]. Run 18 trained head .867 (Δ **−.115** [−.141, −.090]); run 22 trained head .864 (Δ −.112 [−.137, −.087]); run 22 attribution .760 (Δ −.008 [−.022, +.006]). Run 21 alone would ship a much weaker heatmap. Run 18 stays default; submission choice **Pending (user)**. [Journal](journal/2026-11-05/README.md).
 
 ## Run22 evaluated — mixed, not a clear upgrade
 
