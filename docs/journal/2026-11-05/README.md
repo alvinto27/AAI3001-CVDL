@@ -72,6 +72,11 @@ Primary metric: mean per-tile within-stego AUC, 128 contiguous test tiles, 2,000
 - **Pending (user):** push `yx` and `pipeline`; merge to `main` (C1).
 - HEIC input is still not supported by the app (PNG/JPEG/TIFF only).
 
+## Report notebooks for runs 18, 21 and 22
+
+- Built `runs/<run>/report.ipynb` for run 18 (eval `b3d9a49137b5dbd7bd5a`), run 21 (`cdc91a4b6d63a1517064`) and run 22 (`a1ab2faad8f27bca309e`); no detector reference. Each: 0 errors, all charts, headline P_E matches the recorded evaluations (2.6 / 2.2 / 2.5%).
+- Added a general cell-heatmap view to `cvdl/report_cells.py` for `cell_eval.py` outputs without run-13 comparison files; the run-13 view is unchanged. One new test; `tests.test_reporting` 17 OK. Cell sections: run 18 own outputs; runs 21 and 22 with run 18 as side-by-side heatmap reference (same frozen tiles checked). Values match the recorded cell results (run 18 head .867, run 21 attribution .752, run 22 head .864 / attribution .760).
+
 Evidence (git-ignored): `runs/verification/photo-verdict-run22-2026-11-05/` (`REPORT.md`, `frozen-rules.json`, `compare-run18.json`, `compare_run18.py`, cache/fit/score logs, `pipeline-full*.log`).
 
 Evidence (git-ignored): `runs/verification/run21-attribution-cell-eval-2026-11-05/` (`cells/`, `cell.log`, `cell.exit`, `compare.py`, `compare.log`, `comparison.json`).

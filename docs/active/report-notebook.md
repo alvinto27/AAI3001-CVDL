@@ -20,6 +20,8 @@ recipes. Each model keeps its own saved validation cut-off.
 
 For a run with cell outputs, add `--cell-dir <cell_eval output>` and, for the control map's cut-off row, `--cell-reference-dir <control cell_eval output>` (`5981ab2`). The report then has a "Where in the tile? (cell heatmap)" section with the saved figure and tables. Without these options the report does not change. Run 13 example: `--cell-dir runs/verification/cell-run13-2026-10-21/cells --cell-reference-dir runs/verification/cell-control-2026-10-21`.
 
+Other runs (2026-11-05): if the `--cell-dir` folder has no run-13 comparison files (`aux-minus-control-cam.json`, `tile-comparison.json`), the section uses the general view. It reads only `cells/summary.json` and `cells/cells.png` of a `cell_eval.py` output. It shows every saved map (cell head, CAM or attribution) with its patch size, the same-model paired difference when saved, and each map's own cut-off, false alarms and recall. `--cell-reference-dir` (a folder with `summary.json` or `cells/summary.json`) adds the reference maps side by side; it must use the same frozen tiles, and it is not a paired test. Example (run 22, run 18 as heatmap reference): `--cell-dir runs/verification/run22-cell-eval-2026-10-29 --cell-reference-dir runs/verification/cell-curriculum50-paired-2026-10-23/cells`.
+
 If there is one evaluation folder, the generator can select it without an id.
 If there are zero or multiple folders, it stops and lists the available ids.
 It refuses missing, pending, QUICK, or mismatched calibration results.
