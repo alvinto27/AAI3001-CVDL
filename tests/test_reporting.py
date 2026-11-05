@@ -167,6 +167,33 @@ class ReportingTests(unittest.TestCase):
         (control/'summary.json').write_text(json.dumps(saved))
         with self.assertRaisesRegex(ValueError,'control cell summary differs'):cell_tables(folder,control)
 
+    def test_general_cell_tables_attribution_head_and_side_by_side_reference(self):
+        from cvdl.report_cells import general_cell_tables
+        def estimate(point):return dict(point=point,low=point-.05,high=point+.05)
+        def record(cutoff):return dict(cutoff=cutoff,validation_FA=.0499,test=[dict(panel='pooled',placement='all',FA=.045,recall=.17)])
+        counts=dict(test=dict(placement=dict(contiguous=2)))
+        folder=self.root/'general';(folder/'cells').mkdir(parents=True)
+        own=[dict(split='test',panel=p,placement='contiguous',maps=dict(class_score=dict(within_stego_auc=estimate(.76)),aux=dict(within_stego_auc=estimate(.86))),
+            aux_minus_class_score=dict(within_stego_auc=estimate(.1))) for p in ('pooled','raise')]
+        (folder/'cells/summary.json').write_text(json.dumps(dict(localization=own,maps=dict(class_score=record(9.),aux=record(.31)),
+            map_kind='attribution',map_metadata=dict(class_score=dict(receptive_field=256,global_context=True),aux=dict(receptive_field=48)),
+            selection_counts=counts)))
+        (folder/'cells/cells.png').write_bytes(PNG)
+        reference=self.root/'general-reference';reference.mkdir()
+        (reference/'summary.json').write_text(json.dumps(dict(localization=[dict(split='test',panel='pooled',placement='contiguous',
+            maps=dict(aux=dict(within_stego_auc=estimate(.87)),cam=dict(within_stego_auc=estimate(.8))))],maps=dict(aux=record(.2),cam=record(1.)),
+            selection_counts=counts)))
+        tables=general_cell_tables(folder,reference)
+        self.assertEqual(list(tables['auc'].columns),['Test panel','This model: cell head','This model: attribution','Reference: cell head','Reference: CAM'])
+        self.assertEqual(tables['auc'].iloc[0]['This model: attribution'],'0.760 [0.710, 0.810]')
+        self.assertEqual(tables['auc'].iloc[1]['Reference: cell head'],'—')
+        self.assertEqual(tables['differences'].iloc[0]['Comparison'],'Cell head − same-model attribution')
+        self.assertEqual(tables['rates']['Patch seen'].tolist(),['48×48','256×256 (whole tile)','48×48','48×48'])
+        self.assertEqual(len(general_cell_tables(folder)['rates']),2)
+        saved=json.loads((reference/'summary.json').read_text());saved['selection_counts']=dict(other=1)
+        (reference/'summary.json').write_text(json.dumps(saved))
+        with self.assertRaisesRegex(ValueError,'different frozen fixture'):general_cell_tables(folder,reference)
+
     def test_generator_optional_cell_section_executes_saved_outputs_only(self):
         template=self.root/'notebooks/templates';template.mkdir(parents=True)
         shutil.copy(ROOT/'notebooks/templates/report.ipynb',template/'report.ipynb')
