@@ -4,7 +4,28 @@ Updated 2026-10-21 for the standard-256 / hard-256 tests. Read [status](status.m
 
 **Terms.** *P_E* = overall error, the mean of the false-alarm rate (FA, clean tiles called stego) and the miss rate (stego tiles called clean). Each model uses **its own cut-off, chosen on validation** before the test. *AUC* = how well the scores rank stego above clean, independent of the cut-off (1.0 = perfect, 0.5 = guessing). *Standard* = RAISE + DIV2K, 10,944 pairs. *Hard target* = k=1, low bpp, contiguous payloads on ALASKA seen/unseen + LSDIR. *Interval* = 95% photo-bootstrap range.
 
-## Submission model (user, 2026-10-24)
+## Submission model (user, 2026-11-05)
+
+**Run 22, `srm-cell-aux-paired-gapcov32-20261029T063502Z-5452`, `last.ckpt`** (SHA-256 `6be0ec8f...6f48`), evaluation `a1ab2faad8f27bca309e`, tile cut-off .5245 (own `60da`, train-matched). Run 21's GAP + covariance detector (BEST weights) plus a trained 1×1 cell head, 15 paired epochs. Standard P_E 2.54% (run 21 2.15%, run 18 2.62%); hard k=1 low AUC .798 (run 21 .787, run 18 .751); cell head mean per-tile AUC .864 (run 18 .867; Δ −.003 [−.015, +.008]); cell FA 4.5% at its own 5% validation cut-off. Photo rule (c) re-fitted (below); bundle `deploy/run22-rule-c-v1/` is the `pipeline` default (`044c1ad`).
+
+## Photo verdict for run 22 (rule c, re-fitted 2026-11-05)
+
+Same frozen method and photos as run 18; run 22's own cut-offs (tile .5245, cell .3115). Frozen rule SHA-256 `b5d8ba6f...30fc`. Record: `runs/verification/photo-verdict-run22-2026-11-05/REPORT.md`; [2026-11-05 journal](journal/2026-11-05/README.md).
+
+| TEST photos (576), run 18 -> run 22 | Clean photos flagged | Messages missed | P_E | AUC |
+| --- | ---: | ---: | ---: | ---: |
+| All | 8.7 -> **5.6%** | 8.4 -> 10.2% | 8.5 -> 7.9% | .965 -> .967 |
+| RAISE | 0.0 -> 1.0% | 0.9 -> 2.0% | 0.4 -> 1.5% | — |
+| DIV2K | 10.4 -> 7.3% | 1.5 -> 2.4% | 5.9 -> 4.9% | — |
+| ALASKA seen | 9.4 -> 5.5% | 19.7 -> 22.8% | 14.5 -> 14.1% | — |
+| ALASKA unseen | 16.4 -> **8.6%** | 12.5 -> 15.8% | 14.5 -> 12.2% | — |
+| LSDIR | 5.5 -> 4.7% | 3.7 -> 4.0% | 4.6 -> 4.3% | — |
+| Hard: k=1, 0.05-0.15 bpp | 8.1 -> 5.5% | 33.0 -> 39.7% | 20.5 -> 22.6% | .884 -> .891 |
+
+- Frozen marks: FA <= 7% **passed** (5.6%, 32 of 576); hard P_E <= 25% passed (22.6%). First model to pass both.
+- Paired photo bootstrap vs run 18 (descriptive, same photos): FA −3.1 points [−5.4, −1.0]; miss +1.8 [+1.0, +2.7]; P_E −0.65 [−1.6, +0.3]. The rule trades misses for fewer false alarms; overall error is not clearly different.
+
+## ~~Submission model (user, 2026-10-24)~~ (superseded 2026-11-05)
 
 **Run 18, `srm-cell-aux-curriculum50-paired-20261023T133537Z-1366`, `last.ckpt`** (SHA-256 `eee9c63a...0b80`), evaluation `b3d9a49137b5dbd7bd5a`, tile cut-off .5094 (own `60da`, train-matched). It is run 13's recipe with paired batches, started from the Curriculum50 paired best. Standard P_E 2.62% (run 13 2.97%, R2 2.43%); cell head mean per-tile AUC .867 (run 13 .863, R2 .860); cell FA 4.2% at its own 5% validation cut-off. It failed its frozen rule against R2 (cell +.007 [-.002, +.016]; standard +.19 points [-.06, +.42]); the user chose it for now. Its photo verdict rule (c) was re-fitted (below), and its bundle `deploy/run18-rule-c-v1/` is the `pipeline` default (`bfbbdcc`).
 

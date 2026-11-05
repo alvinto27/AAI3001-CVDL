@@ -40,10 +40,38 @@ Primary metric: mean per-tile within-stego AUC, 128 contiguous test tiles, 2,000
 
 ## Decided
 
-- No decision. Run 18 stays the submission and `pipeline` default.
+- **User: ship run 22** as the submission model (replaces run 18). Run 21 alone was not chosen because of its weaker map.
 
-## Next
+## Run 22 shipped
 
-- **Pending (user):** submission choice. Run 21 alone would ship a map about .11 AUC worse than run 18. Options include run 18 (current), run 22, or run 21 verdict + run 18 heatmap (two models).
+### Did
+
+- Photo rule (c) re-fitted for run 22 with the frozen method of runs 13/18. Same photos, splits, variants and seeds as run 18 (checked: `photos` lists identical); only the cut-offs are run 22's own (tile .5245211124 from `a1ab2faad8f27bca309e`, cell .3114905656 from the run 22 cell summary). Photo list SHA-256 `192006e2...900b`.
+- GPU cache, 1,024 photos × 13 versions: **22.4 min, exit 0**. CPU fit/freeze on validation only: frozen rule SHA-256 **`b5d8ba6f1e0faf85575aa4e8d8fddfdae394fe86ff0fa4884b759421131130fc`**, unchanged after the single TEST score. Rule (c) logit cut-off .6958.
+- `pipeline` `044c1ad`: ported `xunet_wide_gapcov32` inference (`cvdl/models.py`, `cov_pool.py`, `cell_diagnostics.py`, `photo_inference.py` byte-identical to `yx`). Bundle contract accepts the covariance model only with its exact `cov_pool_identity` and the trained-head map. Built `deploy/run22-rule-c-v1` (`weights.pt` `6d58acdb...42c1`, `deploy.json` `3aae1259...3203`); made it the default. Run 18 and run 13 bundles stay selectable. Dockerfile and `.dockerignore` include `cov_pool.py` and the new bundle.
+- Tests on `pipeline`: 2 new covariance-bundle contract tests; parity replay now covers run 22 (default) and run 18. FULL **419 tests OK, exit 0, 526.8 s**. A first FULL run had 3 environment failures (worktree lacked `runs/.scratch` and older run folders); with temporary links to the main `runs/` they pass; links removed after.
+- Podman CPU image: `/health` reports `run22-rule-c`; DIV2K 0281 `not_detected`, about 1.05 s, logit within 1.5×10⁻⁷ of project CPU. Test image removed.
+
+### Found
+
+| TEST photos (576), rule (c) | Run 18 | Run 22 |
+| --- | ---: | ---: |
+| Clean photos flagged (FA) | 8.681% | **5.556%** |
+| Messages missed | 8.362% | 10.185% |
+| P_E | 8.521% | 7.870% |
+| AUC | .96475 | .96686 |
+| ALASKA unseen FA | 16.406% | **8.594%** |
+| Hard k=1 .05-.15 bpp P_E | 20.536% | 22.592% |
+| Practical mark (FA <= 7% and hard P_E <= 25%) | FAIL | **PASS** |
+
+- Paired photo bootstrap vs run 18 (descriptive; panel-stratified, 2,000 draws, seed 20261021): FA **−3.125 [−5.382, −1.037]**, miss **+1.823 [+1.013, +2.705]**, P_E −0.651 [−1.635, +0.311].
+- Validation parity (CPU app vs cached GPU features), run 22: tile delta 0.0; feature delta ≤ 1.729×10⁻⁶; logit delta ≤ 4.472×10⁻⁶; 6/6 verdicts match.
+
+### Next
+
+- **Pending (user):** push `yx` and `pipeline`; merge to `main` (C1).
+- HEIC input is still not supported by the app (PNG/JPEG/TIFF only).
+
+Evidence (git-ignored): `runs/verification/photo-verdict-run22-2026-11-05/` (`REPORT.md`, `frozen-rules.json`, `compare-run18.json`, `compare_run18.py`, cache/fit/score logs, `pipeline-full*.log`).
 
 Evidence (git-ignored): `runs/verification/run21-attribution-cell-eval-2026-11-05/` (`cells/`, `cell.log`, `cell.exit`, `compare.py`, `compare.log`, `comparison.json`).

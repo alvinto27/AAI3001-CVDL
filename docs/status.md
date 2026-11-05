@@ -1,8 +1,12 @@
 # Project status — 2026-11-05
 
+## Run 22 shipped — submission model (user, 2026-11-05)
+
+`pipeline` `044c1ad`: default bundle **`deploy/run22-rule-c-v1`** (`srm-cell-aux-paired-gapcov32-20261029T063502Z-5452` LAST, eval `a1ab2faad8f27bca309e`). Photo rule (c) re-fitted (frozen `b5d8ba6f...30fc`): TEST clean-photo FA **5.556%** (run 18 8.681%), miss 10.185% (8.362%), P_E 7.870% (8.521%), hard P_E 22.592%; **practical mark PASS** (run 18 FAIL). FULL 419 OK; container check OK. Run 18/13 bundles stay selectable. Push and merge **Pending (user)**. [Journal](journal/2026-11-05/README.md#run-22-shipped), [findings](findings.md).
+
 ## Run 21 attribution heatmap scored — clearly worse than trained heads
 
-On the frozen cell fixture (128 contiguous test tiles), run 21 BEST signed covariance attribution scores within-tile AUC **.752** [.718, .786]. Run 18 trained head .867 (Δ **−.115** [−.141, −.090]); run 22 trained head .864 (Δ −.112 [−.137, −.087]); run 22 attribution .760 (Δ −.008 [−.022, +.006]). Run 21 alone would ship a much weaker heatmap. Run 18 stays default; submission choice **Pending (user)**. [Journal](journal/2026-11-05/README.md).
+On the frozen cell fixture (128 contiguous test tiles), run 21 BEST signed covariance attribution scores within-tile AUC **.752** [.718, .786]. Run 18 trained head .867 (Δ **−.115** [−.141, −.090]); run 22 trained head .864 (Δ −.112 [−.137, −.087]); run 22 attribution .760 (Δ −.008 [−.022, +.006]). Run 21 alone would ship a much weaker heatmap; the user chose run 22. [Journal](journal/2026-11-05/README.md).
 
 ## Run22 evaluated — mixed, not a clear upgrade
 
