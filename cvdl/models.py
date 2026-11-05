@@ -81,6 +81,20 @@ class SRMFilter(nn.Module):
         return self.conv(x)
 
 
+def clipped_residuals(front, x, clip_t):
+    """Protect fixed SRM residuals and clamp from outer AMP rounding.
+
+    KV retains its historical autocast behavior. FP32 inputs outside AMP keep
+    the old operations and checkpoint state exactly.
+    """
+    if isinstance(front, SRMFilter):
+        with torch.autocast(device_type=x.device.type, enabled=False):
+            x = front(x.float())
+            return torch.clamp(x, -clip_t, clip_t) if clip_t is not None else x
+    x = front(x)
+    return torch.clamp(x, -clip_t, clip_t) if clip_t is not None else x
+
+
 FRONT_ENDS = {'kv': (KVFilter, 3), 'srm': (SRMFilter, 90)}
 
 
@@ -118,9 +132,7 @@ class XuNet(nn.Module):
         self.classifier = nn.Linear(128, 2)
 
     def features(self, x):
-        x = self.kv(x)
-        if self.clip_t is not None:
-            x = torch.clamp(x, -self.clip_t, self.clip_t)
+        x = clipped_residuals(self.kv, x, self.clip_t)
         x = self.pool(torch.tanh(self.bn1(torch.abs(self.conv1(x)))))
         x = self.pool(torch.tanh(self.bn2(self.conv2(x))))
         x = self.pool(F.relu(self.bn3(self.conv3(x))))
@@ -152,9 +164,7 @@ class XuNetWide(XuNet):
         self.classifier = nn.Linear(d, 2)
 
     def features(self, x):
-        x = self.kv(x)
-        if self.clip_t is not None:
-            x = torch.clamp(x, -self.clip_t, self.clip_t)
+        x = clipped_residuals(self.kv, x, self.clip_t)
         x = self.pool(torch.tanh(self.bn1(torch.abs(self.conv1(x)))))
         x = self.pool(torch.tanh(self.bn2(self.conv2(x))))
         for name in (3, 4, 5):
@@ -177,9 +187,7 @@ class XuNetWideDelayed(XuNetWide):
         super().__init__(clip_t=clip_t, norm=norm, width=width, front_end=front_end)
 
     def features(self, x):
-        x = self.kv(x)
-        if self.clip_t is not None:
-            x = torch.clamp(x, -self.clip_t, self.clip_t)
+        x = clipped_residuals(self.kv, x, self.clip_t)
         x = torch.tanh(self.bn1(torch.abs(self.conv1(x))))
         x = torch.tanh(self.bn2(self.conv2(x)))
         for name in (3, 4, 5):
@@ -187,6 +195,91 @@ class XuNetWideDelayed(XuNetWide):
         for name in (6, 7):
             x = F.relu(getattr(self, f'bn{name}')(getattr(self, f'conv{name}')(x)))
         return x
+
+
+class XuNetWideColourSep36(XuNetWide):
+    """Frozen-SRM arm B: twelve learned maps per colour before conv2."""
+    def __init__(self, clip_t=3.0, norm='none', width=4, front_end='srm'):
+        if (front_end, norm, width, clip_t) != ('srm', 'none', 4, 3.0):
+            raise ValueError('coloursep36 requires SRM, norm none, width4 and clip_t3')
+        super().__init__(clip_t=clip_t, norm=norm, width=width, front_end=front_end)
+        with torch.random.fork_rng(devices=[]):
+            self.conv1 = nn.Conv2d(90, 36, 5, padding=2, groups=3)
+            self.conv2 = nn.Conv2d(36, 64, 5, padding=2)
+
+
+class XuNetWideLearnSRM(XuNetWide):
+    """R1 graph and initialization; only the existing SRM bank is unfrozen."""
+    def __init__(self, clip_t=3.0, norm='none', width=4, front_end='srm'):
+        if (front_end, norm, width, clip_t) != ('srm', 'none', 4, 3.0):
+            raise ValueError('learn_srm requires SRM, norm none, width4 and clip_t3')
+        super().__init__(clip_t=clip_t, norm=norm, width=width, front_end=front_end)
+        self.kv.conv.weight.requires_grad_(True)
+
+
+class XuNetWideGAPCov32(XuNetWide):
+    """R1 GAP extended with 32-feature covariance; signed attribution, not CAM."""
+    cell_map_kind = 'attribution'
+    cell_map_label = 'GAP + covariance gradient attribution (not a cell probability)'
+    cell_receptive_field = 256  # Diagnostic256 tiles: covariance gives global context.
+
+    def __init__(self, clip_t=3.0, norm='none', width=4, front_end='srm'):
+        if (front_end, norm, width, clip_t) != ('srm', 'none', 4, 3.0):
+            raise ValueError('gapcov32 requires SRM, norm none, width4 and clip_t3')
+        super().__init__(clip_t=clip_t, norm=norm, width=width, front_end=front_end)
+        with torch.random.fork_rng(devices=[]):
+            self.cov_reduce = nn.Conv2d(256, 32, 1, bias=False)
+            # Data-free default fan-in784 init; no branch scaling/calibration.
+            self.classifier = nn.Linear(784, 2)
+
+    def pooled_parts(self, features):
+        from .cov_pool import descriptor
+        with torch.autocast(device_type=features.device.type, enabled=False):
+            features = features.float()
+            return features.mean((-2, -1)), descriptor(self.cov_reduce(features))
+
+    def forward(self, x, *, return_aux=False):
+        if return_aux and not hasattr(self, 'cell_head'):
+            raise ValueError('gapcov32 has no trained cell head')
+        features = self.features(x)
+        gap, cov = self.pooled_parts(features)
+        with torch.autocast(device_type=x.device.type, enabled=False):
+            logits = self.classifier(torch.cat((gap, cov), 1))
+        return (logits, self.cell_head(features)) if return_aux else logits
+
+    def cell_logits(self, x):
+        raise ValueError('gapcov32 has attribution scores, not local class logits; use class_score_cells')
+
+    def class_score_cells(self, x, *, return_aux=False):
+        """GAP linear cells + M times centred covariance gradient contribution.
+
+        Mean GAP cells equals the GAP tile margin (without bias). M matches the
+        map's mean-over-cells convention; covariance attribution is NOT promised
+        to average to the covariance margin. The classifier bias is tile-only.
+        No model/body gradient, mode change or parameter-gradient accumulation.
+        """
+        from .cov_pool import descriptor
+        with torch.inference_mode(), torch.autocast(device_type=x.device.type, enabled=False):
+            features = self.features(x.float()).float()
+            gap = features.mean((-2, -1))
+            reduced = self.cov_reduce(features)
+            gap_cells = F.conv2d(features, self.classifier.weight[:, :256, None, None])
+            aux = self.cell_head(features) if return_aux else None
+        # enable_grad alone is insufficient inside a caller's inference_mode.
+        with torch.inference_mode(False), torch.enable_grad(), torch.autocast(device_type=x.device.type, enabled=False):
+            h = reduced.clone().requires_grad_(True)
+            wc = self.classifier.weight[:, 256:].detach().clone()
+            cov = descriptor(h)
+            cov_logits = F.linear(cov, wc)
+            gradient = torch.autograd.grad((cov_logits[:, 1]-cov_logits[:, 0]).sum(), h)[0]
+            with torch.no_grad():
+                centred = h-h.mean((-2, -1), keepdim=True)
+                m = h.shape[-2]*h.shape[-1]
+                score = (gap_cells[:, 1]-gap_cells[:, 0]).clone()+m*(gradient*centred).sum(1)
+                logits = F.linear(torch.cat((gap.clone(), cov.detach()), 1),
+                    self.classifier.weight.detach().clone(), self.classifier.bias.detach().clone())
+                result = torch.stack((torch.zeros_like(score), score), 1), logits
+                return (*result, aux) if return_aux else result
 
 
 def model_from_hparams(hparams):
@@ -199,16 +292,31 @@ def model_from_hparams(hparams):
         network = XuNetWide(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
     elif model == 'xunet_wide_delayed':
         network = XuNetWideDelayed(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
+    elif model == 'xunet_wide_coloursep36':
+        network = XuNetWideColourSep36(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
+    elif model == 'xunet_wide_learn_srm':
+        network = XuNetWideLearnSRM(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
+    elif model == 'xunet_wide_gapcov32':
+        from .cov_pool import SPEC
+        if hparams.get('cov_pool_identity') != SPEC:
+            raise ValueError('gapcov32 requires its exact saved head identity')
+        network = XuNetWideGAPCov32(clip_t=clip_t, norm=norm, width=int(hparams.get('width', 4)), front_end=front_end)
+    elif model == 'gbras':
+        from .gbras import GBRASNet
+        network = GBRASNet(clip_t=clip_t, norm=norm, front_end=front_end)
     else:
         raise ValueError(f'unsupported checkpoint model: {model}')
     supervision = hparams.get('cell_supervision', 'off')
     if supervision != 'off':
-        if (supervision != 'changed_cells_v1' or model != 'xunet_wide' or
+        if (supervision != 'changed_cells_v1' or model not in {'xunet_wide', 'xunet_wide_gapcov32'} or
                 front_end != 'srm' or int(hparams.get('width',4)) != 4 or norm != 'none'):
             raise ValueError('cell head requires changed_cells_v1 with SRM wide-w4, norm none')
-        # The new head must not perturb the historical backbone/training RNG.
+        # Both bodies end at 256 channels. Covariance extends the TILE descriptor
+        # to 784 values, not the spatial features used by this local head.
         with torch.random.fork_rng(devices=[]):
-            network.cell_head = nn.Conv2d(network.classifier.in_features, 1, 1)
+            network.cell_head = nn.Conv2d(256, 1, 1)
+        network.aux_map_label = 'Trained changed-cell logit (not a pixel probability)'
+        network.aux_receptive_field = 48
     return network
 
 

@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from ..cov_pool import MODEL as GAPCOV, SPEC
 from ..models import model_from_hparams
 from ..photo_verdict import FEATURES
 
@@ -43,9 +44,16 @@ def validate_config(config):
         if any(not isinstance(config[k],str) or not config[k] for k in ('name','version')):
             raise ValueError('bundle name/version required')
         architecture=config['architecture']
-        if set(architecture)!={'model','clip_t','norm','front_end','width','cell_supervision'}:
+        fields={'model','clip_t','norm','front_end','width','cell_supervision'}
+        if architecture.get('model')==GAPCOV:
+            # Covariance pooling: the exact frozen head SPEC is part of the contract.
+            if set(architecture)!=fields|{'cov_pool_identity'} or architecture['cov_pool_identity']!=SPEC:
+                raise ValueError('gapcov32 requires its exact covariance head identity')
+            if (architecture['front_end'],architecture['norm'],architecture['width'],architecture['clip_t'])!=('srm','none',4,3.0):
+                raise ValueError('gapcov32 requires SRM, norm none, width 4 and clip 3')
+        elif set(architecture)!=fields:
             raise ValueError('invalid architecture fields')
-        if architecture['model'] not in ('xunet','xunet_wide') or architecture['norm'] not in ('none','batch','group') or architecture['front_end'] not in ('kv','srm'):
+        if architecture['model'] not in ('xunet','xunet_wide',GAPCOV) or architecture['norm'] not in ('none','batch','group') or architecture['front_end'] not in ('kv','srm'):
             raise ValueError('unsupported architecture')
         if type(architecture['width']) is not int or architecture['width'] not in (1,2,4):
             raise ValueError('unsupported width')
@@ -63,6 +71,8 @@ def validate_config(config):
         kinds={'trained_head':'logit','cam':'class1_minus_class0'}
         if maps['kind'] not in kinds or maps['score']!=kinds[maps['kind']] or not _finite(maps['cutoff']):
             raise ValueError('unsupported map contract')
+        if architecture['model']==GAPCOV and maps['kind']!='trained_head':
+            raise ValueError('gapcov32 bundles ship the trained head map only; CAM does not apply')
         if maps['kind']=='trained_head' and architecture['cell_supervision']=='off':
             raise ValueError('trained-head map requires a cell head')
         rule=config['photo_rule']
@@ -93,7 +103,7 @@ def validate_config(config):
 
 
 def load_bundle(bundle_dir=None, *, device='cpu'):
-    folder=Path(bundle_dir or os.environ.get('CVDL_BUNDLE') or Path(__file__).resolve().parents[2]/'deploy/run18-rule-c-v1')
+    folder=Path(bundle_dir or os.environ.get('CVDL_BUNDLE') or Path(__file__).resolve().parents[2]/'deploy/run22-rule-c-v1')
     try:
         config=json.loads((folder/'deploy.json').read_text())
         validate_config(config)

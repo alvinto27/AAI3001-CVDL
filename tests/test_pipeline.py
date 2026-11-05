@@ -18,7 +18,7 @@ import torch
 
 from cvdl.pipeline import load_pipeline, BundleError, InputError, InputTooLarge, UnsupportedInput
 from cvdl.pipeline.inputs import decode_photo
-from cvdl.pipeline.bundle import contract_hash, file_hash
+from cvdl.pipeline.bundle import contract_hash, file_hash, validate_config
 from cvdl.models import model_from_hparams
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -135,10 +135,10 @@ class PipelineBundleTests(unittest.TestCase):
         json.dumps(result,allow_nan=False)
         self.assertEqual(result['heatmap']['shape'],[9,10])
         self.assertEqual([r['box'] for r in result['tiles']],[[0,0,256,256],[33,0,289,256],[0,1,256,257],[33,1,289,257]])
-        self.assertEqual(result['tile_cutoff'],.5094263553619385)
-        self.assertEqual(result['heatmap']['cutoff'],.1966136991977692)
-        self.assertEqual(result['photo_rule']['cutoff'],-.05636374639150742)
-        self.assertEqual(result['bundle']['name'],'run18-rule-c')
+        self.assertEqual(result['tile_cutoff'],.5245211124420166)
+        self.assertEqual(result['heatmap']['cutoff'],.3114905655384064)
+        self.assertEqual(result['photo_rule']['cutoff'],.6957924294430787)
+        self.assertEqual(result['bundle']['name'],'run22-rule-c')
         grid=np.asarray(result['heatmap']['values'])
         np.testing.assert_array_equal(result['heatmap']['flagged'],grid>=result['heatmap']['cutoff'])
         self.assertEqual(result['features']['cell_fraction'],float((grid>=result['heatmap']['cutoff']).mean()))
@@ -202,7 +202,7 @@ assert not set(('lightning','pytorch_lightning','pandas','yaml','torchvision')) 
             command=[sys.executable,'-B','-m','cvdl.pipeline',str(photo),'--output',str(folder/'result.json'),'--overlay',str(folder/'overlay.png')]
             subprocess.run(command,cwd=ROOT,env=env,check=True,capture_output=True,timeout=60)
             result=json.loads((folder/'result.json').read_text())
-            self.assertEqual(result['bundle']['name'],'run18-rule-c')
+            self.assertEqual(result['bundle']['name'],'run22-rule-c')
             with Image.open(folder/'overlay.png') as overlay:self.assertEqual(overlay.size,(256,256))
 
     def test_builder_headless_with_own_validation_and_fit(self):
@@ -300,6 +300,77 @@ assert not set(('lightning','pytorch_lightning','pandas','yaml','torchvision')) 
             data['cache_identity']['checkpoint_sha256']='0'*64;bad.write_text(json.dumps(data))
             with self.assertRaisesRegex(ValueError,'another checkpoint'):
                 build_bundle(run,'ea32a4be0e2ce3597fbd',bad,cells,Path(directory)/'bundle')
+
+
+class GapCovBundleTests(unittest.TestCase):
+    """Synthetic covariance + trained-head bundle: contract only, not benchmark evidence."""
+    def _checkpoint_run(self,folder):
+        from cvdl.cov_pool import SPEC
+        hparams=dict(model='xunet_wide_gapcov32',clip_t=3.,norm='none',front_end='srm',width=4,
+            cell_supervision='changed_cells_v1',cov_pool_identity=SPEC)
+        with torch.random.fork_rng(devices=[]):
+            torch.manual_seed(11);model=model_from_hparams(hparams)
+        run=folder/'gapcov-run';run.mkdir();checkpoint=run/'last.ckpt'
+        torch.save(dict(hyper_parameters=hparams,state_dict={'net.'+k:v for k,v in model.state_dict().items()}),checkpoint)
+        sha=file_hash(checkpoint);evaluation=run/'evaluation/standard-256-v1/own-eval'
+        (evaluation/'validation').mkdir(parents=True)
+        (evaluation/'validation/calibration.json').write_text(json.dumps(dict(checkpoint_sha256=sha,deployment=True,quick=False,
+            geometry=dict(tile_size=256,grid='overlap_last'),cutoff=.52,threshold_id='own-threshold')))
+        (evaluation/'evaluation_settings.json').write_text(json.dumps(dict(quick=False,checkpoint_sha256=sha,evaluation_id='own-eval')))
+        cells=folder/'cells.json';cells.write_text(json.dumps(dict(maps=dict(aux=dict(cutoff=.31),class_score=dict(cutoff=9.)))))
+        rule=json.loads((BUNDLE/'deploy.json').read_text())['photo_rule']
+        identity=dict(checkpoint_sha256=sha,tile_cutoff=.52,head_cutoff=.31,
+            cutoff_sources=dict(tile_threshold_id='own-threshold',cell_summary=dict(sha256=file_hash(cells))))
+        fit=folder/'fit.json';fit.write_text(json.dumps(dict(cache_identity=identity,tile_cutoff=.52,head_cutoff=.31,rules={'c':rule})))
+        return run,fit,cells,model
+
+    def test_build_load_and_head_only_maps_match_shared_helper(self):
+        from scripts.build_deploy_bundle import build_bundle
+        from cvdl.cell_diagnostics import cell_maps
+        from cvdl.cov_pool import SPEC
+        from cvdl.pixels import evaluation_tensor
+        torch.set_num_threads(1)
+        with tempfile.TemporaryDirectory() as directory:
+            folder=Path(directory);run,fit,cells,model=self._checkpoint_run(folder)
+            config=build_bundle(run,'own-eval',fit,cells,folder/'export')
+            self.assertEqual(config['architecture']['model'],'xunet_wide_gapcov32')
+            self.assertEqual(config['architecture']['cov_pool_identity'],SPEC)
+            self.assertEqual(config['map']['kind'],'trained_head')
+            pipeline=load_pipeline(folder/'export')
+            self.assertTrue(hasattr(pipeline._network,'cov_reduce') and hasattr(pipeline._network,'cell_head'))
+            pixels=np.random.default_rng(3).integers(0,256,(256,288,3),dtype=np.uint8)
+            result=pipeline.analyze(pixels)
+            json.dumps(result,allow_nan=False)
+            self.assertEqual(result['heatmap']['kind'],'trained_head')
+            self.assertEqual(result['tile_cutoff'],.52);self.assertEqual(result['heatmap']['cutoff'],.31)
+            tile=torch.stack([evaluation_tensor(pixels[:,x:x+256]) for x in (0,32)]).float()
+            # Dual path (attribution + head) and head-only path agree on head and tile scores.
+            primary,head,probability=cell_maps(pipeline._network,tile)
+            none,head_only,probability_only=cell_maps(pipeline._network,tile,include_primary=False)
+            self.assertIsNone(none);self.assertIsNotNone(primary)
+            torch.testing.assert_close(head_only,head,rtol=0,atol=1e-6)
+            torch.testing.assert_close(probability_only,probability,rtol=0,atol=1e-6)
+            np.testing.assert_allclose([r['probability'] for r in result['tiles']],probability_only.numpy(),rtol=0,atol=1e-6)
+
+    def test_gapcov_contract_refusals(self):
+        from scripts.build_deploy_bundle import build_bundle
+        with tempfile.TemporaryDirectory() as directory:
+            folder=Path(directory);run,fit,cells,_=self._checkpoint_run(folder)
+            build_bundle(run,'own-eval',fit,cells,folder/'export')
+            path=folder/'export/deploy.json';original=path.read_text()
+            for mutate in (lambda c:c['architecture'].pop('cov_pool_identity'),
+                           lambda c:c['architecture']['cov_pool_identity'].update(iterations=6),
+                           lambda c:c['architecture'].update(width=2),
+                           lambda c:c['map'].update(kind='cam',score='class1_minus_class0'),
+                           lambda c:c['architecture'].update(model='xunet_wide')):
+                config=json.loads(original);mutate(config)
+                # The contract check itself refuses, before any weights hash comparison.
+                with self.assertRaisesRegex(BundleError,'gapcov32|architecture'):validate_config(config)
+                path.write_text(json.dumps(config))
+                with self.assertRaises(BundleError):load_pipeline(folder/'export')
+            path.write_text(original);load_pipeline(folder/'export')
+            with self.assertRaises(ValueError):build_bundle(run,'own-eval',fit,cells,folder/'cam',map_kind='cam')
+            self.assertFalse((folder/'cam').exists())
 
 
 if __name__=='__main__':unittest.main()

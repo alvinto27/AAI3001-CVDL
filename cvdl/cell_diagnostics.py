@@ -79,11 +79,27 @@ def replay_cell_pair(corpus, row):
     return clean.copy(),stego,counts,valid
 
 
-def cell_maps(network, images):
-    """Same features for tile-head CAM and trained head; raw scores retain rank."""
+def cell_maps(network, images, *, include_primary=True):
+    """Return primary map, auxiliary logits and ordinary tile probability.
+
+    The primary covariance map is signed attribution, never a CAM. A head-only
+    request skips that gradient calculation and returns None as the primary.
+    """
     import torch
     from torch.nn import functional as F
     with torch.inference_mode():
+        if not include_primary:
+            if not hasattr(network,'cell_head'):raise ValueError('head-only maps require a trained cell head')
+            logits,aux=network(images.float(),return_aux=True)
+            return None,aux[:,0],logits.softmax(1)[:,1]
+        if hasattr(network,'class_score_cells'):
+            if getattr(network,'cell_map_kind',None)=='attribution' and hasattr(network,'cell_head'):
+                cells,logits,aux=network.class_score_cells(images.float(),return_aux=True)
+                aux=aux[:,0]
+            else:
+                cells,logits=network.class_score_cells(images.float())
+                aux=None
+            return cells[:,1]-cells[:,0],aux,logits.softmax(1)[:,1]
         features=network.features(images.float())
         cam=F.conv2d(features,network.classifier.weight[:,:,None,None],network.classifier.bias)
         aux=network.cell_head(features)[:,0] if hasattr(network,'cell_head') else None
@@ -94,7 +110,8 @@ def cell_maps(network, images):
 def render_cell_figure(network, corpus, root, output, *, score_limits, manifest=None, control_cam=None, control_limits=None):
     """Required same-tile comparison. Limits must be frozen from validation.
 
-    score_limits = {'cam':(low,high),'aux':(low,high)}. No per-image scaling.
+    score_limits = {'cam':(low,high),'aux':(low,high)} for XuNet. GBRAS uses
+    'class_score' instead of 'cam', with no aux. No per-image scaling.
     This does not choose cutoffs, evaluate a suite or compute result statistics.
     """
     import torch
@@ -106,7 +123,8 @@ def render_cell_figure(network, corpus, root, output, *, score_limits, manifest=
     manifest=json.loads((root/MANIFEST).read_text()) if manifest is None else manifest
     rows={r['pair_id']:r for r in selected_rows(root,'test',manifest=manifest)}
     has_aux=hasattr(network,'cell_head')
-    if set(score_limits)!=({'cam','aux'} if has_aux else {'cam'}) or any(len(v)!=2 or not np.isfinite(v).all() or v[0]>=v[1] for v in score_limits.values()):
+    primary='class_score' if hasattr(network,'class_score_cells') else 'cam'
+    if set(score_limits)!=({primary,'aux'} if has_aux else {primary}) or any(len(v)!=2 or not np.isfinite(v).all() or v[0]>=v[1] for v in score_limits.values()):
         raise ValueError('CAM and auxiliary limits must be finite validation-derived ranges')
     if control_cam is not None and (control_limits is None or len(control_limits)!=2 or not np.isfinite(control_limits).all() or control_limits[0]>=control_limits[1]):
         raise ValueError('control CAM requires fixed validation limits')
@@ -131,8 +149,8 @@ def render_cell_figure(network, corpus, root, output, *, score_limits, manifest=
         axes[index,2].set_title('Cell target / sparse weight')
         for r,c in zip(*np.where((counts==0)&~valid)):
             axes[index,2].add_patch(Rectangle((c-.5,r-.5),1,1,fill=False,hatch='//',edgecolor='gray',linewidth=0))
-        maps=[(cam[1],score_limits['cam'],'Tile-head CAM margin')]
-        if has_aux:maps.append((aux[1],score_limits['aux'],'Trained auxiliary logit'))
+        maps=[(cam[1],score_limits[primary],getattr(network,'cell_map_label','Tile-head CAM margin'))]
+        if has_aux:maps.append((aux[1],score_limits['aux'],getattr(network,'aux_map_label','Trained auxiliary logit')))
         if control_cam is not None:maps.append((control_cam[row['pair_id']],control_limits,'Control CAM margin'))
         for axis,(values,limits,title) in zip(axes[index,3:],maps):
             im=axis.imshow(values,interpolation='nearest',cmap='coolwarm',vmin=limits[0],vmax=limits[1])
@@ -141,8 +159,16 @@ def render_cell_figure(network, corpus, root, output, *, score_limits, manifest=
         records.append(dict(pair_id=row['pair_id'],source_photo=row['source_photo'],k=int(row['k']),
             bpp=float(row['effective_bpp']),method=row['method'],placement=row['placement'],
             tile_clean_score=float(tile[0]),tile_stego_score=float(tile[1]),counts=counts.tolist(),valid_negative=valid.tolist()))
-    fig.suptitle('Same tiles: changed-cell targets, tile-head CAM'+(', trained auxiliary head' if has_aux else ' (no auxiliary head)')+'\n32-pixel spacing; 48×48 receptive field. Maps are not causal pixel saliency.')
+    rf=getattr(network,'cell_receptive_field',48)
+    label=('signed covariance attribution (context only)' if getattr(network,'cell_map_kind',None)=='attribution'
+           else 'class-score map' if hasattr(network,'class_score_cells') else 'tile-head CAM')
+    geometry=f'32-pixel spacing; {rf}×{rf} receptive field.'
+    if has_aux and getattr(network,'cell_map_kind',None)=='attribution':
+        geometry='32-pixel spacing; attribution has tile-global context; trained head sees 48×48 pixels.'
+    fig.suptitle('Same tiles: changed-cell targets, '+label+(', trained auxiliary head' if has_aux else ' (no auxiliary head)')+'\n'+geometry+' Maps are not causal pixel saliency.')
     fig.tight_layout();output.parent.mkdir(parents=True,exist_ok=True)
     try:fig.savefig(output,dpi=160)
     finally:plt.close(fig)
-    output.with_suffix('.json').write_text(json.dumps(dict(score_limits=score_limits,tiles=records),indent=2)+'\n')
+    geometry={primary:dict(receptive_field=rf,stride=32,global_context=getattr(network,'cell_map_kind',None)=='attribution')}
+    if has_aux:geometry['aux']=dict(receptive_field=48,stride=32,global_context=False)
+    output.with_suffix('.json').write_text(json.dumps(dict(score_limits=score_limits,map_geometry=geometry,tiles=records),indent=2)+'\n')

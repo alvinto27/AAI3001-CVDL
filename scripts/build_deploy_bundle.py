@@ -10,6 +10,7 @@ import tempfile
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 import torch
+from cvdl.cov_pool import MODEL as GAPCOV
 from cvdl.models import model_from_hparams
 from cvdl.pipeline.bundle import contract_hash, file_hash, load_bundle, validate_config
 
@@ -76,6 +77,9 @@ def build_bundle(run,evaluation_id,photo_rule,cells_summary,output,*,map_kind='t
     hparams=checkpoint['hyper_parameters']
     architecture={k:hparams.get(k,default) for k,default in dict(model='xunet',clip_t=3.,norm='group',
         front_end='kv',width=4,cell_supervision='off').items()}
+    if architecture['model']==GAPCOV:
+        # Copy the saved head identity; model_from_hparams refuses any other SPEC.
+        architecture['cov_pool_identity']=copy.deepcopy(hparams['cov_pool_identity'])
     network=model_from_hparams(architecture)
     state={k.removeprefix('net.'):v.detach().cpu().contiguous() for k,v in checkpoint['state_dict'].items()}
     network.load_state_dict(state,strict=True)

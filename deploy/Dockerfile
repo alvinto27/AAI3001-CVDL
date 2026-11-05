@@ -15,11 +15,12 @@ RUN python -m pip install --no-cache-dir torch==2.14.0 --index-url "${TORCH_INDE
     && groupadd --gid 10001 pipeline \
     && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin pipeline
 
-COPY cvdl/__init__.py cvdl/models.py cvdl/pixels.py cvdl/photo_inference.py cvdl/cell_diagnostics.py cvdl/cell_metrics.py cvdl/photo_verdict.py /app/cvdl/
+COPY cvdl/__init__.py cvdl/models.py cvdl/cov_pool.py cvdl/pixels.py cvdl/photo_inference.py cvdl/cell_diagnostics.py cvdl/cell_metrics.py cvdl/photo_verdict.py /app/cvdl/
 COPY cvdl/pipeline/*.py /app/cvdl/pipeline/
 COPY LSB-Dataset-Generator/lsb_train_grid.py LSB-Dataset-Generator/lsb_source.py LSB-Dataset-Generator/lsb_raw.py /app/LSB-Dataset-Generator/
 COPY deploy/run13-rule-c-v1/ /app/deploy/run13-rule-c-v1/
 COPY deploy/run18-rule-c-v1/ /app/deploy/run18-rule-c-v1/
+COPY deploy/run22-rule-c-v1/ /app/deploy/run22-rule-c-v1/
 
 USER 10001:10001
 EXPOSE 8000
