@@ -4,6 +4,8 @@ AAI3001 Computer Vision and Deep Learning
 
 **Live demo:** <https://gcp-aai3001.taild62d21.ts.net> · **Run it locally:** [Appendix A](#appendix-a-run-and-reproduce) · **Shipped model:** [`deploy/run22-rule-c-v1/`](deploy/run22-rule-c-v1/)
 
+**Presentation:** [Reveal.js deck](docs/slides/index.html) · [Offline ZIP](docs/downloads/AAI3001-slides.zip) · [PDF](docs/downloads/AAI3001-slides.pdf)
+
 A photo can carry a hidden message in the lowest bits of its pixels, and the change is invisible. We built a dataset, a neural network and a web tool that answer two questions about an uploaded photo: **does it carry a hidden message, and where?**
 
 ![The web tool marks the region of a photo that carries a hidden message](docs/figures/report/ui-result-stego.png)
@@ -664,6 +666,8 @@ Our setting differs in four ways: colour photos instead of greyscale; a mixture 
 ---
 
 ## Appendix A. Run and reproduce
+
+**Present the slides.** Open [the deck](docs/slides/index.html) in a browser from a local checkout. For speaker notes, run `python -m http.server 8080 --bind 127.0.0.1` from the repository root, open <http://127.0.0.1:8080/docs/slides/>, and press **S**.
 
 **Run the detector on one photo (no web app):**
 
