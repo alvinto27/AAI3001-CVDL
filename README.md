@@ -95,10 +95,10 @@ The contributions of this work:
 
 | Source | Photos | Train / Val / Test | What it adds | Licence |
 | --- | ---: | --- | --- | --- |
-| RAISE [15] | 1,000 Nikon RAW (NEF), 6–16 MP | 701 / 150 / 149 | Large, clean, camera-native photos | Non-commercial research and education |
-| DIV2K [16] | 900 PNG, 1–4 MP | 680 / 120 / 100 | Never used in training: a source the model has not seen | Academic research only |
-| ALASKA2 [17] | 18,200 TIFF, ≤1 MP, 38 camera models | 13,500 / 1,000 / 1,700 seen-camera + 2,000 unseen-camera | Many phones and cameras, very noisy photos. 8 camera models are held out completely | Source site terms |
-| LSDIR [18] | 11,000 PNG, 0.3–11 MP | 7,000 / 1,500 / 2,500 | Varied web-scale scenes | Source site terms |
+| RAISE [1] | 1,000 Nikon RAW (NEF), 6–16 MP | 701 / 150 / 149 | Large, clean, camera-native photos | Non-commercial research and education |
+| DIV2K [2] | 900 PNG, 1–4 MP | 680 / 120 / 100 | Never used in training: a source the model has not seen | Academic research only |
+| ALASKA2 [3] | 18,200 TIFF, ≤1 MP, 38 camera models | 13,500 / 1,000 / 1,700 seen-camera + 2,000 unseen-camera | Many phones and cameras, very noisy photos. 8 camera models are held out completely | Source site terms |
+| LSDIR [4] | 11,000 PNG, 0.3–11 MP | 7,000 / 1,500 / 2,500 | Varied web-scale scenes | Source site terms |
 
 - No tile of a test photo is used in training or validation. Each split is frozen in a CSV file in [`data/`](data/), identified by a SHA-256 hash. [`data/<source>/photo_manifest.csv`](data/raise/) lists every photo's path, camera, size, tile grid and split.
 - RAISE NEF files are decoded with one fixed set of settings: rawpy/LibRaw, AHD demosaicing, camera white balance, no auto-brightness, 8-bit output ([`lsb_raw.py`](LSB-Dataset-Generator/lsb_raw.py)). A different decoder produces different noise, so a fixed decoder keeps the clean class consistent.
@@ -170,8 +170,8 @@ flowchart LR
 
 *Figure 2. Run 22 network ([`cvdl/models.py`](cvdl/models.py), class `XuNetWideGAPCov32`): 638,611 trained parameters and 2,250 fixed SRM weights.*
 
-- **SRM filters** [5, 8] remove image content and keep the noise, where the message is.
-- **Covariance pooling** [12, 13] keeps how feature channels vary *together*, not only their averages. It was the most effective architecture change (§4.2).
+- **SRM filters** [5, 6] remove image content and keep the noise, where the message is.
+- **Covariance pooling** [7, 8] keeps how feature channels vary *together*, not only their averages. It was the most effective architecture change (§4.2).
 - **The cell head** (this work) is trained on the generator's pixel masks, so the heatmap learns *where* the message is. It adds only 257 parameters.
 
 <details>
@@ -189,9 +189,9 @@ flowchart LR
 | Classifier | Linear 784 → 2 | tile score |
 | Cell head | 1×1 conv 256 → 1 | 8×8 map (one cell = 32 px) |
 
-- *Fixed SRM front end* [5, 8]. Clipping at ±3 (pixel units) stops strong edges from dominating. A *trainable* SRM bank (run 20) did worse (3.34% vs 2.55%).
-- *XuNet body, 4× wider, without normalisation* [7]. The absolute-value and tanh layers keep the sign symmetry of ±1 changes. Removing GroupNorm and widening the 1×1 layers gave more capacity at almost no cost in speed.
-- *Covariance pooling* [12, 13]. Our independent implementation is in [`cvdl/cov_pool.py`](cvdl/cov_pool.py).
+- *Fixed SRM front end* [5, 6]. Clipping at ±3 (pixel units) stops strong edges from dominating. A *trainable* SRM bank (run 20) did worse (3.34% vs 2.55%).
+- *XuNet body, 4× wider, without normalisation* [9]. The absolute-value and tanh layers keep the sign symmetry of ±1 changes. Removing GroupNorm and widening the 1×1 layers gave more capacity at almost no cost in speed.
+- *Covariance pooling* [7, 8]. Our independent implementation is in [`cvdl/cov_pool.py`](cvdl/cov_pool.py).
 - *Cell head*. It shares the body with the tile classifier, so the heatmap adds almost no computation.
 
 </details>
@@ -201,7 +201,7 @@ flowchart LR
 
 $$\mathcal{L} = \text{CE}(\hat y_{\text{tile}}, y) + 0.2 \cdot \text{BCE}(\hat m_{\text{cell}}, m_{\text{cell}})$$
 
-CE is the cross-entropy of the tile classifier. BCE is the binary cross-entropy of the cell head against the 8×8 changed-cell target from the generator's mask. This loss trains the heatmap to show *where* the message is, which the class activation map (CAM) [14] of a classifier does not learn on purpose.
+CE is the cross-entropy of the tile classifier. BCE is the binary cross-entropy of the cell head against the 8×8 changed-cell target from the generator's mask. This loss trains the heatmap to show *where* the message is, which the class activation map (CAM) [10] of a classifier does not learn on purpose.
 
 Training ran in two stages, each once, on one NVIDIA RTX PRO 6000 GPU with 48 vCPUs for data loading.
 
@@ -545,10 +545,10 @@ Future work: more source collections in training to reduce false alarms on unsee
 
 ## 10. Related work
 
-- **Statistical detectors.** The chi-square attack [1] detects pairs of values that LSB replacement makes equal in frequency. RS analysis [2] and weighted-stego analysis [3, 4] estimate the message length. They are precise for full-image LSB replacement, but weaker for LSB matching, small payloads and local embedding.
+- **Statistical detectors.** The chi-square attack [11] detects pairs of values that LSB replacement makes equal in frequency. RS analysis [12] and weighted-stego analysis [13, 14] estimate the message length. They are precise for full-image LSB replacement, but weaker for LSB matching, small payloads and local embedding.
 - **Rich models.** The Spatial Rich Model [5] computes noise residuals (the image minus a prediction from its neighbours) with fixed high-pass filters, then trains a classifier on their statistics.
-- **CNN steganalysis.** Qian et al. [6] started a CNN with one fixed high-pass filter (the "KV" kernel). XuNet [7] added an absolute-value layer, tanh activations and 1×1 convolutions; it is small and stable. Ye-Net [8] used the 30 SRM filters with truncation. SRNet [9], Yedroudj-Net [10] and GBRAS-Net [11] are deeper designs built mostly for adaptive embedding on greyscale 256×256 images. Deng et al. [12] showed that global covariance pooling, with iterative matrix square-root normalisation [13], helps steganalysis.
-- **Localisation.** Class activation mapping (CAM) [14] reads a coarse "where" map from a network trained only on image labels.
+- **CNN steganalysis.** Qian et al. [15] started a CNN with one fixed high-pass filter (the "KV" kernel). XuNet [9] added an absolute-value layer, tanh activations and 1×1 convolutions; it is small and stable. Ye-Net [6] used the 30 SRM filters with truncation. SRNet [16], Yedroudj-Net [17] and GBRAS-Net [18] are deeper designs built mostly for adaptive embedding on greyscale 256×256 images. Deng et al. [7] showed that global covariance pooling, with iterative matrix square-root normalisation [8], helps steganalysis.
+- **Localisation.** Class activation mapping (CAM) [10] reads a coarse "where" map from a network trained only on image labels.
 
 Our setting differs in four ways: colour photos instead of greyscale; a mixture of LSB settings instead of one algorithm at one payload; messages that often fill only part of the image; and a photo-level verdict with a heatmap. We therefore kept the small XuNet family, which trains quickly and was the course baseline, and added only the parts that measurements supported.
 
@@ -556,24 +556,43 @@ Our setting differs in four ways: colour photos instead of greyscale; a mixture 
 
 ## References
 
-1. A. Westfeld and A. Pfitzmann, "Attacks on Steganographic Systems," *Information Hiding (IH 1999)*, LNCS 1768, Springer, 2000, pp. 61–76.
-2. J. Fridrich, M. Goljan and R. Du, "Detecting LSB Steganography in Color and Gray-Scale Images," *IEEE MultiMedia*, vol. 8, no. 4, 2001.
-3. J. Fridrich and M. Goljan, "On Estimation of Secret Message Length in LSB Steganography in Spatial Domain," *Proc. SPIE Security, Steganography, and Watermarking of Multimedia Contents VI*, 2004.
-4. A. D. Ker and R. Böhme, "Revisiting Weighted Stego-Image Steganalysis," *Proc. SPIE Security, Forensics, Steganography, and Watermarking of Multimedia Contents X*, vol. 6819, 2008.
-5. J. Fridrich and J. Kodovský, "Rich Models for Steganalysis of Digital Images," *IEEE Trans. Information Forensics and Security*, vol. 7, no. 3, pp. 868–882, 2012.
-6. Y. Qian, J. Dong, W. Wang and T. Tan, "Deep Learning for Steganalysis via Convolutional Neural Networks," *Proc. SPIE Media Watermarking, Security, and Forensics*, 2015.
-7. G. Xu, H.-Z. Wu and Y. Q. Shi, "Structural Design of Convolutional Neural Networks for Steganalysis," *IEEE Signal Processing Letters*, vol. 23, no. 5, pp. 708–712, 2016.
-8. J. Ye, J. Ni and Y. Yi, "Deep Learning Hierarchical Representations for Image Steganalysis," *IEEE Trans. Information Forensics and Security*, vol. 12, no. 11, pp. 2545–2557, 2017.
-9. M. Boroumand, M. Chen and J. Fridrich, "Deep Residual Network for Steganalysis of Digital Images," *IEEE Trans. Information Forensics and Security*, vol. 14, no. 5, pp. 1181–1193, 2019.
-10. M. Yedroudj, F. Comby and M. Chaumont, "Yedroudj-Net: An Efficient CNN for Spatial Steganalysis," *IEEE ICASSP*, 2018.
-11. T.-S. Reinel et al., "GBRAS-Net: A Convolutional Neural Network Architecture for Spatial Image Steganalysis," *IEEE Access*, vol. 9, pp. 14340–14350, 2021.
-12. X. Deng, B. Chen, W. Luo and D. Luo, "Fast and Effective Global Covariance Pooling Network for Image Steganalysis," *ACM IH&MMSec*, 2019.
-13. P. Li, J. Xie, Q. Wang and Z. Gao, "Towards Faster Training of Global Covariance Pooling Networks by Iterative Matrix Square Root Normalization," *CVPR*, 2018.
-14. B. Zhou, A. Khosla, A. Lapedriza, A. Oliva and A. Torralba, "Learning Deep Features for Discriminative Localization," *CVPR*, 2016.
-15. D.-T. Dang-Nguyen, C. Pasquini, V. Conotter and G. Boato, "RAISE – A Raw Images Dataset for Digital Image Forensics," *ACM Multimedia Systems*, 2015.
-16. E. Agustsson and R. Timofte, "NTIRE 2017 Challenge on Single Image Super-Resolution: Dataset and Study," *CVPR Workshops*, 2017.
-17. R. Cogranne, Q. Giboulot and P. Bas, "ALASKA#2: Challenging Academic Research on Steganalysis with Realistic Images," *IEEE WIFS*, 2020.
-18. Y. Li et al., "LSDIR: A Large Scale Dataset for Image Restoration," *CVPR Workshops (NTIRE)*, 2023.
+IEEE style, numbered in order of first citation.
+
+\[1\] D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, and G. Boato, "RAISE: A raw images dataset for digital image forensics," in *Proc. 6th ACM Multimedia Syst. Conf. (MMSys)*, Portland, OR, USA, 2015, pp. 219–224, doi: 10.1145/2713168.2713194.
+
+\[2\] E. Agustsson and R. Timofte, "NTIRE 2017 challenge on single image super-resolution: Dataset and study," in *Proc. IEEE Conf. Comput. Vis. Pattern Recognit. Workshops (CVPRW)*, Honolulu, HI, USA, 2017, pp. 1122–1131, doi: 10.1109/CVPRW.2017.150.
+
+\[3\] R. Cogranne, E. Giboulot, and P. Bas, "ALASKA#2: Challenging academic research on steganalysis with realistic images," in *Proc. IEEE Int. Workshop Inf. Forensics Secur. (WIFS)*, New York, NY, USA, 2020, pp. 1–5, doi: 10.1109/WIFS49906.2020.9360896.
+
+\[4\] Y. Li *et al.*, "LSDIR: A large scale dataset for image restoration," in *Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. Workshops (CVPRW)*, Vancouver, BC, Canada, 2023, pp. 1775–1787, doi: 10.1109/CVPRW59228.2023.00178.
+
+\[5\] J. Fridrich and J. Kodovský, "Rich models for steganalysis of digital images," *IEEE Trans. Inf. Forensics Security*, vol. 7, no. 3, pp. 868–882, Jun. 2012, doi: 10.1109/TIFS.2012.2190402.
+
+\[6\] J. Ye, J. Ni, and Y. Yi, "Deep learning hierarchical representations for image steganalysis," *IEEE Trans. Inf. Forensics Security*, vol. 12, no. 11, pp. 2545–2557, Nov. 2017, doi: 10.1109/TIFS.2017.2710946.
+
+\[7\] X. Deng, B. Chen, W. Luo, and D. Luo, "Fast and effective global covariance pooling network for image steganalysis," in *Proc. ACM Workshop Inf. Hiding Multimedia Secur. (IH&MMSec)*, Paris, France, 2019, pp. 230–234, doi: 10.1145/3335203.3335739.
+
+\[8\] P. Li, J. Xie, Q. Wang, and Z. Gao, "Towards faster training of global covariance pooling networks by iterative matrix square root normalization," in *Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR)*, Salt Lake City, UT, USA, 2018, pp. 947–955, doi: 10.1109/CVPR.2018.00105.
+
+\[9\] G. Xu, H.-Z. Wu, and Y.-Q. Shi, "Structural design of convolutional neural networks for steganalysis," *IEEE Signal Process. Lett.*, vol. 23, no. 5, pp. 708–712, May 2016, doi: 10.1109/LSP.2016.2548421.
+
+\[10\] B. Zhou, A. Khosla, A. Lapedriza, A. Oliva, and A. Torralba, "Learning deep features for discriminative localization," in *Proc. IEEE Conf. Comput. Vis. Pattern Recognit. (CVPR)*, Las Vegas, NV, USA, 2016, pp. 2921–2929, doi: 10.1109/CVPR.2016.319.
+
+\[11\] A. Westfeld and A. Pfitzmann, "Attacks on steganographic systems," in *Information Hiding (IH 1999)* (Lecture Notes in Computer Science, vol. 1768), A. Pfitzmann, Ed. Berlin, Germany: Springer, 2000, pp. 61–76, doi: 10.1007/10719724_5.
+
+\[12\] J. Fridrich, M. Goljan, and R. Du, "Detecting LSB steganography in color and gray-scale images," *IEEE MultiMedia*, vol. 8, no. 4, pp. 22–28, Oct.–Dec. 2001, doi: 10.1109/93.959097.
+
+\[13\] J. Fridrich and M. Goljan, "On estimation of secret message length in LSB steganography in spatial domain," in *Proc. SPIE, Security, Steganography, and Watermarking of Multimedia Contents VI*, vol. 5306, San Jose, CA, USA, 2004, pp. 23–34, doi: 10.1117/12.521350.
+
+\[14\] A. D. Ker and R. Böhme, "Revisiting weighted stego-image steganalysis," in *Proc. SPIE, Security, Forensics, Steganography, and Watermarking of Multimedia Contents X*, vol. 6819, San Jose, CA, USA, 2008, Art. no. 681905, doi: 10.1117/12.766820.
+
+\[15\] Y. Qian, J. Dong, W. Wang, and T. Tan, "Deep learning for steganalysis via convolutional neural networks," in *Proc. SPIE, Media Watermarking, Security, and Forensics*, vol. 9409, San Francisco, CA, USA, 2015, Art. no. 94090J, doi: 10.1117/12.2083479.
+
+\[16\] M. Boroumand, M. Chen, and J. Fridrich, "Deep residual network for steganalysis of digital images," *IEEE Trans. Inf. Forensics Security*, vol. 14, no. 5, pp. 1181–1193, May 2019, doi: 10.1109/TIFS.2018.2871749.
+
+\[17\] M. Yedroudj, F. Comby, and M. Chaumont, "Yedroudj-Net: An efficient CNN for spatial steganalysis," in *Proc. IEEE Int. Conf. Acoust., Speech, Signal Process. (ICASSP)*, Calgary, AB, Canada, 2018, pp. 2092–2096, doi: 10.1109/ICASSP.2018.8461438.
+
+\[18\] R. Tabares-Soto *et al.*, "GBRAS-Net: A convolutional neural network architecture for spatial image steganalysis," *IEEE Access*, vol. 9, pp. 14340–14350, 2021, doi: 10.1109/ACCESS.2021.3052494.
 
 ---
 
