@@ -53,3 +53,29 @@ This migration restores the original settings only. Deployment calibration
 still uses the frozen checkpoint mapping: best checkpoint
 `9ba63252e8eecbf398f646f2d69641b70ad37c914ed8b7d6b4665dda54a961e1`
 uses recipe `8328cc6b0673cade0312`, labelled `post_hoc_256`.
+
+## g4-prime-1 (V3c baseline) migration (2026-11-25)
+
+Run: `g4-prime-1`, the notebook-04 V3c baseline (KV XuNet, GroupNorm, clip 3,
+RAISE + DIV2K, 512 overlap-last, 10 epochs). It has the same three missing data
+fields as wide-R2. Its `model_run_settings.json` holds compile settings only.
+
+| Evidence file (relative to `runs/g4-prime-1/`) | SHA-256 |
+| --- | --- |
+| `checkpoints/g4-prime-1/data_run_settings.json` | `fe32946b66cb54f3d8950c75ae8f99706fc6bb248de8ccca43f1b11c8f2967b3` |
+| `checkpoints/g4-prime-1/model_run_settings.json` | `800d54be08b7cf576fbc3201763733ce6ae76d827d3513151d56dece699d4f0a` |
+| `executed.ipynb` | `adfca428ea5e86b92fa74a3485e1dab3b416bba201a7b3d7ab36e9dce7906fd7` |
+
+Model values from the pinned notebook: cell 2 (`NORM="group"`, `CLIP_T=3.0`,
+`EPOCHS=10`, `BATCH_SIZE=32`, no train YAML, so the generator default k 1-8),
+cell 19 (AdamW LR 1e-3, weight decay 1e-4, `StepLR(step_size=5, gamma=0.1)` =
+drop at epoch 6, no warmup, no gradient clipping). Cell 8 output: 53,950 train /
+11,238 validation pairs. Cell 21 output: 22,476 validation images. The checkpoint
+hyperparameters agree (`norm=group`, `clip_t=3.0`, `lr=0.001`, `max_epochs=10`).
+
+Migration id `g4-prime-1-v3c-v1`. The run name is derived from the recipe because
+`g4-prime-1` is not a derived-prefix name. The saved training photo selection and
+data settings equal wide-R2's exactly (checked by `scripts/build_calibration.py`),
+so the best checkpoint
+`741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d` maps to the
+same list `8328cc6b0673cade0312`, `post_hoc_256` (calibration entry 16).

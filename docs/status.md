@@ -1,4 +1,8 @@
-# Project status — 2026-11-05
+# Project status — 2026-11-25
+
+## Submission prep (2026-11-25)
+
+The README is the report (rubric: dataset, model development, deployment, UI, scalability). V3c baseline `g4-prime-1` re-scored on the frozen suites (eval `29fb97d0c311a0eca3b1`; calibration entry 16, `MAPPING_SHA` `6ab71f35...cf7c`): standard P_E 4.05% vs shipped run 22 2.54% (−1.50 points [−1.90, −1.12]); hard k=1 low AUC .627 vs .798. Full model-history ladder in the [2026-11-25 journal](journal/2026-11-25/README.md). Next: `pipeline` into `app`, optimization/cloud deployment, README rewrite, cleanup, merge to `main`.
 
 ## Run 22 shipped — submission model (user, 2026-11-05)
 
