@@ -1,0 +1,19 @@
+# AAI3001-CVDL demo API (run 22, ONNX). Published on host loopback only; Tailscale Serve/Funnel fronts it.
+[Unit]
+Description=CVDL pipeline API (run 22, ONNX Runtime)
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=localhost/cvdl-pipeline:report-fb1f6ad
+ContainerName=cvdl-pipeline
+PublishPort=127.0.0.1:8000:8000
+PodmanArgs=--memory=6g
+Exec=--engine onnx --allow-origin https://gcp-aai3001.taild62d21.ts.net
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target default.target
