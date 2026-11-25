@@ -10,6 +10,7 @@ The project report is the [root README](../README.md). Its figures are in `figur
 - [2026-10-26 session handoff — read first next session](active/handoff-2026-10-26.md)
 - [50-epoch low-bpp curriculum from scratch (ideas #17) — approved plan (2026-10-22)](active/plan-curriculum50.md)
 - [Paired training (ideas #16): R1 SRM-e50 paired, R2 cell model paired — approved plan (2026-10-22)](active/plan-paired-training.md)
+- [Cloud deployment: GCP VM + Tailscale Funnel — live demo layout, checks and runbook (2026-11-25)](active/deploy-gcp-funnel.md)
 - [Web-app pipeline — approved plan: core library, HTTP API, container, swappable model bundle, ONNX Runtime engine (2026-10-21, ONNX 2026-11-25)](active/plan-pipeline.md); guide `cvdl/pipeline/README.md`
 - [Test levels and the changed-path rule — fast/full/none tests; golden retired 2026-10-21 (built `891aefe`, 2026-10-20)](active/test-levels.md)
 - [Wide-R2 legacy settings migration — saved evidence and limits](active/legacy-wide-r2-migration.md)

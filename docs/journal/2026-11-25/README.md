@@ -14,6 +14,11 @@
 - Model optimization for deployment (user approved: ONNX first, then a measured INT8 test). Work in `runs/verification/onnx-2026-11-25/` (git-ignored): `export_probe.py`, `variants.py` (INT8 builds, timing, frozen evaluation with ONNX Runtime in place of PyTorch), `compare.py` (paired comparison with the recorded PyTorch evaluation `a1ab2faad8f27bca309e`). Container packages added: onnx 1.23.2, onnxruntime 1.32.0, onnxscript 0.7.2.
 - `pipeline` branch, commits `da70753` (code) and `b96ca7c` (docs): ONNX Runtime engine (`engine='onnx'`, `CVDL_ENGINE`), torch-free bundle contract module, `python -m cvdl.pipeline.export_onnx`, `model.onnx` + `onnx.json` for the run 13/18/22 bundles, `deploy/Dockerfile` now ONNX (old image is `deploy/Dockerfile.torch`), `tests/test_pipeline_onnx.py` (6 tests OK). FULL level in the pipeline worktree: 425 tests, 3 failures, all also present on the unchanged `044c1ad` because the worktree has no `runs/` training records.
 - `pipeline` merged into `app` (`73fa326`, pushed). New branch `report` = `app` + `yx` (merge `3c96319`; `yx` docs kept on conflicts). FULL level after the merge commit: all failures explained (uncommitted merge, no photo data in the worktree).
+- Cloud deployment (user: use the team L4 VM instead of a Hugging Face Space, because HF Docker Spaces now need a paid plan). VM `gcp-aai3001` (`aai3001-510802`, `asia-northeast3-a`, `g2-standard-8`, Spot). Recovered admin access through the GCP console SSH (user); temporary passwordless `sudo` for `aai-team`, removed at the end.
+  - Cleanup (user approved): VM-only checkpoints copied to `runs/vm-backup-2026-11-25/` first (117 files, SHA-256 match). Deleted `otf-cache` (50 GB), `ImageSets` (21 GB; the PC has all 1,000 RAISE NEF and 900 DIV2K), `.venv` and the `uv` cache (11.3 GB), `.vscode-server`. Disk 107 GB → 24 GB used.
+  - Installed Podman 4.9.3. Image `cvdl-pipeline:report-fb1f6ad` (ONNX) built on the PC and loaded on the VM; Quadlet unit `deploy/gcp/cvdl-pipeline.container` (loopback port 8000, starts at boot). App built with `VITE_API_URL=/api` into `/srv/demo/app`.
+  - Tailscale Funnel on 443: `/` = app, `/api` = API. User enabled Funnel and added `tag:aai3001` to the funnel `nodeAttrs`.
+  - Checks on the public route: health ready (engine onnx); DIV2K 0829 clean 0.009 `not_detected`, stego 0.839 `message_detected` (same as local), about 4.3 s per request; browser verdict after 4.4 s, no console errors; reboot test: service and Funnel came back by themselves. [Runbook](../../active/deploy-gcp-funnel.md).
 - README rewritten as the project report, in paper form (abstract, related work, dataset, method, protocol, results, system, scalability, limitations, 18 references checked online). The old README moved to `docs/development.md` (links fixed). New: `scripts/build_report_figures.py` (model-history chart from `docs/results/model-history-2026-11-25.json`; heatmap example from DIV2K test photo 0829 with a seeded k=1 contiguous 0.25 bpp message, ONNX engine: clean 0.009 not detected, stego 0.839 detected), and 3 UI screenshots of `app/` against the real ONNX container. FAST level: **697 tests OK (35 skipped)**.
 
 ## Found
@@ -74,11 +79,12 @@ Image size 1.14 GB → 329 MB. Memory after the runs: PyTorch 198–246 MB, ONNX
 ## Decided
 
 - User: re-score only the V3c baseline.
-- User (Option A): host on one Hugging Face Docker Space that serves the backend and the React build; no Vercel.
+- ~~User (Option A): host on one Hugging Face Docker Space that serves the backend and the React build; no Vercel.~~ Replaced: HF Docker Spaces now need a paid plan. User: host on the team L4 VM behind Tailscale Funnel.
 - Ship ONNX FP32 as the deployed engine. Reject INT8: it fails the frozen tests. Do not resize photos for speed: resizing destroys the LSB signal.
 
 ## Next
 
 - Pending (user): push `pipeline` (`da70753`, `b96ca7c`).
 - Pending (user): may `pipeline` merge into `app` (Babydage's branch)? Who owns the Hugging Face account?
-- Pending: HF Space deployment, then the live URL in the README (two places marked Pending); repo cleanup; merge to `main`.
+- Pending (user): switch the VM from Spot to standard provisioning for the demo period (VM stop, change, start; the service restarts by itself).
+- Pending: repo cleanup; merge to `main`.

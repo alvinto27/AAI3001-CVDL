@@ -4,7 +4,7 @@ AAI3001 Computer Vision and Deep Learning, team project. This README is the proj
 
 | Item | Where |
 | --- | --- |
-| Live demo (cloud) | Pending: Hugging Face Space, link added after deployment |
+| Live demo (cloud) | <https://gcp-aai3001.taild62d21.ts.net> (online while the demo VM runs) |
 | Run it locally | [Appendix A](#appendix-a-run-and-reproduce) |
 | Shipped model | [`deploy/run22-rule-c-v1/`](deploy/run22-rule-c-v1/) (run 22, ONNX and PyTorch) |
 | All runs and results | [Findings](docs/findings.md), [journal](docs/journal/README.md) |
@@ -348,7 +348,9 @@ The service needs no gradients, so we export the network to ONNX ([`cvdl/pipelin
 | **Local, container** | `podman build -f deploy/Dockerfile -t cvdl-pipeline:onnx .` then `podman run --rm -p 127.0.0.1:8000:8000 cvdl-pipeline:onnx` (Docker works the same way) | Working, used for Figures 5–6 |
 | **Local, Python** | `pip install -r deploy/requirements-onnx.txt` then `python -m cvdl.pipeline.serve --engine onnx` | Working |
 | **Local, GPU** | `deploy/Dockerfile.torch` with a CUDA torch build | Not tested on a GPU |
-| **Cloud** | One Hugging Face Docker Space that serves the API and the built web app | Pending: URL added here after deployment |
+| **Cloud** | Google Cloud VM (8 vCPU, `asia-northeast3`) runs the same ONNX image as a `systemd` service. Tailscale Funnel gives the public HTTPS address: `/` serves the built web app, `/api` goes to the API on the same origin ([runbook](docs/active/deploy-gcp-funnel.md), [service file](deploy/gcp/cvdl-pipeline.container)) | **Live**: <https://gcp-aai3001.taild62d21.ts.net>. Checked from the public route: same scores as local (0.009 clean, 0.839 stego), about 4.3 s per 2.8 MP photo including upload; restarts by itself after a VM reboot |
+
+The cloud and local deployments use the same image, built from the same commit, with the optimised ONNX model (§7.2).
 
 ### 7.4 User interface
 
