@@ -93,5 +93,5 @@ Image size 1.14 GB → 329 MB. Memory after the runs: PyTorch 198–246 MB, ONNX
 
 - ~~Pending (user): push `pipeline` (`da70753`, `b96ca7c`).~~ Done.
 - ~~Pending (user): may `pipeline` merge into `app` (Babydage's branch)? Who owns the Hugging Face account?~~ Merged (`73fa326`); Hugging Face not used.
-- Pending (user): switch the VM from Spot to standard provisioning for the demo period (VM stop, change, start; the service restarts by itself).
+- ~~Pending (user): switch the VM from Spot to standard provisioning for the demo period.~~ Done: instance `aai-3001` is standard (method in the [runbook](../../active/deploy-gcp-funnel.md#spot-to-standard-done-2026-11-25)). After the start: metadata preemptible FALSE, GPU service active on CUDA, public `/api/health` ready, `/` HTTP 200.
 - Pending: repo cleanup; merge to `main`.

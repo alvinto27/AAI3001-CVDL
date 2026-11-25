@@ -6,7 +6,7 @@ Status: **live** since 2026-11-25 at <https://gcp-aai3001.taild62d21.ts.net> whe
 
 | Part | Value |
 | --- | --- |
-| VM | `gcp-aai3001`, project `aai3001-510802`, zone `asia-northeast3-a`, `g2-standard-8` (8 vCPU = 4 cores at 2.2 GHz, 31 GB RAM, 1 NVIDIA L4 24 GB), Ubuntu 24.04, driver 595.91.07 (CUDA 13.2) |
+| VM | `gcp-aai3001` (instance `aai-3001`), project `aai3001-510802`, zone `asia-northeast3-a`, standard provisioning since 2026-11-25 (was Spot with a 12 h maximum run time), `g2-standard-8` (8 vCPU = 4 cores at 2.2 GHz, 31 GB RAM, 1 NVIDIA L4 24 GB), Ubuntu 24.04, driver 595.91.07 (CUDA 13.2) |
 | GPU access | NVIDIA Container Toolkit 1.20.2 with a Podman-4.9-compatible CDI spec from [`deploy/gcp/make-cdi-spec.sh`](../../deploy/gcp/make-cdi-spec.sh) (rewrites cdiVersion 0.7.0 to 0.6.0 and masks `nvidia-cdi-refresh`) |
 | GPU service | Quadlet unit [`deploy/gcp/cvdl-pipeline.container`](../../deploy/gcp/cvdl-pipeline.container): image `localhost/cvdl-pipeline:gpu-5970a3b` (5.88 GB, `deploy/Dockerfile.torch` with torch 2.14.0 cu130), `--engine torch --device cuda`. Starts at boot |
 | CPU fallback | Quadlet unit [`deploy/gcp/cvdl-pipeline-cpu.container`](../../deploy/gcp/cvdl-pipeline-cpu.container): image `localhost/cvdl-pipeline:report-fb1f6ad` (329 MB, `deploy/Dockerfile`, ONNX Runtime). Not started at boot |
@@ -58,6 +58,16 @@ Commands need `sudo` on the VM. The `aai-team` account has no `sudo`. Use the GC
 
 ## Limits
 
-- The site is up only while the VM runs. A Spot VM can stop at any time; switch to standard provisioning for the demo period (user action in the GCP console).
+- The site is up only while the VM runs. The VM is standard (not Spot): no 12 h stop, restarts by itself after a host failure, and stops for host maintenance (`onHostMaintenance: TERMINATE`, required with a GPU). After a maintenance stop, start it again.
+
+### Spot to standard (done 2026-11-25)
+
+The console field is read-only for this VM. `gcloud compute instances set-scheduling` and the REST `setScheduling` call fail, because they merge with the old settings and keep `preemptionNoticeDuration` (Spot only; no clear flag). What worked, with the VM stopped, in Cloud Shell:
+
+1. `gcloud compute instances export aai-3001 --project=aai3001-510802 --zone=asia-northeast3-a --destination=vm.yaml`
+2. Replace the `scheduling:` block with `scheduling: {automaticRestart: true, onHostMaintenance: TERMINATE, preemptible: false, provisioningModel: STANDARD, gracefulShutdown: {enabled: true, maxDuration: {seconds: 600}}}` (one line, so pasting cannot break the indentation).
+3. `gcloud compute instances update-from-file aai-3001 ... --source=vm.yaml --most-disruptive-allowed-action=RESTART` (a full replace, so missing Spot fields are removed).
+
+Old values: `preemptible: true`, `provisioningModel: SPOT`, `maxRunDuration` 43,200 s, `instanceTerminationAction: STOP`, `preemptionNoticeDuration` 120 s, `automaticRestart: false`.
 - One analysis at a time (the service queues the rest).
 - The VM bills for the L4 every hour it runs.
