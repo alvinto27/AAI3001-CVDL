@@ -22,11 +22,11 @@ On 10,944 test pairs from photos that were never seen in training, the shipped m
 
 ## 1. Introduction
 
-**The problem.** An LSB tool writes message bits into the lowest bits of pixel values. The image looks the same, and file size and metadata do not change. To find the message, a detector must notice small statistical changes in the image noise, and the noise of the photo itself hides those changes. Noisy photos from small-sensor phones hide them best.
+LSB steganography writes message bits into the lowest bits of pixel values. The image looks the same, and file size and metadata do not change. A detector must therefore find small statistical changes in the image noise, and the natural noise of the photo masks those changes. The masking is strongest in noisy photos from small-sensor phone cameras.
 
-**Who needs it.** Forensic analysts, platform moderators and security teams receive images and must decide which ones to examine further. Our tool gives a score, a verdict, and a map of the suspect regions, so that a person can check the evidence.
+Steganalysis of this kind is used in image forensics and content screening, where an analyst must decide which images to examine further. A single score gives the analyst no evidence to check. This work therefore produces a score, a photo-level verdict and a map of the regions that most likely carry the message.
 
-**What is new in this project.**
+The contributions of this work are:
 
 | # | Contribution | Section |
 | --- | --- | --- |
@@ -50,7 +50,7 @@ On 10,944 test pairs from photos that were never seen in training, the shipped m
 
 **Localisation.** Class activation mapping (CAM) [14] reads a coarse "where" map from a network trained only on image labels.
 
-**Our setting differs from most of this work in four ways:**
+Our setting differs from most of this work in four ways:
 
 1. Colour RGB photos, not greyscale.
 2. A *mixture* of LSB settings, not one algorithm at one payload.
@@ -78,8 +78,8 @@ All splits are **by photo**: no tile of a test photo is used in training or vali
 | ALASKA2 [17] | 18,200 TIFF, ≤1 MP, 38 camera models | 13,500 / 1,000 / 1,700 seen-camera + **2,000 unseen-camera** | Many phones and cameras, very noisy photos. 8 camera models are held out completely | Source site terms |
 | LSDIR [18] | 11,000 PNG, 0.3–11 MP | 7,000 / 1,500 / 2,500 | Varied web-scale scenes | Source site terms |
 
-- **One fixed RAW pipeline.** We decode RAISE NEF files once, with fixed settings: rawpy/LibRaw, AHD demosaicing, camera white balance, no auto-brightness, 8-bit output ([`lsb_raw.py`](LSB-Dataset-Generator/lsb_raw.py)). A change of decoder changes the noise. Keeping it fixed keeps the clean class consistent.
-- **Frozen source records.** [`data/<source>/photo_manifest.csv`](data/raise/) lists every photo's path, camera, size, tile grid and split. [`Datasets/README.md`](Datasets/README.md) gives the download links and checksums. Images are not stored in git.
+- RAISE NEF files are decoded with one fixed set of settings: rawpy/LibRaw, AHD demosaicing, camera white balance, no auto-brightness, 8-bit output ([`lsb_raw.py`](LSB-Dataset-Generator/lsb_raw.py)). A different decoder produces different noise, so a fixed decoder keeps the clean class consistent.
+- [`data/<source>/photo_manifest.csv`](data/raise/) lists every photo's path, camera, size, tile grid and split. [`Datasets/README.md`](Datasets/README.md) gives the download links and checksums. Images are not stored in git.
 
 ### 3.2 The generator and its labels
 
@@ -96,7 +96,7 @@ All splits are **by photo**: no tile of a test photo is used in training or vali
 | `start` | random | Where the message starts |
 | `size` | 0.05–0.5 bpp | Message length |
 
-**Labels for each pair:**
+Each pair has four labels:
 
 1. Image label: clean or stego.
 2. All the drawn settings and the actual bpp.
@@ -144,12 +144,12 @@ flowchart LR
 
 *Figure 2. Run 22 network ([`cvdl/models.py`](cvdl/models.py), class `XuNetWideGAPCov32`). It has 638,611 trained parameters and 2,250 fixed SRM weights.*
 
-**Design choices:**
+The components are as follows.
 
-- **Fixed SRM front end** (from [5, 8]). The 30 high-pass filters remove image content and keep the noise. Clipping at ±3 (pixel units) stops strong edges from dominating. We tested a *trainable* SRM bank (run 20), and it did worse (3.34% vs 2.55%).
-- **XuNet body, 4× wider, no normalisation** (from [7]). The absolute-value and tanh layers keep the sign symmetry of ±1 changes. Removing GroupNorm and widening the 1×1 layers gave more capacity at almost no cost in speed.
-- **Covariance pooling** (from [12, 13]). Average pooling keeps only the mean of each channel. The covariance of 32 reduced channels (528 unique values after a 5-step Newton–Schulz matrix square root) also keeps how channels change *together*. Our independent implementation is in [`cvdl/cov_pool.py`](cvdl/cov_pool.py).
-- **Cell head** (our addition). A 1×1 convolution reads the 8×8×256 feature map and returns one score per 32 px cell. It shares the body with the tile classifier, so the heatmap costs almost nothing.
+- *Fixed SRM front end* [5, 8]. The 30 high-pass filters remove image content and keep the noise. Clipping at ±3 (pixel units) stops strong edges from dominating. We tested a *trainable* SRM bank (run 20), and it did worse (3.34% vs 2.55%).
+- *XuNet body, 4× wider, without normalisation* [7]. The absolute-value and tanh layers keep the sign symmetry of ±1 changes. Removing GroupNorm and widening the 1×1 layers gave more capacity at almost no cost in speed.
+- *Covariance pooling* [12, 13]. Average pooling keeps only the mean of each channel. The covariance of 32 reduced channels (528 unique values after a 5-step Newton–Schulz matrix square root) also keeps how channels change *together*. Our independent implementation is in [`cvdl/cov_pool.py`](cvdl/cov_pool.py).
+- *Cell head* (this work). A 1×1 convolution reads the 8×8×256 feature map and returns one score per 32 px cell. It shares the body with the tile classifier, so the heatmap adds 257 parameters and almost no computation.
 
 ### 4.2 Loss
 
@@ -212,11 +212,11 @@ A photo is larger than one tile, so the service ([`cvdl/photo_inference.py`](cvd
 | **AUC** | Chance that a random stego image scores above a random clean one. It does not depend on the cut-off. 1.0 is perfect, 0.5 is guessing |
 | 95% interval | 2,000 bootstrap resamples **of photos** (all tiles of a photo stay together). Comparisons between models use the *same* resampled photos (a paired bootstrap) |
 
-Protocol rules:
+Three rules apply to all results.
 
-- **The cut-off comes from validation only.** Each model's tile cut-off minimises P_E on the 18,000-pair validation list. The cell cut-off gives 5% false cells on validation. Test data never sets a cut-off.
-- **Criteria before results.** Each run had pass/fail criteria fixed before it was scored. Example: run 13's cell map had to beat the CAM of a control model, and its standard P_E could not rise more than 0.25 points above the control. The map passed; the P_E criterion failed by 0.07 points.
-- **Same tests for every model.** All 10 models in §6.3 were re-scored on the same frozen sets, so their differences are fair comparisons.
+- Each model's tile cut-off minimises P_E on the 18,000-pair validation list. The cell cut-off gives 5% false cells on validation. Test data never sets a cut-off.
+- Each run had pass/fail criteria fixed before it was scored. Example: run 13's cell map had to beat the CAM of a control model, and its standard P_E could not rise more than 0.25 points above the control. The map passed; the P_E criterion failed by 0.07 points.
+- All 10 models in §6.3 were re-scored on the same frozen sets, so their differences are direct comparisons.
 
 ---
 
@@ -233,9 +233,9 @@ Protocol rules:
 | ALASKA **unseen** cameras | 3,168 | — | — | — | 14.87% |
 | LSDIR | 5,280 | — | — | — | 7.59% |
 
-By bit depth on the standard set, **k=1 is the hard case**: P_E is 4.79% (AUC .991) for k=1, and 1.5–2.0% (AUC ≥.999) for k=2–4. One changed bit per value is the smallest possible signal.
+By bit depth on the standard set, k=1 is the hardest case: P_E is 4.79% (AUC .991) for k=1, and 1.5–2.0% (AUC ≥.999) for k=2–4. One changed bit per value is the smallest possible signal.
 
-**Generalisation.** Unseen ALASKA cameras (14.87%) score *better* than seen cameras (17.62%), so the model did not just memorise the noise of its training cameras. DIV2K is the weak point: its clean tiles cause most of the false alarms (13.3% FA). This is a source the model never trained on, and it has different processing.
+Unseen ALASKA cameras (14.87%) score *better* than seen cameras (17.62%), so the model did not simply memorise the noise of its training cameras. DIV2K is the weakest set: its clean tiles cause most of the false alarms (13.3% FA). This is a source the model never trained on, and it has different processing.
 
 ### 6.2 Hard cases
 
@@ -271,15 +271,15 @@ A 1-bit, low-payload message in a *noisy* phone photo is close to undetectable f
 | run 21 → run 22 | trained cell head | +0.39 [+0.22, +0.58] | +.012 [+.009, +.015] |
 | **Baseline → run 22** | **all of the above** | **−1.50 [−1.90, −1.12]** | **+.172 [+.163, +.180]** |
 
-What the history shows:
+Five observations follow from Figure 3 and the table.
 
-1. **Tile size mattered most.** Training on 256 px tiles instead of 512 px tiles gave the largest single gain. The 256 px tiles also match the test tiles, and each epoch sees more photos.
-2. **More varied data trades standard score for robustness.** Adding ALASKA and LSDIR made the standard set worse by 1.35 points. It also cut P_E on every other panel, by 1.4 points (LSDIR) to 9.9 points (ALASKA unseen), and raised hard AUC by .05. We kept the varied data because real uploads come from phones, not only from RAISE.
-3. **Covariance pooling was the best architecture change.** It improved hard AUC by .029 and standard P_E by 0.40 points.
-4. **Run-to-run spread is about 0.5 points.** Running the same recipe again moved P_E by +0.48. Smaller differences between single runs are not strong evidence.
-5. **Run 22 trades 0.39 points of standard P_E for a heatmap and a better hard AUC.** We chose it because the heatmap is part of the product (§6.4), and it is the first model whose photo rule met both pre-set criteria (§6.5).
+1. Tile size had the largest effect. Training on 256 px tiles instead of 512 px tiles gave the largest single gain. The 256 px tiles also match the test tiles, and each epoch covers more photos.
+2. More varied training data traded standard-set accuracy for robustness. Adding ALASKA and LSDIR made the standard set worse by 1.35 points. It also cut P_E on every other panel, by 1.4 points (LSDIR) to 9.9 points (ALASKA unseen), and raised hard AUC by .05. The varied data was kept because real images also come from phones, not only from cameras like those in RAISE.
+3. Covariance pooling was the most effective architecture change. It improved hard AUC by .029 and standard P_E by 0.40 points.
+4. The run-to-run spread is about 0.5 points: a repeat of the same recipe moved P_E by +0.48. Smaller differences between single runs are weak evidence.
+5. Run 22 gives up 0.39 points of standard P_E for a trained heatmap and a higher hard AUC. It was selected because localisation is one of the two aims of this work (§6.4), and because it is the first model whose photo rule met both pre-set criteria (§6.5).
 
-**Changes that did not help** (standard P_E, same tests): delayed pooling 3.43%; colour-separated first layer 3.66%; trainable SRM 3.34%; a low-payload curriculum 3.10%; a harder data mix 3.10%; trim or pad tiling instead of overlap 4.82–6.53%. 
+The following changes did not help (standard P_E on the same tests): delayed pooling 3.43%; colour-separated first layer 3.66%; trainable SRM 3.34%; a low-payload curriculum 3.10%; a harder data mix 3.10%; trim or pad tiling instead of overlap 4.82–6.53%.
 
 ### 6.4 Localisation: does the heatmap point to the message?
 
@@ -327,14 +327,13 @@ flowchart LR
     R -- JSON --> U
 ```
 
-- **Model bundle.** A folder that holds the weights, the cut-offs and the photo rule. `deploy.json` and `onnx.json` bind them together with SHA-256 hashes. The service refuses to start if any file was changed or does not match ([bundle guide](cvdl/pipeline/README.md#swap-or-build-a-bundle)). To use a different model, provide a different bundle folder.
-- **The service keeps nothing.** Uploads are processed in memory and nothing is saved, so more copies of the container can run behind a load balancer (§8).
+The model is packaged as a *bundle*: a folder that holds the weights, the cut-offs and the photo rule. `deploy.json` and `onnx.json` bind these files together with SHA-256 hashes, and the service does not start if any file is changed or mismatched ([bundle guide](cvdl/pipeline/README.md#swap-or-build-a-bundle)). A different model is deployed by supplying a different bundle folder. The service is stateless: uploads are processed in memory and not stored, so several copies of the container can run behind a load balancer (§8).
 
 ### 7.2 Inference optimisation: ONNX Runtime
 
 The service needs no gradients, so we export the network to ONNX ([`cvdl/pipeline/export_onnx.py`](cvdl/pipeline/export_onnx.py)). The export refuses to write the bundle record if ONNX and PyTorch differ by more than 1e-3 on 32 seeded random tiles.
 
-**No loss of accuracy.** We ran the ONNX model on the full frozen evaluation:
+The exported model was run on the full frozen evaluation and compared with PyTorch:
 
 | Check | ONNX FP32 vs PyTorch |
 | --- | --- |
@@ -343,7 +342,7 @@ The service needs no gradients, so we export the network to ONNX ([`cvdl/pipelin
 | Standard P_E, panel P_E, hard AUC | unchanged (2.545%, 17.62 / 14.87 / 7.59%, .7983) |
 | HTTP results on 3 photos | same verdicts and flagged cells |
 
-**Smaller and faster.** Both images were built from the same source. Times are the median of 3 runs on a Ryzen 7 7700:
+Both service images were built from the same source. Times are the median of 3 runs on a Ryzen 7 7700:
 
 | Container CPUs | Photo | PyTorch | **ONNX** | Speed-up |
 | --- | --- | ---: | ---: | ---: |
@@ -353,7 +352,7 @@ The service needs no gradients, so we export the network to ONNX ([`cvdl/pipelin
 | 8 | 12 MP | 4.74 s | **2.11 s** | 2.25× |
 | — | Image size | 1.14 GB | **329 MB** | 3.5× smaller |
 
-**INT8 rejected.** We also tested 8-bit quantisation, which stores values as 8-bit integers instead of 32-bit floats. The best INT8 variant raised standard P_E from 2.54% to **5.78%** (+3.24 points [+2.76, +3.68], 1,267 changed decisions) and lowered hard AUC by .057. It was also *slower* on 8 threads (12.1 vs 9.2 ms per tile). The cause: an 8-bit step is too coarse for a ±1 pixel signal.
+8-bit (INT8) quantisation was also tested. It stores values as 8-bit integers instead of 32-bit floats. The best INT8 variant raised standard P_E from 2.54% to **5.78%** (+3.24 points [+2.76, +3.68], 1,267 changed decisions) and lowered hard AUC by .057. It was also *slower* on 8 threads (12.1 vs 9.2 ms per tile). An 8-bit step is too coarse for a ±1 pixel signal, so INT8 was not used.
 
 ### 7.3 Deployments
 
@@ -387,14 +386,14 @@ The VM's CPU (4 physical cores at 2.2 GHz) is about 4× slower than the desktop 
 
 ![Result for the stego photo](docs/figures/report/ui-result-stego.png)
 
-*Figure 6. Result for the stego photo of Figure 4, from the real model (ONNX container). The verdict, the score against the threshold, a heatmap over the photo that can be zoomed and moved, and numbered regions with their scores. The clean photo gets "No significant anomaly detected" with score 0.01 ([screenshot](docs/figures/report/ui-result-clean.png)).*
+*Figure 6. Result for the stego photo of Figure 4, produced by the deployed model (ONNX container). The verdict, the score against the threshold, a heatmap over the photo that can be zoomed and moved, and numbered regions with their scores. The clean photo gets "No significant anomaly detected" with score 0.01 ([screenshot](docs/figures/report/ui-result-clean.png)).*
 
-UI design decisions:
+The interface follows four design decisions.
 
-- **Careful wording.** The verdict says "suspicious modification detected", not "hidden message found". The screen states that a positive result is not proof and that a negative result is not a guarantee.
-- **Evidence, not only a score.** Regions are sorted by score. The user can show the cell grid and tile grid, adjust the heatmap strength, download the heatmap as PNG, and export the analysis as JSON.
-- **Input guidance.** The upload screen asks for the original file, never resized or recompressed. Input warnings from the service, for example for JPEG, are shown with the result.
-- **Tested.** Playwright end-to-end tests run on desktop, tablet and mobile screen sizes, with axe accessibility checks. A mock API (`npm run mock-api`) lets the UI be developed without the model.
+- The verdict says "suspicious modification detected", not "hidden message found". The screen states that a positive result is not proof and that a negative result is not a guarantee.
+- The interface shows the evidence, not only a score. Regions are sorted by score. The user can show the cell grid and tile grid, adjust the heatmap strength, download the heatmap as PNG, and export the analysis as JSON.
+- The upload screen asks for the original file, never resized or recompressed. Input warnings from the service, for example for JPEG, are shown with the result.
+- Playwright end-to-end tests run on desktop, tablet and mobile screen sizes, with axe accessibility checks. A mock API (`npm run mock-api`) lets the UI be developed without the model.
 
 ---
 
@@ -410,27 +409,22 @@ UI design decisions:
 | **Throughput** | The service keeps nothing between requests and handles one analysis per worker. Copies scale out with the number of containers. `CVDL_THREADS` sets CPU threads | ONNX cut CPU time by 1.7–2.3× and image size by 3.5×. On the cloud L4 GPU, a 2–3 MP photo takes 0.27 s of server time (§7.3) |
 | **Model updates** | Replace the bundle folder. The integrity checks refuse a mismatched model | Three bundles (runs 13, 18, 22) already use the same service |
 
-**Future work.**
-
-1. Add more source collections to training to reduce DIV2K-style false alarms.
-2. Add a JPEG-domain detector next to this one.
-3. Calibrate the photo score per source.
-4. Serve ONNX Runtime with its CUDA or TensorRT backend, so the GPU also runs the optimised ONNX model.
-
 ---
 
 ## 9. Limitations and responsible use
 
-- **Detection, not extraction.** The tool says *whether* and *where*. It does not read the message.
-- **Noisy photos are a hard limit.** For 1-bit, low-payload messages in noisy phone photos, AUC is about .53–.55, which is close to guessing.
-- **Domain shift.** False alarms are higher on collections not seen in training: 13.3% at tile level on DIV2K.
-- **The photo-verdict test is not fully independent.** It uses the same source pools as development, so results for seen cameras are not evidence for unseen cameras.
-- **Single runs.** Each recipe was trained once, with one seed. Run-to-run spread is about 0.5 P_E points (§6.3).
-- **Human review.** A flag is evidence for a person to check, not a finding of wrongdoing. The UI says so on every result.
+- The system detects and localises messages; it does not extract them. It reports *whether* and *where*, not the message content.
+- For 1-bit, low-payload messages in noisy phone photos, AUC is about .53–.55, which is close to guessing.
+- False alarms are higher on collections not seen in training: 13.3% at tile level on DIV2K.
+- The photo-verdict test is not fully independent: it uses the same source pools as development, so results for seen cameras are not evidence for unseen cameras.
+- Each recipe was trained once, with one seed. Run-to-run spread is about 0.5 P_E points (§6.3).
+- A flag is evidence for a person to check, not a finding of wrongdoing. The UI says so on every result.
 
 ## 10. Conclusion
 
-We built the whole pipeline: a labelled LSB dataset generator, frozen tests split by photo, a compact CNN, and a deployed web tool. Every design step was measured against the same tests. The shipped model detects colour-LSB messages with 2.54% error on unseen photos, finds the message region with a trained heatmap (per-tile AUC .864), and decides on whole photos with 5.6% false alarms. It runs on a CPU in about 0.5–2 s per photo through ONNX Runtime with no loss of accuracy. The largest gains came from data and tile size, and from covariance pooling. Noisy phone photos with tiny payloads remain the open problem.
+This work presented an end-to-end system for colour LSB steganalysis: a labelled dataset generator, frozen test sets split by photo, a compact CNN with a trained localisation head, and a deployed web tool. Every design step was measured against the same tests. The shipped model detects colour-LSB messages with 2.54% error on unseen photos, finds the message region with a trained heatmap (per-tile AUC .864), and decides on whole photos with 5.6% false alarms. It runs on a CPU in about 0.5–2 s per photo through ONNX Runtime with no loss of accuracy. The largest gains came from data and tile size, and from covariance pooling. Noisy phone photos with very small payloads remain the open problem.
+
+Future work includes more source collections in training to reduce false alarms on unseen collections such as DIV2K, a separate detector for JPEG-domain steganography, per-source calibration of the photo score, and ONNX Runtime with a CUDA or TensorRT backend so that GPU deployments also use the exported model.
 
 ---
 
