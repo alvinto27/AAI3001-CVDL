@@ -1,10 +1,12 @@
 # Photo analysis API
 
-The API tiles an original photo, runs **run 18 with photo rule (c)**, and returns a verdict and heatmap. It does not extract messages. No front end is included.
+The API tiles an original photo, runs **run 22 with photo rule (c)**, and returns a verdict and heatmap. It does not extract messages. No front end is included.
 
 ## Quick start: container
 
 Run from the repository root. Allow about **4 GiB RAM**. The CPU image contains the model and downloads nothing at startup.
+
+The default image (`deploy/Dockerfile`) runs the model with **ONNX Runtime** and does not contain PyTorch: 329 MB instead of 1.14 GB, and about 1.7–2.3× faster per photo (see [Host settings and limits](#host-settings-and-limits)). `deploy/Dockerfile.torch` keeps the PyTorch image, which is needed for GPUs.
 
 | Step | Docker | Podman |
 | --- | --- | --- |
@@ -21,16 +23,17 @@ Use Python 3.12 with `venv` support (`python3.12-venv` on Debian/Ubuntu). Create
 ```sh
 python3.12 -m venv "$HOME/.venvs/cvdl-pipeline"
 . "$HOME/.venvs/cvdl-pipeline/bin/activate"
-python -m pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
-python -m pip install -r deploy/requirements-http.txt
-python -m cvdl.pipeline.serve --host 127.0.0.1 --port 8000
+python -m pip install -r deploy/requirements-onnx.txt
+python -m cvdl.pipeline.serve --engine onnx --host 127.0.0.1 --port 8000
 ```
+
+For the PyTorch engine instead, install `torch==2.14.0` from `https://download.pytorch.org/whl/cpu`, then `deploy/requirements-http.txt`, and use `--engine torch` (the default outside the container).
 
 No Lightning/pandas/YAML/torchvision/RAW decoders are needed. Leave training dependencies, `pyproject.toml` and `uv.lock` unchanged.
 
 ### GPU option
 
-**Passing GPU devices does not turn the CPU image into a GPU image.** A compatible wheel/runtime and host driver are required. Build with `--build-arg TORCH_INDEX_URL=...` for the matching torch 2.14.0 index. GPU builds are untested here.
+**Passing GPU devices does not turn the CPU image into a GPU image.** The ONNX image is CPU only. Build `deploy/Dockerfile.torch` with `--build-arg TORCH_INDEX_URL=...` for the matching torch 2.14.0 index. A compatible wheel/runtime and host driver are required. GPU builds are untested here.
 
 For a prepared NVIDIA image tagged `cvdl-pipeline:gpu`:
 
@@ -50,7 +53,7 @@ curl -F 'photo=@photo.png' -F 'include_images=true' \
 
 | Route / form field | Meaning |
 | --- | --- |
-| `GET /health` | `ready`, bundle identity and device; HTTP 503 when not ready. |
+| `GET /health` | `ready`, bundle identity, device and engine (`onnx` or `torch`); HTTP 503 when not ready. |
 | `POST /analyze` | Multipart upload. `photo` must be one file, not a server path. |
 | `include_images` | `true` returns base64 PNG heatmap and overlay; default `false`. |
 | `allow_rgba` | Explicitly discard alpha without changing RGB; default `false`. |
@@ -62,7 +65,7 @@ A successful response includes:
 | `bundle` | Name, version, format version and weights hash. Also present in health/error responses; `null` if startup failed before a bundle loaded. |
 | `photo_verdict` | `message_detected` or `not_detected`. |
 | `photo_rule` | Raw `logit`, its 0–1 `probability` score, and **logit** `cutoff`. Use the supplied verdict; this is not a calibrated real-world chance. |
-| `schema_version`, `device` | Response contract version and execution device. |
+| `schema_version`, `device`, `engine` | Response contract version, execution device and engine (`onnx` or `torch`). |
 | `width`, `height`, `input` | Stored dimensions, format, orientation and warnings. |
 | `tiles` | Row-major tile `box`, stego `probability`, and `flagged` value. |
 | `heatmap` | Raw `values`, boolean `flagged` mask, map kind/score, cutoff, cell size, shape and x/y edges. |
@@ -76,9 +79,9 @@ Example fields from a validation-photo response (other fields omitted):
   "photo_verdict": "not_detected",
   "photo_rule": {
     "type": "logistic_v1",
-    "logit": -3.318719151331937,
-    "probability": 0.034934565531585776,
-    "cutoff": -0.05636374639150742
+    "logit": -2.9580300194457307,
+    "probability": 0.04935835971502337,
+    "cutoff": 0.6957924294430787
   },
   "width": 2040,
   "height": 1152
@@ -111,9 +114,11 @@ Use **stored-pixel orientation** for photo and overlay: browsers may otherwise r
 
 ## Swap or build a bundle
 
-Selection: `--bundle DIR` > `CVDL_BUNDLE` > shipped default `deploy/run18-rule-c-v1`. Both bundles are included in the CPU image. Select the previous model with `--bundle /app/deploy/run13-rule-c-v1` (or `deploy/run13-rule-c-v1` outside the image).
+Selection: `--bundle DIR` > `CVDL_BUNDLE` > shipped default `deploy/run22-rule-c-v1`. All three bundles are included in the CPU image. Select the previous model with `--bundle /app/deploy/run18-rule-c-v1` (or `deploy/run18-rule-c-v1` outside the image); run 13 stays at `deploy/run13-rule-c-v1`.
 
-Run 18 uses its own tile cutoff **0.5094263553619385**, trained-head cell cutoff **0.1966136991977692**, and frozen rule (c) logit cutoff **−0.05636374639150742**. The bundle records the checkpoint, evaluation, threshold and frozen-fit hashes, plus the accepted identity route. Its `yx_cutoff_sources` route checks the checkpoint, tile threshold ID/value, cell-source file hash/value and trained-head map; it does not re-fit or edit the frozen rule.
+Run 22 (`xunet_wide_gapcov32`: GAP + covariance pooling, plus a trained 1×1 cell head) uses its own tile cutoff **0.5245211124420166**, trained-head cell cutoff **0.3114905655384064**, and frozen rule (c) logit cutoff **0.6957924294430787**. Its `architecture` also records the exact covariance head `cov_pool_identity`; the loader refuses any other value. Covariance bundles ship the trained-head map only (CAM does not apply). The bundle records the checkpoint, evaluation, threshold and frozen-fit hashes, plus the accepted identity route (`pipeline_native`).
+
+Run 18 uses tile cutoff **0.5094263553619385**, cell cutoff **0.1966136991977692** and rule (c) logit cutoff **−0.05636374639150742**. Its `yx_cutoff_sources` route checks the checkpoint, tile threshold ID/value, cell-source file hash/value and trained-head map; it does not re-fit or edit the frozen rule.
 
 Restart to swap supported bundles without app code changes. Do not hand-edit weights/rules/cutoffs: identity checks reject mismatches.
 
@@ -134,11 +139,43 @@ python scripts/build_deploy_bundle.py --run "$RUN" --evaluation-id "$EVAL" \
   --photo-rule "$FIT/frozen-rules.json" --output deploy/my-bundle
 ```
 
-Headless models use `MAP=cam` with their **own CAM cutoff and fit**; otherwise `MAP=trained_head`. Cache defaults to GPU; `--device cpu` is available. Original full cache: ~25 min, hardware-dependent. Unsupported architectures/grids need implementation.
+Then export the network for the ONNX engine (needs torch, `onnx` and `onnxscript`; refuses to write `onnx.json` if ONNX Runtime and PyTorch outputs differ by more than 1×10⁻³):
+
+```sh
+python -m cvdl.pipeline.export_onnx deploy/my-bundle
+```
+
+This writes `model.onnx` and `onnx.json`. `onnx.json` records the model hash, the bundle weights hash and the contract hash; the ONNX engine refuses a model that does not match its own bundle. The ONNX engine serves trained-head bundles only.
+
+Headless models use `MAP=cam` with their **own CAM cutoff and fit**; otherwise `MAP=trained_head`. GAP + covariance models are `trained_head` only. Cache defaults to GPU; `--device cpu` is available. Original full cache: ~25 min, hardware-dependent. Unsupported architectures/grids need implementation.
 
 ## Host settings and limits
 
-CPU threads use PyTorch's default or existing `OMP_NUM_THREADS`/`MKL_NUM_THREADS` settings; one analysis can use several cores. Optionally cap PyTorch with `CVDL_THREADS=4 python -m cvdl.pipeline.serve ...`, or add `-e CVDL_THREADS=4` before the container image name. This overrides PyTorch's environment-derived count. Lower it on a shared/CPU-limited host; do not start extra server workers to get more threads. Keep the **4 GiB container memory allowance**: more threads did not require a higher cap in this test.
+CPU threads use the engine's default (all cores for ONNX Runtime; PyTorch's default or `OMP_NUM_THREADS`/`MKL_NUM_THREADS`); one analysis can use several cores. Optionally cap either engine with `CVDL_THREADS=4 python -m cvdl.pipeline.serve ...`, or add `-e CVDL_THREADS=4` before the container image name. Lower it on a shared/CPU-limited host; do not start extra server workers to get more threads. Keep the **4 GiB container memory allowance**: more threads did not require a higher cap in this test.
+
+### ONNX Runtime versus PyTorch (run 22)
+
+Both CPU images built from the same tree, run 22 bundle, `--cpus` and `CVDL_THREADS` set to the same count, 4 GiB limit, `include_images=false` (what the app sends). Median of three `/analyze` calls, AMD Ryzen 7 7700, nothing else running. The 2.8 MP photo is DIV2K 0801 (2040×1356, 48 tiles); the 12 MP photo is 4000×3000 (192 tiles).
+
+| CPUs | Photo | PyTorch | ONNX Runtime | Speed-up |
+| --- | --- | ---: | ---: | ---: |
+| 2 | 2.8 MP | 2.71 s | 1.54 s | 1.76× |
+| 2 | 12 MP | 10.80 s | 6.21 s | 1.74× |
+| 8 | 2.8 MP | 1.19 s | 0.53 s | 2.27× |
+| 8 | 12 MP | 4.74 s | 2.11 s | 2.25× |
+
+| Image | Size | Memory after the runs |
+| --- | ---: | ---: |
+| `deploy/Dockerfile.torch` | 1.14 GB | 198–246 MB |
+| `deploy/Dockerfile` (ONNX) | 329 MB | 578 MB |
+
+ONNX Runtime keeps a memory pool between calls, so it holds more memory; both stay far below the 4 GiB limit.
+
+**Same results.** The run 22 ONNX model went through the complete frozen evaluation (standard-256 and hard-256 suites, ONNX Runtime in place of PyTorch, nothing else changed). Its validation cut-off was 0.5245214 against 0.5245211 for PyTorch. On all 21,888 standard test tiles not one decision changed (largest tile-probability difference 1.6×10⁻⁴); standard P_E 2.545%, ALASKA seen/unseen and LSDIR P_E and hard k=1 low-payload AUC 0.7983 are the same as PyTorch. `tests/test_pipeline_onnx.py` checks every shipped bundle against PyTorch and checks that the ONNX path never imports torch.
+
+**INT8 was measured and rejected.** Static INT8 quantization (Conv and Gemm layers, SRM filter kept in FP32, 512 validation tiles for calibration) was 1.4× faster on 2 threads but slower on 8, and it failed the frozen tests: standard P_E 5.78% (+3.24 points [+2.76, +3.68]) and hard AUC 0.742 (−0.057). The LSB signal is a ±1 change in pixel values; 8-bit activations are too coarse for it. Fewer pixels are also not an option: resizing a photo destroys the LSB signal, so every pixel is analysed.
+
+### PyTorch engine, earlier bundles
 
 For the previous run-13 bundle on this PC, three `/analyze` runs per validation photo gave these medians (CPU image, 4 GiB limit; default selected 8 threads). Results stayed within the tile-score parity tolerance, with identical verdicts. Other CPUs can differ.
 
@@ -147,8 +184,10 @@ For the previous run-13 bundle on this PC, three `/analyze` runs per validation 
 | DIV2K, 2040×1152, 40 tiles | 3.806 s | 1.372 s | 0.958 s |
 | RAISE, 3280×4948, 260 tiles | 24.038 s | 9.022 s | 6.252 s |
 
+Run 22 passed the same six-case CPU replay against its own frozen validation cache: tile scores matched the reference inference exactly, all six verdicts matched, the largest cached-feature difference was **1.729×10⁻⁶** and the largest rule-logit difference **4.472×10⁻⁶** (tolerance **1×10⁻⁵**). A Podman CPU build served `run22-rule-c` and returned `not_detected` for DIV2K 0281 (40 tiles, about 1.05 s with default threads); its rule logit differed by **1.5×10⁻⁷** from the project CPU result.
+
 Run 18 passed a six-case CPU replay: clean and fixed-stego versions of the same DIV2K, ALASKA and LSDIR validation photos used for run 13. Tile scores matched the reference inference exactly; all six verdicts matched the frozen run-18 validation cache. The largest cached-feature difference was **5.961×10⁻⁷**, and the largest rule-logit difference was **1.981×10⁻⁶** (tolerance **1×10⁻⁵**). A fresh Podman CPU build returned the same `not_detected` verdict for DIV2K 0281; its 40 tile scores differed by at most **1.490×10⁻⁷** from the project CPU result.
 
 Use `--allow-origin http://localhost:3000` for the app's exact origin; repeat for more origins, or set comma-separated `CVDL_ALLOWED_ORIGINS`. Wildcards are refused. CORS is not authentication. For public hosting, add HTTPS, authentication, upload timeouts and rate limits at a reverse proxy; expose non-loopback ports only deliberately. Local Python defaults to `127.0.0.1`; `--host` changes it.
 
-On the measured TEST pool, run 18's frozen rule falsely flagged **8.681% of clean photos** (50/576), and **16.406% on new ALASKA cameras**. Its pooled miss rate was **8.362%**, balanced error **8.521%**, and AUC **0.96475**. On the hard low-payload pool, balanced error was **20.536%**. These are measured panel averages, not guarantees for another camera/app. The earlier practical false-alarm mark failed, and this was not a wholly untouched benchmark. **“Not detected” is not proof that no message exists.** This model examines spatial RGB LSB patterns only, not general image authenticity or every form of steganography.
+On the measured TEST pool, run 22's frozen rule falsely flagged **5.556% of clean photos** (32/576), and **8.594% on new ALASKA cameras**. Its pooled miss rate was **10.185%**, balanced error **7.870%**, and AUC **0.96686**. On the hard low-payload pool, balanced error was **22.592%**. The practical mark (pooled clean-photo false alarms ≤7% and hard balanced error ≤25%) **passes**; run 18 failed it (false alarms 8.681%). Same photos, paired photo bootstrap versus run 18: false alarms −3.125 points [−5.382, −1.037], misses +1.823 [+1.013, +2.705], balanced error −0.651 [−1.635, +0.311]. These are measured panel averages, not guarantees for another camera/app, and this was not a wholly untouched benchmark. **“Not detected” is not proof that no message exists.** This model examines spatial RGB LSB patterns only, not general image authenticity or every form of steganography.

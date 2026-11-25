@@ -105,12 +105,13 @@ def _boolean(form,key):
     return value.lower() in ('true','1')
 
 
-def create_app(bundle_dir=None,*,device='cpu',batch_size=8,allowed_origins=(),max_request_bytes=MAX_ENCODED_BYTES):
+def create_app(bundle_dir=None,*,device='cpu',batch_size=8,engine='torch',threads=None,allowed_origins=(),max_request_bytes=MAX_ENCODED_BYTES):
     """One immutable bundle per process. Optional dependencies stay in this module."""
     @asynccontextmanager
     async def lifespan(app):
         try:
-            app.state.pipeline=await run_in_threadpool(load_pipeline,bundle_dir,device=device,batch_size=batch_size)
+            app.state.pipeline=await run_in_threadpool(load_pipeline,bundle_dir,device=device,batch_size=batch_size,
+                engine=engine,threads=threads)
             app.state.bundle=app.state.pipeline.identity
             app.state.ready=True
         except Exception as exc:
@@ -145,7 +146,8 @@ def create_app(bundle_dir=None,*,device='cpu',batch_size=8,allowed_origins=(),ma
     @app.get('/health')
     async def health():
         pipeline=app.state.pipeline
-        return JSONResponse(dict(ready=app.state.ready,bundle=app.state.bundle,device=pipeline.device if pipeline else None),
+        return JSONResponse(dict(ready=app.state.ready,bundle=app.state.bundle,device=pipeline.device if pipeline else None,
+            engine=pipeline.engine if pipeline else None),
             status_code=200 if app.state.ready else 503)
 
     @app.post('/analyze')
@@ -184,19 +186,23 @@ def main(argv=None):
     parser.add_argument('--port',type=int,default=8000)
     parser.add_argument('--bundle')
     parser.add_argument('--device',choices=('cpu','cuda','auto'),default='cpu')
+    parser.add_argument('--engine',choices=('torch','onnx'),default=os.environ.get('CVDL_ENGINE','torch'),
+        help='torch (default) or onnx: CPU-only ONNX Runtime, no torch import. Env: CVDL_ENGINE.')
     parser.add_argument('--allow-origin',action='append',default=[])
     args=parser.parse_args(argv)
-    import torch
+    if args.engine not in ('torch','onnx'):parser.error('CVDL_ENGINE must be torch or onnx')
     import uvicorn
-    threads=os.environ.get('CVDL_THREADS')
+    threads=os.environ.get('CVDL_THREADS');count=None
     if threads is not None:
         try:
             count=int(threads)
             if count<1:raise ValueError
         except ValueError:
             parser.error('CVDL_THREADS must be a positive integer')
+    if args.engine=='torch' and count is not None:
+        import torch
         torch.set_num_threads(count)
-    app=create_app(args.bundle,device=args.device,
+    app=create_app(args.bundle,device=args.device,engine=args.engine,threads=count if args.engine=='onnx' else None,
         allowed_origins=args.allow_origin or [v for v in os.environ.get('CVDL_ALLOWED_ORIGINS','').split(',') if v])
     uvicorn.run(app,host=args.host,port=args.port,workers=1,access_log=False)
 

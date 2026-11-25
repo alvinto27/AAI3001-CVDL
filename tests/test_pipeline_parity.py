@@ -11,12 +11,19 @@ from cvdl.photo_verdict import FEATURES, features, predict
 from scripts.photo_heatmap import infer_photo
 
 ROOT=Path(__file__).resolve().parents[1]
-OUTPUT=ROOT/'runs/verification/photo-verdict-run18-2026-10-24'
 REFERENCE_SELECTION=ROOT/'runs/verification/photo-verdict-run13-2026-10-21/photo-list.json'
+# (bundle folder or None for the shipped default, local validation cache of that model)
+CASES=((None,ROOT/'runs/verification/photo-verdict-run22-2026-11-05'),
+       (ROOT/'deploy/run18-rule-c-v1',ROOT/'runs/verification/photo-verdict-run18-2026-10-24'))
 
 
 class PipelineValidationParityTests(unittest.TestCase):
     def test_three_validation_photos_clean_and_fixed_stego(self):
+        for bundle,output in CASES:
+            with self.subTest(bundle=str(bundle or 'default')):
+                self._parity(bundle,output)
+
+    def _parity(self,bundle,OUTPUT):
         if not (OUTPUT/'photo-list.json').exists():self.skipTest('local validation feature cache absent')
         from lsb_source import load_photo
         from lsb_engine import embed_fast
@@ -32,7 +39,9 @@ class PipelineValidationParityTests(unittest.TestCase):
             chosen.append(min(candidates,key=lambda p:(p['tiles'],p['record']['photo_id'])))
         if any(not (ROOT/p['record']['master_path']).exists() for p in chosen):self.skipTest('local validation pixels absent')
         torch.set_num_threads(1)
-        pipeline=load_pipeline(device='cpu')
+        pipeline=load_pipeline(bundle,device='cpu')
+        # Covariance models have attribution, not CAM, as their second map.
+        two_maps=('trained_head','attribution' if getattr(pipeline._network,'cell_map_kind',None)=='attribution' else 'cam')
         frozen=json.loads((OUTPUT/'frozen-rules.json').read_text())
         for index,selected in enumerate(chosen):
             record=selected['record'];clean=load_photo(record,ROOT)
@@ -44,7 +53,7 @@ class PipelineValidationParityTests(unittest.TestCase):
                         settings['rng']=np.random.default_rng(np.random.SeedSequence(selected['versions'][variant]['embedding_seed']))
                         photo,_,_=embed_fast(clean,**settings)
                     else:photo=clean
-                    origins,scores,maps=infer_photo(pipeline._network,photo,record,'cpu',8)
+                    origins,scores,maps=infer_photo(pipeline._network,photo,record,'cpu',8,map_kinds=two_maps)
                     result=pipeline.analyze(photo)
                     self.assertEqual([r['box'] for r in result['tiles']],[[x,y,x+256,y+256] for y,x in origins])
                     # Shared helper two-map path vs selected-map public path.

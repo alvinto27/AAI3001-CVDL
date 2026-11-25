@@ -14,6 +14,7 @@ def main(argv=None):
     parser.add_argument('--bundle',type=Path)
     parser.add_argument('--device',choices=('cpu','cuda','auto'),default='cpu')
     parser.add_argument('--batch-size',type=int,default=8)
+    parser.add_argument('--engine',choices=('torch','onnx'),default='torch')
     parser.add_argument('--allow-rgba',action='store_true')
     parser.add_argument('--output',type=Path)
     parser.add_argument('--overlay',type=Path)
@@ -24,7 +25,7 @@ def main(argv=None):
             if path and path.resolve()==args.photo.resolve():raise ValueError('output must not overwrite the input photo')
         destinations=[p.resolve() for p in (args.output,args.overlay,args.heatmap) if p]
         if len(destinations)!=len(set(destinations)):raise ValueError('output paths must be distinct')
-        pipeline=load_pipeline(args.bundle,device=args.device,batch_size=args.batch_size)
+        pipeline=load_pipeline(args.bundle,device=args.device,batch_size=args.batch_size,engine=args.engine)
         result=pipeline.analyze(args.photo,allow_rgba=args.allow_rgba,include_images=bool(args.overlay or args.heatmap))
         images=result.pop('images',None)
         if images:
