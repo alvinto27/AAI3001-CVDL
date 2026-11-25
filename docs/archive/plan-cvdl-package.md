@@ -257,7 +257,7 @@ missing, symlink and traversal paths fail. The installed bootstrap is unchanged
 (SHA-256 `89cc83e9c73cc43476f6daf5e77825ddc298a32a22a52af8ded0909f15b1f2af`)
 and already execs the checked-out `job_run.sh`, which calls its checked-out
 `run_notebook.py`. No selector shim, reinstall or maintenance boot is needed.
-The [runbook](../active/g4-batch-runner.md#submit-a-run) records the handover and strict
+The [runbook](g4-batch-runner.md#submit-a-run) records the handover and strict
 DMI/CUDA GPU detection checks. Runtime jobs require the detected G4 profile;
 wrong detection cannot silently select PC workers.
 

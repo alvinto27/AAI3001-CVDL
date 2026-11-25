@@ -46,7 +46,7 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
   metrics are skipped only while `trainer.sanity_checking`; opt-in
   `V3_LIMIT_TRAIN_BATCHES` for a PC pre-flight; new unit test. PC pre-flight
   with the exact full 8,035-pair list passed (2,009 validation batches).
-- Worker_3 Pi fixes (`3a6b1fd`, `docs/active/pi-host-changes.md`): `/srv/swapfile`
+- Worker_3 Pi fixes (`3a6b1fd`, `docs/archive/pi-host-changes.md`): `/srv/swapfile`
   (8 GiB on the USB SSD) removed, fstab line commented; zram 2 GiB kept.
   Persistent journal (`/etc/systemd/journald.conf.d/90-cvdl-persistent.conf`,
   SystemMaxUse=200M); the old journal was volatile by an RPi default, so the

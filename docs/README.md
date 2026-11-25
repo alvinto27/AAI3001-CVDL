@@ -1,31 +1,20 @@
 # Documentation — start here
 
-This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Nothing runs without a user decision**; approved G4 runs are in the [run queue](active/run-queue.md), ideas on the [ideas board](active/ideas-board.md). Read [status](status.md) before acting, [findings](findings.md) for older run comparisons (512-era; see its note), and the [dated journal](journal/README.md) for the original records.
+This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. Training is finished. The [run queue](archive/run-queue.md) and the [ideas board](archive/ideas-board.md) are kept as records. Read [status](status.md) before acting, [findings](findings.md) for older run comparisons (512-era; see its note), and the [dated journal](journal/README.md) for the original records.
 
 The project report is the [root README](../README.md). Its figures are in `figures/report/` (rebuilt by `scripts/build_report_figures.py`, except the UI screenshots). The former root README (environment setup, notebooks, Spot VM training) is now the [development guide](development.md).
 
 ## Current references (`active/` means kept for use, not permission to run)
+Plans that scripts read by path (`plan-run21-cell-heatmap`, `plan-curriculum50`, `plan-paired-training`, `plan-architecture-tests`, `legacy-wide-r2-migration`) stay in `active/`, because the decision scripts and tests fingerprint them.
+
 - [Run21 trained heatmap / run22 — implementation, launch and collection record](active/plan-run21-cell-heatmap.md)
 - [Run22 LAST evaluation — standard errors worse, hard ranking better, no clear primary localization gain; photos/adoption pending (2026-10-29)](active/plan-run21-cell-heatmap.md#run22--detector-and-trained-head-evaluation-complete)
-- [2026-10-26 session handoff — read first next session](active/handoff-2026-10-26.md)
 - [50-epoch low-bpp curriculum from scratch (ideas #17) — approved plan (2026-10-22)](active/plan-curriculum50.md)
 - [Paired training (ideas #16): R1 SRM-e50 paired, R2 cell model paired — approved plan (2026-10-22)](active/plan-paired-training.md)
 - [Cloud deployment: GCP VM + Tailscale Funnel — live demo layout, checks and runbook (2026-11-25)](active/deploy-gcp-funnel.md)
-- [Web-app pipeline — approved plan: core library, HTTP API, container, swappable model bundle, ONNX Runtime engine (2026-10-21, ONNX 2026-11-25)](active/plan-pipeline.md); guide `cvdl/pipeline/README.md`
 - [Test levels and the changed-path rule — fast/full/none tests; golden retired 2026-10-21 (built `891aefe`, 2026-10-20)](active/test-levels.md)
 - [Wide-R2 legacy settings migration — saved evidence and limits](active/legacy-wide-r2-migration.md)
-- [Saved-output report notebook — CPU generator and use (work list #5)](active/report-notebook.md)
 - [Architecture tests: delayed pooling and GBRAS-Net (idea 10) — approved 2026-10-19; arm A no gain, arm G waits for the user](active/plan-architecture-tests.md)
-- [Ideas board — checks and experiments; each needs a user decision](active/ideas-board.md)
-- [Ideas board: done and closed items (moved 2026-10-24)](archive/ideas-board-done.md)
-- [One deployment threshold from validation — built `68e4f0b` (work list #4)](active/plan-validation-threshold.md)
-- [Hard test at 256 — built `a56c275` (work list #3)](active/plan-hard-test-256.md)
-- [Standard test at 256 — built `bd36403` (work list #2)](active/plan-standard-test-256.md)
-- [Train-matched validation — frozen recipes and use (work list #1)](active/plan-train-matched-validation.md)
-- [Training tiling — rules and PC implementation gates](active/plan-training-tiling.md)
-- [G4 run queue — all runs and their state](active/run-queue.md)
-- [G4 batch-runner guide](active/g4-batch-runner.md)
-- [Pi host state](active/pi-host-changes.md)
 - [Settings and seed rules](active/settings-and-seeds.md)
 - [Frozen RAISE/DIV2K records](active/frozen-source-records.md)
 - [ALASKA selection v2](active/alaska-selection-v2.md)
@@ -42,6 +31,22 @@ The project report is the [root README](../README.md). Its figures are in `figur
 - [Model history: 10 models re-scored on the frozen tests (2026-11-25)](results/model-history-2026-11-25.md) (data: `model-history-2026-11-25.json`)
 
 ## Historical records (`archive/`)
+
+Moved from `active/` on 2026-11-25 (submission cleanup; finished plans and internal run notes):
+
+- [2026-10-26 session handoff](archive/handoff-2026-10-26.md)
+- [Web-app pipeline — approved plan: core library, HTTP API, container, swappable model bundle, ONNX Runtime engine (2026-10-21, ONNX 2026-11-25)](archive/plan-pipeline.md); guide `cvdl/pipeline/README.md`
+- [Saved-output report notebook — CPU generator and use (work list #5)](archive/report-notebook.md)
+- [Ideas board — checks and experiments; each needs a user decision](archive/ideas-board.md)
+- [One deployment threshold from validation — built `68e4f0b` (work list #4)](archive/plan-validation-threshold.md)
+- [Hard test at 256 — built `a56c275` (work list #3)](archive/plan-hard-test-256.md)
+- [Standard test at 256 — built `bd36403` (work list #2)](archive/plan-standard-test-256.md)
+- [Train-matched validation — frozen recipes and use (work list #1)](archive/plan-train-matched-validation.md)
+- [Training tiling — rules and PC implementation gates](archive/plan-training-tiling.md)
+- [G4 run queue — all runs and their state](archive/run-queue.md)
+- [G4 batch-runner guide](archive/g4-batch-runner.md)
+- [Pi host state](archive/pi-host-changes.md)
+- [Ideas board: done and closed items (moved 2026-10-24)](archive/ideas-board-done.md)
 
 Moved from `active/` on 2026-10-26 (housekeeping; finished plans and records):
 

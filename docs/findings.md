@@ -1,6 +1,6 @@
 # Findings across runs and checks
 
-Updated 2026-10-21 for the standard-256 / hard-256 tests. Read [status](status.md) first. Each row cites its record; the [run queue](active/run-queue.md) has every run's job ID and evaluation ID.
+Updated 2026-10-21 for the standard-256 / hard-256 tests. Read [status](status.md) first. Each row cites its record; the [run queue](archive/run-queue.md) has every run's job ID and evaluation ID.
 
 **Terms.** *P_E* = overall error, the mean of the false-alarm rate (FA, clean tiles called stego) and the miss rate (stego tiles called clean). Each model uses **its own cut-off, chosen on validation** before the test. *AUC* = how well the scores rank stego above clean, independent of the cut-off (1.0 = perfect, 0.5 = guessing). *Standard* = RAISE + DIV2K, 10,944 pairs. *Hard target* = k=1, low bpp, contiguous payloads on ALASKA seen/unseen + LSDIR. *Interval* = 95% photo-bootstrap range.
 
@@ -122,7 +122,7 @@ A whole photo is cut into 256 tiles; a small logistic rule reads 8 summary numbe
 
 | Question | Status |
 | --- | --- |
-| Can a model separate k=1 low-bpp payloads in noisy ALASKA photos? | Open; all CNNs so far near chance (best, run 21: AUC .53-.61). WS reached .66-.69 there (check 1), so the signal exists; [ideas board](active/ideas-board.md) #24 (parity-aware input) targets it |
+| Can a model separate k=1 low-bpp payloads in noisy ALASKA photos? | Open; all CNNs so far near chance (best, run 21: AUC .53-.61). WS reached .66-.69 there (check 1), so the signal exists; [ideas board](archive/ideas-board.md) #24 (parity-aware input) targets it |
 | Does a GBRAS-Net style front end (arm G) help? | On hold (user, 2026-10-21) |
 | Does a heavier cell-loss weight or a cell-only cut-off improve recall at a strict cut-off? | Not tested |
 | Do the gains hold across seeds? | Not tested; every run is one seed |
@@ -132,7 +132,7 @@ A whole photo is cut into 256 tiles; a small logistic rule reads 8 summary numbe
 > Superseded by the sections above. Kept unchanged as the record of the 512 era.
 
 
-> ~~**Note (2026-10-19):** this ledger covers runs up to 2026-10-17 on the **old 512 tests** (threshold 0.5 or best threshold). It is not updated for the standard-256 / hard-256 suite. Current numbers: [2026-10-18 journal](journal/2026-10-18/README.md) (all 11 models rescored), [2026-10-19 journal](journal/2026-10-19/README.md), the [run queue](active/run-queue.md) and the result sections of the active plans. A rewrite is pending (A4, with the results write-up A3).~~ Rewritten 2026-10-21: see the 256 sections above.
+> ~~**Note (2026-10-19):** this ledger covers runs up to 2026-10-17 on the **old 512 tests** (threshold 0.5 or best threshold). It is not updated for the standard-256 / hard-256 suite. Current numbers: [2026-10-18 journal](journal/2026-10-18/README.md) (all 11 models rescored), [2026-10-19 journal](journal/2026-10-19/README.md), the [run queue](archive/run-queue.md) and the result sections of the active plans. A rewrite is pending (A4, with the results write-up A3).~~ Rewritten 2026-10-21: see the 256 sections above.
 
 Read [status](status.md) before doing more work. This is a cross-run index, not a new experiment. `P_E` below is the best-threshold error on the named test; clean false alarm (FA) and k1 miss use the **fixed 0.5 threshold** unless stated otherwise. `—` means the cited record did not give a comparable value or cost. The early prebuilt RAISE test has **7,433 pairs**; the later standard OTF RAISE/DIV2K test has **10,956 pairs**. Do not compare their P_E as if they were the same panel. Small one-seed differences are not proof of a general gain. Rates and costs are cited in the linked result or [dated journal](journal/README.md).
 

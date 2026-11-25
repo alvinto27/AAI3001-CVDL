@@ -1,6 +1,6 @@
 # Ideas board
 
-Status (~~2026-10-24~~ 2026-10-26): open ideas only. Done, closed and dropped items (#1, #2, #2b, #3, #4, #5, #9, #10, #11, #14, #15, #16, #17, #19, #20, #21; old #6 merged into #18) moved to [done ideas](../archive/ideas-board-done.md). Nothing here starts without a user decision. Created 2026-10-18.
+Status (~~2026-10-24~~ 2026-10-26): open ideas only. Done, closed and dropped items (#1, #2, #2b, #3, #4, #5, #9, #10, #11, #14, #15, #16, #17, #19, #20, #21; old #6 merged into #18) moved to [done ideas](ideas-board-done.md). Nothing here starts without a user decision. Created 2026-10-18.
 
 Evidence: the dated [journal](../journal/README.md); the [run queue](run-queue.md) has every run.
 

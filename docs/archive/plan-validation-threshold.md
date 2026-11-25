@@ -2,7 +2,7 @@
 
 Status: **built** in `68e4f0b` (2026-10-18, Worker_2): `cvdl/deployment.py`, `scripts/build_calibration.py`, mapping `configs/evaluation-calibration-v1.json` (10 checkpoints), wide-R2 list `data/val/8328cc6b0673cade0312/` (RAISE 15,239 / DIV2K 2,761 from its 45,674 / 8,276 training pairs per epoch). No threshold values yet: they come from rescoring (#6). Design by Worker_2 (2026-10-18).
 
-Source decisions: [2026-10-18 journal](../journal/2026-10-18/README.md) (one threshold; per-source thresholds reference only; no DIV2K reference) and the [2026-10-17 handoff](../archive/handoff-2026-10-17.md) section 2 row "Thresholds" (superseded text).
+Source decisions: [2026-10-18 journal](../journal/2026-10-18/README.md) (one threshold; per-source thresholds reference only; no DIV2K reference) and the [2026-10-17 handoff](handoff-2026-10-17.md) section 2 row "Thresholds" (superseded text).
 
 ## Rule
 
@@ -43,7 +43,7 @@ Roster source: `runs/verification/post-training-model-comparison-20261017.csv` r
 - **Reference:** `source_reference_thresholds.csv` and a separate reference summary labelled `if_source_known_reference`: one min-P_E threshold per source present in the validation list, **except DIV2K**. ALASKA's reference is shared by seen and unseen. No mixed RAISE+DIV2K reference.
 - **Diagnostics** keep their names: `test_min_P_E`, `test_min_cutoff`, `*_at_0_5`. Never promoted to main.
 - QUICK uses a pinned subset with its own identity, marked non-deployment; never cached as the full calibration.
-- ~~`--test-suite legacy-512` unchanged.~~ Retired 2026-10-21 ([legacy-512 retirement](../archive/legacy-512-retirement.md)).
+- ~~`--test-suite legacy-512` unchanged.~~ Retired 2026-10-21 ([legacy-512 retirement](legacy-512-retirement.md)).
 - The report notebook (#5) reads only these saved files.
 
 ## Out of scope

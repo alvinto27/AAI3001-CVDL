@@ -1,6 +1,6 @@
 # Ideas board: done and closed items
 
-Moved from the [ideas board](../active/ideas-board.md) on 2026-10-24 (user: remove done items from the board). Rows are kept as they were, with links updated. Evidence: the dated [journal](../journal/README.md).
+Moved from the [ideas board](ideas-board.md) on 2026-10-24 (user: remove done items from the board). Rows are kept as they were, with links updated. Evidence: the dated [journal](../journal/README.md).
 
 ## Checks (done 2026-10-19)
 
