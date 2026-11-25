@@ -1,0 +1,11 @@
+{
+  "version": "train-grid-v1",
+  "tile_size": 256,
+  "policy": "overlap_last",
+  "sha256": "d10935a9132826a524733cace1bfac6ff26d6d9f8d6fb15323dec1ab8059e2fd",
+  "pool_counts": {
+    "raise": 170356,
+    "alaska": 121704,
+    "lsdir": 140863
+  }
+}

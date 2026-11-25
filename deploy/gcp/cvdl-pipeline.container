@@ -1,0 +1,23 @@
+# AAI3001-CVDL demo API: run 22 on the L4 GPU (PyTorch CUDA build). Host loopback only; Tailscale Funnel fronts it.
+# Fallback without GPU: sudo systemctl start cvdl-pipeline-cpu (stops this unit).
+[Unit]
+Description=CVDL pipeline API (run 22, PyTorch on the L4 GPU)
+After=network-online.target
+Wants=network-online.target
+Conflicts=cvdl-pipeline-cpu.service
+After=cvdl-pipeline-cpu.service
+
+[Container]
+Image=localhost/cvdl-pipeline:gpu-5970a3b
+ContainerName=cvdl-pipeline
+AddDevice=nvidia.com/gpu=all
+PublishPort=127.0.0.1:8000:8000
+PodmanArgs=--memory=8g
+Exec=--engine torch --device cuda --allow-origin https://gcp-aai3001.taild62d21.ts.net
+
+[Service]
+Restart=always
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target default.target

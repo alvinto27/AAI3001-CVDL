@@ -1,0 +1,17 @@
+{
+  "source": "kodim23.png",
+  "box_xyxy": [
+    416,
+    96,
+    640,
+    320
+  ],
+  "engine": "LSB-Dataset-Generator/lsb_engine.embed_fast",
+  "bit_mode": "lowest",
+  "k": 3,
+  "method": "replace",
+  "placement": "random",
+  "bpp": 3.0,
+  "seed": 7,
+  "units_changed": 43822
+}

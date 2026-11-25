@@ -17,6 +17,8 @@ import numpy as np
 import yaml
 from PIL import Image, ImageOps
 
+from lsb_raw import decode_raw_pixels, raw_settings_record
+
 VERSION = "6.0.0"
 RUN_FILE = "run_config.yaml"
 LEDGER_FILE = "done.jsonl"
@@ -114,14 +116,7 @@ class PrepareConfig:
         result = asdict(config)
         result["version"] = VERSION
         result["rawpy_version"] = _rawpy_version()
-        result["raw_settings"] = {
-            "use_camera_wb": True,
-            "no_auto_bright": True,
-            "output_color": "sRGB",
-            "output_bps": 8,
-            "demosaic_algorithm": "AHD",
-            "orientation": "default",
-        }
+        result["raw_settings"] = raw_settings_record()
         return result
 
 
@@ -209,25 +204,9 @@ def _raw_camera_info(path: Path) -> tuple[str, str]:
 
 def _decode_raw(path: Path) -> DecodedImage:
     """Decode one RAW image with fixed LibRaw settings."""
-    try:
-        import rawpy
-    except ImportError as exc:
-        raise RuntimeError("rawpy is required to decode RAW files") from exc
     camera_make, camera_model = _raw_camera_info(path)
-    try:
-        with rawpy.imread(str(path)) as raw:
-            pixels = raw.postprocess(
-                use_camera_wb=True,
-                no_auto_bright=True,
-                output_color=rawpy.ColorSpace.sRGB,
-                output_bps=8,
-                demosaic_algorithm=rawpy.DemosaicAlgorithm.AHD,
-            )
-    except Exception as exc:
-        raise RuntimeError(f"RAW decode failed: {exc}") from exc
-    if pixels.dtype != np.uint8 or pixels.ndim != 3 or pixels.shape[2] != 3:
-        raise RuntimeError("RAW decoder did not return 8-bit RGB pixels")
-    return DecodedImage(np.ascontiguousarray(pixels), "raw", camera_make, camera_model)
+    pixels = decode_raw_pixels(path)
+    return DecodedImage(pixels, "raw", camera_make, camera_model)
 
 
 def _decode_raster(path: Path, source_format: str) -> DecodedImage:

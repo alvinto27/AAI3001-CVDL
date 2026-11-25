@@ -1,0 +1,25 @@
+| Model | Change | Std P_E % | Std AUC | ALASKA seen P_E % | ALASKA unseen P_E % | LSDIR P_E % | Hard k=1 low AUC | Cut-off origin |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| V3c baseline | KV XuNet + GroupNorm, RAISE/DIV2K, 512 tiles, 10 ep (course-style baseline) | 4.05 | 0.9900 | 30.30 | 26.88 | 14.79 | 0.627 | post_hoc_256 `8328` |
+| Wide-R2 | wider XuNet (x4), no norm, k1-4, 30 ep | 3.78 | 0.9909 | 32.65 | 31.08 | 14.02 | 0.616 | post_hoc_256 `8328` |
+| newdata-1 | + ALASKA and LSDIR training photos | 5.13 | 0.9878 | 24.29 | 21.21 | 12.64 | 0.667 | post_hoc_256 `60da` |
+| overlap-512 | same recipe re-run (run-to-run spread) | 5.61 | 0.9869 | 23.94 | 21.43 | 12.62 | 0.670 | post_hoc_256 `60da` |
+| overlap-256 | 256 training tiles | 3.43 | 0.9939 | 21.21 | 18.75 | 11.27 | 0.714 | post_hoc_256 `60da` |
+| SRM-30 | 30 fixed SRM filters replace KV | 3.07 | 0.9952 | 20.03 | 17.31 | 9.63 | 0.739 | post_hoc_256 `60da` |
+| SRM-e50 | 50 epochs | 2.54 | 0.9964 | 19.42 | 16.30 | 9.39 | 0.745 | post_hoc_256 `60da` |
+| R1 paired | paired clean/stego batches | 2.55 | 0.9964 | 18.99 | 15.58 | 8.84 | 0.757 | post_hoc_256 `60da` |
+| Run 21 | + covariance pooling head | 2.15 | 0.9972 | 17.50 | 15.37 | 7.76 | 0.787 | post_hoc_256 `60da` |
+| Run 22 (shipped) | + trained cell head (CE + 0.2 cell BCE), 15 ep from run 21 | 2.54 | 0.9971 | 17.62 | 14.87 | 7.59 | 0.798 | train_matched `60da` |
+
+| Step | Δ standard P_E, points [95%] | Δ hard k=1 low AUC [95%] |
+|---|---|---|
+| V3c baseline → Wide-R2 | -0.26 [-0.54, -0.00] | -0.011 [-0.018, -0.003] |
+| Wide-R2 → newdata-1 | +1.35 [+1.06, +1.63] | +0.051 [+0.043, +0.059] |
+| newdata-1 → overlap-512 | +0.48 [+0.21, +0.73] | +0.003 [-0.002, +0.008] |
+| overlap-512 → overlap-256 | -2.17 [-2.47, -1.87] | +0.045 [+0.038, +0.052] |
+| overlap-256 → SRM-30 | -0.37 [-0.63, -0.11] | +0.025 [+0.018, +0.032] |
+| SRM-30 → SRM-e50 | -0.52 [-0.72, -0.32] | +0.006 [+0.002, +0.010] |
+| SRM-e50 → R1 paired | +0.00 [-0.16, +0.17] | +0.012 [+0.008, +0.017] |
+| R1 paired → Run 21 | -0.40 [-0.65, -0.15] | +0.029 [+0.023, +0.034] |
+| Run 21 → Run 22 (shipped) | +0.39 [+0.22, +0.58] | +0.012 [+0.009, +0.015] |
+| V3c baseline → Run 22 (shipped) | -1.50 [-1.90, -1.12] | +0.172 [+0.163, +0.180] |

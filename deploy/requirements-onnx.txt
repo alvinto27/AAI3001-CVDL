@@ -1,0 +1,8 @@
+# Torch-free CPU serving with ONNX Runtime (deploy/Dockerfile).
+# model.onnx files are made by `python -m cvdl.pipeline.export_onnx`, which needs torch.
+numpy==2.5.3
+Pillow==12.3.0
+onnxruntime==1.32.0
+fastapi==0.157.0
+uvicorn==0.54.0
+python-multipart==0.0.32

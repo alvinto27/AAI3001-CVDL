@@ -1,0 +1,111 @@
+{
+  "checkpoint": "/home/yangxuan/AAI3001-CVDL/runs-out/srm-e50-paired-gapcov32-20261026T115421Z-1917/checkpoints/srm-e50-paired-gapcov32-20261026T115421Z-1917/best-epoch43-val_pe0.0329-val_auc0.9946.ckpt",
+  "checkpoint_sha256": "4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf",
+  "weights_only": true,
+  "optimizer_restored": false,
+  "scheduler_restored": false,
+  "source_epoch": 43,
+  "initial_weights_sha256": "3f2310f3438b7d94e65124613ace35d5fe606f69d7c9314cdbb21ca0f8dfec8c",
+  "initial_cell_head_sha256": "2179f3fae438ee79bf294fa2c69fdf42c1457161550787f393554ce81d9ee4bf",
+  "source_provenance": {
+    "version": "cell-aux-v2",
+    "historical": {
+      "revision": "9425d07cbf474ae20a8f9bf0bddb6eb14b9c23cc",
+      "files_sha256": {
+        "cvdl/models.py": "09d3e41599a7cd28c167dacf95a67ce91ec2bca95b1ecfb5e73a491289a432bb",
+        "cvdl/cov_pool.py": "31cf8ecb4eb7f36c12b789f669f7c13f23ff51f0fdb8be46d6e33ecdaeb6ea28",
+        "notebooks/experiments/srm-e50-paired-gapcov32.ipynb": "bb67c346c1886a94af2e8dee43c953747a25fc1c0ce8d772182c56253e825fcd"
+      },
+      "spec": {
+        "version": "gapcov32-v1",
+        "gap_features": 256,
+        "reduced_features": 32,
+        "cov_features": 528,
+        "covariance_divisor": "M",
+        "ridge_relative": 0.0001,
+        "ridge_absolute": 1e-12,
+        "iterations": 5,
+        "sqrt": "trace_normalized_newton_schulz_with_compensation",
+        "triangle": "upper_unweighted",
+        "reduction_bias": false,
+        "post_normalization": "none",
+        "branch_scaling": "none",
+        "classifier": "default_Linear784_to_2",
+        "attribution": "gap_cam_plus_M_centered_cov_gradient"
+      }
+    },
+    "current_files_sha256": {
+      "cvdl/models.py": "403023c538d217f243b7f5f6c1de8f567928e7d2ab572ac105429315acd63c5d",
+      "cvdl/cov_pool.py": "31cf8ecb4eb7f36c12b789f669f7c13f23ff51f0fdb8be46d6e33ecdaeb6ea28",
+      "notebooks/experiments/srm-e50-paired-gapcov32.ipynb": "bb67c346c1886a94af2e8dee43c953747a25fc1c0ce8d772182c56253e825fcd",
+      "notebooks/experiments/srm-cell-aux-paired-gapcov32.ipynb": "7200edda277584b2a734a40640eb445b209d4233a456428e59281e9c5f180429"
+    },
+    "spec_sha256": "a16afe93634a5acf98b1d06353418e85ae4220c427ec7b4038e48dccd76de02f"
+  },
+  "settings": {
+    "seed": 0,
+    "paired_batches": true,
+    "data": "otf",
+    "clip_t": 3.0,
+    "norm": "none",
+    "epochs": 15,
+    "limit_train_batches": 0,
+    "lr": 3e-05,
+    "warmup_epochs": 1,
+    "grad_clip": 1.0,
+    "lr_drops": [],
+    "init_checkpoint": "runs-out/srm-e50-paired-gapcov32-20261026T115421Z-1917/checkpoints/srm-e50-paired-gapcov32-20261026T115421Z-1917/best-epoch43-val_pe0.0329-val_auc0.9946.ckpt",
+    "init_checkpoint_sha256": "4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf",
+    "embedding_schedule": "original",
+    "embedding_stage_epochs": 5,
+    "cell_supervision": "changed_cells_v1",
+    "cell_loss_weight": 0.2,
+    "evaluation_checkpoint": "last",
+    "train_yaml": "/home/yangxuan/AAI3001-CVDL/configs/train-k1to4.yaml",
+    "train_grid": "overlap_last",
+    "train_tile_size": 256,
+    "post_fit_eval": "none",
+    "name": "srm-cell-aux-paired-gapcov32",
+    "extra_tests": "test-bpp1,source-panels",
+    "front_end": "srm",
+    "model": "xunet_wide_gapcov32",
+    "width": 4,
+    "batch_size": 128,
+    "source": "decode",
+    "source_mix": {
+      "raise": 0.4,
+      "lsdir": 0.2,
+      "alaska": 0.4
+    },
+    "sources": [
+      "raise",
+      "lsdir",
+      "alaska"
+    ],
+    "tiles_per_epoch": 180000,
+    "tile_size": 512,
+    "run_seed": 0,
+    "train_photo_fraction": 1.0,
+    "checkpoint_validation": "train_matched",
+    "validation_recipe": "60da4391043e8ce48ff2",
+    "val_cap_raise": 5000,
+    "val_cap_lsdir": 1500,
+    "eval_profile": "overlap_full_mix",
+    "run_name": "srm-cell-aux-paired-gapcov32",
+    "train_yaml_sha256": "ab924b67af4c67d742d942b4cc500c6dcfee6e81422a7d64bf94ed960750cd54",
+    "stage_table": [
+      [
+        0.35,
+        1
+      ],
+      [
+        0.25,
+        2
+      ],
+      [
+        0.15,
+        3
+      ]
+    ]
+  }
+}

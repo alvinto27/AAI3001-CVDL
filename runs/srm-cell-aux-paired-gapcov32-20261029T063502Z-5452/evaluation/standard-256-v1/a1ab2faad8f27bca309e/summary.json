@@ -1,0 +1,140 @@
+{
+  "evaluation_id": "a1ab2faad8f27bca309e",
+  "output": "/work/runs/srm-cell-aux-paired-gapcov32-20261029T063502Z-5452/evaluation/standard-256-v1/a1ab2faad8f27bca309e",
+  "suite": "standard-256-v1",
+  "quick": false,
+  "timings": [
+    {
+      "panel": "validation",
+      "pairs": 18000,
+      "seconds": 60.686473465000745
+    },
+    {
+      "panel": "standard",
+      "higher_k": false,
+      "pairs": 10944,
+      "seconds": 40.80068008499802
+    },
+    {
+      "panel": "alaska-seen",
+      "higher_k": false,
+      "pairs": 2688,
+      "seconds": 9.74489914500009
+    },
+    {
+      "panel": "alaska-unseen",
+      "higher_k": false,
+      "pairs": 3168,
+      "seconds": 10.613922250995529
+    },
+    {
+      "panel": "lsdir",
+      "higher_k": false,
+      "pairs": 5280,
+      "seconds": 16.952681085000222
+    }
+  ],
+  "total_seconds": 233.94009288899542,
+  "hard_test": {
+    "status": "complete",
+    "version": "hard-test-256-v1",
+    "recipe_sha256": "d6d91a5a98dae856d1ae47ba864455d2986967fbc8ce816348ef4de2b1370793",
+    "files_sha256": {
+      "pairs-alaska-seen.csv": "3a8b3be4b990571121b005808ab73d3fc889937b391365511b468a0fdd6f4c5b",
+      "pairs-alaska-unseen.csv": "9c7708ee1e4aedca578119b1bc969e14887e7b6edc1a9126d74b75770e7ba241",
+      "pairs-lsdir.csv": "c60a77a3ba0d3db79eb067c9c0eb983fbad6b534aaa432da5e45114136a8926b",
+      "pairs-standard.csv": "77c96353ed89b925e07f0f1e1c84b36515a6b9d8be96ffffaec81cf0071be074"
+    },
+    "noise_edges": {
+      "alaska": 2.6133468747138977,
+      "div2k": 2.4415316581726074,
+      "lsdir": 2.515662729740143,
+      "raise": 1.6907958090305328
+    },
+    "pairs": 32256,
+    "cells": 32,
+    "seconds": 90.80929050500708,
+    "quick": false,
+    "AUC_clean_weighting": "paired rows (as v1)",
+    "FA_counting": "distinct clean tiles within cell",
+    "validation_threshold": {
+      "threshold_origin": "train_matched",
+      "recipe_id": "60da4391043e8ce48ff2",
+      "run_name": "srm-cell-aux-paired-gapcov32",
+      "mapping_sha256": null,
+      "checkpoint_sha256": "6be0ec8f722c5e4c0de80cea961f61e7295b37b4aa927555562467f94b3c6f48",
+      "policy": "validation-min-pe-v1/atol1e-12/min-fa/first-ascending/float64-ge",
+      "recipe_sha256": "60da4391043e8ce48ff2ca879a62ccacc6d77751c7fb7ddba1d2e097e49b5fbc",
+      "full_pairs_sha256": "e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d",
+      "selected_pairs_sha256": "e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d",
+      "geometry": {
+        "tile_size": 256,
+        "grid": "overlap_last"
+      },
+      "quick": false,
+      "deployment": true,
+      "score_csv_sha256": "4df0fd7af32ba9210d69c154ea17fcc7a3d9d3cc4b9cd6db2dfc4272167b241e",
+      "cutoff": 0.5245211124420166,
+      "FA": 0.06316666666666666,
+      "miss": 0.11688888888888889,
+      "P_E_at_validation_cutoff": 0.09002777777777778,
+      "AUC": 0.9759860432098766,
+      "pairs": 18000,
+      "clean_tiles": 18000,
+      "images": 36000,
+      "photos": 2497,
+      "threshold_id": "99358dbab451028b8240"
+    },
+    "overlap_standard": {
+      "alaska-seen": {
+        "distinct_hard_tiles": 5675,
+        "shared_distinct_tiles": 997,
+        "shared_pairs": 1429
+      },
+      "alaska-unseen": {
+        "distinct_hard_tiles": 5763,
+        "shared_distinct_tiles": 1009,
+        "shared_pairs": 1391
+      },
+      "lsdir": {
+        "distinct_hard_tiles": 7251,
+        "shared_distinct_tiles": 730,
+        "shared_pairs": 808
+      },
+      "standard": {
+        "distinct_hard_tiles": 7020,
+        "shared_distinct_tiles": 1882,
+        "shared_pairs": 2168
+      }
+    }
+  },
+  "validation_threshold": {
+    "status": "complete",
+    "threshold_origin": "train_matched",
+    "recipe_id": "60da4391043e8ce48ff2",
+    "run_name": "srm-cell-aux-paired-gapcov32",
+    "mapping_sha256": null,
+    "checkpoint_sha256": "6be0ec8f722c5e4c0de80cea961f61e7295b37b4aa927555562467f94b3c6f48",
+    "policy": "validation-min-pe-v1/atol1e-12/min-fa/first-ascending/float64-ge",
+    "recipe_sha256": "60da4391043e8ce48ff2ca879a62ccacc6d77751c7fb7ddba1d2e097e49b5fbc",
+    "full_pairs_sha256": "e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d",
+    "selected_pairs_sha256": "e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d",
+    "geometry": {
+      "tile_size": 256,
+      "grid": "overlap_last"
+    },
+    "quick": false,
+    "deployment": true,
+    "score_csv_sha256": "4df0fd7af32ba9210d69c154ea17fcc7a3d9d3cc4b9cd6db2dfc4272167b241e",
+    "cutoff": 0.5245211124420166,
+    "FA": 0.06316666666666666,
+    "miss": 0.11688888888888889,
+    "P_E_at_validation_cutoff": 0.09002777777777778,
+    "AUC": 0.9759860432098766,
+    "pairs": 18000,
+    "clean_tiles": 18000,
+    "images": 36000,
+    "photos": 2497,
+    "threshold_id": "99358dbab451028b8240"
+  }
+}

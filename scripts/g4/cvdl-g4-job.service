@@ -1,0 +1,16 @@
+[Unit]
+Description=CVDL G4 one-shot metadata job
+Wants=network-online.target
+After=network-online.target tailscaled.service
+
+[Service]
+Type=exec
+User=@USER@
+WorkingDirectory=@REPO@
+ExecStart=/usr/bin/bash /home/@USER@/.local/lib/cvdl-g4/job.sh
+TimeoutStartSec=infinity
+TimeoutStopSec=120s
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

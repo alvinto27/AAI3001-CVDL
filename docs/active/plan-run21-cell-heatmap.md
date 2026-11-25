@@ -1,0 +1,328 @@
+# Run 21 with a trained changed-cell head
+
+## State — 2026-10-29
+
+The user approved the implementation and recipe, then explicitly said **“make the paid run.”** Run22 **completed and was collected**,15epochs/42,195steps, exit0; default postflight29PASS/0FAIL/1INFO. Terminal and evaluation records below. Detector and trained-head evaluations are complete; photo evaluation and adoption remain pending. The separately approved, bounded local correctness pilot completed below. FULL CPU verification and read-only preflight are complete on selected launch revision `c031fca3511f7e66d4df35bc10bdf23b0ef5087e`, recorded below. Actual VM initializer SHA, finite startup and terminal results are verified below. No automatic staging is provided. Proposed evaluation guards and adoption remain **Pending (user)**. Results are mixed: standard detector errors increased, hard-test ranking improved, and no clear primary localization gain was found. Run 18 remains the submission and `pipeline` default.
+
+The detector reference is run 21. The trained heatmap reference is run 18. These are different roles; do not substitute one for the other.
+
+## Approved recipe
+
+| Setting | Value |
+| --- | --- |
+| Notebook | [srm-cell-aux-paired-gapcov32.ipynb](../../notebooks/experiments/srm-cell-aux-paired-gapcov32.ipynb), run 16/18 fine-tune template |
+| Model | Existing `xunet_wide_gapcov32`; SRM, width 4, no normalization, clip 3 |
+| Start | **Run 21 BEST**, epoch 43; weights only; fresh AdamW and scheduler |
+| Training | 15 epochs, paired batches, 128 images (64 pairs), 180,000 draws per epoch |
+| Loss | Tile cross-entropy + 0.2 changed-cell BCE; existing `changed_cells_v1` target/loss rules |
+| Learning rate | 0.00003; 1 warmup epoch; no drops; weight decay 0.0001; gradient clip 1 |
+| Embedding | Original schedule, `configs/train-k1to4.yaml`; not the 50-epoch curriculum |
+| Sources | RAISE .4 / LSDIR .2 / ALASKA .4 |
+| Tiles | 256, `overlap_last`; source tile setting 512 |
+| Validation | `train_matched`, recipe `60da4391043e8ce48ff2`; cap 64 images per batch |
+| Evaluation checkpoint | New run's `last.ckpt`; no automatic post-fit evaluation |
+
+## Read-only checkpoint identities
+
+All three local SHA-256 values were checked on 2026-10-29. No original checkpoint was modified.
+
+| Role | Run / checkpoint | SHA-256 |
+| --- | --- | --- |
+| Fine-tune initializer | `srm-e50-paired-gapcov32-20261026T115421Z-1917`, `best-epoch43-val_pe0.0329-val_auc0.9946.ckpt` | `4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf` |
+| Original run 21 last (not the initializer) | Same run, `last.ckpt` | `110e64f5d4e92de7419606b98dcf320d52a1fc00ab203b3a18a7e91d5781f946` |
+| Heatmap reference | `srm-cell-aux-curriculum50-paired-20261023T133537Z-1366`, `last.ckpt` | `eee9c63a0bd9a91b63758dfc4ddfcca37e47a2a621fbb663557c37bec4b00b80` |
+
+The local initializer is:
+
+```text
+runs/srm-e50-paired-gapcov32-20261026T115421Z-1917/checkpoints/srm-e50-paired-gapcov32-20261026T115421Z-1917/best-epoch43-val_pe0.0329-val_auc0.9946.ckpt
+```
+
+The notebook uses the same suffix under `runs-out/` for G4 staging. `runs-out/` is absent on this PC. Before a separately approved PC run, override `init_checkpoint` to the native path above and keep the pinned hash. Do not copy or edit an original checkpoint. No remote files were staged.
+
+## Implementation contract
+
+- The spatial features have 256 channels. Add `Conv2d(256, 1, 1)`: **257 parameters**, output `[N,1,8,8]` on 256 tiles. The classifier's 784 inputs are not spatial channels.
+- One feature pass feeds the original GAP + covariance detector and the auxiliary head. Covariance math and `SPEC` are unchanged. Feature-off state names, RNG, outputs and signed attribution stay unchanged.
+- The start loader checks source SHA-256, exact `SPEC`, frozen published SRM bank, exact source keys and shapes before copying. Every base tensor is copied exactly; only the new head keeps its initialization. No optimizer, scheduler, epoch or step is restored from run 21.
+- `training_start.json` records a weights-only start, not a random scratch start. Base and head fingerprints are also saved in model records and checkpoint hyperparameters.
+- Resume checks recipe/start identity, loss, head keys/shapes, `SPEC`, frozen SRM, initialization fingerprints, and head Adam moments before run records are overwritten. Historical scratch runs keep their existing path.
+- `cell_maps` exposes both trained auxiliary logits and signed covariance attribution. A covariance model never uses a linear CAM. Head-only photo inference skips gradient attribution; explicit dual maps use `('trained_head','attribution')`. Old inference defaults are unchanged.
+- Trained-head geometry: receptive field **48×48**, stride **32**. Attribution geometry: **256×256 tile-global context**, stride 32. Neither map is a causal pixel mask or a calibrated pixel probability.
+
+## Evaluation gates — PROPOSED, Pending (user)
+
+These are not frozen decision rules and do not authorize adoption:
+
+1. Detector versus run 21: standard-test P_E difference upper 95% bound ≤ **+0.0025** (0.25 percentage points); hard k=1 low AUC difference lower 95% bound ≥ **−0.01**.
+2. Heatmap versus run 18: compare the trained-head changed-cell results on the same frozen examples. Candidate false alarms ≤ **7%**, using its **own validation 5%-FA cutoff**. Keep the reference's own validation cutoff. No new +0.02 AUC gain requirement is imposed.
+3. Use validation only to fit cutoffs. Do not fit them on test results. Report paired uncertainty and both reference identities. Evaluation and adoption decisions remain Pending (user).
+
+No submission bundle, photo-verdict policy, or `pipeline` setting changes in this task.
+
+## Focused verification and remaining blockers
+
+2026-10-29: [new CPU tests](../../tests/test_gapcov_cell_training.py), covariance math/model tests, photo stitching tests, and three existing cell-training tests: **20 tests PASS, 3.147 s** (final rerun; exact command in the journal). Synthetic tensors only, plus a read-only run 21 BEST load. The actual run 21 BEST base tensors and detector outputs match exactly after head attachment. All Python commands used the container shared CPU runner; no fit loop or GPU work ran.
+
+**Initial core milestone (before the versioned policy below):** the historical source-approval test failed. It was not bypassed:
+
+```sh
+podman exec -w /work aai3001 python -B scripts/test_cpu.py --tests tests.test_gapcov_context.IdentityTests.test_same_literal_routes_and_frozen_source
+```
+
+Result: **1 test FAIL**. Current `cvdl/models.py` SHA-256 is `403023c538d217f243b7f5f6c1de8f567928e7d2ab572ac105429315acd63c5d`; historical approved hash is `09d3e41599a7cd28c167dacf95a67ce91ec2bca95b1ecfb5e73a491289a432bb`. The old `cov_pool` decision route also refused changed model source. Historical approval constants are unchanged. The source-versioning blocker was then resolved by the explicit policy below, not by refreshing old hashes. The historical test now checks actual pinned bytes; separate tests require live historical-route refusal. FAST/FULL have not been run and are not claimed green.
+
+Historical follow-ups at the core milestone (later completion/evaluation below):
+
+- User review of the proposed gates and paid launch decision. FULL CPU tests passed on the selected launch revision below; the evidence does not cover a different source revision.
+- Historical source-approval handling is resolved below. The narrow two-reference numeric report is implemented in the evaluation follow-up below; it is not a frozen decision/adoption route.
+- Photo CLI map choices, labels and identity checks were completed in the evaluation follow-up below. Real candidate photo scoring and its quality remain Pending.
+- The bounded local pilot below verified the native initializer override. G4 staging, full training stability, accuracy, heatmap quality and adoption remain Pending.
+
+## Source lineage policy — 2026-10-29 follow-up
+
+The orchestrator confirmed this bounded policy before implementation. [Source validator](../../cvdl/gapcov_provenance.py) defines two exact versions, not a broad list of acceptable hashes:
+
+| Version | Scope | Current checkout accepted? |
+| --- | --- | --- |
+| `run21-original-v1` | Original model, math and experiment notebook at full launch revision `9425d07cbf474ae20a8f9bf0bddb6eb14b9c23cc` | **No**: the extended model is deliberately refused |
+| `cell-aux-v2` | Exact extended executing model, unchanged math, original notebook, new cell notebook and unchanged live `SPEC`; also verifies the original revision and its three exact Git blobs | **Yes**, only while every pinned byte and `SPEC` matches |
+
+The original launch revision comes from run 21's saved `run_settings.json`. Its source hashes match the original approvals. Both scopes read and hash the trusted Git blobs; v2 additionally checks the actual executing checkout paths and bytes. A directory of old source files cannot be supplied instead of the executing v2 checkout. Historical `SPEC` is parsed as literal data from the trusted math blob, never executed.
+
+| Pinned input | Historical SHA-256 | Extended SHA-256 |
+| --- | --- | --- |
+| `cvdl/models.py` | `09d3e41599a7cd28c167dacf95a67ce91ec2bca95b1ecfb5e73a491289a432bb` | `403023c538d217f243b7f5f6c1de8f567928e7d2ab572ac105429315acd63c5d` |
+| `cvdl/cov_pool.py` | `31cf8ecb4eb7f36c12b789f669f7c13f23ff51f0fdb8be46d6e33ecdaeb6ea28` | Unchanged |
+| Original GAP/covariance notebook | `bb67c346c1886a94af2e8dee43c953747a25fc1c0ce8d772182c56253e825fcd` | Unchanged |
+| New cell notebook | Not part of v1 | `7200edda277584b2a734a40640eb445b209d4233a456428e59281e9c5f180429` |
+
+Canonical `SPEC` SHA-256: `a16afe93634a5acf98b1d06353418e85ae4220c427ec7b4038e48dccd76de02f` (sorted compact JSON).
+
+New cell starts validate v2 before writing run records. `training_start.json`, `model_run_settings.json` and checkpoint hyperparameters carry the full `source_provenance` record. Resume revalidates live v2 and requires the same provenance in all three saved identities before overwriting records. Missing/changed provenance refuses. Future intentional changes to pinned files require a reviewed source-version update; do not silently refresh old v1 approvals. The historical Git objects must be available locally; missing objects fail closed, with no fetch.
+
+Supported/refused commands:
+
+- Original `training_decision.py --rule cov_pool`, GAP/covariance context v1 freeze/score/report, and `report_gapcov_usage.py` remain **pinned-only**. Run their historical implementation in an actual checkout of the launch revision. The extended live checkout refuses original approval, even though its trusted historical blobs are available. Existing original results/manifests and decision thresholds are unchanged.
+- The new cell notebook's training start/resume uses **v2 only**, not `cov_pool` approval. There is no new frozen cell decision route. A later narrow saved-score numeric report is described below.
+- Normal historical metadata tests use real pinned-source trees, not fake hash results. These fixtures do not execute historical inference. The inference-capable usage-report test requires live refusal on the extended checkout rather than using a pinned-source fixture to approve current execution. The full-only panel replay uses the pinned source fixture for data replay; no model inference runs there.
+
+Final follow-up verification: **52 focused CPU tests PASS, no skips, 4.844 s**. Exact command and earlier diagnostic run are in the [journal](../journal/2026-10-29/README.md#source-lineage-follow-up). Tests cover changed current model/math/both notebooks/live `SPEC`, wrong historical revision/blob, missing Git object, live v1 refusal, fake executing-root refusal, and new-start/resume refusal before record overwrite. Historical learn-SRM/B36 tests and verdict boundaries also pass. `tests/frozen_sources.py` and the provenance validator now require FULL under the changed-path helper because the full-only replay uses them. No full suite, GPU work, remote staging or launch ran.
+
+## Evaluation and photo compatibility — 2026-10-29 follow-up
+
+[Cell scorer](../../scripts/cell_eval.py) keeps the historical CAM schema for old models. For covariance, `class_score` is explicitly signed attribution, context only, global receptive field 256, stride 32. `aux` is a normal trained-head diagnostic, receptive field 48, stride 32; it is not marked context-only. The two-map difference is named `aux_minus_class_score`, never `aux_minus_cam`. Figures record separate map geometry. No legacy absolute auxiliary target mark is applied to the covariance candidate.
+
+New saved cell output includes `manifest.json` and `artifact_identity.json`. The summary and sidecar bind the checkpoint SHA-256, source provenance and manifest hash to both row CSVs, both score arrays and the summary hash. Consumers verify these bytes and the actual selected checkpoint. Validation 5%-FA cell cutoffs and 1%/99% color limits are recomputed from that model's own saved validation scores; borrowed or test-fitted values refuse.
+
+[Photo CLI](../../scripts/photo_heatmap.py) supports explicit `--maps head-only` or `--maps head-attribution`. Covariance CAM is refused. Head-only skips gradient attribution. Non-default runs must supply their own evaluation ID and cell summary; checkpoint identity must match deployment calibration and cell artifacts. Original run 13 defaults retain their exact pinned summary/checkpoint. Captions and JSON state per-map geometry and that the any-tile verdict is **not a calibrated photo false-alarm guarantee**. Photo figures are demonstrations, not new calibration evidence.
+
+[Two-reference wrapper](../../scripts/compare_run21_cells.py) reads saved scores only. Its [reference pins](../../configs/run21-cell-comparison-v1.json) contain the run 21 BEST checkpoint and nine consumed evaluation artifacts for `cdc91a4b6d63a1517064`. The run 18 folder actually contains **seven files**: six non-PNG files plus `cells.png`; all seven original hashes are pinned. No metadata is retroactively added to run 18.
+
+The wrapper uses strict detector row joins and the existing auxiliary-head comparison/target checks. It refuses quick/pilot, missing/stale identity, mismatched targets/rows, duplicate keys, validation/test overlap, or changed inputs. Candidate and reference inputs are hashed before and after processing. Detector reference `post_hoc_256` and candidate `train_matched` are accepted only with identical recipe ID/hash, full/selected list hashes, geometry and policy. Each numeric cutoff is independently checked against its own validation min-P_E fit; no cutoff is copied. Cell cutoffs likewise use own validation 5%-FA fits.
+
+The output is only `comparison.json`, `bootstrap-replicates.npz` and a short `REPORT.md`. Shared paired source-photo draws: **2,000**, detector seed **20261019**, cell seed **20261021**, percentile 95% intervals. Detector reference is run 21; auxiliary-map reference is run 18. Existing `cov_pool` and `paired_r2` approval paths are not reused. The three guard checks are labeled **PROPOSED / Pending (user)**, with no `passed` verdict, +0.02 gain rule, new absolute AUC target, automatic adoption or pipeline change.
+
+### Future command recipe (not permission to run)
+
+Replace `CANDIDATE_RUN`, `CANDIDATE_EID`, and checkpoint path after a separately approved training/evaluation run. Outputs must be new folders. Full-data inference and the full saved-score bootstrap require their own resource approval; none ran in this implementation task.
+
+```sh
+# Own last checkpoint; source/manifest/score binding is written with cell output.
+podman exec -w /work aai3001 python -B scripts/cell_eval.py CANDIDATE_LAST.ckpt --device cpu --workers 0 --output runs/verification/CANDIDATE_RUN-cells --figure
+
+# Saved outputs only; detector run21 and heatmap run18 are pinned internally.
+podman exec -w /work aai3001 python -B scripts/compare_run21_cells.py runs/CANDIDATE_RUN/evaluation/standard-256-v1/CANDIDATE_EID --candidate-cells runs/verification/CANDIDATE_RUN-cells --output runs/verification/CANDIDATE_RUN-comparison
+
+# Selected model's own calibration and cell summary; use head-attribution for both maps.
+podman exec -w /work aai3001 python -B scripts/photo_heatmap.py --run CANDIDATE_RUN --evaluation-id CANDIDATE_EID --cell-summary runs/verification/CANDIDATE_RUN-cells/summary.json --maps head-only --device cpu --batch-size 1 --output runs/verification/CANDIDATE_RUN-photos
+```
+
+Focused verification: **50 PASS, no skips, 8.897 s**, including 11 new workflow tests and read-only checks of the real reference pins and legacy run 13 inputs. Exact command and intermediate test results are in the journal. Model/math/notebook source bytes and v2 source hashes are unchanged. All real candidate metrics, full-data inference, full-suite evidence, staging and launch remain Pending.
+
+## Bounded local correctness pilot — 2026-10-29
+
+The user separately authorized this local GPU probe, not full training or a cloud launch. [Dedicated script](../../scripts/pilot_run21_cells.py) and [focused tests](../../tests/test_run21_cell_pilot.py) leave the pinned model/math/notebook bytes unchanged. Native run 21 BEST SHA and every copied base tensor match exactly; only the 257-parameter head is new. AdamW and scheduler start fresh.
+
+Scope: `pilot=true`, `quick=true`, training-photo fraction **.005**, **16 images / 8 pairs**, four training workers, zero evaluation workers, FP32, ROCm unfold-wgrad workaround on, `prime_next_epoch=false`, `post_fit_eval=none`. The recipe still declares 15 epochs, LR3e-5, warmup1, original embedding schedule, .4/.2/.4 source mix and 180,000 draws. Pilot data caps this at 4,096 draws and a fixed 256-pair validation slice, after verifying the full 18,000-pair `60da4391043e8ce48ff2` recipe. No validation accuracy was measured. The first real batch has 48,621 changed pixels; tags match actual clean/stego differences.
+
+Safety: own process group, shared test-runner kernel lock, available-RAM watchdog with 12 GiB floor, 600-second execution bound, and private temporary checkpoint/compiler-cache directories. Compilation is included in that bound and timed separately; one compiler thread is used. All temporary files and loggers are closed in cleanup. The settings record says `compile=off` for initial eager construction; the script explicitly compiles the actual `return_aux` GPU forward/backward later.
+
+Evidence folders under `runs/verification/` each retain `evidence.json`, `pilot.log`, `exit-status` and external `cleanup.txt`:
+
+| Attempt | Folder suffix | Result | Elapsed |
+| --- | --- | --- | --- |
+| Original | `run21-cell-pc-pilot-2026-10-29` | **Blocked / exit1**: final SRM comparison mixed saved CUDA and Lightning-teardown CPU tensors; substantive checks had completed | 40.737 s |
+| Authorized identical-profile rerun | `run21-cell-pc-pilot-2026-10-29-r2` | **Complete / exit0**, including final frozen-SRM equality | 39.577 s |
+
+The original failure remains intact. Only the final comparison was corrected to detached CPU copies, with a CPU teardown regression; no precision, batch, source or recipe fallback. Before GPU work, initial focused tests passed **4/4 in1.408 s**; after the fix, **5/5 in1.426 s** through the shared container runner. No further GPU probe ran.
+
+Rerun measurements:
+
+| Same real batch, 32 shared `training_step` updates | First8 mean | Last8 mean |
+| --- | --- | --- |
+| Tile CE | .153356623 | .120829844 |
+| Changed-cell BCE | .596875519 | .598153323 |
+| CE + .2 BCE | .272731729 | .240460513 |
+
+Replay took **6.322 s**. Total loss falls; auxiliary BCE rises slightly. This does **not** establish auxiliary learning or accuracy. No extension to64 updates was needed or run. Gradients remain finite through conv1, body, covariance reduction, classifier and head; required weights have nonzero gradients and SRM stays frozen.
+
+- Actual compiled forward/backward: **15.710 s** first-call window. Per-tensor error is `max(abs(compiled-eager)) / max(abs(eager))`, with exact equality required when the eager scale is zero; tolerance **1e-4**. Tile error **1.884e-7**, auxiliary error **3.227e-7**, largest gradient error **2.249e-6**. Reconstructed eager checkpoint outputs match eager outputs exactly; no `_orig_mod` keys.
+- Fresh-batch timing: **8 updates / .749188 s =10.6782 steps/s**. This small PC-only window is not a full-source benchmark or a G4 forecast.
+- Reconstructed head-only and dual-map outputs are finite, both `[2,8,8]`; head-only returns no attribution.
+- Real Lightning continuation: save at epoch0/global step1, continue to step2, then rebuild through the shared runtime and restore with `ckpt_path` on the same cached next batch. Weights, Adam moments, scheduler and trainer epoch/global step match **bit exactly**. Returned trainer epoch1/global step2 agrees in both paths. Source provenance is retained; pilot checkpoint is evaluator-refused. This does not claim arbitrary mid-epoch data-order restoration; Lightning warns about the deliberately cached non-resumable loader.
+- Peak GPU allocated **11,452,424,192 bytes**, reserved **15,378,415,616 bytes**. Minimum available RAM **21.961 GiB**, above12GiB throughout.
+- External cleanup: no GPU/Python/worker/compiler processes, GPU VRAM back to **428MB used /15,876MB free**, RAM **27GiB available**, `/dev/shm` **92KiB**. No temporary directories or checkpoints remain. Original BEST and last SHA values and v2 source pins remain unchanged.
+
+**Pending after the pilot:** paid/cloud launch/resource decision, real training stability and all detector/heatmap quality/adoption decisions. FULL evidence was completed later on the selected revision below. The pilot supplies correctness evidence only.
+
+## Selected launch revision — FULL and read-only preflight complete
+
+**Selected launch commit remains `c031fca3511f7e66d4df35bc10bdf23b0ef5087e`; tree `a1b39dd403e6586643544b53e6c2d17d143156fc`.** Implementation commit is `3d35a02`. This later documentation-only record does not change the launch target to documentation HEAD. FULL evidence is bound to code, fixtures and runtime tested at the selected commit, not to the later documentation tree; matching current-HEAD FULL evidence is not claimed after this record commit.
+
+Exactly one serial default `python -B scripts/test_cpu.py`, after `python -B scripts/required_test_level.py`, ran inside container `aai3001` under the shared lock: **exit0, 658 tests, 656 passed, 2 existing GPU-only skips, 1007.620 s**. Skips: GBRAS full-body GPU backward and BF16/channels-last GPU smoke. No CPU/full-only replay was skipped. Start/end were clean and unchanged; local FULL matching was verified before this documentation change. Fixture key: `fe5004cc35c74a240e9edea70283348cc9ea545593040669b537480009659f88`; Python3.12.3, torch2.14.0+rocm10.1.0. Original checkpoint/source hashes stayed unchanged and workers/shm/GPU returned to baseline.
+
+Local evidence links below refer to **git-ignored outputs**, not committed records; they are absent from a fresh checkout:
+
+- [Complete FULL log](../../runs/verification/run21-cell-launch-readiness-2026-10-29/full.log), [copied FULL key](../../runs/verification/run21-cell-launch-readiness-2026-10-29/local-full-evidence-after.json), [cleanup](../../runs/verification/run21-cell-launch-readiness-2026-10-29/cleanup.txt).
+- [Read-only preflight report](../../runs/verification/run21-cell-readonly-preflight-2026-10-29/REPORT.md), [resolved recipe/tensors](../../runs/verification/run21-cell-readonly-preflight-2026-10-29/resolved-summary.json), [seven launch checks](../../runs/verification/run21-cell-readonly-preflight-2026-10-29/launch-gate.log).
+
+Pinned-notebook local preflight exited0: G4 quick=false, pilot=false, full training-photo selection1.0, train128/validation64 images, 15×2,813=42,195 steps, FP32, original embedding schedule, LR3e-5/warmup1, source weights.4/.2/.4, train-matched recipe60da4391043e8ce48ff2, new head257 parameters, exact source `cell-aux-v2`. Fake CPU production forward/backward passed the2,147,483,647-element limit: training maximum754,974,720, validation377,487,360. This does not measure real GPU memory or G4 speed.
+
+The permitted read-only launch probe and container validator returned **7 PASS**: Pi mount source, read-write filesystem, upload ownership/write bits, /srv search, results-directory search, GCE18,000-second duration and STOP action. VM state was **TERMINATED**. Raw GCE metadata is kept locally at mode600 in a mode700 ignored directory; it is not linked or published here. Watchdog service/armed state is **unverified**: the allowed probe does not query it.
+
+The actual initializer file on the terminated VM is **unverified**. On a separately authorized boot, `curriculum.initialize` resolves the exact notebook `runs-out/` path under the VM checkout; `weights_only` checks pinned SHA, architecture/SPEC, frozen SRM and exact keys/shapes before strict copying and optimization. Missing/wrong bytes fail closed. There is **no automatic staging or alternate source search**. This does not assert an OS/package-update gate or that the remote file currently exists.
+
+At this earlier preflight milestone, canonical submit dry-run, push and paid authorization were pending. The approved attempt below supersedes that authorization state. Proposed evaluation guards remain **Pending (user)**; run18 remains submission/`pipeline` default.
+
+## Run22 — paid authorization, capacity blocked
+
+The user explicitly said **“make the paid run.”** The orchestrator pushed/fetched `yx` through documentation commit9805d09, verified FULL against selected launch commit **`c031fca3511f7e66d4df35bc10bdf23b0ef5087e`** and its tested tree/fixtures/runtime (later changes documentation only), and ran the canonical submit dry-run: **7 gates PASS**. The selected actual launch commit is unchanged.
+
+Job **`srm-cell-aux-paired-gapcov32-20261029T063502Z-5452`** set metadata to run, commitc031fca, timeout90min, maximum120min, protocolresume-v1, attempt0. The initial start plus2 manual retries at240-second intervals all returned **STOCKOUT** for `g4-standard-48` / `nvidia-rtx-pro-6000` in `us-central1-c`. No boot was accepted; VM remains **TERMINATED**, with old lastStartTimestamp2026-10-26. No training/compute launched, accuracy result or measured billing is claimed.
+
+Watchdog read-only status reported **UNARMED**, armed=false, audit_approved=true, service active. This supersedes the earlier unobserved state; it was not armed for this job. Actual initializer availability/SHA on the terminated VM remains **unverified**. Strict source verification still occurs before optimization on the approved boot, with no automatic staging.
+
+Local git-ignored logs: `runs/verification/run21-cell-paid-launch-2026-10-29/{dry-run.log,submit.log,submit-exit-status,retry-1.log,retry-1-exit-status,retry-2.log,retry-2-exit-status}`. Raw probe metadata stays mode600 in a mode700 folder; do not publish it. This bookkeeping records orchestrator-reported launch actions, not new worker network activity.
+
+**Historical next action at the stockout milestone:** manually retry the same approved job. No automatic retry was running at that point; the supervised retry below supersedes this state. Numeric gates remain PROPOSED/Pending(user), run18 submission unchanged.
+
+## Run22 — supervised start accepted
+
+User explicitly requested **“try again using the supervising guard.”** The same approved job's global start4 (first additional guarded call) succeeded; actual boot **2026-10-29T08:27:45.243Z**, runner08:28:06Z. The first-start guard exited immediately after success. No further PC start guard runs; the existing audited Pi watchdog is **OBSERVING/armed for the actual job**, sole resume/start owner, with policy unchanged. Its native counters do not include the earlier external capacity calls; those are recorded separately as4 total.
+
+VM checkout is the selected **c031fca**, checkout runner rather than last-good fallback; automatic-update gate PASS. Actual VM initializer exists and SHA matches `4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf`. Weights-only base fingerprint matches; optimizer/scheduler fresh, frozen SRM and covariance SPEC retained. First saved checkpoint epoch0/global step2813 has257 head parameters and all finite tensors; training CE.193456471, BCE.425405830, total.278537720. Source v2, full G4 recipe15 epochs/42,195 steps, train128/val64 verified. No Traceback/OOM/NaN in startup snapshot. This is startup proof, not test accuracy or adoption.
+
+Evidence is local/ignored `runs/verification/run21-cell-supervised-retry-2026-10-29/`. Completion supervision/collection evidence uses `runs/verification/run22-supervision-2026-10-29/`; the terminal result follows. At that startup milestone, no further experiment or GPU evaluation was authorized. The later user-approved detector/cell evaluation is recorded below. Numeric guards remain PROPOSED/Pending(user), run18 default; launchc031fca stays fixed, later docs HEAD is not claimed FULL-tested.
+
+## Run22 — delivered, collected and postflight complete
+
+Same job `srm-cell-aux-paired-gapcov32-20261029T063502Z-5452`, selected launch **c031fca3511f7e66d4df35bc10bdf23b0ef5087e**: **done/exit0, one attempt, no resumes,15epochs/42,195steps**. Notebook08:28:12.181800–09:16:39.619966Z: **2907.438166s**. Actual VM boot08:27:45.243Z, stop09:17:32.399Z: **2987.156s (49.786min)**. Watchdog estimated compute **$1.670662** under unchanged$2/h policy; this is a planning estimate, **not measured billing**.
+
+Saved metrics below are the run's own train-matched validation, **not standard/hard-test accuracy or comparison evidence**:
+
+| Checkpoint | Epoch(one-based) | Own validation P_E | Own validation AUC | Own validation loss |
+| --- | --- | --- | --- | --- |
+| Best by validation P_E | 12 | .08905555307865143 | .9762953519821167 | .18975208699703217 |
+| Last (evaluation target) | 15 | .09002777934074402 | .9759882688522339 | .19205862283706665 |
+
+Last training CE **.187950000166893**, cell BCE **.30841630697250366**, total **.249633327126503**. All saved scalars and best/last state tensors finite; head257, frozen SRM equals original source, covariance SPEC and source v2 preserved.
+
+- Best `best-epoch11-val_pe0.0891-val_auc0.9763.ckpt` SHA **`7c1f33fcfe34e5a32527a0176e7254d9d371295b7221bb4dcc5d3a58148cf24c`**.
+- Last `last.ckpt` SHA **`6be0ec8f722c5e4c0de80cea961f61e7295b37b4aa927555562467f94b3c6f48`**.
+- PC artifact root: `runs/srm-cell-aux-paired-gapcov32-20261029T063502Z-5452/`, copied from Pi using existing admin access, preserving bytes/modes. Full Pi-PC inventory matches **27files,10directories,30,072,207bytes**, mismatches[]. Checkpoint/status/attempt identities/readability pass.
+- Original admin rsync exited23 because only **132-byte job.env** was private(mode600). Retained the diagnostic. After explicit authorization, read only that file through existing adminSSH+sudo-n; source mode/size/SHA and exact approved two lines verified, streamed to an atomic local temporary, renamed at mode600 and temporary removed. **No Pi ownership/mode/ACL change or broad elevated rsync.**
+- Captured watchdog **DONE** for actualjob with VM **TERMINATED** before disarm. Existing CLI disarmed safely; fresh **UNARMED**, actualjob, counters/policy preserved. Standard **default** postflight exited0: **29PASS/0FAIL/1INFO** (VM-only runner record). No checker or metadata change to obtain this result.
+
+Evidence below is local/git-ignored and absent from a fresh checkout: [result summary](../../runs/verification/run22-supervision-2026-10-29/result-summary.json), [full inventory proof](../../runs/verification/run22-supervision-2026-10-29/complete-inventory-check.json), [default postflight table](../../runs/verification/run22-supervision-2026-10-29/postflight.md). Original rsync23 and private-file retrieval evidence remain alongside them; raw GCE metadata stays600 inside700 folder, not published.
+
+**At collection:** evaluation was pending. The user then authorized local evaluation, completed below. Photo evaluation and adoption remain pending; run18 remains default. Selected launchc031fca/source hashes stay unchanged; later docs HEAD is not claimed FULL-tested.
+
+## Run22 — detector and trained-head evaluation complete
+
+**Conclusion: mixed, not a clear upgrade.** Standard detector errors increased; hard-test ranking improved; the primary localization difference is uncertain. No frozen verdict or adoption. Run18 remains the submission/`pipeline` default. Photos/HEIC inputs have not been evaluated.
+
+### Exact identities
+
+| Role | Identity |
+| --- | --- |
+| Candidate | Run `srm-cell-aux-paired-gapcov32-20261029T063502Z-5452`, **LAST only**; SHA `6be0ec8f722c5e4c0de80cea961f61e7295b37b4aa927555562467f94b3c6f48` |
+| Candidate detector evaluation | `a1ab2faad8f27bca309e`, suite `standard-256-v1`; executing code `edfb200`, unchanged source from launch `c031fca3511f7e66d4df35bc10bdf23b0ef5087e`, exact `cell-aux-v2` |
+| Detector reference | Run21 BEST, `srm-e50-paired-gapcov32-20261026T115421Z-1917`, evaluation `cdc91a4b6d63a1517064`; SHA `4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf` |
+| Trained-head reference | Run18 LAST, `srm-cell-aux-curriculum50-paired-20261023T133537Z-1366`; SHA `eee9c63a0bd9a91b63758dfc4ddfcca37e47a2a621fbb663557c37bec4b00b80`; all seven saved artifact hashes pinned by `configs/run21-cell-comparison-v1.json` |
+
+### Test results and paired uncertainty
+
+Differences are **candidate minus reference**. P_E is error at each model's own frozen validation cutoff, not the minimum on test. A percentage point (pp) is an absolute difference between percentages.
+
+| Test metric | Reference | Run22 | Difference, paired 95% interval |
+| --- | ---: | ---: | --- |
+| Standard P_E | 2.151864% | 2.544773% | **+0.392909 pp [+0.216105, +0.577668]** |
+| Standard AUC | .997244754 | .997083070 | −.000161683 [−.000387384, +.000034447] |
+| Hard k1-low pooled AUC | .786527664 | .798277799 | **+.011750135 [+.008984228, +.014637394]** |
+| Primary trained-head localization AUC | .866946462 | .863511789 | **−.003434672 [−.015250877, +.008352589]** |
+| Secondary pooled-cell AUC | .866370941 | .873496248 | Descriptive secondary metric; not a primary gain claim |
+
+- Standard: **10,944 pairs / 249 photos**. Other standard panels: ALASKA seen2,688, unseen3,168, LSDIR5,280 pairs; all22,080 pairs scored.
+- Hard: **32,256 pairs**; primary comparison uses **3,024 k1-low pairs / 2,335 photos**, pooled ALASKA seen/unseen and LSDIR.
+- Cell primary: mean per eligible stego-tile AUC on **128 contiguous test tiles / 128 photos**; not a pooled-pixel AUC.
+- **2,000 shared paired source-photo resamples**, percentile95 intervals; detector seed **20261019**, cell seed **20261021**. Repeated paired rows are retained; this is photo-sample uncertainty, not training-seed uncertainty.
+
+### Calibration is separate from test
+
+| Calibration | Reference | Run22 |
+| --- | --- | --- |
+| Detector cutoff | .49069544672966003 (`post_hoc_256`) | .5245211124420166 (`train_matched`) |
+| Detector validation P_E / AUC | .0902777778 / .9758331235 | .0900277778 / .9759860432 |
+| Cell logit cutoff | .1966136991977692 | .3114905655384064 |
+| Cell validation FA | 4.996211% | 4.996211% |
+| Own validation 1%–99% aux colors | [−6.098598957, 7.086827993] | [−5.986734271, 5.976934552] |
+
+Detector calibration uses identical frozen18,000-pair recipe `60da4391043e8ce48ff2`, list SHA `e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d`,256 `overlap_last`, and min-P_E/tie policy. Each model fits its own cutoff on validation **before test**, never 5%-FA for the detector. Cells independently use their own validation 5%-FA cutoff on17,153 negative cells. No borrowed/test-fitted cutoff or color range.
+
+### False alarms, misses and localization limits
+
+Detector FA / miss percentages at each model's own global cutoff:
+
+| Source/panel | Reference FA → Run22 FA | Reference miss → Run22 miss |
+| --- | --- | --- |
+| RAISE | 1.5161 → 1.8152 | 1.7430 → 1.7120 |
+| DIV2K | **7.6122 → 13.3013** | 4.8077 → 3.9263 |
+| ALASKA seen | 13.0952 → 12.4256 | 21.9122 → 22.8051 |
+| ALASKA unseen | 11.2689 → 10.8586 | 19.4760 → 18.8763 |
+| LSDIR | 3.8636 → 5.6818 | 11.6477 → 9.5076 |
+
+Cell test results at own validation5%-FA cutoffs:
+
+| Cell metric | Run18 | Run22 |
+| --- | ---: | ---: |
+| Pooled FA | 4.208083% | 4.514603% |
+| Pooled changed-cell recall | 16.139308% | 16.691442% |
+| Contiguous recall | 51.549755% | 52.365416% |
+| Random recall | 10.839844% | 11.352539% |
+
+- Fixed selected diagnostic fixture, **192 validation / 256 test pairs**, not whole-photo performance. Validation:64 each RAISE/ALASKA/LSDIR; test:64 each RAISE/ALASKA seen/ALASKA unseen/LSDIR. Each panel has32 contiguous +32 random examples, distinct photos.
+- No selected empty changed tiles. Test masks: **9,418 positive cells,6,453 eligible stego-negative cells,513 excluded halo cells**; with clean cells,22,837 test negatives. Targets/masks match the reference exactly.
+- All **128 contiguous tiles are eligible**. All **128 random tiles have all64 cells positive**, so within-tile localization AUC is undefined there; recall/FA can still be reported. Do not generalize the contiguous AUC to random placement.
+- Run22 cell FA differs by source: RAISE1.28%, ALASKA seen**7.74%**, unseen6.70%, LSDIR2.31%. Pooled FA below7% does not guarantee that every source is below7%.
+- Trained aux: **48×48 receptive field, stride32**, logits, not pixel probabilities or causal masks. Signed `class_score` attribution is separate, **256 tile-global context**, stride32; it is not the trained head.
+
+### Execution, evidence and remaining decisions
+
+- Existing full `evaluate_run.py`: **exit0,233.940093s**, FP32 ROCm,32 images,4 workers, convolution workaround off; no quick/pilot, alternate checkpoint or reference inference.
+- Existing full `cell_eval.py --figure`: **exit0,66.024941s**, FP32 CUDA-name/ROCm,4 pairs,2 workers. Published **unmodified** `compare_run21_cells.py`: **exit0**. Its detector results exactly equal the accepted detector-only report.
+- Cell output:9 files; combined output:3 files,4 finite bootstrap arrays each2000×2; **40 input hashes unchanged**. Source/head/checkpoint/manifest/score bindings, strict complete row joins/duplicates, targets, own cutoffs/colors and validation/test photo separation pass. No production checker relaxation; GPU compute processes absent after completion; tracked tree unchanged before this documentation task.
+- Retained operational diagnostics: detector preflight initially used absent `settings.pilot`; corrected the inspection to the existing mapping convention. The first one-off CPU comparison added an unpublished literal `split='test'` assertion; stopped/reported. Both models and frozen files actually match `test`, `test_seen`, `test_unseen`. Authorized r2 removed **only that extra assertion**, preserving all published checks and failed helper/logs. No inference rerun or production change. The subsequent full published cell/combined flows succeeded without correction.
+
+**Local/git-ignored evidence; not guaranteed on a fresh checkout:**
+
+| Evidence | Repository-relative path |
+| --- | --- |
+| Canonical detector scores/calibration | `runs/srm-cell-aux-paired-gapcov32-20261029T063502Z-5452/evaluation/standard-256-v1/a1ab2faad8f27bca309e/` |
+| Detector comparison + exact commands/logs/exits/diagnostics | `runs/verification/run22-detector-eval-2026-10-29/comparison.json`, `bootstrap-replicates.npz`, `REPORT.md`, and command/log files in that same folder |
+| Full cell scores/bindings + fixed three-example figure | `runs/verification/run22-cell-eval-2026-10-29/cells/` (`cells.png`, `cells.json`) |
+| Combined published comparison | `runs/verification/run22-cell-eval-2026-10-29/comparison/comparison.json`, `bootstrap-replicates.npz`, `REPORT.md` in that same folder |
+| Explicit success/counts/coverage + command records | `runs/verification/run22-cell-eval-2026-10-29/verified-summary.json`, `own-cutoffs-recall-summary.json`, `cell-command.sh`, `combined-command.sh`, logs/PIDs/exits in that same folder |
+| Original pinned detector / heatmap artifacts | `runs/srm-e50-paired-gapcov32-20261026T115421Z-1917/evaluation/standard-256-v1/cdc91a4b6d63a1517064/`; `runs/verification/cell-curriculum50-paired-2026-10-23/cells/` |
+
+**Proposals only:** standard ΔP_E upper .005776684 exceeds proposed .0025; hard ΔAUC lower +.008984228 meets proposed ≥−.01; pooled cell FA .045146035 meets proposed ≤.07. These are **PROPOSED / Pending (user)**, not frozen pass/fail/adoption rules. No extra +.02 localization-gain rule. Photo/HEIC evaluation and adoption remain pending; no photo CLI run, refit, paid VM, submission/default change, or later-HEAD FULL claim.

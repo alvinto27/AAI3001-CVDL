@@ -1,0 +1,97 @@
+{
+  "format_version": 1,
+  "name": "run22-rule-c",
+  "version": "1",
+  "architecture": {
+    "model": "xunet_wide_gapcov32",
+    "clip_t": 3.0,
+    "norm": "none",
+    "front_end": "srm",
+    "width": 4,
+    "cell_supervision": "changed_cells_v1",
+    "cov_pool_identity": {
+      "version": "gapcov32-v1",
+      "gap_features": 256,
+      "reduced_features": 32,
+      "cov_features": 528,
+      "covariance_divisor": "M",
+      "ridge_relative": 0.0001,
+      "ridge_absolute": 1e-12,
+      "iterations": 5,
+      "sqrt": "trace_normalized_newton_schulz_with_compensation",
+      "triangle": "upper_unweighted",
+      "reduction_bias": false,
+      "post_normalization": "none",
+      "branch_scaling": "none",
+      "classifier": "default_Linear784_to_2",
+      "attribution": "gap_cam_plus_M_centered_cov_gradient"
+    }
+  },
+  "input": "rgb8_0_255",
+  "tile": {
+    "size": 256,
+    "grid": "overlap_last",
+    "cutoff": 0.5245211124420166
+  },
+  "map": {
+    "kind": "trained_head",
+    "cell_size": 32,
+    "score": "logit",
+    "cutoff": 0.3114905655384064
+  },
+  "photo_rule": {
+    "type": "logistic_v1",
+    "features": [
+      "cell_fraction",
+      "log_group_count",
+      "group_fraction",
+      "log_cell_count",
+      "max_tile",
+      "top3_tile",
+      "tile_fraction",
+      "log_tile_count"
+    ],
+    "model": {
+      "mean": [
+        0.35119832048717575,
+        5.270871552193614,
+        0.3147844477258249,
+        7.490569685640994,
+        0.9326868408649346,
+        0.9099531763762754,
+        0.5734646623072307,
+        3.50317725055116
+      ],
+      "scale": [
+        0.33505288975512165,
+        2.343863871225562,
+        0.3479649799447831,
+        1.2917565313339685,
+        0.18122778174640158,
+        0.20574216502702142,
+        0.35197068717077556,
+        1.2148530139828888
+      ],
+      "coefficients": [
+        -0.29747490984482194,
+        1.3038334557279077,
+        0.059235503043900996,
+        -0.44625874787709036,
+        0.28707167506497167,
+        0.9448840527011297,
+        0.4008408962778621,
+        -0.45427295701317083
+      ],
+      "intercept": 2.1034618801557188
+    },
+    "cutoff": 0.6957924294430787
+  },
+  "source": {
+    "checkpoint_sha256": "6be0ec8f722c5e4c0de80cea961f61e7295b37b4aa927555562467f94b3c6f48",
+    "evaluation_id": "a1ab2faad8f27bca309e",
+    "threshold_id": "99358dbab451028b8240",
+    "photo_fit_sha256": "b5d8ba6f1e0faf85575aa4e8d8fddfdae394fe86ff0fa4884b759421131130fc",
+    "identity_route": "pipeline_native"
+  },
+  "weights_sha256": "6d58acdb92bfbc61e45f7df6f9d3f9aa24c9a4eefa6aef11e75af96265f242c1"
+}

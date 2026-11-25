@@ -1,0 +1,15 @@
+{
+  "source": "alaska",
+  "selection_sha256": "d3f122d637b09d9c65e7cafd8592f211c8b8381a3b3fa80303363bde5255206d",
+  "photos": 18200,
+  "tiles512": 28475,
+  "splits": {
+    "test_unseen": 2000,
+    "train": 13500,
+    "test_seen": 1700,
+    "val": 1000
+  },
+  "verified_masters": true,
+  "decoder_policy": "stored RGB8, no ICC conversion, no resize",
+  "grid_policy": "trim512"
+}

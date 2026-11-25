@@ -447,13 +447,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--count", type=nonnegative_int, default=1000)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--csv", type=Path, default=Path("ImageSets/RAISE/RAISE_all.csv"))
+    parser.add_argument("--csv", type=Path, default=Path("Datasets/originals/raise/RAISE_all.csv"))
     parser.add_argument(
         "--selection",
         type=Path,
         help="use this selection manifest without reading the full catalog",
     )
-    parser.add_argument("--out", type=Path, default=Path("ImageSets/RAISE/NEF"))
+    parser.add_argument("--out", type=Path, default=Path("Datasets/originals/raise/NEF"))
     parser.add_argument("--workers", type=positive_int, default=4)
     parser.add_argument("--retries", type=nonnegative_int, default=3)
     parser.add_argument("--timeout", type=float, default=60.0)

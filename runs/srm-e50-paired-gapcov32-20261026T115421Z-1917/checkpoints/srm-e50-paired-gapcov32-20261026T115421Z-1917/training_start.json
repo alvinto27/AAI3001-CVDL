@@ -1,0 +1,59 @@
+{
+  "initialization": "random",
+  "weights_only": false,
+  "optimizer_restored": false,
+  "scheduler_restored": false,
+  "settings": {
+    "seed": 0,
+    "paired_batches": true,
+    "data": "otf",
+    "clip_t": 3.0,
+    "norm": "none",
+    "epochs": 50,
+    "limit_train_batches": 0,
+    "lr": 0.0003,
+    "warmup_epochs": 1,
+    "grad_clip": 1.0,
+    "lr_drops": [
+      [
+        8,
+        0.3
+      ],
+      [
+        33,
+        0.1
+      ]
+    ],
+    "train_yaml": "/home/yangxuan/AAI3001-CVDL/configs/train-k1to4.yaml",
+    "train_grid": "overlap_last",
+    "train_tile_size": 256,
+    "post_fit_eval": "none",
+    "name": "srm-e50-paired-gapcov32",
+    "extra_tests": "test-bpp1,source-panels",
+    "front_end": "srm",
+    "model": "xunet_wide_gapcov32",
+    "width": 4,
+    "batch_size": 128,
+    "source": "decode",
+    "source_mix": {
+      "raise": 0.4,
+      "lsdir": 0.2,
+      "alaska": 0.4
+    },
+    "sources": [
+      "raise",
+      "lsdir",
+      "alaska"
+    ],
+    "tiles_per_epoch": 180000,
+    "tile_size": 512,
+    "run_seed": 0,
+    "train_photo_fraction": 1.0,
+    "checkpoint_validation": "capped",
+    "val_cap_raise": 5000,
+    "val_cap_lsdir": 1500,
+    "eval_profile": "overlap_full_mix",
+    "run_name": "srm-e50-paired-gapcov32",
+    "train_yaml_sha256": "ab924b67af4c67d742d942b4cc500c6dcfee6e81422a7d64bf94ed960750cd54"
+  }
+}

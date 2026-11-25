@@ -1,0 +1,19 @@
+# AAI3001-CVDL demo API fallback: run 22 with ONNX Runtime on the CPU. Not started at boot.
+# Start: sudo systemctl start cvdl-pipeline-cpu (stops the GPU unit). Back to GPU: sudo systemctl start cvdl-pipeline
+[Unit]
+Description=CVDL pipeline API (run 22, ONNX Runtime CPU fallback)
+After=network-online.target
+Wants=network-online.target
+Conflicts=cvdl-pipeline.service
+After=cvdl-pipeline.service
+
+[Container]
+Image=localhost/cvdl-pipeline:report-fb1f6ad
+ContainerName=cvdl-pipeline-cpu
+PublishPort=127.0.0.1:8000:8000
+PodmanArgs=--memory=6g
+Exec=--engine onnx --allow-origin https://gcp-aai3001.taild62d21.ts.net
+
+[Service]
+Restart=always
+TimeoutStartSec=120

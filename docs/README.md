@@ -1,16 +1,87 @@
-# Documentation
+# Documentation — start here
 
-- [V3b baseline results](results-v3b.md)
-- [V3 comparison results](results-v3.md)
-- [Rebuild the RAISE 512 dataset](rebuild-raise512-run1.md)
+This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. Training is finished. The [run queue](archive/run-queue.md) and the [ideas board](archive/ideas-board.md) are kept as records. Read [status](status.md) before acting, [findings](findings.md) for older run comparisons (512-era; see its note), and the [dated journal](journal/README.md) for the original records.
 
-Full working history (journal, v1/v2 notebooks, v1 report, ROCm fix, ideas): [branch yx](https://github.com/alvinto27/AAI3001-CVDL/tree/yx).
+The project report is the [root README](../README.md). Its figures are in `figures/report/` (rebuilt by `scripts/build_report_figures.py`, except the UI screenshots). The former root README (environment setup, notebooks, Spot VM training) is now the [development guide](development.md).
 
-## Local data folders
+## Current references (`active/` means kept for use, not permission to run)
+Plans that scripts read by path (`plan-run21-cell-heatmap`, `plan-curriculum50`, `plan-paired-training`, `plan-architecture-tests`, `legacy-wide-r2-migration`) stay in `active/`, because the decision scripts and tests fingerprint them.
 
-| Folder | Guide |
-| --- | --- |
-| [`ImageSets/`](../ImageSets/README.md) | Source images and intermediate image records |
-| [`Datasets/`](../Datasets/README.md) | Generated training and test datasets |
-| [`runs/`](../runs/README.md) | Local checkpoints and run outputs |
-| [`logs/`](../logs/README.md) | Detached-run console logs |
+- [Run21 trained heatmap / run22 — implementation, launch and collection record](active/plan-run21-cell-heatmap.md)
+- [Run22 LAST evaluation — standard errors worse, hard ranking better, no clear primary localization gain; photos/adoption pending (2026-10-29)](active/plan-run21-cell-heatmap.md#run22--detector-and-trained-head-evaluation-complete)
+- [50-epoch low-bpp curriculum from scratch (ideas #17) — approved plan (2026-10-22)](active/plan-curriculum50.md)
+- [Paired training (ideas #16): R1 SRM-e50 paired, R2 cell model paired — approved plan (2026-10-22)](active/plan-paired-training.md)
+- [Cloud deployment: GCP VM + Tailscale Funnel — live demo layout, checks and runbook (2026-11-25)](active/deploy-gcp-funnel.md)
+- [Test levels and the changed-path rule — fast/full/none tests; golden retired 2026-10-21 (built `891aefe`, 2026-10-20)](active/test-levels.md)
+- [Wide-R2 legacy settings migration — saved evidence and limits](active/legacy-wide-r2-migration.md)
+- [Architecture tests: delayed pooling and GBRAS-Net (idea 10) — approved 2026-10-19; arm A no gain, arm G waits for the user](active/plan-architecture-tests.md)
+- [Settings and seed rules](active/settings-and-seeds.md)
+- [Frozen RAISE/DIV2K records](active/frozen-source-records.md)
+- [ALASKA selection v2](active/alaska-selection-v2.md)
+- [LSDIR selection v1](active/lsdir-selection-v1.md)
+
+## Completed results (`results/`)
+- [V1 baseline](results/results-v1-baseline.md)
+- [V3 comparison](results/results-v3.md)
+- [V3b baseline](results/results-v3b.md)
+- [Wide XuNet versus R2](results/result-wide-xunet.md)
+- [Mixed-source wide XuNet](results/result-newdata-1.md)
+- [PC check B: thresholds and ALASKA tiles](results/result-check-b.md)
+- [Training tiling: 6 arms](results/result-training-tiling.md)
+- [Model history: 10 models re-scored on the frozen tests (2026-11-25)](results/model-history-2026-11-25.md) (data: `model-history-2026-11-25.json`)
+
+## Historical records (`archive/`)
+
+Moved from `active/` on 2026-11-25 (submission cleanup; finished plans and internal run notes):
+
+- [2026-10-26 session handoff](archive/handoff-2026-10-26.md)
+- [Web-app pipeline — approved plan: core library, HTTP API, container, swappable model bundle, ONNX Runtime engine (2026-10-21, ONNX 2026-11-25)](archive/plan-pipeline.md); guide `cvdl/pipeline/README.md`
+- [Saved-output report notebook — CPU generator and use (work list #5)](archive/report-notebook.md)
+- [Ideas board — checks and experiments; each needs a user decision](archive/ideas-board.md)
+- [One deployment threshold from validation — built `68e4f0b` (work list #4)](archive/plan-validation-threshold.md)
+- [Hard test at 256 — built `a56c275` (work list #3)](archive/plan-hard-test-256.md)
+- [Standard test at 256 — built `bd36403` (work list #2)](archive/plan-standard-test-256.md)
+- [Train-matched validation — frozen recipes and use (work list #1)](archive/plan-train-matched-validation.md)
+- [Training tiling — rules and PC implementation gates](archive/plan-training-tiling.md)
+- [G4 run queue — all runs and their state](archive/run-queue.md)
+- [G4 batch-runner guide](archive/g4-batch-runner.md)
+- [Pi host state](archive/pi-host-changes.md)
+- [Ideas board: done and closed items (moved 2026-10-24)](archive/ideas-board-done.md)
+
+Moved from `active/` on 2026-10-26 (housekeeping; finished plans and records):
+
+- [2026-10-19 session handoff (superseded by the dated journal and status)](archive/handoff-2026-10-19.md)
+- [G4 resume after a spot preemption (ideas #19) — approved slim plan (2026-10-23)](archive/plan-g4-resume.md)
+- [GBRAS speed-ups and unattended long runs (watchdog, resume) — approved plan (2026-10-22)](archive/plan-gbras-speed.md)
+- [Cell-level training at 256 — approved plan, frozen pass marks, matched control `srm-low-bpp-control` (2026-10-21)](archive/plan-cell-training-256.md)
+- [Legacy-512 evaluation retirement — what moved to archive, rescoring rule (`3c3dc39`, 2026-10-21)](archive/legacy-512-retirement.md)
+- [Three diagnostic checks (ideas 1, 2, 2b) — done 2026-10-19: #12 raised, #3 lowered, tanh fix struck](archive/plan-diagnostic-checks.md)
+- [Low-bpp curriculum from SRM-e50 (idea 9) — done 2026-10-19: small real gain, rule not met, not adopted](archive/plan-low-bpp-curriculum.md)
+- [Report notebook readability — revisions 1-3 built](archive/plan-report-readability.md)
+- [Tiling at 256 — three arms (runs 4-6, done) and the first 256 test panel design](archive/plan-tiling-256.md)
+- [Per-cell design — not approved, on hold](archive/plan-per-cell-training.md)
+- [Shared cvdl package and settings plan](archive/plan-cvdl-package.md)
+
+- [Notebook refactor golden compare — retired 2026-10-21 (`72f51b5`); history only](archive/refactor-golden.md)
+- [OTF generator design; prebuilt writer deferred](archive/plan-otf-generator.md)
+- [GPU LSB generator; shelved](archive/plan-gpu-generator.md)
+- [G4 epoch-overhead analysis](archive/plan-epoch-overhead.md)
+- [Wide XuNet plan](archive/plan-wide-xunet.md)
+- [New-source proposal](archive/plan-new-sources.md)
+- [New-source code plan](archive/plan-new-data-code.md)
+- [Noisy-cover idea; parked](archive/plan-noisy-covers.md)
+- [Source API verification](archive/source-verification.md)
+- [Settings/source cache verification](archive/cache-verification.md)
+- [Embedding-core verification](archive/embed-core-verification.md)
+- [Mode 1 verification](archive/mode1-verification.md)
+- [Mode 2 verification](archive/mode2-verification.md) (Mode 2 code archived)
+- [PyTorch loader verification](archive/torch-loader-verification.md)
+- [Notebook OTF verification](archive/notebook-otf-verification.md)
+- [Notebook diagnostics verification](archive/notebook-diagnostics-verification.md)
+- [Notebook compile verification](archive/notebook-compile-verification.md)
+- [RAISE 512 rebuild record](archive/rebuild-raise512-run1.md)
+- [2026-10-17 session handoff](archive/handoff-2026-10-17.md) (work list done; superseded by the 2026-10-19 handoff)
+- [2026-10-15 session handoff](archive/handoff-2026-10-15.md)
+- [Superseded research checklist](archive/research-checklist.md)
+
+Local data guides: [Datasets](../Datasets/README.md), [runs](../runs/README.md), and [logs](../logs/README.md).

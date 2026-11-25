@@ -26,6 +26,10 @@ from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
 from lsb_engine import EmbedResult, embed, extract
+from lsb_settings import (
+    SizeDoesNotFit, _draw_choice, _draw_stride, _seed_sequence,
+    _bpp_payload_bytes, _maximum_payload_bytes, _draw_size, _draw_settings,
+)
 
 VERSION = "6.0.0"
 ARTIFACT_DIRS = ("clean", "stego", "masks")
@@ -38,6 +42,8 @@ CONFIG_KEYS = {
     "write_masks",
     "bit_mode",
     "k",
+    "k_weights",
+    "bpp_mixture",
     "method",
     "placement",
     "stride",
@@ -127,6 +133,8 @@ class Config:
     payload: str | list[str] = "random_bytes"
     start: str | int = "random"
     size: dict[str, int | float | list[int] | list[float]] | int | float | list[int] | list[float] | None = None
+    k_weights: dict[int, float] | None = None
+    bpp_mixture: list[dict[str, Any]] | None = None
 
     def normalized(self) -> Config:
         """Return a validated configuration with canonical size syntax."""
@@ -158,6 +166,8 @@ class Config:
         if self.start != "random":
             _validate_scalar_int(self.start, "start", minimum=0)
         size = _normalize_size(self.size)
+        k_weights = _normalize_k_weights(self.k_weights, ks)
+        bpp_mixture = _normalize_bpp_mixture(self.bpp_mixture, size)
         return Config(
             seed=int(self.seed),
             input=str(self.input),
@@ -173,16 +183,18 @@ class Config:
             payload=_restore_choice(payloads, self.payload),
             start=self.start,
             size=size,
+            k_weights=k_weights,
+            bpp_mixture=bpp_mixture,
         )
 
     def as_dict(self) -> dict[str, Any]:
         """Return the canonical YAML-compatible mapping."""
         result = asdict(self.normalized())
+        # Absent opt-ins must not change legacy config bytes or recorded keys.
+        for key in ("k_weights", "bpp_mixture"):
+            if result[key] is None:
+                del result[key]
         return result
-
-
-class SizeDoesNotFit(ValueError):
-    """The minimum configured payload cannot fit one embedding."""
 
 
 def _validate_scalar_int(
@@ -276,6 +288,41 @@ def _normalize_size(value: Any) -> dict[str, Any]:
     return {kind: normalized}
 
 
+def _positive_weights(values: list[Any], name: str) -> list[float]:
+    if (not values or any(type(v) not in (int, float) or not math.isfinite(v) or v < 0 for v in values)
+            or not math.isfinite(sum(values)) or sum(values) <= 0):
+        raise ValueError(f"{name} must be finite non-negative weights with a positive sum")
+    return [float(v) for v in values]
+
+
+def _normalize_k_weights(value: Any, ks: list[int]) -> dict[int, float] | None:
+    if value is None:
+        return None
+    if (not isinstance(value, dict) or any(type(k) is not int for k in value)
+            or len(set(ks)) != len(ks) or set(value) != set(ks)):
+        raise ValueError("k_weights must name every unique configured k exactly once")
+    weights = _positive_weights([value[k] for k in ks], "k_weights")
+    return dict(zip(ks, weights))
+
+
+def _normalize_bpp_mixture(value: Any, size: dict[str, Any]) -> list[dict[str, Any]] | None:
+    if value is None:
+        return None
+    if "bpp" not in size or not isinstance(value, list) or not value:
+        raise ValueError("bpp_mixture requires size.bpp and a non-empty component list")
+    base = size["bpp"] if isinstance(size["bpp"], list) else [size["bpp"]]
+    result = []
+    for component in value:
+        if not isinstance(component, dict) or set(component) != {"weight", "bpp"}:
+            raise ValueError("bpp_mixture components require exactly weight and bpp")
+        bounds = _normalize_range(component["bpp"], "bpp_mixture bpp", integer=False, minimum=0.0)
+        if min(bounds) <= 0 or min(bounds) < base[0] or max(bounds) > base[-1]:
+            raise ValueError("bpp_mixture bounds must be positive and inside size.bpp")
+        result.append(dict(weight=component["weight"], bpp=_restore_range(bounds, component["bpp"])))
+    weights = _positive_weights([part["weight"] for part in result], "bpp_mixture")
+    return [dict(weight=weight, bpp=part["bpp"]) for weight, part in zip(weights, result)]
+
+
 def read_config(path: Path) -> Config:
     """Read and strictly validate a YAML configuration."""
     path = Path(path)
@@ -318,124 +365,6 @@ def read_config(path: Path) -> Config:
 def write_config(path: Path, config: Config) -> None:
     """Write a canonical configuration mapping."""
     path.write_text(yaml.safe_dump(config.as_dict(), sort_keys=False), encoding="utf-8")
-
-
-def _draw_choice(value: Any, rng: np.random.Generator) -> Any:
-    """Draw one uniformly selected choice or return a fixed value."""
-    if isinstance(value, list):
-        return value[int(rng.integers(0, len(value)))]
-    return value
-
-
-def _draw_stride(value: int | list[int], rng: np.random.Generator) -> int:
-    """Draw one integer uniformly from a stride range."""
-    if isinstance(value, list):
-        return int(rng.integers(value[0], value[1] + 1))
-    return int(value)
-
-
-def _seed_sequence(
-    seed: int,
-    cover_index: int,
-    variant: int,
-    stream: int,
-) -> np.random.SeedSequence:
-    """Build one stable settings or embedding seed sequence."""
-    return np.random.SeedSequence([seed, cover_index, variant, stream])
-
-
-def _bpp_payload_bytes(value: float, pixels: int) -> int:
-    """Apply the engine's bpp-to-byte conversion."""
-    return max(1, int(round(value * pixels / 8.0)))
-
-
-def _maximum_payload_bytes(
-    image: np.ndarray,
-    bit_mode: str,
-    k: int,
-    placement: str,
-    stride: int,
-    start: str | int,
-) -> int:
-    """Find the largest byte payload for the drawn embedding settings."""
-    total_units = int(image.size)
-    bits_per_unit = k if bit_mode == "lowest" else 1
-    if placement == "random":
-        usable_units = total_units
-    elif start == "random":
-        usable_units = (total_units - 1) // stride + 1
-    else:
-        if int(start) >= total_units:
-            return 0
-        usable_units = (total_units - 1 - int(start)) // stride + 1
-    return (usable_units * bits_per_unit) // 8
-
-
-def _draw_size(
-    size: dict[str, Any],
-    image: np.ndarray,
-    max_payload_bytes: int,
-    rng: np.random.Generator,
-) -> tuple[str, int | float]:
-    """Draw a size and cap its upper bound at carrier capacity."""
-    kind = next(iter(size))
-    raw = size[kind]
-    values = raw if isinstance(raw, list) else [raw]
-    low = values[0]
-    high = values[-1]
-    if max_payload_bytes < 1:
-        raise SizeDoesNotFit("carrier cannot hold the minimum one-byte payload")
-    if kind == "payload_bytes":
-        if low > max_payload_bytes:
-            raise SizeDoesNotFit("minimum payload_bytes does not fit")
-        high = min(high, max_payload_bytes)
-        actual = int(rng.integers(low, high + 1)) if len(values) == 2 else int(low)
-        return kind, actual
-    pixels = int(image.shape[0] * image.shape[1])
-    low_bytes = _bpp_payload_bytes(float(low), pixels)
-    if low_bytes > max_payload_bytes:
-        raise SizeDoesNotFit("minimum bpp does not fit")
-    high = min(float(high), max_payload_bytes * 8.0 / pixels)
-    actual = float(rng.uniform(float(low), high)) if len(values) == 2 else float(low)
-    if _bpp_payload_bytes(actual, pixels) > max_payload_bytes:
-        actual = max_payload_bytes * 8.0 / pixels
-    return kind, actual
-
-
-def _draw_settings(
-    config: Config,
-    image: np.ndarray,
-    rng: np.random.Generator,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Draw one variant's settings and its metadata size value."""
-    config = config.normalized()
-    compression = config.png_compress_level
-    bit_mode = str(_draw_choice(config.bit_mode, rng))
-    k = int(_draw_choice(config.k, rng))
-    method = str(_draw_choice(config.method, rng))
-    placement = str(_draw_choice(config.placement, rng))
-    stride = _draw_stride(config.stride, rng) if placement == "stride" else 1
-    payload = str(_draw_choice(config.payload, rng))
-    start: str | int = config.start
-    maximum = _maximum_payload_bytes(image, bit_mode, k, placement, stride, start)
-    size_kind, size_value = _draw_size(config.size, image, maximum, rng)
-    kwargs: dict[str, Any] = {
-        "bit_mode": bit_mode,
-        "k": k,
-        "method": method,
-        "placement": placement,
-        "rng": rng,
-        "start": None if start == "random" else int(start),
-        "stride": stride,
-        "payload": payload,
-    }
-    kwargs[size_kind] = size_value
-    draw_metadata = {
-        "png_compress_level": compression,
-        "size_kind": size_kind,
-        "size_value": size_value,
-    }
-    return kwargs, draw_metadata
 
 
 def _size_metadata_value(value: Any) -> Any:
