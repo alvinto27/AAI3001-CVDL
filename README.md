@@ -274,6 +274,7 @@ The service ([`cvdl/photo_inference.py`](cvdl/photo_inference.py)) works in five
 - Each run had pass/fail criteria fixed before it was scored. Example: run 13's cell map had to beat the CAM of a control model, and its standard P_E could not rise more than 0.25 points above the control. The map passed; the P_E criterion failed by 0.07 points.
 - 95% intervals come from 2,000 bootstrap resamples *of photos* (all tiles of a photo stay together). Comparisons between models use the same resampled photos (a paired bootstrap).
 - All 10 models in §4.2 were re-scored on the same frozen sets, so their differences are direct comparisons.
+- The score summaries, training curves and executed report notebooks of the baseline, run 21 and run 22 are in [`runs/`](runs/README.md#report-runs-summaries-tracked).
 
 </details>
 

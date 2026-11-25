@@ -1,0 +1,296 @@
+{
+  "calibration_inputs": {
+    "threshold_origin": "post_hoc_256",
+    "recipe_id": "8328cc6b0673cade0312",
+    "run_name": "g4-prime-1",
+    "mapping_sha256": "6ab71f35338d384575e04101fc8cc666a6381b646e2c977da8ceec228f20cf7c",
+    "checkpoint_sha256": "741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d",
+    "policy": "validation-min-pe-v1/atol1e-12/min-fa/first-ascending/float64-ge",
+    "recipe_sha256": "8328cc6b0673cade03127786f8a43475b20cccf0c786696c570a550698877e90",
+    "full_pairs_sha256": "b42abd186c3baa157400c159fddb6a32d116e9f059f346ed4059a6c052a71664",
+    "selected_pairs_sha256": "b42abd186c3baa157400c159fddb6a32d116e9f059f346ed4059a6c052a71664",
+    "geometry": {
+      "tile_size": 256,
+      "grid": "overlap_last"
+    },
+    "quick": false,
+    "deployment": true
+  },
+  "software": {
+    "torch": "2.14.0+rocm10.1.0",
+    "numpy": "2.5.3"
+  },
+  "suite": "standard-256-v1",
+  "recipe_sha256": "5045c1076ab3f540a61c619c0759f02e79c2ea36f388a094d33cf813d3756d83",
+  "checkpoint_sha256": "741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d",
+  "selected_pairs_sha256": {
+    "pairs-standard.csv": "a15983f33e8f96d4fbca5b281664ed6a4a10bdd2b7864c12475defd4ea23fc92",
+    "pairs-alaska-seen.csv": "c17c3d7de35d18cdce839cebc51d4a079098f25ff361616612ecf58b17b3537e",
+    "pairs-alaska-unseen.csv": "19629ef766e37b5ca5d7d68fa5f08d649d6cd44d7651e0039dd59f5fedd3330f",
+    "pairs-lsdir.csv": "98259cf9bb912cd8f50c94e69db4896cfa133a372b9cd9bc506c08c27045424b"
+  },
+  "higher_k": false,
+  "quick": false,
+  "device": "cuda",
+  "batch_size": 32,
+  "workers": 4,
+  "rocm_conv1_fix": true,
+  "hard_enabled": true,
+  "hard_recipe_sha256": "d6d91a5a98dae856d1ae47ba864455d2986967fbc8ce816348ef4de2b1370793",
+  "hard_selected_pairs_sha256": "305364aa1d326a1bad21d062c9b7262b2d6b5bd074238552fa55a1b774744fe4",
+  "evaluation_id": "29fb97d0c311a0eca3b1",
+  "full_files_sha256": {
+    "pairs-alaska-seen.csv": "c17c3d7de35d18cdce839cebc51d4a079098f25ff361616612ecf58b17b3537e",
+    "pairs-alaska-unseen.csv": "19629ef766e37b5ca5d7d68fa5f08d649d6cd44d7651e0039dd59f5fedd3330f",
+    "pairs-k5to8-alaska-seen.csv": "075639b3acc9bcabf5679c6802469d9366059206302a4df3a77caf4ac7653043",
+    "pairs-k5to8-alaska-unseen.csv": "bed3630546dad5f5096917e57124f1314e5f9fb619c2d932a032cb27d25fd054",
+    "pairs-k5to8-lsdir.csv": "3b5a6919c176bf74111043ae08478e146975607b19a0f9e57626ac397c2cadcf",
+    "pairs-k5to8-standard.csv": "a61b1c4281845101d3092db2bc4d7c4a3d5c9325eed57714ee7a52ddc010a99b",
+    "pairs-lsdir.csv": "98259cf9bb912cd8f50c94e69db4896cfa133a372b9cd9bc506c08c27045424b",
+    "pairs-standard.csv": "a15983f33e8f96d4fbca5b281664ed6a4a10bdd2b7864c12475defd4ea23fc92"
+  },
+  "values": {
+    "root": "/work",
+    "device": "cuda",
+    "rocm": true,
+    "precision_limits": [
+      "32",
+      "bf16-mixed"
+    ],
+    "quick": false,
+    "workers": 6,
+    "eval_workers": 4,
+    "diag_workers": 4,
+    "headless": false,
+    "main_threads": 1,
+    "precision": "32",
+    "channels_last": false,
+    "persistent_workers": true,
+    "compile": "off",
+    "compile_threads": 4,
+    "inductor_cache": null,
+    "triton_cache": null,
+    "rocm_conv1_fix": true,
+    "output_root": "/work/runs",
+    "cache_root": null,
+    "manifest_root": null,
+    "data_root": "/work/Datasets/generated/raise512-run1-records",
+    "labels_path": "/work/Datasets/generated/raise512-run1-records/labels.csv",
+    "split_path": "/work/Datasets/generated/raise512-run1-records/splits/split_seed0.csv",
+    "quick_train_pairs": 32,
+    "quick_eval_pairs": 16,
+    "seed": 0,
+    "paired_batches": false,
+    "data": "otf",
+    "clip_t": 3.0,
+    "norm": "group",
+    "epochs": 10,
+    "limit_train_batches": 0,
+    "lr": 0.001,
+    "warmup_epochs": 0,
+    "grad_clip": 0.0,
+    "lr_drops": [
+      [
+        6,
+        0.1
+      ]
+    ],
+    "train_yaml": null,
+    "train_grid": "recorded",
+    "train_tile_size": null,
+    "post_fit_eval": "full",
+    "name": null,
+    "extra_tests": "none",
+    "front_end": "kv",
+    "model": "xunet",
+    "width": 4,
+    "batch_size": 32,
+    "source": "decode",
+    "source_mix": null,
+    "sources": [
+      "raise",
+      "div2k"
+    ],
+    "tiles_per_epoch": null,
+    "tile_size": 512,
+    "run_seed": 0,
+    "train_photo_fraction": 1.0,
+    "checkpoint_validation": "standard",
+    "val_cap_raise": 5000,
+    "val_cap_lsdir": 1500,
+    "eval_profile": "overlap_full_mix",
+    "prefetch": null,
+    "prefetch_images": 128,
+    "pack_blocks": 16,
+    "prime_next_epoch": false,
+    "run_name": "xunet_v4_clip3_group_lr0.001_warm0_drops6x0.1_e10_otf",
+    "notebook": null,
+    "job_id": null,
+    "speed_matrix": false,
+    "speed_batches": [
+      32,
+      64,
+      128
+    ],
+    "speed_precisions": [
+      "32",
+      "bf16-mixed"
+    ],
+    "speed_pairs": null,
+    "speed_steps": 600,
+    "speed_warmup": 50
+  },
+  "provenance": {
+    "legacy_settings_migration": {
+      "migration": "g4-prime-1-v3c-v1",
+      "evidence_sha256": {
+        "data_run_settings.json": "fe32946b66cb54f3d8950c75ae8f99706fc6bb248de8ccca43f1b11c8f2967b3",
+        "model_run_settings.json": "800d54be08b7cf576fbc3201763733ce6ae76d827d3513151d56dece699d4f0a",
+        "executed.ipynb": "adfca428ea5e86b92fa74a3485e1dab3b416bba201a7b3d7ab36e9dce7906fd7"
+      },
+      "derived": {
+        "checkpoint_validation": "standard",
+        "source_mix": null,
+        "tiles_per_epoch": null
+      },
+      "original_validation_pairs": 11238,
+      "original_training_pairs": 53950,
+      "model_settings": {
+        "model": "xunet",
+        "width": 4,
+        "norm": "group",
+        "clip_t": 3.0,
+        "lr": 0.001,
+        "warmup_epochs": 0,
+        "lr_drops": [
+          [
+            6,
+            0.1
+          ]
+        ],
+        "batch_size": 32,
+        "train_yaml": null,
+        "extra_tests": "none",
+        "max_epochs": 10,
+        "grad_clip_norm": 0.0
+      }
+    }
+  },
+  "checkpoint": "/work/runs/g4-prime-1/checkpoints/g4-prime-1/best-epoch08-val_pe0.0147-val_auc0.9973.ckpt",
+  "train_geometry": {
+    "tile_size": 512,
+    "grid": "recorded"
+  },
+  "test_geometry": {
+    "tile_size": 256,
+    "grid": "overlap_last"
+  },
+  "hard_test": {
+    "status": "complete",
+    "version": "hard-test-256-v1",
+    "recipe_sha256": "d6d91a5a98dae856d1ae47ba864455d2986967fbc8ce816348ef4de2b1370793",
+    "files_sha256": {
+      "pairs-alaska-seen.csv": "3a8b3be4b990571121b005808ab73d3fc889937b391365511b468a0fdd6f4c5b",
+      "pairs-alaska-unseen.csv": "9c7708ee1e4aedca578119b1bc969e14887e7b6edc1a9126d74b75770e7ba241",
+      "pairs-lsdir.csv": "c60a77a3ba0d3db79eb067c9c0eb983fbad6b534aaa432da5e45114136a8926b",
+      "pairs-standard.csv": "77c96353ed89b925e07f0f1e1c84b36515a6b9d8be96ffffaec81cf0071be074"
+    },
+    "noise_edges": {
+      "alaska": 2.6133468747138977,
+      "div2k": 2.4415316581726074,
+      "lsdir": 2.515662729740143,
+      "raise": 1.6907958090305328
+    },
+    "pairs": 32256,
+    "cells": 32,
+    "seconds": 74.89351299000009,
+    "quick": false,
+    "AUC_clean_weighting": "paired rows (as v1)",
+    "FA_counting": "distinct clean tiles within cell",
+    "validation_threshold": {
+      "threshold_origin": "post_hoc_256",
+      "recipe_id": "8328cc6b0673cade0312",
+      "run_name": "g4-prime-1",
+      "mapping_sha256": "6ab71f35338d384575e04101fc8cc666a6381b646e2c977da8ceec228f20cf7c",
+      "checkpoint_sha256": "741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d",
+      "policy": "validation-min-pe-v1/atol1e-12/min-fa/first-ascending/float64-ge",
+      "recipe_sha256": "8328cc6b0673cade03127786f8a43475b20cccf0c786696c570a550698877e90",
+      "full_pairs_sha256": "b42abd186c3baa157400c159fddb6a32d116e9f059f346ed4059a6c052a71664",
+      "selected_pairs_sha256": "b42abd186c3baa157400c159fddb6a32d116e9f059f346ed4059a6c052a71664",
+      "geometry": {
+        "tile_size": 256,
+        "grid": "overlap_last"
+      },
+      "quick": false,
+      "deployment": true,
+      "score_csv_sha256": "ce0efd15d654f86762ae9b2eed13ea3374be513fa4cb83eb0587a54f1c99a4ca",
+      "cutoff": 0.5790094137191772,
+      "FA": 0.015222222222222222,
+      "miss": 0.06733333333333333,
+      "P_E_at_validation_cutoff": 0.041277777777777774,
+      "AUC": 0.9888338395061729,
+      "pairs": 18000,
+      "clean_tiles": 18000,
+      "images": 36000,
+      "photos": 270,
+      "threshold_id": "be4c3a478ef7779486c7"
+    },
+    "overlap_standard": {
+      "alaska-seen": {
+        "distinct_hard_tiles": 5675,
+        "shared_distinct_tiles": 997,
+        "shared_pairs": 1429
+      },
+      "alaska-unseen": {
+        "distinct_hard_tiles": 5763,
+        "shared_distinct_tiles": 1009,
+        "shared_pairs": 1391
+      },
+      "lsdir": {
+        "distinct_hard_tiles": 7251,
+        "shared_distinct_tiles": 730,
+        "shared_pairs": 808
+      },
+      "standard": {
+        "distinct_hard_tiles": 7020,
+        "shared_distinct_tiles": 1882,
+        "shared_pairs": 2168
+      }
+    }
+  },
+  "validation_threshold": {
+    "status": "complete",
+    "threshold_origin": "post_hoc_256",
+    "recipe_id": "8328cc6b0673cade0312",
+    "run_name": "g4-prime-1",
+    "mapping_sha256": "6ab71f35338d384575e04101fc8cc666a6381b646e2c977da8ceec228f20cf7c",
+    "checkpoint_sha256": "741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d",
+    "policy": "validation-min-pe-v1/atol1e-12/min-fa/first-ascending/float64-ge",
+    "recipe_sha256": "8328cc6b0673cade03127786f8a43475b20cccf0c786696c570a550698877e90",
+    "full_pairs_sha256": "b42abd186c3baa157400c159fddb6a32d116e9f059f346ed4059a6c052a71664",
+    "selected_pairs_sha256": "b42abd186c3baa157400c159fddb6a32d116e9f059f346ed4059a6c052a71664",
+    "geometry": {
+      "tile_size": 256,
+      "grid": "overlap_last"
+    },
+    "quick": false,
+    "deployment": true,
+    "score_csv_sha256": "ce0efd15d654f86762ae9b2eed13ea3374be513fa4cb83eb0587a54f1c99a4ca",
+    "cutoff": 0.5790094137191772,
+    "FA": 0.015222222222222222,
+    "miss": 0.06733333333333333,
+    "P_E_at_validation_cutoff": 0.041277777777777774,
+    "AUC": 0.9888338395061729,
+    "pairs": 18000,
+    "clean_tiles": 18000,
+    "images": 36000,
+    "photos": 270,
+    "threshold_id": "be4c3a478ef7779486c7"
+  },
+  "code_commit": "7e7df14",
+  "runtime": {
+    "torch": "2.14.0+rocm10.1.0",
+    "numpy": "2.5.3",
+    "pillow": "12.3.0"
+  }
+}

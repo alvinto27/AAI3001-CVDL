@@ -1,0 +1,15 @@
+{"epoch": 0, "stage": 1, "bpp_min": 0.05, "bpp_max": 0.5, "k1_weight": 1, "original_fraction": 1.0, "original_stegos": 180000, "stage_stegos": 0, "consumed_stegos": 180000}
+{"epoch": 1, "stage": 1, "bpp_min": 0.05, "bpp_max": 0.5, "k1_weight": 1, "original_fraction": 1.0, "original_stegos": 180000, "stage_stegos": 0, "consumed_stegos": 180000}
+{"epoch": 2, "stage": 1, "bpp_min": 0.05, "bpp_max": 0.5, "k1_weight": 1, "original_fraction": 1.0, "original_stegos": 180000, "stage_stegos": 0, "consumed_stegos": 180000}
+{"epoch": 3, "stage": 1, "bpp_min": 0.05, "bpp_max": 0.5, "k1_weight": 1, "original_fraction": 1.0, "original_stegos": 180000, "stage_stegos": 0, "consumed_stegos": 180000}
+{"epoch": 4, "stage": 1, "bpp_min": 0.05, "bpp_max": 0.5, "k1_weight": 1, "original_fraction": 1.0, "original_stegos": 180000, "stage_stegos": 0, "consumed_stegos": 180000}
+{"epoch": 5, "stage": 2, "bpp_min": 0.05, "bpp_max": 0.5, "k1_weight": 1, "original_fraction": 1.0, "original_stegos": 180000, "stage_stegos": 0, "consumed_stegos": 180000}
+{"epoch": 6, "stage": 2, "bpp_min": 0.05, "bpp_max": 0.5, "k1_weight": 1, "original_fraction": 1.0, "original_stegos": 180000, "stage_stegos": 0, "consumed_stegos": 180000}
+{"epoch": 7, "stage": 2, "bpp_min": 0.05, "bpp_max": 0.5, "k1_weight": 1, "original_fraction": 1.0, "original_stegos": 180000, "stage_stegos": 0, "consumed_stegos": 180000}
+{"epoch": 8, "stage": 2, "bpp_min": 0.05, "bpp_max": 0.5, "k1_weight": 1, "original_fraction": 1.0, "original_stegos": 180000, "stage_stegos": 0, "consumed_stegos": 180000}
+{"epoch": 9, "stage": 2, "bpp_min": 0.05, "bpp_max": 0.5, "k1_weight": 1, "original_fraction": 1.0, "original_stegos": 180000, "stage_stegos": 0, "consumed_stegos": 180000}
+{"epoch": 10, "stage": 3, "bpp_min": 0.05, "bpp_max": 0.5, "k1_weight": 1, "original_fraction": 1.0, "original_stegos": 180000, "stage_stegos": 0, "consumed_stegos": 180000}
+{"epoch": 11, "stage": 3, "bpp_min": 0.05, "bpp_max": 0.5, "k1_weight": 1, "original_fraction": 1.0, "original_stegos": 180000, "stage_stegos": 0, "consumed_stegos": 180000}
+{"epoch": 12, "stage": 3, "bpp_min": 0.05, "bpp_max": 0.5, "k1_weight": 1, "original_fraction": 1.0, "original_stegos": 180000, "stage_stegos": 0, "consumed_stegos": 180000}
+{"epoch": 13, "stage": 3, "bpp_min": 0.05, "bpp_max": 0.5, "k1_weight": 1, "original_fraction": 1.0, "original_stegos": 180000, "stage_stegos": 0, "consumed_stegos": 180000}
+{"epoch": 14, "stage": 3, "bpp_min": 0.05, "bpp_max": 0.5, "k1_weight": 1, "original_fraction": 1.0, "original_stegos": 180000, "stage_stegos": 0, "consumed_stegos": 180000}

@@ -1,0 +1,67 @@
+{
+  "compile_mode": "default",
+  "compile_target": "net",
+  "compile_dynamic": false,
+  "compile_fullgraph": false,
+  "channels_last": false,
+  "memory_format": "contiguous",
+  "amp_boundaries": {
+    "srm_front_end_and_clamp": "float32_autocast_disabled",
+    "learned_layers": "float32",
+    "normalization_parameters_and_running_stats": "float32",
+    "cross_entropy": "float32",
+    "validation_probabilities_and_metrics": "float32",
+    "gap_covariance_head": "float32_autocast_disabled"
+  },
+  "tf32_matmul": false,
+  "tf32_cudnn": true,
+  "torch_version": "2.14.1+cu130",
+  "norm": "none",
+  "clip_t": 3.0,
+  "lr": 0.0003,
+  "max_epochs": 50,
+  "warmup_epochs": 1,
+  "steps_per_epoch": 2813,
+  "grad_clip_norm": 1.0,
+  "weight_decay": 0.0001,
+  "lr_drops": [
+    [
+      8,
+      0.3
+    ],
+    [
+      33,
+      0.1
+    ]
+  ],
+  "batch_size": 128,
+  "precision": "32",
+  "model": "xunet_wide_gapcov32",
+  "width": 4,
+  "persistent_validation_workers": true,
+  "train_yaml": "/home/yangxuan/AAI3001-CVDL/configs/train-k1to4.yaml",
+  "extra_tests": "test-bpp1,source-panels",
+  "val_batch_images": 64,
+  "effective_val_batch_images": 64,
+  "cov_pool_identity": {
+    "version": "gapcov32-v1",
+    "gap_features": 256,
+    "reduced_features": 32,
+    "cov_features": 528,
+    "covariance_divisor": "M",
+    "ridge_relative": 0.0001,
+    "ridge_absolute": 1e-12,
+    "iterations": 5,
+    "sqrt": "trace_normalized_newton_schulz_with_compensation",
+    "triangle": "upper_unweighted",
+    "reduction_bias": false,
+    "post_normalization": "none",
+    "branch_scaling": "none",
+    "classifier": "default_Linear784_to_2",
+    "attribution": "gap_cam_plus_M_centered_cov_gradient"
+  },
+  "srm_trainable": false,
+  "conv1_backend": "native_dense",
+  "initialization": "random",
+  "initial_weights_sha256": "ea36c867bf6f6dc8db2c876629ced60ab84b108c7bb6ffff12641a9881bf3a1b"
+}

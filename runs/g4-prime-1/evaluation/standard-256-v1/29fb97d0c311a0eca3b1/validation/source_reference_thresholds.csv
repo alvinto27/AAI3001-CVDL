@@ -1,0 +1,2 @@
+source,threshold_origin,cutoff,FA,miss,P_E_at_validation_cutoff,pairs,threshold_id,recipe_id,AUC,distinct_clean_tiles,images,photos
+raise,if_source_known_reference,0.59507119655609131,0.014633506135573199,0.045081698274164972,0.029857602204869084,15239,be4c3a478ef7779486c7,8328cc6b0673cade0312,0.99272330900575567,15239,30478,150
