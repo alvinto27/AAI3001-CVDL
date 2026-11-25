@@ -1,13 +1,12 @@
 # Finding Hidden Messages in Photographs: a CNN for Colour LSB Steganalysis with a Localisation Heatmap
 
-AAI3001 Computer Vision and Deep Learning, team project. This README is the project report. Links point to the detailed records (plans, measurements and the dated journal) in [`docs/`](docs/README.md).
+AAI3001 Computer Vision and Deep Learning
 
 | Item | Where |
 | --- | --- |
-| Live demo (cloud) | <https://gcp-aai3001.taild62d21.ts.net> (online while the demo VM runs) |
+| Live demo | <https://gcp-aai3001.taild62d21.ts.net> |
 | Run it locally | [Appendix A](#appendix-a-run-and-reproduce) |
 | Shipped model | [`deploy/run22-rule-c-v1/`](deploy/run22-rule-c-v1/) (run 22, ONNX and PyTorch) |
-| All runs and results | [Findings](docs/findings.md), [journal](docs/journal/README.md) |
 
 ---
 
@@ -15,7 +14,7 @@ AAI3001 Computer Vision and Deep Learning, team project. This README is the proj
 
 *Steganography* hides a message inside an ordinary file. The simplest and most common tool for photos changes the **least significant bits (LSB)** of the pixel values. Each changed pixel moves by about ±1 out of 255, which no person can see. We built a detector that receives an RGB photo and answers two questions: *does this photo carry a hidden message?* and *where?*
 
-We made our own labelled dataset. A deterministic generator embeds messages into 31,100 real photos from four public collections (RAISE, DIV2K, ALASKA2, LSDIR). It records, for each image, the settings used and a mask of every pixel that carries the message. The model is a 0.64 M-parameter convolutional neural network (CNN). It has a fixed bank of 30 high-pass filters (SRM), a widened XuNet body, a covariance-pooling head, and a second output head that we trained on the pixel masks to make a 32 px heatmap. Every model was scored on the same frozen test sets, with photo-level bootstrap intervals.
+We made our own labelled dataset. A deterministic generator embeds messages into 31,100 real photos from four public collections (RAISE, DIV2K, ALASKA2, LSDIR). It records, for each image, the settings used and a mask of every pixel that carries the message. The model is a 0.64 M-parameter convolutional neural network (CNN). It has a fixed bank of 30 high-pass filters (SRM), a widened XuNet body, a covariance-pooling head, and a second output head that we trained on the pixel masks to make a 32 px heatmap. Training data is generated on the fly, so every epoch has new messages; a parallel, deterministic data pipeline keeps the GPU supplied. Every model was scored on the same frozen test sets, with photo-level bootstrap intervals.
 
 On 10,944 test pairs from photos that were never seen in training, the shipped model (run 22) has an error rate P_E of **2.54%** (AUC .997). The course-style baseline had 4.05%. On the hardest case, a 1-bit message at low payload, AUC rises from .627 to **.798**. For whole photos, a small logistic rule flags **5.6%** of clean test photos and misses 10.2% of photos with a message. We export the model to ONNX Runtime with no change in any of the 21,888 test decisions. This makes the service image 3.5× smaller and 1.7–2.3× faster than PyTorch on CPU. The public cloud demo runs on an NVIDIA L4 GPU, 6–8× faster than the cloud VM's CPU, with no change in any of 50 test verdicts. A React web app shows the verdict and the heatmap.
 
@@ -33,7 +32,7 @@ On 10,944 test pairs from photos that were never seen in training, the shipped m
 | --- | --- | --- |
 | C1 | A deterministic, labelled LSB dataset generator. It has 8 kinds of embedding setting. Each image comes with a pixel mask, and the generator can re-create any image exactly to verify it | [3.2](#32-the-generator-and-its-labels) |
 | C2 | Frozen benchmarks, split by photo: a standard test, three domain-shift panels (seen cameras, unseen cameras, another collection), a 32-cell hard test, a cell-map test and a whole-photo test | [3.4](#34-frozen-test-sets) |
-| C3 | A detector that combines an SRM front end, a widened XuNet, covariance pooling and a trained cell head, with paired clean/stego training | [4](#4-method) |
+| C3 | A detector that combines an SRM front end, a widened XuNet, covariance pooling and a trained cell head, with paired clean/stego training on a deterministic, on-the-fly data pipeline | [4](#4-method) |
 | C4 | A model history: 10 models scored on the same tests, so the effect of each design step is measured, not guessed | [6.3](#63-what-made-the-difference-model-history) |
 | C5 | A deployed system: a checked model bundle, a CPU-optimised ONNX engine, an HTTP API, a container image and a web app | [7](#7-system-and-deployment) |
 
@@ -108,18 +107,18 @@ The mask is used only as a training target. The network never receives it as an 
 
 ### 3.3 Training data, built on the fly
 
-We do not store a fixed training set. Each epoch, the loader draws **180,000 tiles** of 256×256 px from the training photos. The source mix is RAISE 0.4, ALASKA 0.4 and LSDIR 0.2. The loader decodes each tile and embeds a new random message into a copy. The model therefore never sees the same message twice. In **paired** batches, the clean tile and its stego copy go into the same batch of 128 (64 pairs). The network then sees the effect of the message with the image content held constant.
+We do not store a fixed training set. Each epoch, the loader draws **180,000 clean tiles** of 256×256 px from the training photos. The source mix is RAISE 0.4, ALASKA 0.4 and LSDIR 0.2. The loader decodes each tile and embeds a new random message into a copy, so an epoch has 360,000 training images. The model therefore never sees the same message twice. In **paired** batches, the clean tile and its stego copy go into the same batch of 128 (64 pairs). The network then sees the effect of the message with the image content held constant.
 
 ### 3.4 Frozen test sets
 
-We built every test set once, recorded its hash, and froze it before any model was scored on it ([plan](docs/active/plan-standard-test-256.md)).
+Every test set was built once and fixed, with a SHA-256 hash, before any model was scored on it.
 
 | Set | Size | Purpose |
 | --- | --- | --- |
-| Validation list `60da…` | 18,000 pairs (RAISE, ALASKA, LSDIR validation photos) | Chooses each model's decision cut-off. Never used for testing |
+| Validation set | 18,000 pairs (RAISE, ALASKA, LSDIR validation photos) | Chooses each model's decision cut-off. Never used for testing |
 | **Standard-256** | 10,944 pairs from 249 RAISE + DIV2K test photos | Main score |
 | Domain panels | ALASKA seen-camera 2,688; ALASKA **unseen-camera** 3,168; LSDIR 5,280 pairs | Effect of new cameras and collections |
-| **Hard-256** [(plan)](docs/active/plan-hard-test-256.md) | 4 panels × k∈{1,2} × {all, low bpp 0.05–0.15, noisy, low+noisy} = 32 cells × 1,008 = 32,256 pairs | Stress test. *Noisy* means above the source's validation 75th percentile of KV-residual noise |
+| **Hard-256** | 4 panels × k∈{1,2} × {all, low bpp 0.05–0.15, noisy, low+noisy} = 32 cells × 1,008 = 32,256 pairs | Stress test. *Noisy* means above the source's validation 75th percentile of KV-residual noise |
 | Cell-map set | 192 validation / 256 test pairs ([`configs/cell-diagnostic-v1.json`](configs/cell-diagnostic-v1.json)) | Is the heatmap in the right place? |
 | Photo-verdict set | 576 test photos, each clean + 12 stego versions | Whole-photo decision |
 
@@ -160,7 +159,7 @@ CE is the cross-entropy of the tile classifier. BCE is the binary cross-entropy 
 
 ### 4.3 Training
 
-Training ran in two stages. Each stage ran once on a Google Cloud `g4-standard-48` Spot VM with one NVIDIA RTX PRO 6000. Every epoch saves a checkpoint, so a stopped VM can resume.
+Training ran in two stages, each once, on one NVIDIA RTX PRO 6000 GPU with 48 vCPUs for data loading.
 
 | | Run 21: detector from scratch | Run 22: cell head (shipped) |
 | --- | --- | --- |
@@ -168,13 +167,30 @@ Training ran in two stages. Each stage ran once on a Google Cloud `g4-standard-4
 | Start | random initial weights | run 21 best epoch (43) |
 | Loss | CE | CE + 0.2 cell BCE |
 | Optimiser | AdamW, lr 3e-4, ×0.3 at epoch 8, ×0.1 at epoch 33 | AdamW, lr 3e-5 |
-| Epochs × tiles per epoch | 50 × 180,000 | 15 × 180,000 (42,195 steps) |
+| Epochs × tile pairs per epoch | 50 × 180,000 | 15 × 180,000 (42,195 steps) |
 | Common settings | batch 128 (64 pairs), 1 warm-up epoch, weight decay 1e-4, gradient clipping 1.0 | same |
-| Wall time | 151 min (about US$4) | 48 min |
+| Training time | 151 min | 48 min |
 
-The settings, seeds and file hashes of each run are saved with its checkpoint ([settings and seeds](docs/active/settings-and-seeds.md)). The [run queue](docs/active/run-queue.md) lists every run and its job ID.
+The settings, seeds and data hashes of each run are saved with its checkpoint ([settings and seeds](docs/active/settings-and-seeds.md)).
 
-### 4.4 From tiles to a verdict for the whole photo
+### 4.4 Training-pipeline optimisation
+
+Generating the data on the fly (§3.3) moves photo decoding and message embedding into the training loop. The network is small, so the pipeline must make new tiles as fast as the GPU trains on them. We changed the pipeline in measured steps. Each change had to leave the training data the same, byte for byte.
+
+| Change | What it does | Measured effect |
+| --- | --- | --- |
+| **Deterministic parallel loader** | Worker processes share out the photos. Each tile's random settings come from a seed built from (run seed, epoch, photo, tile position), not from the worker | The same sample hashes from 1 process and from 4. With 32 workers on the 48-vCPU training machine, the loader supplied 3,003 tiles/s, more than the compiled network used (2,243 tiles/s) |
+| **8-bit transfer** | Tiles stay 8-bit integers through the worker queues and to the GPU; the conversion to float happens on the GPU | Queues hold 4× less data than with 32-bit floats |
+| **Decoded-photo cache** (for small machines) | Each RAW photo is decoded once into a memory-mapped array file | Photo load 2.7 ms, against 293 ms from stored PNG tiles and about 684 ms to decode one RAW file. Loader on the 8-core desktop, against stored PNG tiles: 438 → 609 tiles/s with 4 workers, 739 → 1,000 with 8. The 48-vCPU machine was fast enough without it |
+| **Graph compilation** (`torch.compile`) | Fuses the network's operations into fewer GPU kernels | GPU-only training images/s: 1,635 → 2,243 (1.37×) on the RTX PRO 6000; 1.21× on an L4; 1.24× on the desktop GPU |
+| **Epoch-start priming** | Starts the next epoch's workers during validation, so their shuffle buffers are already full | Stall at each epoch start 11–12 s → 1 s; training part of an epoch 60–62 s → 49–51 s |
+| **Precision** | cuDNN TF32 kept for convolutions; full FP32 for the matrix products of the covariance head | TF32 convolutions are 4–6% faster than full FP32 on an L4 |
+
+Tested and not used: BF16 mixed precision gave only 1.10× (measured on GBRAS-Net, the slowest candidate network), and the channels-last memory layout gave no gain. The compilation and per-step rates above were measured on the 512 px model of that stage. With all the changes, run 21 trained at a steady 18 steps/s with 128 tiles per step (about 2,300 tiles/s).
+
+These changes affect training only. The deployed service has its own inference path (§7.2).
+
+### 4.5 From tiles to a verdict for the whole photo
 
 A photo is larger than one tile, so the service ([`cvdl/photo_inference.py`](cvdl/photo_inference.py)) works in five steps:
 
@@ -196,11 +212,11 @@ A photo is larger than one tile, so the service ([`cvdl/photo_inference.py`](cvd
 | **AUC** | Chance that a random stego image scores above a random clean one. It does not depend on the cut-off. 1.0 is perfect, 0.5 is guessing |
 | 95% interval | 2,000 bootstrap resamples **of photos** (all tiles of a photo stay together). Comparisons between models use the *same* resampled photos (a paired bootstrap) |
 
-Rules that keep the numbers honest:
+Protocol rules:
 
 - **The cut-off comes from validation only.** Each model's tile cut-off minimises P_E on the 18,000-pair validation list. The cell cut-off gives 5% false cells on validation. Test data never sets a cut-off.
-- **Targets before results.** Each run had pass/fail marks written in its plan before it was scored. Example: run 13's cell map had to beat the CAM of a control model, and its standard P_E could not rise more than 0.25 points above the control. The map passed; the P_E guard failed by 0.07 points. The marks and outcomes are in the [plans](docs/README.md) and the [journal](docs/journal/README.md).
-- **Same tests for everyone.** All 10 models in §6.3 were re-scored on the same frozen sets, so their differences are fair comparisons.
+- **Criteria before results.** Each run had pass/fail criteria fixed before it was scored. Example: run 13's cell map had to beat the CAM of a control model, and its standard P_E could not rise more than 0.25 points above the control. The map passed; the P_E criterion failed by 0.07 points.
+- **Same tests for every model.** All 10 models in §6.3 were re-scored on the same frozen sets, so their differences are fair comparisons.
 
 ---
 
@@ -216,8 +232,6 @@ Rules that keep the numbers honest:
 | ALASKA seen cameras | 2,688 | — | — | — | 17.62% |
 | ALASKA **unseen** cameras | 3,168 | — | — | — | 14.87% |
 | LSDIR | 5,280 | — | — | — | 7.59% |
-
-*Source: evaluation `a1ab2faad8f27bca309e` (run folder, not in git). Summary in [findings](docs/findings.md#submission-model-user-2026-11-05).*
 
 By bit depth on the standard set, **k=1 is the hard case**: P_E is 4.79% (AUC .991) for k=1, and 1.5–2.0% (AUC ≥.999) for k=2–4. One changed bit per value is the smallest possible signal.
 
@@ -263,9 +277,9 @@ What the history shows:
 2. **More varied data trades standard score for robustness.** Adding ALASKA and LSDIR made the standard set worse by 1.35 points. It also cut P_E on every other panel, by 1.4 points (LSDIR) to 9.9 points (ALASKA unseen), and raised hard AUC by .05. We kept the varied data because real uploads come from phones, not only from RAISE.
 3. **Covariance pooling was the best architecture change.** It improved hard AUC by .029 and standard P_E by 0.40 points.
 4. **Run-to-run spread is about 0.5 points.** Running the same recipe again moved P_E by +0.48. Smaller differences between single runs are not strong evidence.
-5. **Run 22 trades 0.39 points of standard P_E for a heatmap and a better hard AUC.** We chose it because the heatmap is part of the product (§6.4), and it is the first model whose photo rule passed both frozen marks (§6.5).
+5. **Run 22 trades 0.39 points of standard P_E for a heatmap and a better hard AUC.** We chose it because the heatmap is part of the product (§6.4), and it is the first model whose photo rule met both pre-set criteria (§6.5).
 
-**Changes that did not help** (standard P_E, same tests): delayed pooling 3.43%; colour-separated first layer 3.66%; trainable SRM 3.34%; a low-payload curriculum 3.10%; a harder data mix 3.10%; trim or pad tiling instead of overlap 4.82–6.53%. Full list: [findings ledger](docs/findings.md#standard-256-ledger).
+**Changes that did not help** (standard P_E, same tests): delayed pooling 3.43%; colour-separated first layer 3.66%; trainable SRM 3.34%; a low-payload curriculum 3.10%; a harder data mix 3.10%; trim or pad tiling instead of overlap 4.82–6.53%. 
 
 ### 6.4 Localisation: does the heatmap point to the message?
 
@@ -282,11 +296,11 @@ The trained head beats the untrained CAM by **+.070 [+.053, +.088]**. The pixel 
 
 ![Heatmap example](docs/figures/report/heatmap-example.png)
 
-*Figure 4. A DIV2K test photo, clean (top) and with an 86 kB, k=1 contiguous message at 0.25 bpp (bottom). Middle: the true message location. Right: run 22 through the ONNX engine. The clean photo gets a low score (0.01, 6 isolated cells); the stego photo gets a high score (0.84), and the flagged cells follow the band. Script: [`scripts/build_report_figures.py`](scripts/build_report_figures.py).*
+*Figure 4. A DIV2K test photo, clean (top) and with an 86 kB, k=1 contiguous message at 0.25 bpp (bottom). Middle: the true message location. Right: run 22 through the ONNX engine. The clean photo gets a low score (0.01, 6 isolated cells); the stego photo gets a high score (0.84), and the flagged cells follow the band.*
 
 ### 6.5 Whole-photo verdict
 
-576 test photos, each clean and with 12 stego versions. The rule was fitted on 224 validation photos and set to 5% FA on 224 others, before the test ([record](docs/findings.md#photo-verdict-for-run-22-rule-c-re-fitted-2026-11-05)).
+576 test photos, each clean and with 12 stego versions. The rule was fitted on 224 validation photos and set to 5% FA on 224 others, before the test.
 
 | Rule | FA (clean photos flagged) | Miss | P_E | AUC |
 | --- | ---: | ---: | ---: | ---: |
@@ -294,7 +308,7 @@ The trained head beats the untrained CAM by **+.070 [+.053, +.088]**. The pixel 
 | (b) cells only: logistic rule on the 4 cell features | 9.5% | 12.5% | 11.0% | .945 |
 | **(c) 8-feature logistic rule (shipped)** | **5.6%** | 10.2% | **7.9%** | **.967** |
 
-By source, rule (c) has P_E of RAISE 1.5%, DIV2K 4.9%, LSDIR 4.3%, ALASKA unseen 12.2% and ALASKA seen 14.1%. Using tile *and* cell evidence together beats both one-sided rules; the paired 95% interval of the P_E difference is below zero for both. Run 22 is the first model that passed both frozen marks: FA ≤ 7%, and P_E ≤ 25% on hard k=1 low-payload photos (22.6%).
+By source, rule (c) has P_E of RAISE 1.5%, DIV2K 4.9%, LSDIR 4.3%, ALASKA unseen 12.2% and ALASKA seen 14.1%. Using tile *and* cell evidence together beats both one-sided rules; the paired 95% interval of the P_E difference is below zero for both. Run 22 is the first model that met both criteria set before testing: FA ≤ 7%, and P_E ≤ 25% on hard k=1 low-payload photos (22.6%).
 
 ---
 
@@ -316,7 +330,7 @@ flowchart LR
 - **Model bundle.** A folder that holds the weights, the cut-offs and the photo rule. `deploy.json` and `onnx.json` bind them together with SHA-256 hashes. The service refuses to start if any file was changed or does not match ([bundle guide](cvdl/pipeline/README.md#swap-or-build-a-bundle)). To use a different model, provide a different bundle folder.
 - **The service keeps nothing.** Uploads are processed in memory and nothing is saved, so more copies of the container can run behind a load balancer (§8).
 
-### 7.2 Optimised model: ONNX Runtime
+### 7.2 Inference optimisation: ONNX Runtime
 
 The service needs no gradients, so we export the network to ONNX ([`cvdl/pipeline/export_onnx.py`](cvdl/pipeline/export_onnx.py)). The export refuses to write the bundle record if ONNX and PyTorch differ by more than 1e-3 on 32 seeded random tiles.
 
@@ -339,16 +353,16 @@ The service needs no gradients, so we export the network to ONNX ([`cvdl/pipelin
 | 8 | 12 MP | 4.74 s | **2.11 s** | 2.25× |
 | — | Image size | 1.14 GB | **329 MB** | 3.5× smaller |
 
-**INT8 rejected.** We also tested 8-bit quantisation, which stores values as 8-bit integers instead of 32-bit floats. The best INT8 variant raised standard P_E from 2.54% to **5.78%** (+3.24 points [+2.76, +3.68], 1,267 changed decisions) and lowered hard AUC by .057. It was also *slower* on 8 threads (12.1 vs 9.2 ms per tile). The cause: an 8-bit step is too coarse for a ±1 pixel signal. Details: [pipeline guide](cvdl/pipeline/README.md#onnx-runtime-versus-pytorch-run-22) and the [2026-11-25 journal](docs/journal/2026-11-25/README.md).
+**INT8 rejected.** We also tested 8-bit quantisation, which stores values as 8-bit integers instead of 32-bit floats. The best INT8 variant raised standard P_E from 2.54% to **5.78%** (+3.24 points [+2.76, +3.68], 1,267 changed decisions) and lowered hard AUC by .057. It was also *slower* on 8 threads (12.1 vs 9.2 ms per tile). The cause: an 8-bit step is too coarse for a ±1 pixel signal.
 
 ### 7.3 Deployments
 
-| Target | How | Status |
+| Target | How | Result |
 | --- | --- | --- |
-| **Local, container** | `podman build -f deploy/Dockerfile -t cvdl-pipeline:onnx .` then `podman run --rm -p 127.0.0.1:8000:8000 cvdl-pipeline:onnx` (Docker works the same way) | Working, used for Figures 5–6 |
-| **Local, Python** | `pip install -r deploy/requirements-onnx.txt` then `python -m cvdl.pipeline.serve --engine onnx` | Working |
-| **GPU** | `deploy/Dockerfile.torch` built with the CUDA 13.0 torch wheel (`--build-arg TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130`), run with `--device nvidia.com/gpu=all ... --device cuda` | Working on an NVIDIA L4 (the cloud row) |
-| **Cloud** | Google Cloud VM (`g2-standard-8`: 8 vCPU, 1 NVIDIA L4, `asia-northeast3`). The GPU image runs as a `systemd` service; the ONNX CPU image is installed as a fallback that one command starts. Tailscale Funnel gives the public HTTPS address: `/` serves the built web app, `/api` goes to the API on the same origin ([runbook](docs/active/deploy-gcp-funnel.md), [GPU service](deploy/gcp/cvdl-pipeline.container), [CPU fallback](deploy/gcp/cvdl-pipeline-cpu.container)) | **Live**: <https://gcp-aai3001.taild62d21.ts.net>. Checked from the public route: 2.9 s for a 2.8 MP photo including the upload, 4.5 s for a 16 MP RAISE photo; restarts by itself after a VM reboot |
+| **Local, container** | `podman build -f deploy/Dockerfile -t cvdl-pipeline:onnx .` then `podman run --rm -p 127.0.0.1:8000:8000 cvdl-pipeline:onnx` (Docker works the same way) | ONNX on CPU, timings in §7.2 |
+| **Local, Python** | `pip install -r deploy/requirements-onnx.txt` then `python -m cvdl.pipeline.serve --engine onnx` | ONNX on CPU |
+| **GPU** | `deploy/Dockerfile.torch` built with the CUDA 13.0 torch wheel (`--build-arg TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130`), run with `--device nvidia.com/gpu=all ... --device cuda` | PyTorch on an NVIDIA GPU |
+| **Cloud** | Google Cloud VM (8 vCPU, 1 NVIDIA L4) runs the GPU container as a system service, with the ONNX CPU container as a fallback. Tailscale Funnel provides the public HTTPS address; the web app and the API share one origin ([service files](deploy/gcp/)) | <https://gcp-aai3001.taild62d21.ts.net>. 2.9 s for a 2.8 MP photo and 4.5 s for a 16 MP photo, upload included |
 
 All deployments serve the same run 22 bundle (weights, cut-offs and photo rule) from the same commit. Local CPU use gets the optimised ONNX model (§7.2). The cloud VM has a GPU, so it serves the PyTorch build on CUDA instead:
 
@@ -361,7 +375,7 @@ All deployments serve the same run 22 bundle (weights, cut-offs and photo rule) 
 | Median server time, 2–3 MP (DIV2K) | 2.10 s | **0.27 s** (7.8×) |
 | Median server time, 16 MP (RAISE) | 10.16 s | **1.67 s** (6.1×) |
 
-The VM's CPU (4 physical cores at 2.2 GHz) is about 4× slower than the desktop in §7.2, so the GPU matters there. The small differences come from GPU arithmetic (PyTorch uses TF32 for convolutions on NVIDIA GPUs, as in training); they changed no verdict and no tile decision. Record: [runbook](docs/active/deploy-gcp-funnel.md#gpu-check-2026-11-25).
+The VM's CPU (4 physical cores at 2.2 GHz) is about 4× slower than the desktop in §7.2, so the GPU matters there. The small differences come from GPU arithmetic (PyTorch uses TF32 for convolutions on NVIDIA GPUs, as in training); they changed no verdict and no tile decision.
 
 ### 7.4 User interface
 
@@ -466,10 +480,10 @@ cd app && npm install && npm run dev        # http://127.0.0.1:3000
 | --- | --- |
 | Python environment (CUDA) | `uv sync` ([development guide](docs/development.md)) |
 | Get the source photos | [`Datasets/README.md`](Datasets/README.md) |
-| Train run 21, then run 22 | The notebooks in §4.3, through `scripts/run_notebook.py` or the [G4 runner](docs/active/g4-batch-runner.md) |
+| Train run 21, then run 22 | The notebooks in §4.3, through `scripts/run_notebook.py` |
 | Score a run on the frozen tests | `python scripts/evaluate_run.py runs/<run>` |
 | Build an ONNX bundle | `python -m cvdl.pipeline.export_onnx deploy/<bundle>` |
-| Rebuild the report figures | `python scripts/build_report_figures.py` |
+| Rebuild the figures | `python scripts/build_report_figures.py` |
 | Run the test suite | `python scripts/test_cpu.py --level full` |
 
 ## Appendix B. Repository map
@@ -484,4 +498,4 @@ cd app && npm install && npm run dev        # http://127.0.0.1:3000
 | [`app/`](app/README.md) | Web user interface |
 | [`notebooks/`](notebooks/) | Training notebooks, one per experiment |
 | [`scripts/`](scripts/) | Evaluation, dataset building, report figures |
-| [`docs/`](docs/README.md) | Plans, results, the [findings ledger](docs/findings.md) and the [dated journal](docs/journal/README.md) |
+| [`docs/`](docs/README.md) | Experiment plans, result tables and development notes |

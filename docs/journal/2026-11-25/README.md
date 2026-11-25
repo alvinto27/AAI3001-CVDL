@@ -25,6 +25,8 @@
   - Switched the live service to the GPU (`deploy/gcp/cvdl-pipeline.container`); ONNX CPU unit `deploy/gcp/cvdl-pipeline-cpu.container` kept as a fallback (`Conflicts=` + `After=`; the first version without `After=` failed once on the shared port, then recovered on retry). Public route: 2.9 s for a 3.7 MB photo, 4.5 s for a 23.8 MB RAISE photo; browser verdict after 1.8 s, header "run22-rule-c · CUDA". Reboot test passed. Temporary `sudo` removed again.
 - README rewritten as the project report, in paper form (abstract, related work, dataset, method, protocol, results, system, scalability, limitations, 18 references checked online). The old README moved to `docs/development.md` (links fixed). New: `scripts/build_report_figures.py` (model-history chart from `docs/results/model-history-2026-11-25.json`; heatmap example from DIV2K test photo 0829 with a seeded k=1 contiguous 0.25 bpp message, ONNX engine: clean 0.009 not detected, stego 0.839 detected), and 3 UI screenshots of `app/` against the real ONNX container. FAST level: **697 tests OK (35 skipped)**.
 
+- README edit (user review): removed text about the report itself and internal records (evaluation IDs, list hashes, journal and plan pointers, job IDs), the training cost, and the Spot/VM-type details. Corrected "180,000 tiles" to 180,000 tile pairs (360,000 images) per epoch (42,195 steps = 15 × ⌈180,000/64⌉). New §4.4 "Training-pipeline optimisation" from the measured records (2026-10-13 to 10-15 journals, archived loader/cache/compile verifications, `plan-gbras-speed.md`); ONNX section renamed "Inference optimisation".
+
 ## Found
 
 | Model | Change | Std P_E % | Std AUC | ALASKA seen P_E % | ALASKA unseen P_E % | LSDIR P_E % | Hard k=1 low AUC | Cut-off origin |
