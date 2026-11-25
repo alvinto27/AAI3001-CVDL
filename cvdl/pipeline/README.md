@@ -6,6 +6,8 @@ The API tiles an original photo, runs **run 22 with photo rule (c)**, and return
 
 Run from the repository root. Allow about **4 GiB RAM**. The CPU image contains the model and downloads nothing at startup.
 
+The default image (`deploy/Dockerfile`) runs the model with **ONNX Runtime** and does not contain PyTorch: 329 MB instead of 1.14 GB, and about 1.7–2.3× faster per photo (see [Host settings and limits](#host-settings-and-limits)). `deploy/Dockerfile.torch` keeps the PyTorch image, which is needed for GPUs.
+
 | Step | Docker | Podman |
 | --- | --- | --- |
 | Build | `docker build -f deploy/Dockerfile -t cvdl-pipeline:cpu .` | `podman build -f deploy/Dockerfile -t cvdl-pipeline:cpu .` |
@@ -21,16 +23,17 @@ Use Python 3.12 with `venv` support (`python3.12-venv` on Debian/Ubuntu). Create
 ```sh
 python3.12 -m venv "$HOME/.venvs/cvdl-pipeline"
 . "$HOME/.venvs/cvdl-pipeline/bin/activate"
-python -m pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
-python -m pip install -r deploy/requirements-http.txt
-python -m cvdl.pipeline.serve --host 127.0.0.1 --port 8000
+python -m pip install -r deploy/requirements-onnx.txt
+python -m cvdl.pipeline.serve --engine onnx --host 127.0.0.1 --port 8000
 ```
+
+For the PyTorch engine instead, install `torch==2.14.0` from `https://download.pytorch.org/whl/cpu`, then `deploy/requirements-http.txt`, and use `--engine torch` (the default outside the container).
 
 No Lightning/pandas/YAML/torchvision/RAW decoders are needed. Leave training dependencies, `pyproject.toml` and `uv.lock` unchanged.
 
 ### GPU option
 
-**Passing GPU devices does not turn the CPU image into a GPU image.** A compatible wheel/runtime and host driver are required. Build with `--build-arg TORCH_INDEX_URL=...` for the matching torch 2.14.0 index. GPU builds are untested here.
+**Passing GPU devices does not turn the CPU image into a GPU image.** The ONNX image is CPU only. Build `deploy/Dockerfile.torch` with `--build-arg TORCH_INDEX_URL=...` for the matching torch 2.14.0 index. A compatible wheel/runtime and host driver are required. GPU builds are untested here.
 
 For a prepared NVIDIA image tagged `cvdl-pipeline:gpu`:
 
@@ -50,7 +53,7 @@ curl -F 'photo=@photo.png' -F 'include_images=true' \
 
 | Route / form field | Meaning |
 | --- | --- |
-| `GET /health` | `ready`, bundle identity and device; HTTP 503 when not ready. |
+| `GET /health` | `ready`, bundle identity, device and engine (`onnx` or `torch`); HTTP 503 when not ready. |
 | `POST /analyze` | Multipart upload. `photo` must be one file, not a server path. |
 | `include_images` | `true` returns base64 PNG heatmap and overlay; default `false`. |
 | `allow_rgba` | Explicitly discard alpha without changing RGB; default `false`. |
@@ -62,7 +65,7 @@ A successful response includes:
 | `bundle` | Name, version, format version and weights hash. Also present in health/error responses; `null` if startup failed before a bundle loaded. |
 | `photo_verdict` | `message_detected` or `not_detected`. |
 | `photo_rule` | Raw `logit`, its 0–1 `probability` score, and **logit** `cutoff`. Use the supplied verdict; this is not a calibrated real-world chance. |
-| `schema_version`, `device` | Response contract version and execution device. |
+| `schema_version`, `device`, `engine` | Response contract version, execution device and engine (`onnx` or `torch`). |
 | `width`, `height`, `input` | Stored dimensions, format, orientation and warnings. |
 | `tiles` | Row-major tile `box`, stego `probability`, and `flagged` value. |
 | `heatmap` | Raw `values`, boolean `flagged` mask, map kind/score, cutoff, cell size, shape and x/y edges. |
@@ -136,11 +139,43 @@ python scripts/build_deploy_bundle.py --run "$RUN" --evaluation-id "$EVAL" \
   --photo-rule "$FIT/frozen-rules.json" --output deploy/my-bundle
 ```
 
+Then export the network for the ONNX engine (needs torch, `onnx` and `onnxscript`; refuses to write `onnx.json` if ONNX Runtime and PyTorch outputs differ by more than 1×10⁻³):
+
+```sh
+python -m cvdl.pipeline.export_onnx deploy/my-bundle
+```
+
+This writes `model.onnx` and `onnx.json`. `onnx.json` records the model hash, the bundle weights hash and the contract hash; the ONNX engine refuses a model that does not match its own bundle. The ONNX engine serves trained-head bundles only.
+
 Headless models use `MAP=cam` with their **own CAM cutoff and fit**; otherwise `MAP=trained_head`. GAP + covariance models are `trained_head` only. Cache defaults to GPU; `--device cpu` is available. Original full cache: ~25 min, hardware-dependent. Unsupported architectures/grids need implementation.
 
 ## Host settings and limits
 
-CPU threads use PyTorch's default or existing `OMP_NUM_THREADS`/`MKL_NUM_THREADS` settings; one analysis can use several cores. Optionally cap PyTorch with `CVDL_THREADS=4 python -m cvdl.pipeline.serve ...`, or add `-e CVDL_THREADS=4` before the container image name. This overrides PyTorch's environment-derived count. Lower it on a shared/CPU-limited host; do not start extra server workers to get more threads. Keep the **4 GiB container memory allowance**: more threads did not require a higher cap in this test.
+CPU threads use the engine's default (all cores for ONNX Runtime; PyTorch's default or `OMP_NUM_THREADS`/`MKL_NUM_THREADS`); one analysis can use several cores. Optionally cap either engine with `CVDL_THREADS=4 python -m cvdl.pipeline.serve ...`, or add `-e CVDL_THREADS=4` before the container image name. Lower it on a shared/CPU-limited host; do not start extra server workers to get more threads. Keep the **4 GiB container memory allowance**: more threads did not require a higher cap in this test.
+
+### ONNX Runtime versus PyTorch (run 22)
+
+Both CPU images built from the same tree, run 22 bundle, `--cpus` and `CVDL_THREADS` set to the same count, 4 GiB limit, `include_images=false` (what the app sends). Median of three `/analyze` calls, AMD Ryzen 7 7700, nothing else running. The 2.8 MP photo is DIV2K 0801 (2040×1356, 48 tiles); the 12 MP photo is 4000×3000 (192 tiles).
+
+| CPUs | Photo | PyTorch | ONNX Runtime | Speed-up |
+| --- | --- | ---: | ---: | ---: |
+| 2 | 2.8 MP | 2.71 s | 1.54 s | 1.76× |
+| 2 | 12 MP | 10.80 s | 6.21 s | 1.74× |
+| 8 | 2.8 MP | 1.19 s | 0.53 s | 2.27× |
+| 8 | 12 MP | 4.74 s | 2.11 s | 2.25× |
+
+| Image | Size | Memory after the runs |
+| --- | ---: | ---: |
+| `deploy/Dockerfile.torch` | 1.14 GB | 198–246 MB |
+| `deploy/Dockerfile` (ONNX) | 329 MB | 578 MB |
+
+ONNX Runtime keeps a memory pool between calls, so it holds more memory; both stay far below the 4 GiB limit.
+
+**Same results.** The run 22 ONNX model went through the complete frozen evaluation (standard-256 and hard-256 suites, ONNX Runtime in place of PyTorch, nothing else changed). Its validation cut-off was 0.5245214 against 0.5245211 for PyTorch. On all 21,888 standard test tiles not one decision changed (largest tile-probability difference 1.6×10⁻⁴); standard P_E 2.545%, ALASKA seen/unseen and LSDIR P_E and hard k=1 low-payload AUC 0.7983 are the same as PyTorch. `tests/test_pipeline_onnx.py` checks every shipped bundle against PyTorch and checks that the ONNX path never imports torch.
+
+**INT8 was measured and rejected.** Static INT8 quantization (Conv and Gemm layers, SRM filter kept in FP32, 512 validation tiles for calibration) was 1.4× faster on 2 threads but slower on 8, and it failed the frozen tests: standard P_E 5.78% (+3.24 points [+2.76, +3.68]) and hard AUC 0.742 (−0.057). The LSB signal is a ±1 change in pixel values; 8-bit activations are too coarse for it. Fewer pixels are also not an option: resizing a photo destroys the LSB signal, so every pixel is analysed.
+
+### PyTorch engine, earlier bundles
 
 For the previous run-13 bundle on this PC, three `/analyze` runs per validation photo gave these medians (CPU image, 4 GiB limit; default selected 8 threads). Results stayed within the tile-score parity tolerance, with identical verdicts. Other CPUs can differ.
 
