@@ -14,9 +14,9 @@ A photo can carry a hidden message in the lowest bits of its pixels, and the cha
 
 | Part | Main result | Section |
 | --- | --- | --- |
-| **Dataset** | Our own generator turns 31,100 real photos into labelled clean/stego pairs, with a mask of every changed pixel. Frozen test sets, split by photo | [2](#2-dataset) |
-| **Model** | A 0.64 M-parameter CNN with a second output head, trained on the pixel masks, that draws the heatmap | [3](#3-model) |
-| **Results** | Error rate 2.54% on unseen photos (course baseline: 4.05%). Heatmap finds the message region (AUC .864). Whole photos: 5.6% false alarms | [4](#4-results) |
+| **Dataset** | Our own generator turns 31,100 real photos into labelled clean/stego pairs, with a message mask and a record of every changed value. Frozen test sets, split by photo | [2](#2-dataset) |
+| **Model** | A 0.64 M-parameter CNN without normalisation layers, with a second output head, trained on changed-cell targets, that draws the heatmap | [3](#3-model) |
+| **Results** | Tile error rate 2.54% on the held-out RAISE + DIV2K test set (course baseline: 4.05%). Heatmap ranks changed cells above unchanged ones (AUC .864). Whole photos: 5.6% false alarms | [4](#4-results) |
 | **Deployment** | Live in the cloud on a GPU, and locally as a container with an optimised ONNX model (up to 2.3× faster, 3.5× smaller, same decisions) | [5](#5-deployment) |
 | **User interface** | Web app with verdict, zoomable heatmap and ranked regions | [6](#6-user-interface) |
 | **Scalability** | Any photo size up to 32 MP, new cameras, new embedding settings, model swap without code changes | [7](#7-scalability-and-other-image-types) |
@@ -27,7 +27,7 @@ A photo can carry a hidden message in the lowest bits of its pixels, and the cha
 | --- | --- |
 | **LSB** | Least significant bit. The lowest bit of a pixel value (0–255). Changing it moves the value by ±1 |
 | **Clean / stego** | A photo without / with a hidden message |
-| **k** | How many low bits per value the message uses. k=1 is the smallest and hardest-to-detect change |
+| **k** | How many low bits per value the message uses. k=1 changes a value by at most ±1 and is the hardest to detect; k bits can change it by up to 2<sup>k</sup> − 1 |
 | **bpp** | Bits per pixel: message length divided by the number of pixels |
 | **Tile / cell** | The model reads 256×256 px tiles. Each tile is split into an 8×8 grid of 32 px cells for the heatmap |
 | **FA / Miss** | False alarm: a clean image called stego. Miss: a stego image called clean |
@@ -53,13 +53,13 @@ A photo can carry a hidden message in the lowest bits of its pixels, and the cha
 
 ## 1. Problem and approach
 
-**An LSB message changes pixel values by ±1, so a detector must find it in the image noise.** The natural noise of the photo masks the message. The masking is strongest in noisy photos from small-sensor phone cameras.
+**An LSB message changes pixel values by very small amounts (at most ±1 for a 1-bit message), so a detector must find it in the image noise.** The natural noise of the photo masks the message. The masking is strongest in noisy photos from small-sensor phone cameras.
 
 Steganalysis is used in image forensics and content screening, where an analyst must decide which images to examine further. A score alone gives the analyst no evidence to check, so our tool also shows *where* the message most likely is.
 
 ```mermaid
 flowchart LR
-    P["31,100 real photos<br/>4 collections"] --> G["Our generator<br/>clean/stego pairs<br/>+ pixel masks"]
+    P["31,100 real photos<br/>4 collections"] --> G["Our generator<br/>clean/stego pairs<br/>+ change labels"]
     G --> T["Training<br/>new messages<br/>every epoch"]
     T --> M["CNN<br/>tile score + cell heatmap"]
     M --> S["Service<br/>photo verdict"]
@@ -80,25 +80,25 @@ The contributions of this work:
 
 ## 2. Dataset
 
-**We built our own labelled dataset: a generator hides messages in real photos and records exactly which pixels changed.**
+**We built our own labelled dataset: a generator hides messages in real photos and records exactly where the message is and which values changed.**
 
 ![Sample photos, the 256 px tile grid, and change masks for three placements](docs/figures/report/data-sample.png)
 
-*Figure 1. Top: one test photo from each source, with the 256 px tile grid. Middle: a clean tile, the same tile with a message (they look the same), and the change masks for three placements. Bottom: in a noisy phone photo the noise covers the changes.*
+*Figure 1. Top: one test photo from each source, with the 256 px tile grid. Middle: a clean tile, the same tile with a message (they look the same), and the message masks for three placements. Bottom: in a noisy phone photo the noise covers the changes.*
 
 - **Photos:** 31,100 photos from four public collections (RAISE, DIV2K, ALASKA2, LSDIR), split by photo into train, validation and test. One collection (DIV2K) and 8 camera models are never used in training.
-- **Labels:** each clean/stego pair has an image label, the embedding settings, a pixel mask and an 8×8 cell target. The generator is seeded, so it can re-create and verify every image byte for byte.
-- **Training data on the fly:** each epoch draws 180,000 new tile pairs with new random messages, so the model never sees the same message twice.
+- **Labels:** each clean/stego pair has an image label, the embedding settings, a pixel mask and an 8×8 changed-cell target. The generator is seeded, so it can re-create and verify every image byte for byte.
+- **Training data on the fly:** each epoch draws 180,000 tile pairs with freshly generated messages, so the model does not train on a fixed, repeated set of stego images.
 
 <details>
 <summary><b>Details:</b> source collections</summary>
 
 | Source | Photos | Train / Val / Test | What it adds | Licence |
 | --- | ---: | --- | --- | --- |
-| RAISE [1] | 1,000 Nikon RAW (NEF), 6–16 MP | 701 / 150 / 149 | Large, clean, camera-native photos | Non-commercial research and education |
-| DIV2K [2] | 900 PNG, 1–4 MP | 680 / 120 / 100 | Never used in training: a source the model has not seen | Academic research only |
-| ALASKA2 [3] | 18,200 TIFF, ≤1 MP, 38 camera models | 13,500 / 1,000 / 1,700 seen-camera + 2,000 unseen-camera | Many phones and cameras, very noisy photos. 8 camera models are held out completely | Source site terms |
-| LSDIR [4] | 11,000 PNG, 0.3–11 MP | 7,000 / 1,500 / 2,500 | Varied web-scale scenes | Source site terms |
+| RAISE [[1](#ref-1)] | 1,000 Nikon RAW (NEF), 6–16 MP | 701 / 150 / 149 | Large, clean, camera-native photos | Non-commercial research and education |
+| DIV2K [[2](#ref-2)] | 900 PNG, 1–4 MP | 680 / 120 / 100 | Never used in training: a source the model has not seen | Academic research only |
+| ALASKA2 [[3](#ref-3)] | 18,200 TIFF, ≤1 MP, 38 camera models | 13,500 / 1,000 / 1,700 seen-camera + 2,000 unseen-camera | Many phones and cameras, very noisy photos. 8 camera models are held out completely | Source site terms |
+| LSDIR [[4](#ref-4)] | 11,000 PNG, 0.3–11 MP | 7,000 / 1,500 / 2,500 | Varied web-scale scenes | Source site terms |
 
 - No tile of a test photo is used in training or validation. Each split is frozen in a CSV file in [`data/`](data/), identified by a SHA-256 hash. [`data/<source>/photo_manifest.csv`](data/raise/) lists every photo's path, camera, size, tile grid and split.
 - RAISE NEF files are decoded with one fixed set of settings: rawpy/LibRaw, AHD demosaicing, camera white balance, no auto-brightness, 8-bit output ([`lsb_raw.py`](LSB-Dataset-Generator/lsb_raw.py)). A different decoder produces different noise, so a fixed decoder keeps the clean class consistent.
@@ -126,10 +126,10 @@ Each pair has four labels:
 
 1. Image label: clean or stego.
 2. All the drawn settings and the actual bpp.
-3. A boolean pixel mask of the pixels selected for the message.
-4. The cell target `changed_cells_v1`: an 8×8 grid per 256 px tile that marks which 32 px cells contain changed pixels.
+3. A boolean pixel mask of the pixels *selected* for the message.
+4. The cell target `changed_cells_v1`: an 8×8 grid per 256 px tile that counts the pixels whose values *actually changed* in each 32 px cell.
 
-The mask is used only as a training target. The network never receives it as an input.
+The two differ: a selected value whose low bits already equal the message bits does not change, so with encrypted-like data about half of the selected values change at k=1. The heatmap is trained on the changed values, because only they leave a trace a detector can find. The network never receives either label as an input.
 
 **Training data.** No fixed training set is stored. Each epoch, the loader draws 180,000 clean tiles of 256×256 px from the training photos (source mix: RAISE 0.4, ALASKA 0.4, LSDIR 0.2). It embeds a new random message into a copy of each, so an epoch has 360,000 training images. In *paired* batches, a clean tile and its stego copy go into the same batch of 128 (64 pairs), so the network sees the effect of the message with the image content held constant.
 
@@ -170,9 +170,10 @@ flowchart LR
 
 *Figure 2. Run 22 network ([`cvdl/models.py`](cvdl/models.py), class `XuNetWideGAPCov32`): 638,611 trained parameters and 2,250 fixed SRM weights.*
 
-- **SRM filters** [5, 6] remove image content and keep the noise, where the message is.
-- **Covariance pooling** [7, 8] keeps how feature channels vary *together*, not only their averages. It was the most effective architecture change (§4.2).
-- **The cell head** (this work) is trained on the generator's pixel masks, so the heatmap learns *where* the message is. It adds only 257 parameters.
+- **SRM filters** [[5](#ref-5), [6](#ref-6)] remove image content and keep the noise, where the message is.
+- **Covariance pooling** [[7](#ref-7), [8](#ref-8)] keeps how feature channels vary *together*, not only their averages. It was the most effective architecture change (§4.2).
+- **The cell head** (this work) is trained on the generator's changed-cell targets, so the heatmap learns *where* the message is. It adds only 257 parameters.
+- **No normalisation layers.** Both common choices let a message in one place change scores elsewhere, which a heatmap cannot allow (details below).
 
 <details>
 <summary><b>Details:</b> layers and design choices</summary>
@@ -189,9 +190,10 @@ flowchart LR
 | Classifier | Linear 784 → 2 | tile score |
 | Cell head | 1×1 conv 256 → 1 | 8×8 map (one cell = 32 px) |
 
-- *Fixed SRM front end* [5, 6]. Clipping at ±3 (pixel units) stops strong edges from dominating. A *trainable* SRM bank (run 20) did worse (3.34% vs 2.55%).
-- *XuNet body, 4× wider, without normalisation* [9]. The absolute-value and tanh layers keep the sign symmetry of ±1 changes. Removing GroupNorm and widening the 1×1 layers gave more capacity at almost no cost in speed.
-- *Covariance pooling* [7, 8]. Our independent implementation is in [`cvdl/cov_pool.py`](cvdl/cov_pool.py).
+- *Fixed SRM front end* [[5](#ref-5), [6](#ref-6)]. Clipping at ±3 (pixel units) stops strong edges from dominating. A *trainable* SRM bank (run 20) did worse (3.34% vs 2.55%).
+- *XuNet body, 4× wider, without normalisation* [[9](#ref-9)]. The absolute-value and tanh layers keep the sign symmetry of ±1 changes. Widening the 1×1 layers gave more capacity at almost no cost in speed.
+- *Why normalisation was removed.* Normalisation layers rescale features with statistics computed over many positions, so a local change can move the output elsewhere. We measured this for both standard choices. With BatchNorm, a tile's score depended on the other tiles in its batch: in training mode, a batch of only clean tiles was classified correctly only 1.7–2.2% of the time. GroupNorm removed the batch dependence, but its statistics span the whole feature map: a message in one region shifted the scores of unchanged cells in the same normalised region (mean absolute cell-score shift 0.6–11.7, maximum 140). After the normalisation was removed, scores outside the changed regions did not move in 36 of 36 probe cases, and scoring a photo in parts or whole differed by at most 0.00064. A heatmap must leave clean regions unaffected by a message elsewhere, so the final network has no normalisation layers.
+- *Covariance pooling* [[7](#ref-7), [8](#ref-8)]. Our independent implementation is in [`cvdl/cov_pool.py`](cvdl/cov_pool.py).
 - *Cell head*. It shares the body with the tile classifier, so the heatmap adds almost no computation.
 
 </details>
@@ -201,7 +203,14 @@ flowchart LR
 
 $$\mathcal{L} = \text{CE}(\hat y_{\text{tile}}, y) + 0.2 \cdot \text{BCE}(\hat m_{\text{cell}}, m_{\text{cell}})$$
 
-CE is the cross-entropy of the tile classifier. BCE is the binary cross-entropy of the cell head against the 8×8 changed-cell target from the generator's mask. This loss trains the heatmap to show *where* the message is, which the class activation map (CAM) [10] of a classifier does not learn on purpose.
+CE is the cross-entropy of the tile classifier. BCE is the binary cross-entropy of the cell head against the 8×8 changed-cell target. This loss trains the heatmap to show *where* the message is, which the class activation map (CAM) [[10](#ref-10)] of a classifier does not learn on purpose.
+
+The cell loss has two design choices that follow from how the network sees a cell:
+
+- *Receptive-field-aware negatives.* Each cell output sees a 48×48 px area, which reaches 8 px into its neighbours. A cell with no changed pixel of its own can therefore still see changed pixels next to it. Such "halo" cells are left out of the loss; a cell counts as clean only if its whole 48 px field is unchanged. On the heatmap test set this excluded 513 of the 16,384 cells in stego tiles.
+- *Weighted positives.* A changed cell's loss is weighted by its number of changed pixels divided by 16, capped at 1. A cell with one or two changed pixels carries almost no signal, so it counts less than a cell with 16 or more.
+
+Positive and negative cells are averaged separately within each tile, so tiles with few changed cells are not dominated by their clean cells.
 
 Training ran in two stages, each once, on one NVIDIA RTX PRO 6000 GPU with 48 vCPUs for data loading.
 
@@ -258,7 +267,7 @@ The service ([`cvdl/photo_inference.py`](cvdl/photo_inference.py)) works in five
 
 ## 4. Results
 
-**The shipped model (run 22) has a 2.54% error rate on photos it never saw. The weak spots are noisy phone photos and a collection it never trained on.**
+**On the held-out standard test set, the shipped model (run 22) has a tile error rate of 2.54%. The weak spots are noisy phone photos and a collection it never trained on.**
 
 | Test | Result |
 | --- | --- |
@@ -287,7 +296,7 @@ The service ([`cvdl/photo_inference.py`](cvdl/photo_inference.py)) works in five
 | RAISE (camera RAW) | **1.76%** | |
 | DIV2K (never in training) | 8.61% | Mostly false alarms (13.3%) |
 | LSDIR | 7.59% | |
-| ALASKA, unseen cameras | 14.87% | Better than seen cameras, so the model did not memorise camera noise |
+| ALASKA, unseen cameras | 14.87% | Lower than for seen cameras. This does not prove the model ignores camera traits: the two camera groups may differ in difficulty |
 | ALASKA, seen cameras | 17.62% | Noisy phone photos |
 
 - k=1 (one changed bit per value) is the hardest case: P_E 4.79% on the standard set, against 1.5–2.0% for k=2–4.
@@ -330,7 +339,7 @@ The primary hard measure is k=1 at low bpp, pooled over ALASKA seen, ALASKA unse
 
 - **256 px instead of 512 px training tiles:** −2.17 points of error. The smaller tiles match the test tiles, and each epoch covers more photos.
 - **More varied photos (ALASKA, LSDIR):** +1.35 points on the standard test, but better on every other test (−1.4 to −9.9 points). We kept them, because real images also come from phones.
-- **Two runs of the same recipe differ by about 0.5 points**, so smaller differences between single runs are weak evidence.
+- **One repeat of the same recipe differed by 0.48 points.** A single repeat does not estimate run-to-run variance, but it shows that differences of this size between single runs are weak evidence.
 
 <details>
 <summary><b>Details:</b> every step with 95% intervals, and changes that did not help</summary>
@@ -350,13 +359,14 @@ The primary hard measure is k=1 at low bpp, pooled over ALASKA seen, ALASKA unse
 
 - Covariance pooling was the most effective architecture change: hard AUC +.029 and standard P_E −0.40 points.
 - Run 22 gives up 0.39 points of standard P_E for a trained heatmap and a higher hard AUC. It was selected because localisation is one of the two aims of this work (§4.3), and because it is the first model whose photo rule met both pre-set criteria (§4.4).
+- The ladder is not a one-change-at-a-time ablation: some steps changed several settings together (the first step changed width, normalisation and the k range). The course-style baseline also trained for fewer epochs, on fewer photo collections. The total gain is therefore a gain of the whole system, not of the architecture alone.
 - Changes that did not help (standard P_E on the same tests): delayed pooling 3.43%; colour-separated first layer 3.66%; trainable SRM 3.34%; a low-payload curriculum 3.10%; a harder data mix 3.10%; trim or pad tiling instead of overlap 4.82–6.53%.
 
 </details>
 
 ### 4.3 Localisation: does the heatmap point to the message?
 
-**Training the heatmap on the pixel masks made it clearly better than the usual class activation map (CAM).**
+**Training the heatmap on changed-cell targets made it clearly better than the usual class activation map (CAM).**
 
 ![Heatmap example](docs/figures/report/heatmap-example.png)
 
@@ -366,6 +376,16 @@ The primary hard measure is k=1 at low bpp, pooled over ALASKA seen, ALASKA unse
 | --- | ---: |
 | CAM of a model without cell training | .793 |
 | **Trained cell head (shipped)** | **.864** |
+
+Ranking is not the same as finding. At the cell cut-off chosen on validation data (4.5% of clean cells flagged on the test set), the head finds about half of the changed cells when the message is one block, but only about one in nine when it is scattered:
+
+| Message placement | Changed cells flagged (recall) |
+| --- | ---: |
+| One contiguous block | 52.4% |
+| Scattered at random | 11.4% |
+| All test tiles pooled | 16.7% |
+
+A scattered message spreads a few changed pixels over every cell, so each cell carries a weak signal; a block concentrates the signal in a few cells.
 
 <details>
 <summary><b>Details:</b> measure and intervals</summary>
@@ -377,9 +397,12 @@ Measure: within each stego tile with a contiguous message, do the changed cells 
 | CAM of a model without cell training | .793 [.757, .828] |
 | CAM of the cell-trained model | .806 [.770, .840] |
 | Trained cell head (run 13) | .863 [.836, .890] |
-| Trained cell head (run 22, shipped) | .864 (pooled .873); false cells 4.5% at the validation cut-off |
+| Trained cell head (run 22, shipped) | .864 [.835, .891] (pooled .873); false cells 4.5% at the validation cut-off |
+| Attribution map of the detector without a cell head (run 21) | .752 [.718, .786] |
 
-The trained head beats the untrained CAM by +.070 [+.053, +.088].
+The trained head beats the untrained CAM by +.070 [+.053, +.088]. The attribution map of run 21, the strongest detector without a cell head, scores .112 [.087, .137] below the trained head of run 22. A better detector therefore does not by itself give a better map; the map needs its own training signal.
+
+The heatmap test set has 256 test tiles: 64 from each of RAISE, ALASKA seen cameras, ALASKA unseen cameras and LSDIR, half with a contiguous and half with a random message. The per-tile AUC uses only the 128 contiguous tiles, because a random message changes all 64 cells of a tile, which leaves no unchanged cell to compare against. Flagged clean cells differ by source: RAISE 1.3%, LSDIR 2.3%, ALASKA unseen 6.7%, ALASKA seen 7.7%.
 
 </details>
 
@@ -405,6 +428,38 @@ The trained head beats the untrained CAM by +.070 [+.053, +.088].
 | (c) 8-feature logistic rule | 5.6% | 10.2% | 7.9% | .967 |
 
 By source, rule (c) has P_E of RAISE 1.5%, DIV2K 4.9%, LSDIR 4.3%, ALASKA unseen 12.2% and ALASKA seen 14.1%. Rule (c) beats both one-sided rules; the paired 95% interval of the P_E difference is below zero for both. Run 22 is the first model that met both criteria set before testing: FA ≤ 7%, and P_E ≤ 25% on hard k=1 low-payload photos (22.6%).
+
+</details>
+
+### 4.5 Diagnostic findings
+
+**Two diagnostic experiments show where the CNN leaves signal unused: a classical statistic finds scattered 1-bit replacement better in noisy photos, and all models are more sensitive to green than to red or blue.**
+
+A classical detector, weighted-stego analysis (WS) [[11](#ref-11), [12](#ref-12)], was compared with an earlier CNN of this work (SRM-e50, §4.2) on the same hard-test tiles. WS estimates the message length from the parity structure that LSB *replacement* leaves. On noisy ALASKA photos with a 1-bit replacement message, the whole WS 95% interval lay above the CNN in 10 of 12 conditions. The advantage was largest for scattered messages; for a contiguous block the two were tied on ALASKA, and the CNN was better on LSDIR (.894 against .753). WS found no signal in LSB *matching*, as expected, while the CNN detects both methods about equally. A better ranking did not give a better operating point: at cut-offs set on validation data, WS flagged up to 38.7% of noisy clean test tiles, against up to 19.6% for the CNN. The result shows that usable statistical evidence remains in images where the CNN is weak.
+
+A colour experiment hid the same message in only the red, only the green or only the blue values of 480 test photos, with the same pixels and density in each case. All three models tested (runs 18, R1 and SRM-e50, before run 22) were clearly more sensitive to green. A message in red or blue alone raised the miss rate by about 5–6 points. A possible cause, not tested, is that camera sensors have two green sites in each 2×2 Bayer block and the least noise in green. This matters for colour steganalysis, since most published detectors work on greyscale images.
+
+<details>
+<summary><b>Details:</b> numbers</summary>
+
+WS against the CNN, ALASKA seen cameras, scattered 1-bit replacement (AUC [95%]):
+
+| Condition | WS | CNN (SRM-e50) |
+| --- | --- | --- |
+| Low payload | .814 [.774, .855] | .608 [.583, .637] |
+| Noisy | .680 [.646, .721] | .563 [.538, .589] |
+| Low payload + noisy | .575 [.559, .597] | .510 [.498, .525] |
+
+A positive control on 416 pairs confirmed the WS implementation (AUC .994; CNN .997 on the same pairs).
+
+Colour experiment, run 18 (AUC; 5,760 stego tiles per arm):
+
+| Message in | Red only | Green only | Blue only | Red, green and blue |
+| --- | ---: | ---: | ---: | ---: |
+| AUC | .660 | **.775** | .662 | .725 |
+| Change against RGB [98.3%] | −.065 [−.074, −.056] | +.050 [+.041, +.058] | −.063 [−.072, −.054] | — |
+
+The same order held for R1 and SRM-e50, and for the cell head of run 18 (within-tile AUC: green .78–.82, red .68–.74, blue .65–.71).
 
 </details>
 
@@ -456,7 +511,7 @@ Both service images were built from the same source. Times are the median of 3 r
 | 8 | 12 MP | 4.74 s | 2.11 s | 2.25× |
 | — | Image size | 1.14 GB | 329 MB | 3.5× smaller |
 
-8-bit (INT8) quantisation was also tested. The best INT8 variant raised standard P_E from 2.54% to 5.78% (+3.24 points [+2.76, +3.68], 1,267 changed decisions), lowered hard AUC by .057, and was slower on 8 threads (12.1 vs 9.2 ms per tile). An 8-bit step is too coarse for a ±1 pixel signal, so INT8 was not used.
+8-bit (INT8) quantisation was also tested. The best INT8 variant raised standard P_E from 2.54% to 5.78% (+3.24 points [+2.76, +3.68], 1,267 changed decisions), lowered hard AUC by .057, and was slower on 8 threads (12.1 vs 9.2 ms per tile). INT8 was not used. A likely reason is that 8-bit activations cannot keep the very small differences a ±1 change produces, but this cause was not tested separately.
 
 </details>
 
@@ -532,24 +587,37 @@ The result screen for a stego photo is at the top of this page. A clean photo ge
 - **Noisy phone photos:** 1-bit, low-payload messages are close to undetectable (AUC .53–.55).
 - **Unseen collections:** false alarms are higher, 13.3% at tile level on DIV2K.
 - **Detection, not extraction:** the tool reports *whether* and *where*, not the message content.
-- **Single runs:** each recipe was trained once, with one seed; run-to-run spread is about 0.5 points.
+- **Single runs:** each recipe was trained once, with one seed. One repeat differed by 0.48 points; this is a single observation, not an estimate of the variance.
+- **Test-set reuse:** the frozen test sets were never used for training or for cut-offs, but their results guided later design choices. They are not an untouched final confirmation set.
+- **Validation differences:** older models chose their checkpoints with their own validation data (some at 512 px) and were given new 256 px cut-offs afterwards. Their validation photo mix also differed.
+- **Confounded comparisons:** some steps of the model history changed several settings together, and the baseline had less training and less varied data (§4.2).
+- **Scattered messages:** the heatmap finds 52% of changed cells for a contiguous message, but only 11% for a scattered one (§4.3).
 - **Photo-verdict test:** it uses the same source collections as development, so seen-camera results are not evidence for unseen cameras.
 - **Human review:** a flag is evidence for a person to check, not a finding of wrongdoing. The UI says so on every result.
 
 ## 9. Conclusion
 
-This work presented an end-to-end system for colour LSB steganalysis: a labelled dataset generator, frozen test sets split by photo, a compact CNN with a trained localisation head, and a deployed web tool. The shipped model has a 2.54% error rate on unseen photos, finds the message region (per-tile AUC .864), and gives whole-photo verdicts with 5.6% false alarms. The largest gains came from data and tile size, and from covariance pooling. Noisy phone photos with very small payloads remain the open problem.
+This work presented an end-to-end system for colour LSB steganalysis: a labelled dataset generator, frozen test sets split by photo, a compact CNN with a trained localisation head, and a deployed web tool. The shipped model has a tile error rate of 2.54% on the held-out standard test set, ranks changed cells above unchanged ones (per-tile AUC .864), and gives whole-photo verdicts with 5.6% false alarms. The largest gains came from data and tile size, and from covariance pooling. Removing normalisation layers was necessary for a reliable heatmap, and training the heatmap on changed-cell targets made it clearly better than attribution maps. Noisy phone photos with very small payloads remain the open problem.
 
-Future work: more source collections in training to reduce false alarms on unseen collections, a separate detector for JPEG-domain steganography, per-source calibration of the photo score, and ONNX Runtime with a GPU backend so that GPU deployments also use the exported model.
+Future work follows from these results:
+
+- **Parity-aware input.** WS detects scattered replacement better than the CNN (§4.5). An extra fixed input, the SRM residual multiplied by the parity of each pixel value, would give the CNN the same information.
+- **Detectors for LSB matching.** The classical statistics see no signal in matching, so matching needs CNN-specific evidence and its own diagnostics.
+- **Better localisation of scattered messages**, where the heatmap finds only 11% of changed cells.
+- **Multiple training seeds**, to check whether the measured differences survive training variability.
+- **Fully matched 256 px validation** for every model, so that checkpoint selection is the same across the model history.
+- **More source collections** in training, to reduce false alarms on unseen collections, and **per-source calibration** of the photo score.
+- **JPEG-domain steganography**, which needs a separate detector.
+- **ONNX Runtime with a GPU backend**, so that GPU deployments also use the exported model.
 
 ---
 
 ## 10. Related work
 
-- **Statistical detectors.** The chi-square attack [11] detects pairs of values that LSB replacement makes equal in frequency. RS analysis [12] and weighted-stego analysis [13, 14] estimate the message length. They are precise for full-image LSB replacement, but weaker for LSB matching, small payloads and local embedding.
-- **Rich models.** The Spatial Rich Model [5] computes noise residuals (the image minus a prediction from its neighbours) with fixed high-pass filters, then trains a classifier on their statistics.
-- **CNN steganalysis.** Qian et al. [15] started a CNN with one fixed high-pass filter (the "KV" kernel). XuNet [9] added an absolute-value layer, tanh activations and 1×1 convolutions; it is small and stable. Ye-Net [6] used the 30 SRM filters with truncation. SRNet [16], Yedroudj-Net [17] and GBRAS-Net [18] are deeper designs built mostly for adaptive embedding on greyscale 256×256 images. Deng et al. [7] showed that global covariance pooling, with iterative matrix square-root normalisation [8], helps steganalysis.
-- **Localisation.** Class activation mapping (CAM) [10] reads a coarse "where" map from a network trained only on image labels.
+- **Statistical detectors.** The chi-square attack [[13](#ref-13)] detects pairs of values that LSB replacement makes equal in frequency. RS analysis [[14](#ref-14)] and weighted-stego analysis [[11](#ref-11), [12](#ref-12)] estimate the message length. They are precise for full-image LSB replacement, but weaker for LSB matching, small payloads and local embedding.
+- **Rich models.** The Spatial Rich Model [[5](#ref-5)] computes noise residuals (the image minus a prediction from its neighbours) with fixed high-pass filters, then trains a classifier on their statistics.
+- **CNN steganalysis.** Qian et al. [[15](#ref-15)] started a CNN with one fixed high-pass filter (the "KV" kernel). XuNet [[9](#ref-9)] added an absolute-value layer, tanh activations and 1×1 convolutions; it is small and stable. Ye-Net [[6](#ref-6)] used the 30 SRM filters with truncation. SRNet [[16](#ref-16)], Yedroudj-Net [[17](#ref-17)] and GBRAS-Net [[18](#ref-18)] are deeper designs built mostly for adaptive embedding on greyscale 256×256 images. Deng et al. [[7](#ref-7)] showed that global covariance pooling, with iterative matrix square-root normalisation [[8](#ref-8)], helps steganalysis.
+- **Localisation.** Class activation mapping (CAM) [[10](#ref-10)] reads a coarse "where" map from a network trained only on image labels.
 
 Our setting differs in four ways: colour photos instead of greyscale; a mixture of LSB settings instead of one algorithm at one payload; messages that often fill only part of the image; and a photo-level verdict with a heatmap. We therefore kept the small XuNet family, which trains quickly and was the course baseline, and added only the parts that measurements supported.
 
@@ -557,43 +625,41 @@ Our setting differs in four ways: colour photos instead of greyscale; a mixture 
 
 ## References
 
-IEEE style, numbered in order of first citation.
+<a id="ref-1"></a>\[1\] D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, and G. Boato, "RAISE: A raw images dataset for digital image forensics," in *Proc. 6th ACM Multimedia Syst. Conf. (MMSys)*, Portland, OR, USA, 2015, pp. 219–224, doi: 10.1145/2713168.2713194.
 
-\[1\] D.-T. Dang-Nguyen, C. Pasquini, V. Conotter, and G. Boato, "RAISE: A raw images dataset for digital image forensics," in *Proc. 6th ACM Multimedia Syst. Conf. (MMSys)*, Portland, OR, USA, 2015, pp. 219–224, doi: 10.1145/2713168.2713194.
+<a id="ref-2"></a>\[2\] E. Agustsson and R. Timofte, "NTIRE 2017 challenge on single image super-resolution: Dataset and study," in *Proc. IEEE Conf. Comput. Vis. Pattern Recognit. Workshops (CVPRW)*, Honolulu, HI, USA, 2017, pp. 1122–1131, doi: 10.1109/CVPRW.2017.150.
 
-\[2\] E. Agustsson and R. Timofte, "NTIRE 2017 challenge on single image super-resolution: Dataset and study," in *Proc. IEEE Conf. Comput. Vis. Pattern Recognit. Workshops (CVPRW)*, Honolulu, HI, USA, 2017, pp. 1122–1131, doi: 10.1109/CVPRW.2017.150.
+<a id="ref-3"></a>\[3\] R. Cogranne, E. Giboulot, and P. Bas, "ALASKA#2: Challenging academic research on steganalysis with realistic images," in *Proc. IEEE Int. Workshop Inf. Forensics Secur. (WIFS)*, New York, NY, USA, 2020, pp. 1–5, doi: 10.1109/WIFS49906.2020.9360896.
 
-\[3\] R. Cogranne, E. Giboulot, and P. Bas, "ALASKA#2: Challenging academic research on steganalysis with realistic images," in *Proc. IEEE Int. Workshop Inf. Forensics Secur. (WIFS)*, New York, NY, USA, 2020, pp. 1–5, doi: 10.1109/WIFS49906.2020.9360896.
+<a id="ref-4"></a>\[4\] Y. Li *et al.*, "LSDIR: A large scale dataset for image restoration," in *Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. Workshops (CVPRW)*, Vancouver, BC, Canada, 2023, pp. 1775–1787, doi: 10.1109/CVPRW59228.2023.00178.
 
-\[4\] Y. Li *et al.*, "LSDIR: A large scale dataset for image restoration," in *Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. Workshops (CVPRW)*, Vancouver, BC, Canada, 2023, pp. 1775–1787, doi: 10.1109/CVPRW59228.2023.00178.
+<a id="ref-5"></a>\[5\] J. Fridrich and J. Kodovský, "Rich models for steganalysis of digital images," *IEEE Trans. Inf. Forensics Security*, vol. 7, no. 3, pp. 868–882, Jun. 2012, doi: 10.1109/TIFS.2012.2190402.
 
-\[5\] J. Fridrich and J. Kodovský, "Rich models for steganalysis of digital images," *IEEE Trans. Inf. Forensics Security*, vol. 7, no. 3, pp. 868–882, Jun. 2012, doi: 10.1109/TIFS.2012.2190402.
+<a id="ref-6"></a>\[6\] J. Ye, J. Ni, and Y. Yi, "Deep learning hierarchical representations for image steganalysis," *IEEE Trans. Inf. Forensics Security*, vol. 12, no. 11, pp. 2545–2557, Nov. 2017, doi: 10.1109/TIFS.2017.2710946.
 
-\[6\] J. Ye, J. Ni, and Y. Yi, "Deep learning hierarchical representations for image steganalysis," *IEEE Trans. Inf. Forensics Security*, vol. 12, no. 11, pp. 2545–2557, Nov. 2017, doi: 10.1109/TIFS.2017.2710946.
+<a id="ref-7"></a>\[7\] X. Deng, B. Chen, W. Luo, and D. Luo, "Fast and effective global covariance pooling network for image steganalysis," in *Proc. ACM Workshop Inf. Hiding Multimedia Secur. (IH&MMSec)*, Paris, France, 2019, pp. 230–234, doi: 10.1145/3335203.3335739.
 
-\[7\] X. Deng, B. Chen, W. Luo, and D. Luo, "Fast and effective global covariance pooling network for image steganalysis," in *Proc. ACM Workshop Inf. Hiding Multimedia Secur. (IH&MMSec)*, Paris, France, 2019, pp. 230–234, doi: 10.1145/3335203.3335739.
+<a id="ref-8"></a>\[8\] P. Li, J. Xie, Q. Wang, and Z. Gao, "Towards faster training of global covariance pooling networks by iterative matrix square root normalization," in *Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR)*, Salt Lake City, UT, USA, 2018, pp. 947–955, doi: 10.1109/CVPR.2018.00105.
 
-\[8\] P. Li, J. Xie, Q. Wang, and Z. Gao, "Towards faster training of global covariance pooling networks by iterative matrix square root normalization," in *Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR)*, Salt Lake City, UT, USA, 2018, pp. 947–955, doi: 10.1109/CVPR.2018.00105.
+<a id="ref-9"></a>\[9\] G. Xu, H.-Z. Wu, and Y.-Q. Shi, "Structural design of convolutional neural networks for steganalysis," *IEEE Signal Process. Lett.*, vol. 23, no. 5, pp. 708–712, May 2016, doi: 10.1109/LSP.2016.2548421.
 
-\[9\] G. Xu, H.-Z. Wu, and Y.-Q. Shi, "Structural design of convolutional neural networks for steganalysis," *IEEE Signal Process. Lett.*, vol. 23, no. 5, pp. 708–712, May 2016, doi: 10.1109/LSP.2016.2548421.
+<a id="ref-10"></a>\[10\] B. Zhou, A. Khosla, A. Lapedriza, A. Oliva, and A. Torralba, "Learning deep features for discriminative localization," in *Proc. IEEE Conf. Comput. Vis. Pattern Recognit. (CVPR)*, Las Vegas, NV, USA, 2016, pp. 2921–2929, doi: 10.1109/CVPR.2016.319.
 
-\[10\] B. Zhou, A. Khosla, A. Lapedriza, A. Oliva, and A. Torralba, "Learning deep features for discriminative localization," in *Proc. IEEE Conf. Comput. Vis. Pattern Recognit. (CVPR)*, Las Vegas, NV, USA, 2016, pp. 2921–2929, doi: 10.1109/CVPR.2016.319.
+<a id="ref-11"></a>\[11\] J. Fridrich and M. Goljan, "On estimation of secret message length in LSB steganography in spatial domain," in *Proc. SPIE, Security, Steganography, and Watermarking of Multimedia Contents VI*, vol. 5306, San Jose, CA, USA, 2004, pp. 23–34, doi: 10.1117/12.521350.
 
-\[11\] A. Westfeld and A. Pfitzmann, "Attacks on steganographic systems," in *Information Hiding (IH 1999)* (Lecture Notes in Computer Science, vol. 1768), A. Pfitzmann, Ed. Berlin, Germany: Springer, 2000, pp. 61–76, doi: 10.1007/10719724_5.
+<a id="ref-12"></a>\[12\] A. D. Ker and R. Böhme, "Revisiting weighted stego-image steganalysis," in *Proc. SPIE, Security, Forensics, Steganography, and Watermarking of Multimedia Contents X*, vol. 6819, San Jose, CA, USA, 2008, Art. no. 681905, doi: 10.1117/12.766820.
 
-\[12\] J. Fridrich, M. Goljan, and R. Du, "Detecting LSB steganography in color and gray-scale images," *IEEE MultiMedia*, vol. 8, no. 4, pp. 22–28, Oct.–Dec. 2001, doi: 10.1109/93.959097.
+<a id="ref-13"></a>\[13\] A. Westfeld and A. Pfitzmann, "Attacks on steganographic systems," in *Information Hiding (IH 1999)* (Lecture Notes in Computer Science, vol. 1768), A. Pfitzmann, Ed. Berlin, Germany: Springer, 2000, pp. 61–76, doi: 10.1007/10719724_5.
 
-\[13\] J. Fridrich and M. Goljan, "On estimation of secret message length in LSB steganography in spatial domain," in *Proc. SPIE, Security, Steganography, and Watermarking of Multimedia Contents VI*, vol. 5306, San Jose, CA, USA, 2004, pp. 23–34, doi: 10.1117/12.521350.
+<a id="ref-14"></a>\[14\] J. Fridrich, M. Goljan, and R. Du, "Detecting LSB steganography in color and gray-scale images," *IEEE MultiMedia*, vol. 8, no. 4, pp. 22–28, Oct.–Dec. 2001, doi: 10.1109/93.959097.
 
-\[14\] A. D. Ker and R. Böhme, "Revisiting weighted stego-image steganalysis," in *Proc. SPIE, Security, Forensics, Steganography, and Watermarking of Multimedia Contents X*, vol. 6819, San Jose, CA, USA, 2008, Art. no. 681905, doi: 10.1117/12.766820.
+<a id="ref-15"></a>\[15\] Y. Qian, J. Dong, W. Wang, and T. Tan, "Deep learning for steganalysis via convolutional neural networks," in *Proc. SPIE, Media Watermarking, Security, and Forensics*, vol. 9409, San Francisco, CA, USA, 2015, Art. no. 94090J, doi: 10.1117/12.2083479.
 
-\[15\] Y. Qian, J. Dong, W. Wang, and T. Tan, "Deep learning for steganalysis via convolutional neural networks," in *Proc. SPIE, Media Watermarking, Security, and Forensics*, vol. 9409, San Francisco, CA, USA, 2015, Art. no. 94090J, doi: 10.1117/12.2083479.
+<a id="ref-16"></a>\[16\] M. Boroumand, M. Chen, and J. Fridrich, "Deep residual network for steganalysis of digital images," *IEEE Trans. Inf. Forensics Security*, vol. 14, no. 5, pp. 1181–1193, May 2019, doi: 10.1109/TIFS.2018.2871749.
 
-\[16\] M. Boroumand, M. Chen, and J. Fridrich, "Deep residual network for steganalysis of digital images," *IEEE Trans. Inf. Forensics Security*, vol. 14, no. 5, pp. 1181–1193, May 2019, doi: 10.1109/TIFS.2018.2871749.
+<a id="ref-17"></a>\[17\] M. Yedroudj, F. Comby, and M. Chaumont, "Yedroudj-Net: An efficient CNN for spatial steganalysis," in *Proc. IEEE Int. Conf. Acoust., Speech, Signal Process. (ICASSP)*, Calgary, AB, Canada, 2018, pp. 2092–2096, doi: 10.1109/ICASSP.2018.8461438.
 
-\[17\] M. Yedroudj, F. Comby, and M. Chaumont, "Yedroudj-Net: An efficient CNN for spatial steganalysis," in *Proc. IEEE Int. Conf. Acoust., Speech, Signal Process. (ICASSP)*, Calgary, AB, Canada, 2018, pp. 2092–2096, doi: 10.1109/ICASSP.2018.8461438.
-
-\[18\] R. Tabares-Soto *et al.*, "GBRAS-Net: A convolutional neural network architecture for spatial image steganalysis," *IEEE Access*, vol. 9, pp. 14340–14350, 2021, doi: 10.1109/ACCESS.2021.3052494.
+<a id="ref-18"></a>\[18\] R. Tabares-Soto *et al.*, "GBRAS-Net: A convolutional neural network architecture for spatial image steganalysis," *IEEE Access*, vol. 9, pp. 14340–14350, 2021, doi: 10.1109/ACCESS.2021.3052494.
 
 ---
 
