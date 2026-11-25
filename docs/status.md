@@ -1,20 +1,43 @@
 # Project status — 2026-11-25
 
-## Submission prep (2026-11-25)
+## Current state
+
+| Area | State |
+| --- | --- |
+| Submission | Branch `main` (same commit as `report`). The [root README](../README.md) is the report. Slides: [Reveal.js deck](slides/index.html), with a ZIP and a PDF in `downloads/`. |
+| Shipped model | Run 22, `srm-cell-aux-paired-gapcov32-20261029T063502Z-5452` `last.ckpt`, bundle `deploy/run22-rule-c-v1` (photo rule (c)). Standard tile P_E 2.54% (AUC .9971); hard k=1 low-payload AUC .798; heatmap within-tile AUC .864; whole photos: 5.6% false alarms, 10.2% misses. [Findings](findings.md). |
+| Course baseline | V3c `g4-prime-1` re-scored on the same tests: standard P_E 4.05%. Run 22 is 1.50 points lower [1.12, 1.90]. [Model history](results/model-history-2026-11-25.md). |
+| Local deployment | `deploy/Dockerfile`: ONNX Runtime FP32 on CPU, 329 MB image, same decisions as PyTorch on the full frozen test, 1.7–2.3× faster per photo. Guide: `cvdl/pipeline/README.md`. |
+| Cloud deployment | Live demo <https://gcp-aai3001.taild62d21.ts.net> while the VM runs: PyTorch on the L4 GPU, ONNX CPU fallback, Tailscale Funnel. The VM uses standard provisioning. [Runbook](active/deploy-gcp-funnel.md). |
+| Training | Finished. No run is running or approved. |
+| Tests | Last FULL: 697 OK, 2 skipped (2026-11-25, docs move). Last FAST: 697 run, 35 skipped by the level (slide-deck merge). |
+| Run records | Summaries of the baseline, run 21 and run 22 are tracked under `runs/` ([list](../runs/README.md#report-runs-summaries-tracked)). Checkpoints are outside git; the shipped weights are in the bundle. |
+
+## Open items
+
+- No decision is waiting.
+- Operations: the VM bills for the L4 every hour it runs. Stop it when the demo is no longer needed. After a host-maintenance stop, start it again; the demo service and Funnel come back by themselves.
+- Future work is not scheduled; see the conclusion of the [report](../README.md#9-conclusion).
+
+## History
+
+Older status entries, kept unchanged. Each one describes the state on its date. The tables above replace them; "pending" and "next" items below are closed or dropped.
+
+### Submission prep (2026-11-25)
 
 The README is the report (rubric: dataset, model development, deployment, UI, scalability). V3c baseline `g4-prime-1` re-scored on the frozen suites (eval `29fb97d0c311a0eca3b1`; calibration entry 16, `MAPPING_SHA` `6ab71f35...cf7c`): standard P_E 4.05% vs shipped run 22 2.54% (−1.50 points [−1.90, −1.12]); hard k=1 low AUC .627 vs .798. Full model-history ladder in the [2026-11-25 journal](journal/2026-11-25/README.md). Deployment optimization: the `pipeline` branch now serves run 22 with ONNX Runtime FP32 (`da70753`): same decisions as PyTorch on the full frozen test, 1.7–2.3× faster per photo, image 1.14 GB → 329 MB; INT8 rejected (standard P_E +3.24 points). `pipeline` is merged into `app` (`73fa326`). Branch `report` (`app` + `yx`) holds the [README report](../README.md) in paper form, with figures in `figures/report/`; the old README is now the [development guide](development.md). Cloud demo **live** at <https://gcp-aai3001.taild62d21.ts.net> (team VM, run 22 on the L4 GPU: 0/50 verdict changes vs ONNX CPU, 0.27 s per 2–3 MP photo; ONNX CPU fallback; Tailscale Funnel; [runbook](active/deploy-gcp-funnel.md)). VM switched to standard provisioning (no 12 h stop). Next: cleanup, merge to `main`.
 
 Repo cleanup (2026-11-25): ladder-run summaries tracked under `runs/` ([list](../runs/README.md#report-runs-summaries-tracked)); 12 finished plans moved to `archive/`. `report` merged into `main` (`ba30013`); `main` is the submission branch.
 
-## Run 22 shipped — submission model (user, 2026-11-05)
+### Run 22 shipped — submission model (user, 2026-11-05)
 
 `pipeline` `044c1ad`: default bundle **`deploy/run22-rule-c-v1`** (`srm-cell-aux-paired-gapcov32-20261029T063502Z-5452` LAST, eval `a1ab2faad8f27bca309e`). Photo rule (c) re-fitted (frozen `b5d8ba6f...30fc`): TEST clean-photo FA **5.556%** (run 18 8.681%), miss 10.185% (8.362%), P_E 7.870% (8.521%), hard P_E 22.592%; **practical mark PASS** (run 18 FAIL). FULL 419 OK; container check OK. Run 18/13 bundles stay selectable. Push and merge **Pending (user)**. [Journal](journal/2026-11-05/README.md#run-22-shipped), [findings](findings.md).
 
-## Run 21 attribution heatmap scored — clearly worse than trained heads
+### Run 21 attribution heatmap scored — clearly worse than trained heads
 
 On the frozen cell fixture (128 contiguous test tiles), run 21 BEST signed covariance attribution scores within-tile AUC **.752** [.718, .786]. Run 18 trained head .867 (Δ **−.115** [−.141, −.090]); run 22 trained head .864 (Δ −.112 [−.137, −.087]); run 22 attribution .760 (Δ −.008 [−.022, +.006]). Run 21 alone would ship a much weaker heatmap; the user chose run 22. [Journal](journal/2026-11-05/README.md).
 
-## Run22 evaluated — mixed, not a clear upgrade
+### Run22 evaluated — mixed, not a clear upgrade
 
 Candidate: `srm-cell-aux-paired-gapcov32-20261029T063502Z-5452`, **LAST**, evaluation **`a1ab2faad8f27bca309e`**. Detector reference: run21 BEST; trained-head reference: run18 LAST.
 
@@ -45,7 +68,7 @@ Candidate: `srm-cell-aux-paired-gapcov32-20261029T063502Z-5452`, **LAST**, evalu
 
 ~~Start here: Read the [2026-10-19 handoff](archive/handoff-2026-10-19.md) and the [2026-10-19 journal](journal/2026-10-19/README.md). Evaluation redesign is done (standard-256 and hard-256 tests, one frozen deployment threshold from validation, report notebook); all 11 documented models are rescored. Diagnostic checks 1, 2 and 2b are done ([plan](archive/plan-diagnostic-checks.md)): #12 raised, #3 lowered, tanh fix struck. Low-bpp curriculum (#9) done: rule not met; small real gain (+0.02 k=1 low AUC) at +0.56 points standard P_E; not adopted ([plan, result](archive/plan-low-bpp-curriculum.md)). Architecture arm A (delayed pooling) done: **no gain, clearly worse** (pooled hard k=1 low AUC -.060 vs SRM-30; 2.3x compute; [plan, result](active/plan-architecture-tests.md)). Arm G (GBRAS-Net) waits for the user's 90-to-30 adapter choice. PC pilot mode `pilot=true` added (`aec69d0`). **2026-10-20: arm G (G1) paused by the user; review of pre-run checks first. Test levels built (`891aefe`, [record](active/test-levels.md)): fast level 2.7 min vs full 8.3 min; the helper `scripts/required_test_level.py` decides ~~full tests and golden~~ the test level per change; ~~full + golden~~ full tests always before a G4 launch (golden retired 2026-10-21). Follow-ups done: C (`a1ae22c`), `TESTS: NONE` for Markdown-only changes (`c7b5176`); B not done (user, B3). Test trim `4959099`: 445 to 407 tests (5 duplicates deleted, 33 archived with the code of checks 1, 2, 2b and the curriculum decision); fast level 2.5 min. ~~**Paused by the user.** Next, when the user resumes: retire the legacy-512 evaluation (design first); arm G (G1) stays paused.~~ Golden retired; comparison constants list added (`72f51b5`, 360 tests). 512 end-of-training test off in notebook 05 / `newdata-1` / `wide-1` (`7921d58`). Legacy-512 evaluation retired `3c3dc39` (407 to 370 tests; [record](archive/legacy-512-retirement.md), [2026-10-21 journal](journal/2026-10-21/README.md)). ~~Next: the user decides when to resume arm G (G1).~~ **Focus (user, 2026-10-21): finish the basic deliverables. Model tests (arm G) on hold; next work is cell-level training (#3): [approved plan](archive/plan-cell-training-256.md) (one 15-epoch run matched to `srm-low-bpp-control`, 2.65%; about $1.4-1.8); ~~code done `731a27c` (368 tests); next: PC pilot, then one G4 run.~~ Run 13 done and evaluated: cell-head map within-tile AUC .863 vs CAM .793 (+.070 [+.053, +.088]); standard P_E 2.97% (guard missed; control 2.65%). **User chose run 13 as the submission model** (`srm-cell-aux-20261021T054704Z-6997`, `last.ckpt`). Photo verdict rule (c) accepted (test FA 8.5%, P_E 8.9%; [findings](findings.md)). **Next: app pipeline on branch `pipeline`.** ~~Next: the user decides arm G (GBRAS-Net) or stops the architecture tests; then the [ideas board](archive/ideas-board.md).~~ Best tile-only score: SRM-e50 (standard-256 P_E 2.54% at its validation cut-off). ~~Submission model (user, 2026-10-21): run 13 (2.97%, trained cell heatmap).~~ **Submission model (user, 2026-10-24): run 18** `srm-cell-aux-curriculum50-paired-20261023T133537Z-1366` `last.ckpt` (standard 2.62%, cell head .867; [findings](findings.md)). Photo verdict rule (c) re-fitted for run 18 (`0a5f417`; test P_E 8.5%, clean-photo FA 8.7%) and **run 18 bundle shipped as the `pipeline` default** (`bfbbdcc`). Ideas: [ideas board](archive/ideas-board.md).~~
 
-## Current state
+### State on 2026-10-19
 
 | Area | State (2026-10-19, end of session) |
 | --- | --- |
@@ -63,7 +86,7 @@ Candidate: `srm-cell-aux-paired-gapcov32-20261029T063502Z-5452`, **LAST**, evalu
 | PC rules | At most 12 real data workers; total RAM under ~20 GB; kill whole process groups; after each run `pgrep -af spawn_main` empty and `/dev/shm` normal; workers ask before GPU or heavy CPU work. |
 | Deferred | Per-cell training: design only ([plan](archive/plan-per-cell-training.md), out of date; board #3). Prebuilt writer ([design](archive/plan-otf-generator.md)); noisy covers ([parked](archive/plan-noisy-covers.md)); G4 GPU generator ([shelved](archive/plan-gpu-generator.md)). |
 
-## Pending items (waiting for the user)
+### Pending items on 2026-10-19
 
 | Item | Record |
 | --- | --- |
@@ -73,7 +96,7 @@ Candidate: `srm-cell-aux-paired-gapcov32-20261029T063502Z-5452`, **LAST**, evalu
 | A2 report notebooks for all models; A3 results write-up; A4 `findings.md` rewrite; C1 merge `yx` into `main`; C2 G4 spend record | [Handoff](archive/handoff-2026-10-19.md), section 4 |
 | ~~ALASKA train-only models: six or two~~ | Settled: option B used. ~~Fair control R0~~: dropped 2026-10-16. |
 
-## Key commits and records
+### Key commits and records
 
 | Commit | Record |
 | --- | --- |

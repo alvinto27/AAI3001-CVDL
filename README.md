@@ -474,7 +474,7 @@ The same order held for R1 and SRM-e50, and for the cell head of run 18 (within-
 | Where | Engine | Server time, 2–3 MP photo | How to run |
 | --- | --- | ---: | --- |
 | **Cloud:** <https://gcp-aai3001.taild62d21.ts.net> | PyTorch on an NVIDIA L4 GPU | 0.27 s | Open the link |
-| **Local container** | ONNX Runtime on CPU (8 cores) | 0.53 s | `podman build -f deploy/Dockerfile -t cvdl-pipeline:onnx .` then `podman run --rm -p 127.0.0.1:8000:8000 cvdl-pipeline:onnx` (Docker works the same way) |
+| **Local container** | ONNX Runtime on CPU (8 cores) | 0.53 s | `podman build -f deploy/Dockerfile -t cvdl-pipeline:cpu .` then `podman run --rm -p 127.0.0.1:8000:8000 cvdl-pipeline:cpu` (Docker works the same way) |
 | **Local Python** | ONNX Runtime on CPU | — | `pip install -r deploy/requirements-onnx.txt` then `python -m cvdl.pipeline.serve --engine onnx` |
 
 ```mermaid
@@ -678,8 +678,8 @@ python -m cvdl.pipeline photo.png --engine onnx --overlay overlay.png
 **Run the API and the web app locally:**
 
 ```sh
-podman build -f deploy/Dockerfile -t cvdl-pipeline:onnx .
-podman run --rm --memory=4g -p 127.0.0.1:8000:8000 cvdl-pipeline:onnx \
+podman build -f deploy/Dockerfile -t cvdl-pipeline:cpu .
+podman run --rm --memory=4g -p 127.0.0.1:8000:8000 cvdl-pipeline:cpu \
   --allow-origin http://127.0.0.1:3000 --allow-origin http://localhost:3000
 cd app && npm install && npm run dev        # http://127.0.0.1:3000
 ```

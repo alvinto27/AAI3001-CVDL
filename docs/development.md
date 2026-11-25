@@ -109,13 +109,13 @@ See the [Datasets README](../Datasets/README.md) for where each source is stored
 Dataset `masks/` and `records/` are not kept in git. Masks can be regenerated.
 Dataset files remain local; this record preservation does not delete them.
 
-## Train on the Spot VM
+## Train on the team VM
 
-The `gcp-aai3001` VM is a Spot VM. Google can stop it at any time, with a 120-second notice.
+The `gcp-aai3001` VM uses standard provisioning since 2026-11-25 (before that it was a Spot VM). Google does not preempt it, but it stops for host maintenance, and the person who started it can stop it.
 
 ### Team rule
 
-Only run training that can resume on the VM. If a run cannot resume and the VM is preempted, the person who started it runs it again.
+Only run training that can resume on the VM. If a run cannot resume and the VM stops, the person who started it runs it again.
 
 ### Use the template
 
@@ -127,8 +127,8 @@ Only run training that can resume on the VM. If a run cannot resume and the VM i
 3. If the run stops, run the same command again. It continues from `runs/my-run/last.ckpt`.
 4. To start fresh, use a new `--run-name`.
 
-The template uses PyTorch Lightning. It saves `last.ckpt` after every epoch (model, optimizer, and progress), and it also keeps the best epoch by `val_loss`. A preemption loses at most the epoch in progress.
+The template uses PyTorch Lightning. It saves `last.ckpt` after every epoch (model, optimizer, and progress), and it also keeps the best epoch by `val_loss`. A stop loses at most the epoch in progress.
 
 ### Final runs
 
-For a long run that must not stop, change the VM to the standard provisioning model in the GCP console before you start. A standard VM is not preempted, but it costs more per hour. Change it back to Spot after the run.
+The VM also serves the live demo (see the [cloud deployment runbook](active/deploy-gcp-funnel.md)). Training on it shares the L4 GPU with the demo service, so stop the service first (`sudo systemctl stop cvdl-pipeline`) and start it again after the run.

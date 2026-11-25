@@ -1,6 +1,6 @@
 # Findings across runs and checks
 
-Updated 2026-10-21 for the standard-256 / hard-256 tests. Read [status](status.md) first. Each row cites its record; the [run queue](archive/run-queue.md) has every run's job ID and evaluation ID.
+Updated 2026-11-25: run 22 is the submission model, and the V3c course baseline is re-scored on the standard-256 / hard-256 tests ([model history](results/model-history-2026-11-25.md)). Read [status](status.md) first. Each row cites its record; the [run queue](archive/run-queue.md) has every run's job ID and evaluation ID.
 
 **Terms.** *P_E* = overall error, the mean of the false-alarm rate (FA, clean tiles called stego) and the miss rate (stego tiles called clean). Each model uses **its own cut-off, chosen on validation** before the test. *AUC* = how well the scores rank stego above clean, independent of the cut-off (1.0 = perfect, 0.5 = guessing). *Standard* = RAISE + DIV2K, 10,944 pairs. *Hard target* = k=1, low bpp, contiguous payloads on ALASKA seen/unseen + LSDIR. *Interval* = 95% photo-bootstrap range.
 
@@ -35,10 +35,11 @@ Same frozen method and photos as run 18; run 22's own cut-offs (tile .5245, cell
 
 ## Standard-256 ledger
 
-P_E % at each model's own validation cut-off (standard / ALASKA seen / ALASKA unseen / LSDIR). Rescore source: [2026-10-18 journal](journal/2026-10-18/README.md); runs 10-13 from their evaluations.
+P_E % at each model's own validation cut-off (standard / ALASKA seen / ALASKA unseen / LSDIR). Rescore source: [2026-10-18 journal](journal/2026-10-18/README.md); runs 10-22 from their evaluations; V3c baseline from the [2026-11-25 journal](journal/2026-11-25/README.md) (cut-off chosen afterwards on 256 validation tiles, because the run is older than the 256 validation).
 
 | Run | What changed | Standard | ALASKA seen | ALASKA unseen | LSDIR | Standard AUC | Record |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| V3c baseline (`g4-prime-1`) | course-style KV XuNet + GroupNorm, RAISE/DIV2K, 512 tiles, 10 epochs | 4.05 | 30.30 | 26.88 | 14.79 | .9900 | [11-25](journal/2026-11-25/README.md) |
 | overlap-512 | KV front end, 512 tiles | 5.61 | 23.94 | 21.43 | 12.62 | — | [10-18](journal/2026-10-18/README.md) |
 | trim-512 / pad-512 | other tilings, 512 | 6.48 / 6.53 | 23.49 / 24.20 | 21.31 / 20.93 | 12.95 / 12.88 | — | [10-18](journal/2026-10-18/README.md) |
 | newdata-1 | mixed sources, wide KV, 512 | 5.13 | 24.29 | 21.21 | 12.64 | — | [10-18](journal/2026-10-18/README.md) |
@@ -54,10 +55,11 @@ P_E % at each model's own validation cut-off (standard / ALASKA seen / ALASKA un
 | R1 paired | SRM-e50 with paired batches | 2.55 | 18.99 | 15.58 | 8.84 | .9964 | [10-23](journal/2026-10-23/README.md) |
 | R2 paired cell | run 13 recipe + paired, from R1 | 2.43 | 19.10 | 15.83 | 9.08 | .9965 | [10-23](journal/2026-10-23/README.md) |
 | Curriculum50 paired | R1 + 50-epoch low-bpp curriculum | 2.57 | 19.72 | 16.68 | 9.35 | .9967 | [10-23](journal/2026-10-23/README.md) |
-| **run 18 cell (submission)** | R2 recipe, from Curriculum50 | 2.62 | 18.82 | 15.85 | 9.16 | .9963 | [10-23](journal/2026-10-23/README.md) |
+| run 18 cell (submission 10-24 to 11-05) | R2 recipe, from Curriculum50 | 2.62 | 18.82 | 15.85 | 9.16 | .9963 | [10-23](journal/2026-10-23/README.md) |
 | run 19 B36 colour-split | R1 recipe, conv1 per colour (#20 arm B) | 3.66 | — | — | — | .9928 | [10-25](journal/2026-10-25/README.md) |
 | run 20 learnable SRM | R1 recipe, SRM kernels trainable (#20 arm A) | 3.34 | — | — | — | .9937 | [10-26](journal/2026-10-26/README.md) |
 | **run 21 GAP + covariance** | R1 recipe, head adds 528 covariance values (#21), **PASS both routes** | **2.15** | 17.50 | 15.37 | 7.76 | .9972 | [10-26](journal/2026-10-26/README.md) |
+| **run 22 cell head (submission)** | run 21 BEST + trained cell head, 15 paired epochs (CE + 0.2 cell BCE) | 2.54 | 17.62 | 14.87 | 7.59 | .9971 | [10-29](journal/2026-10-29/README.md), [11-05](journal/2026-11-05/README.md) |
 
 ## Cell heatmap (run 13)
 
@@ -172,7 +174,7 @@ This table carries the hypotheses from the [archived checklist](archive/research
 | Scattered low-BPP k1 is noise-limited | Supported, not causal | About 25 changes per 32 px cell at .05 BPP in a prior map; check B found noise linked to both errors | Match tile noise and changed-pixel counts across repeated seeds |
 | Model ignores periodic stride and payload structure | Supported | Similar or worse stride miss than random at equal BPP; small subgroup counts | Equal-photo, matched effective-BPP stride/payload checks |
 | `map(raw) − map(denoised)` cancels clean hot spots | Untested | A denoised reference may also remove real cover noise; about two inference passes | Compare clean FA, cell AUC and k1 P_E with validation calibration |
-| Per-cell training removes clean hot spots | ~~Untested; design on hold~~ Tested at 256 (run 13, see above) | Current cell map is not supervised; [plan written, not approved](archive/plan-per-cell-training.md) | Only after approval: opt-in cell labels, unchanged tile tests and cell validation |
+| Per-cell training removes clean hot spots | ~~Untested; design on hold~~ Tested at 256 (run 13, see above) | ~~Current cell map is not supervised; [plan written, not approved](archive/plan-per-cell-training.md)~~ Superseded: cell supervision is used since run 13 and ships in run 22 | Only after approval: opt-in cell labels, unchanged tile tests and cell validation |
 | LSDIR shrink can teach an easy-source shortcut | Weakened, not isolated | Mixed source uses LSDIR 20%; its separate test P_E is .06635, not near zero | Controlled with/without-LSDIR runs, not approved |
 | R2 k1–4 improvement came from k-range rather than LR | Untested | R2 changed both factors | Factorial controls with the same data and seed |
 | Source diversity helps unseen cameras | Partly supported; one seed | Unseen ALASKA AUC .79818 → .93403 and corrected FA improvement; standard test and k1 misses regress | Separate held-out cameras and seed repeats with fair controls |
