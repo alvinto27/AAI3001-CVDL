@@ -56,21 +56,17 @@ Not tracked: checkpoints (the shipped weights are in
 `deploy/run22-rule-c-v1/`), per-tile prediction CSVs (about 90 MB per run),
 TensorBoard events and machine logs.
 
-## Model files are on the VM
+## Model files
 
-Model files for the frozen v3a/v3b/v3c runs live at:
+The checkpoints of the frozen v3a/v3b/v3c runs (and the user's OTF run) were
+on the team VM at `/srv/aai3001/AAI3001-CVDL/checkpoints/<run>/`. That old VM
+checkout was removed on 2026-11-25, after a full copy was checked by SHA-256
+(checkpoints, dataset records, logs). The copy is outside git on the
+maintainer's PC, in `runs/vm-backup-2026-11-25/`. Ask for a file if you need
+it.
 
-```text
-/srv/aai3001/AAI3001-CVDL/checkpoints/<run>/
-```
-
-(That path is the VM's own working checkout, unrelated to this repository's
-`runs/`.) Fetch a best checkpoint from the repository root with:
-
-```sh
-scp 'aai-team@gcp-aai3001:/srv/aai3001/AAI3001-CVDL/checkpoints/baseline_kv_xunet_v3_clip3_group/best-*.ckpt' \
-  runs/baseline_kv_xunet_v3_clip3_group/
-```
+The shipped model's weights are tracked in `deploy/run22-rule-c-v1/`
+(`weights.pt`, `model.onnx`).
 
 Use `last.ckpt` to resume training. Use `best-*.ckpt` for evaluation. Keep
 local model copies out of git.
