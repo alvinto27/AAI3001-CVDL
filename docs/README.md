@@ -2,6 +2,8 @@
 
 This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Nothing runs without a user decision**; approved G4 runs are in the [run queue](active/run-queue.md), ideas on the [ideas board](active/ideas-board.md). Read [status](status.md) before acting, [findings](findings.md) for older run comparisons (512-era; see its note), and the [dated journal](journal/README.md) for the original records.
 
+The project report is the [root README](../README.md). Its figures are in `figures/report/` (rebuilt by `scripts/build_report_figures.py`, except the UI screenshots). The former root README (environment setup, notebooks, Spot VM training) is now the [development guide](development.md).
+
 ## Current references (`active/` means kept for use, not permission to run)
 - [Run21 trained heatmap / run22 — implementation, launch and collection record](active/plan-run21-cell-heatmap.md)
 - [Run22 LAST evaluation — standard errors worse, hard ranking better, no clear primary localization gain; photos/adoption pending (2026-10-29)](active/plan-run21-cell-heatmap.md#run22--detector-and-trained-head-evaluation-complete)
@@ -36,6 +38,7 @@ This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. **Nothing
 - [Mixed-source wide XuNet](results/result-newdata-1.md)
 - [PC check B: thresholds and ALASKA tiles](results/result-check-b.md)
 - [Training tiling: 6 arms](results/result-training-tiling.md)
+- [Model history: 10 models re-scored on the frozen tests (2026-11-25)](results/model-history-2026-11-25.md) (data: `model-history-2026-11-25.json`)
 
 ## Historical records (`archive/`)
 
