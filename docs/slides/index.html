@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Finding hidden messages in photographs · AAI3001</title>
+  <link rel="stylesheet" href="vendor/reveal-5.2.1/dist/reset.css">
+  <link rel="stylesheet" href="vendor/reveal-5.2.1/dist/reveal.css">
+  <link rel="stylesheet" href="slides.css">
+</head>
+<body>
+<main class="reveal">
+  <div class="slides">
+    <section id="title" class="night" data-background-color="#14221f">
+      <div class="sheet">
+        <p class="kicker">AAI3001 <span>/</span> Computer Vision and Deep Learning</p>
+        <div class="cover">
+          <div>
+            <h1>Finding hidden messages in photographs</h1>
+            <p class="lead">A convolutional network for colour LSB steganalysis and localisation.</p>
+          </div>
+          <figure>
+            <div class="crop butterfly clean"><img src="../figures/report/heatmap-example.png" alt="A yellow and black butterfly with outstretched wings on a leaf"></div>
+            <figcaption>DIV2K 0829 <span>Clean reference photograph</span></figcaption>
+          </figure>
+        </div>
+        <p class="foot">AAI3001 team project</p>
+      </div>
+      <aside class="notes">Start with the butterfly. A second copy carries an 86 kB message in a narrow band. Both look alike at this scale. We will return to this photo and compare the known message location with the model’s prediction.</aside>
+    </section>
+
+    <section id="signal">
+      <div class="sheet">
+        <p class="kicker">The problem <span>/</span> Least significant bits</p>
+        <h2>One intensity step can carry a bit</h2>
+        <div class="split">
+          <div>
+            <p class="lead">Each red, green or blue channel has 256 possible values. Changing its lowest bit can leave the photograph looking identical.</p>
+            <p>The detector looks for small changes in the noise statistics. Camera noise can hide the same signal.</p>
+          </div>
+          <figure class="bit-example">
+            <h3>One example pixel channel</h3>
+            <div><span>Clean · 146</span><code>1001001<b>0</b></code></div>
+            <div><span>With message · 147</span><code>1001001<b>1</b></code></div>
+            <figcaption>8-bit intensity, shown in binary</figcaption>
+          </figure>
+        </div>
+        <p class="foot">Spatial-domain LSB steganalysis</p>
+      </div>
+      <aside class="notes">Read the last digit of each binary number. In this example, embedding one message bit raises the channel value by one. If the bit already matches, the channel can stay as it is. The project covers several settings, including replacement and matching. The output is a detection score and a location.</aside>
+    </section>
+
+    <section id="dataset">
+      <div class="sheet">
+        <p class="kicker">Dataset <span>/</span> Four photo collections</p>
+        <h2>31,100 source photos, split by photo</h2>
+        <div class="specimens">
+          <figure><div class="crop sample raise"><img src="../figures/report/data-sample.png" alt="Indoor scene with the tile grid overlaid"></div><figcaption>RAISE <span>1,000</span></figcaption></figure>
+          <figure><div class="crop sample div2k"><img src="../figures/report/data-sample.png" alt="Squirrel photographed outdoors with the tile grid overlaid"></div><figcaption>DIV2K <span>900</span></figcaption></figure>
+          <figure><div class="crop sample alaska"><img src="../figures/report/data-sample.png" alt="Dark and noisy camera image with the tile grid overlaid"></div><figcaption>ALASKA2 <span>18,200</span></figcaption></figure>
+          <figure><div class="crop sample lsdir"><img src="../figures/report/data-sample.png" alt="Boat at sea with the tile grid overlaid"></div><figcaption>LSDIR <span>11,000</span></figcaption></figure>
+        </div>
+        <div class="columns">
+          <div><h3>Paired training examples</h3><p>A seeded generator embeds a fresh message into a copy of a clean tile. Its mask identifies which 32 px cells contain changed pixels.</p></div>
+          <div><h3>Held-out sources and cameras</h3><p>Every tile from one photo stays in the same split. Training excludes DIV2K and eight ALASKA2 camera models.</p></div>
+        </div>
+        <p class="foot">Yellow squares mark sample tiles</p>
+      </div>
+      <aside class="notes">The training source mix was 40% RAISE, 40% ALASKA and 20% LSDIR. Each epoch drew 180,000 tiles. Embedding varied in bit depth, method, placement and payload, among other settings. The mask supplies training labels. At inference, the detector receives only the image.</aside>
+    </section>
+
+    <section id="network" class="night" data-background-color="#14221f">
+      <div class="sheet">
+        <p class="kicker">Method <span>/</span> Run 22</p>
+        <h2>One network answers “whether” and “where”</h2>
+        <div class="network">
+          <div class="stage"><small>Input</small><h3>RGB tile</h3><p>256 × 256 pixels at original resolution</p></div>
+          <i aria-hidden="true">→</i>
+          <div class="stage"><small>Residuals</small><h3>SRM filters</h3><p>30 fixed filters per colour produce 90 noise maps</p></div>
+          <i aria-hidden="true">→</i>
+          <div class="stage"><small>Shared features</small><h3>Wide XuNet</h3><p>An 8 × 8 grid with 256 feature channels</p></div>
+          <i aria-hidden="true">→</i>
+          <div class="heads"><div><small>Tile score</small><p>Average and covariance pooling</p></div><div><small>Heatmap</small><p>One score per 32 × 32 px cell</p></div></div>
+        </div>
+        <p class="annotation">Run 21 learned to classify paired tiles. Run 22 added 15 epochs of joint training on tile labels and changed-cell masks.</p>
+        <p class="foot">638,611 trainable parameters</p>
+      </div>
+      <aside class="notes">SRM stands for Spatial Rich Model. The high-pass filters suppress much of the scene content. Covariance pooling captures how feature channels vary together. Run 21 trained for 50 epochs, and run 22 started from its best checkpoint. Its loss combines tile cross-entropy with 0.2 times the cell binary cross-entropy.</aside>
+    </section>
+
+    <section id="evaluation">
+      <div class="sheet">
+        <p class="kicker">Evaluation <span>/</span> Frozen benchmarks</p>
+        <h2>Three questions need three tests</h2>
+        <table class="protocol">
+          <thead><tr><th>Question</th><th>Test material</th><th>Measure</th></tr></thead>
+          <tbody>
+            <tr><th>Does a tile carry a message?</th><td>10,944 clean/stego pairs from 249 RAISE and DIV2K photos</td><td>Standard tile error and AUC</td></tr>
+            <tr><th>Where are the changes?</th><td>128 test tiles with a contiguous message for the localisation comparison</td><td>Within-tile ranking of changed cells</td></tr>
+            <tr><th>Should a photo be flagged?</th><td>576 photos, each clean and with 12 embedded variants</td><td>Photo false alarms and misses</td></tr>
+          </tbody>
+        </table>
+        <p class="annotation">Validation data set the thresholds. Confidence intervals resample whole photos, keeping their tiles together.</p>
+        <p class="foot">2,000 photo-bootstrap resamples</p>
+      </div>
+      <aside class="notes">The shipped tile threshold minimised balanced error on 18,000 validation pairs. The cell threshold targeted 5% false cells on validation. The photo rule had a separate validation calibration. AUC measures ranking across thresholds. Balanced error is the average of the false-alarm and miss rates at the selected threshold.</aside>
+    </section>
+
+    <section id="tile-results">
+      <div class="sheet">
+        <p class="kicker">Results <span>/</span> Tile detection</p>
+        <h2>Tile error varies by image source</h2>
+        <div class="result-layout">
+          <div class="spotlight"><strong>2.54<span>%</span></strong><h3>Standard tile error</h3><p>3.1% false alarms<br>2.0% misses<br>0.9971 AUC</p></div>
+          <figure class="bars">
+            <h3>Balanced tile error by source</h3>
+            <div class="bar-row"><label>RAISE</label><div><i style="--value:8.8%"></i></div><b>1.76%</b></div>
+            <div class="bar-row"><label>DIV2K</label><div><i style="--value:43.05%"></i></div><b>8.61%</b></div>
+            <div class="bar-row"><label>LSDIR</label><div><i style="--value:37.95%"></i></div><b>7.59%</b></div>
+            <div class="bar-row"><label>ALASKA unseen</label><div><i style="--value:74.35%"></i></div><b>14.87%</b></div>
+            <div class="bar-row"><label>ALASKA seen</label><div><i style="--value:88.1%"></i></div><b>17.62%</b></div>
+            <figcaption>Fixed validation threshold · lower error is better</figcaption>
+          </figure>
+        </div>
+        <p class="foot">Balanced error (P<sub>E</sub>) = (false-alarm rate + miss rate) / 2</p>
+      </div>
+      <aside class="notes">The standard result pools 9,696 RAISE pairs and 1,248 DIV2K pairs. Its mix therefore matters when interpreting the headline number. On DIV2K, 13.3% of clean tiles triggered an alert. Both ALASKA camera panels had substantially higher balanced error than the pooled standard test.</aside>
+    </section>
+
+    <section id="model-history">
+      <div class="sheet">
+        <p class="kicker">Model history <span>/</span> Ten models on the same tests</p>
+        <h2>Moving to 256 px tiles cut error the most</h2>
+        <div class="chart-layout">
+          <div class="chart-reading">
+            <h3>Matching the test tile size</h3>
+            <p>Reducing training tiles from 512 to 256&nbsp;px matched the test size and cut standard error by 2.17 percentage points.</p>
+          </div>
+          <figure class="chart">
+            <figcaption><strong>Change in standard tile error</strong><span>Percentage points relative to the preceding model · left of zero means fewer errors</span></figcaption>
+            <img src="charts/model-changes.png" alt="Tile-size change: −2.17 points (95% interval −2.47 to −1.87). Covariance pooling: −0.40 (−0.65 to −0.15). Trained cell head: +0.39 (+0.22 to +0.58).">
+          </figure>
+        </div>
+        <p class="foot">Whiskers show 95% paired photo-bootstrap intervals for each change.</p>
+      </div>
+      <aside class="notes">Each displayed change compares adjacent models, and the three changes shown are selected from a longer series. Adding ALASKA and LSDIR training photos increased standard error by 1.35 points while improving the other source panels. Each recipe had one training seed. Repeating one recipe moved standard error by 0.48 points, so small differences warrant care.</aside>
+    </section>
+
+    <section id="model-comparison">
+      <div class="sheet">
+        <p class="kicker">Model comparison <span>/</span> Frozen tile tests</p>
+        <h2>Which model would you deploy?</h2>
+        <div class="chart-layout">
+          <div class="chart-reading">
+            <h3>Why the team chose run 22</h3>
+            <p>Run 21 had the lowest standard error. Run 22 ranked low-payload messages best, produced a heatmap and met both whole-photo deployment targets.</p>
+          </div>
+          <figure class="chart">
+            <figcaption><strong>Detection on three frozen tests</strong><span>Lower error is better on the first two tests. Higher AUC is better on the third.</span></figcaption>
+            <img src="charts/model-comparison.png" alt="Standard tile error, ALASKA unseen-camera tile error, and low-payload one-bit AUC, respectively. V3c: 4.05%, 26.88%, 0.627. Run 21: 2.15%, 15.37%, 0.787. Run 22: 2.54%, 14.87%, 0.798.">
+          </figure>
+        </div>
+        <p class="foot">Low-payload AUC pools 3,024 one-bit pairs across ALASKA seen, ALASKA unseen and LSDIR.</p>
+      </div>
+      <aside class="notes">Each row follows one model across three tests. Each plot has its own labelled scale. Standard and ALASKA error are balanced tile error at each model’s validation-derived threshold. The low-payload AUC measures ranking over 3,024 one-bit pairs pooled across ALASKA seen, ALASKA unseen and LSDIR. The deployment targets apply to a separate whole-photo test. Run 22 flagged 5.6% of clean photos against a 7% limit, and its balanced error on hard, low-payload one-bit photos was 22.6% against a 25% limit.</aside>
+    </section>
+
+    <section id="hard-cases" class="night" data-background-color="#14221f">
+      <div class="sheet">
+        <p class="kicker">Stress test <span>/</span> One-bit, low-payload messages</p>
+        <h2>Noise can push detection close to chance</h2>
+        <div class="chart-layout">
+          <div class="chart-reading">
+            <h3>Interpreting the noisy subset</h3>
+            <p>An AUC of 0.50 means chance ranking. On seen ALASKA cameras, AUC fell from 0.730 across low-payload tiles to 0.535 on the noisy subset.</p>
+          </div>
+          <figure class="chart">
+            <figcaption><strong>Low-payload AUC by test panel</strong><span class="legend"><span><i class="marker circle"></i>All low-payload tiles</span><span><i class="marker diamond"></i>Noisy low-payload tiles</span></span></figcaption>
+            <img src="charts/noise-effect.png" alt="Low-payload AUC for all tiles versus noisy tiles. Standard: 0.965 versus 0.923. ALASKA seen: 0.730 versus 0.535. ALASKA unseen: 0.770 versus 0.552. LSDIR: 0.878 versus 0.705. Chance is 0.50.">
+          </figure>
+        </div>
+        <p class="foot">1,008 pairs per condition · low payload = 0.05–0.15 bits per pixel</p>
+      </div>
+      <aside class="notes">Every hard-test cell contains 1,008 clean/stego pairs. A noisy tile exceeds its source’s validation 75th percentile of residual noise. The primary hard AUC of 0.798 pools low-payload pairs across the two ALASKA panels and LSDIR before restricting to noisy tiles.</aside>
+    </section>
+
+    <section id="localisation">
+      <div class="sheet">
+        <p class="kicker">Localisation <span>/</span> DIV2K test photo 0829</p>
+        <h2>The heatmap follows the embedded band</h2>
+        <div class="triptych">
+          <figure><div class="crop butterfly embedded"><img src="../figures/report/heatmap-example.png" alt="Butterfly photo carrying a message, visually similar to the clean reference"></div><figcaption>Image with message</figcaption></figure>
+          <figure><div class="crop butterfly truth"><img src="../figures/report/heatmap-example.png" alt="Ground truth mask with a narrow white horizontal band across the middle"></div><figcaption>Known message location</figcaption></figure>
+          <figure><div class="crop butterfly detected"><img src="../figures/report/heatmap-example.png" alt="Predicted orange cells cluster along the horizontal band, with a few isolated cells elsewhere"></div><figcaption>Cells flagged by run 22</figcaption></figure>
+        </div>
+        <div class="columns compact">
+          <div><h3>On this photograph</h3><p>An 86 kB contiguous message raised the photo score from 0.01 to 0.84.</p></div>
+          <div><h3>Across 128 contiguous-message tiles</h3><p>Changed cells outranked unchanged cells with a mean per-tile AUC of 0.864.</p></div>
+        </div>
+        <p class="foot">One-bit embedding at 0.25 bits per pixel</p>
+      </div>
+      <aside class="notes">White is the generator’s known message mask. Orange marks 32 px cells above the validation cutoff. The model picks out the band even though some cells away from it are flagged. The 0.864 number is a localisation metric within stego tiles, separate from tile-detection AUC.</aside>
+    </section>
+
+    <section id="whole-photo">
+      <div class="sheet">
+        <p class="kicker">Whole-photo decision <span>/</span> Rule C</p>
+        <h2>Combining tiles and cells cut photo misses</h2>
+        <div class="chart-layout">
+          <div class="chart-reading">
+            <h3>The whole-photo trade-off</h3>
+            <p>Adding cell evidence reduced misses from 66.4% to 10.2%. False alarms rose from 2.4% to 5.6% of clean photos.</p>
+          </div>
+          <figure class="chart">
+            <figcaption><strong>Error rates by photo rule</strong><span class="legend"><span><i class="key false-alarm"></i>False alarms</span><span><i class="key miss"></i>Misses</span><span><i class="key balanced"></i>Balanced error</span></span></figcaption>
+            <img src="charts/photo-rules.png" alt="False alarms, misses, and balanced error, respectively. Tiles only: 2.4%, 66.4%, 34.4%. Cells only: 9.5%, 12.5%, 11.0%. Tiles and cells: 5.6%, 10.2%, 7.9%.">
+          </figure>
+        </div>
+        <p class="foot">576 test photos · lower rates are better · combined-rule AUC 0.967</p>
+      </div>
+      <aside class="notes">The service scans full-resolution tiles and averages cell scores where tiles overlap. A logistic rule combines eight features, including peak tile scores and the largest flagged cell cluster. The team fitted the rule on 224 validation photos and calibrated its threshold on another 224, targeting 5% clean-photo false alarms. The combined rule also met the hard-photo error target at 22.6%. The whole-photo set shares source pools with development, which limits the generalisation claim.</aside>
+    </section>
+
+    <section id="deployment">
+      <div class="sheet">
+        <p class="kicker">Deployment <span>/</span> Image Integrity Inspector</p>
+        <h2>From an upload to regions for review</h2>
+        <div class="demo">
+          <figure><img src="../figures/report/ui-result-stego.png" alt="Image Integrity Inspector showing the butterfly, flagged regions, heatmap controls and a photo score of 0.84"><figcaption>React inspector · run 22 result on DIV2K 0829</figcaption></figure>
+          <div><h3>CPU deployment</h3><p>ONNX Runtime matched all 21,888 PyTorch tile decisions and ran 1.7–2.3× faster on the benchmark CPU.</p><h3>Cloud GPU</h3><p>A 2–3 MP image took 0.27 s on the L4 versus 2.10 s on the VM’s CPU. All 50 test verdicts agreed.</p></div>
+        </div>
+        <p class="foot">The FastAPI service processes uploads in memory</p>
+      </div>
+      <aside class="notes">The viewer lets an analyst inspect numbered regions and export the heatmap or analysis. The ONNX container was 329 MB versus 1.14 GB for PyTorch. The cloud comparison used PyTorch on the L4 and ONNX on CPU. Seven flagged cells changed in that GPU comparison, with identical tile decisions and photo verdicts.</aside>
+    </section>
+
+    <section id="conclusion" class="night" data-background-color="#14221f">
+      <div class="sheet">
+        <p class="kicker">Conclusion <span>/</span> Interpreting the detector</p>
+        <h2>A flag gives an analyst somewhere to look</h2>
+        <div class="closing">
+          <figure><div class="crop butterfly detected"><img src="../figures/report/heatmap-example.png" alt="Orange flagged cells across the butterfly’s wings"></div><figcaption>Run 22 <span>32 px cells</span></figcaption></figure>
+          <div><h3>What the evidence supports</h3><p>On the tested photos, the combined rule flagged 5.6% of clean images and missed 10.2% of images carrying messages. Each verdict needs human interpretation.</p><h3>Where to improve</h3><p>Tiny payloads in noisy photos remain difficult. We propose broader training sources, source-specific calibration and a separate JPEG-domain detector.</p></div>
+        </div>
+        <p class="foot"><a href="../../README.md">Our project report ↗</a></p>
+      </div>
+      <aside class="notes">The detector addresses spatial colour LSB embedding. Resizing and JPEG recompression can erase earlier LSB traces. Request the original file where possible. A flag warrants inspection, and a low score still leaves room for an undetected message. We document how to reproduce the results and give the detailed measurements and references in our report.</aside>
+    </section>
+    <section id="references">
+      <div class="sheet">
+        <h2>References</h2>
+        <div class="columns bibliography">
+          <div>
+            <h3>Detection and localisation</h3>
+            <ul>
+              <li>Fridrich &amp; Kodovský (2012). <cite>Rich Models for Steganalysis of Digital Images.</cite> IEEE TIFS.</li>
+              <li>Xu, Wu &amp; Shi (2016). <cite>Structural Design of Convolutional Neural Networks for Steganalysis.</cite> IEEE Signal Processing Letters.</li>
+              <li>Deng et al. (2019). <cite>Fast and Effective Global Covariance Pooling Network for Image Steganalysis.</cite> ACM IH&amp;MMSec.</li>
+              <li>Zhou et al. (2016). <cite>Learning Deep Features for Discriminative Localization.</cite> CVPR.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Photo collections</h3>
+            <ul>
+              <li><strong>RAISE</strong> · Dang-Nguyen et al. (2015). <cite>RAISE – A Raw Images Dataset for Digital Image Forensics.</cite> ACM Multimedia Systems.</li>
+              <li><strong>DIV2K</strong> · Agustsson &amp; Timofte (2017). <cite>NTIRE 2017 Challenge on Single Image Super-Resolution: Dataset and Study.</cite> CVPR Workshops.</li>
+              <li><strong>ALASKA2</strong> · Cogranne, Giboulot &amp; Bas (2020). <cite>ALASKA#2: Challenging Academic Research on Steganalysis with Realistic Images.</cite> IEEE WIFS.</li>
+              <li><strong>LSDIR</strong> · Li et al. (2023). <cite>LSDIR: A Large Scale Dataset for Image Restoration.</cite> CVPR Workshops.</li>
+            </ul>
+          </div>
+        </div>
+        <p class="foot"><a href="../../README.md#references">Our bibliography ↗</a> · <a href="../results/model-history-2026-11-25.md">Model comparison results ↗</a></p>
+      </div>
+      <aside class="notes">We list all 18 references in our bibliography. The model comparison record gives the measurements for all ten models on the frozen tests.</aside>
+    </section>
+  </div>
+</main>
+<script src="vendor/reveal-5.2.1/dist/reveal.js"></script>
+<script src="vendor/reveal-5.2.1/plugin/notes/notes.js"></script>
+<script>
+  Reveal.initialize({
+    width: 1280, height: 720, margin: 0.035, center: false,
+    hash: true, controls: true, controlsTutorial: false, slideNumber: 'c/t',
+    transition: 'fade', transitionSpeed: 'fast', backgroundTransition: 'none',
+    scrollActivationWidth: null, plugins: [RevealNotes]
+  });
+</script>
+</body>
+</html>

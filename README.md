@@ -4,6 +4,7 @@ AAI3001 Computer Vision and Deep Learning, team project. This README is the proj
 
 | Item | Where |
 | --- | --- |
+| Presentation | [Reveal.js slides](docs/slides/index.html) · Open the HTML file from a local checkout. Use the arrow keys to navigate and Esc for the overview. |
 | Live demo (cloud) | <https://gcp-aai3001.taild62d21.ts.net> (online while the demo VM runs) |
 | Run it locally | [Appendix A](#appendix-a-run-and-reproduce) |
 | Shipped model | [`deploy/run22-rule-c-v1/`](deploy/run22-rule-c-v1/) (run 22, ONNX and PyTorch) |
@@ -444,6 +445,8 @@ We built the whole pipeline: a labelled LSB dataset generator, frozen tests spli
 ---
 
 ## Appendix A. Run and reproduce
+
+**Present the slides.** Open [the deck](docs/slides/index.html) in a browser from a local checkout. For speaker notes, run `python -m http.server 8080 --bind 127.0.0.1` from the repository root, open <http://127.0.0.1:8080/docs/slides/>, and press **S**.
 
 **Run the detector on one photo (no web app):**
 
