@@ -1,4 +1,4 @@
-# 2026-11-25 — submission prep; V3c baseline re-scored; model-history ladder
+# 2026-11-25 — submission prep; V3c baseline re-scored; model-history ladder; ONNX engine
 
 ## Did
 
@@ -11,6 +11,8 @@
   - Tests: `tests/test_deployment.py` (16 entries, appended entry = wide-R2 entry with the baseline identity); `tests/test_legacy_wide_migration.py` (4 new baseline tests, including the real-record test). Focused 27 OK. FAST level: **663 tests OK (35 skipped), 327 s, exit 0**.
 - Evaluation: `podman exec -w /work aai3001 python -B -u scripts/evaluate_run.py runs/g4-prime-1` → **exit 0, about 3 min**, eval **`29fb97d0c311a0eca3b1`**. Validation cut-off .5790 (validation FA 1.52%, miss 6.73%, AUC .9888; 18,000 pairs, 270 photos).
 - One-off ladder (saved outputs only, no inference): `runs/verification/hallmark-ladder-2026-11-25/ladder.py`, outputs `ladder.md`, `ladder.json`. Paired source-photo bootstrap, 2,000 draws, seed 20261019, method of `scripts/architecture_decision.py`. Each model keeps its own frozen validation cut-off.
+- Model optimization for deployment (user approved: ONNX first, then a measured INT8 test). Work in `runs/verification/onnx-2026-11-25/` (git-ignored): `export_probe.py`, `variants.py` (INT8 builds, timing, frozen evaluation with ONNX Runtime in place of PyTorch), `compare.py` (paired comparison with the recorded PyTorch evaluation `a1ab2faad8f27bca309e`). Container packages added: onnx 1.23.2, onnxruntime 1.32.0, onnxscript 0.7.2.
+- `pipeline` branch, commits `da70753` (code) and `b96ca7c` (docs): ONNX Runtime engine (`engine='onnx'`, `CVDL_ENGINE`), torch-free bundle contract module, `python -m cvdl.pipeline.export_onnx`, `model.onnx` + `onnx.json` for the run 13/18/22 bundles, `deploy/Dockerfile` now ONNX (old image is `deploy/Dockerfile.torch`), `tests/test_pipeline_onnx.py` (6 tests OK). FULL level in the pipeline worktree: 425 tests, 3 failures, all also present on the unchanged `044c1ad` because the worktree has no `runs/` training records.
 
 ## Found
 
@@ -45,11 +47,36 @@
 - The newdata-1 → overlap-512 re-run of the same recipe moved standard P_E by +0.48 points: a rough size of run-to-run spread. Steps smaller than this need care. Every run is one training seed; the intervals cover test photos, not training luck.
 - Limits: the V3c and wide-R2 cut-offs come from list `8328` (RAISE/DIV2K, their training sources); later models use `60da`. V3c trained on k 1-8 at 512; the test uses k 1-4 at 256.
 
+### Model optimization (run 22)
+
+| Check | Result |
+|---|---|
+| ONNX FP32 export (opset 18, dynamic batch) | 2.67 MB; same graph and weights as the evaluated file (only debug name metadata differs) |
+| Frozen evaluation, ONNX FP32 vs PyTorch | validation cut-off .5245214 vs .5245211; **0 decision changes** on 21,888 standard tiles (largest probability difference 1.6e-4); standard P_E 2.545% both; ALASKA seen/unseen, LSDIR P_E equal; hard k=1 low AUC .7983 both |
+| HTTP, both containers, 3 photos (clean, LSB-changed, 12 MP) | same verdicts, logits equal to 4 decimals, same flagged cells |
+| INT8 static (Conv+Gemm, SRM filter FP32, 512 validation tiles) | **rejected**: standard P_E 5.78% (+3.24 points [+2.76, +3.68]); hard AUC .742 (−.057 [−.062, −.051]); 1.4× faster on 2 threads, slower on 8 |
+
+Model-only time per tile (batch 8): PyTorch 52.1 ms (2 threads); ONNX FP32 31.3 ms (2 threads), 9.2 ms (8 threads); INT8 (SRM kept FP32) 22.3 / 12.1 ms.
+
+Full `/analyze` call, container images built from the same tree, `--cpus` = `CVDL_THREADS`, `include_images=false`, median of 3:
+
+| CPUs | Photo | PyTorch image | ONNX image | Speed-up |
+|---|---|---:|---:|---:|
+| 2 | 2.8 MP (DIV2K 0801, 48 tiles) | 2.71 s | 1.54 s | 1.76× |
+| 2 | 12 MP (4000×3000, 192 tiles) | 10.80 s | 6.21 s | 1.74× |
+| 8 | 2.8 MP | 1.19 s | 0.53 s | 2.27× |
+| 8 | 12 MP | 4.74 s | 2.11 s | 2.25× |
+
+Image size 1.14 GB → 329 MB. Memory after the runs: PyTorch 198–246 MB, ONNX 578 MB (ONNX Runtime keeps a memory pool).
+
 ## Decided
 
-- User: re-score only the V3c baseline; host the app on Hugging Face Spaces (backend) + Vercel (front end).
+- User: re-score only the V3c baseline.
+- User (Option A): host on one Hugging Face Docker Space that serves the backend and the React build; no Vercel.
+- Ship ONNX FP32 as the deployed engine. Reject INT8: it fails the frozen tests. Do not resize photos for speed: resizing destroys the LSB signal.
 
 ## Next
 
-- Pending (user): model optimization for the deployment rubric row (ONNX/quantization) or document CPU timing only.
-- Pending: merge `pipeline` into `app`; README rewrite as the report; repo cleanup; merge to `main`.
+- Pending (user): push `pipeline` (`da70753`, `b96ca7c`).
+- Pending (user): may `pipeline` merge into `app` (Babydage's branch)? Who owns the Hugging Face account?
+- Pending: HF Space deployment; README rewrite as the report; repo cleanup; merge to `main`.
