@@ -13,6 +13,8 @@
 - One-off ladder (saved outputs only, no inference): `runs/verification/hallmark-ladder-2026-11-25/ladder.py`, outputs `ladder.md`, `ladder.json`. Paired source-photo bootstrap, 2,000 draws, seed 20261019, method of `scripts/architecture_decision.py`. Each model keeps its own frozen validation cut-off.
 - Model optimization for deployment (user approved: ONNX first, then a measured INT8 test). Work in `runs/verification/onnx-2026-11-25/` (git-ignored): `export_probe.py`, `variants.py` (INT8 builds, timing, frozen evaluation with ONNX Runtime in place of PyTorch), `compare.py` (paired comparison with the recorded PyTorch evaluation `a1ab2faad8f27bca309e`). Container packages added: onnx 1.23.2, onnxruntime 1.32.0, onnxscript 0.7.2.
 - `pipeline` branch, commits `da70753` (code) and `b96ca7c` (docs): ONNX Runtime engine (`engine='onnx'`, `CVDL_ENGINE`), torch-free bundle contract module, `python -m cvdl.pipeline.export_onnx`, `model.onnx` + `onnx.json` for the run 13/18/22 bundles, `deploy/Dockerfile` now ONNX (old image is `deploy/Dockerfile.torch`), `tests/test_pipeline_onnx.py` (6 tests OK). FULL level in the pipeline worktree: 425 tests, 3 failures, all also present on the unchanged `044c1ad` because the worktree has no `runs/` training records.
+- `pipeline` merged into `app` (`73fa326`, pushed). New branch `report` = `app` + `yx` (merge `3c96319`; `yx` docs kept on conflicts). FULL level after the merge commit: all failures explained (uncommitted merge, no photo data in the worktree).
+- README rewritten as the project report, in paper form (abstract, related work, dataset, method, protocol, results, system, scalability, limitations, 18 references checked online). The old README moved to `docs/development.md` (links fixed). New: `scripts/build_report_figures.py` (model-history chart from `docs/results/model-history-2026-11-25.json`; heatmap example from DIV2K test photo 0829 with a seeded k=1 contiguous 0.25 bpp message, ONNX engine: clean 0.009 not detected, stego 0.839 detected), and 3 UI screenshots of `app/` against the real ONNX container. FAST level: **697 tests OK (35 skipped)**.
 
 ## Found
 
@@ -79,4 +81,4 @@ Image size 1.14 GB → 329 MB. Memory after the runs: PyTorch 198–246 MB, ONNX
 
 - Pending (user): push `pipeline` (`da70753`, `b96ca7c`).
 - Pending (user): may `pipeline` merge into `app` (Babydage's branch)? Who owns the Hugging Face account?
-- Pending: HF Space deployment; README rewrite as the report; repo cleanup; merge to `main`.
+- Pending: HF Space deployment, then the live URL in the README (two places marked Pending); repo cleanup; merge to `main`.
