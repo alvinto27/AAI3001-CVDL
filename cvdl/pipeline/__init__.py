@@ -6,17 +6,19 @@ import threading
 import numpy as np
 from PIL import Image
 
-from .bundle import BundleError, load_bundle
+from .contract import BundleError
 from .inputs import InputError, InputTooLarge, UnsupportedInput, decode_photo
-from ..photo_inference import cell_edges, cell_to_pixels, infer_photo
+from ..photo_inference import cell_edges, cell_to_pixels, infer_photo, infer_photo_head
 from ..photo_verdict import features, predict
 
 
 class Pipeline:
-    def __init__(self,network,config,device,batch_size):
+    def __init__(self,network,config,device,batch_size,engine='torch'):
+        if engine not in ENGINES:raise ValueError('unknown engine')
         self._network=network
         self._config=config
         self.device=device
+        self.engine=engine
         self.batch_size=batch_size
         self._lock=threading.Lock()
 
@@ -34,8 +36,11 @@ class Pipeline:
         pixels,metadata=decode_photo(photo,allow_rgba=allow_rgba)
         h,w=pixels.shape[:2];config=self._config
         record=dict(photo_id='input',source_height=h,source_width=w)
-        origins,scores,maps=infer_photo(self._network,pixels,record,self.device,self.batch_size,
-            map_kinds=(config['map']['kind'],))
+        if self.engine=='onnx':
+            origins,scores,maps=infer_photo_head(self._network,pixels,record,self.batch_size)
+        else:
+            origins,scores,maps=infer_photo(self._network,pixels,record,self.device,self.batch_size,
+                map_kinds=(config['map']['kind'],))
         grid=maps[0]
         tile_cutoff=config['tile']['cutoff'];cell_cutoff=config['map']['cutoff']
         values,counts=features(scores,grid,tile_cutoff,cell_cutoff)
@@ -43,7 +48,7 @@ class Pipeline:
         logit=float(predict(rule['model'],[[values[k] for k in rule['features']]])[0])
         probability=float(np.exp(-np.logaddexp(0.,-logit)))
         detected=logit>=rule['cutoff']
-        result=dict(schema_version=1,bundle=self.identity,device=self.device,width=w,height=h,
+        result=dict(schema_version=1,bundle=self.identity,device=self.device,engine=self.engine,width=w,height=h,
             input=metadata,photo_verdict='message_detected' if detected else 'not_detected',
             photo_rule=dict(type=rule['type'],logit=logit,probability=probability,cutoff=rule['cutoff'],
                 probability_note='sigmoid score, not a calibrated real-world probability'),
@@ -72,17 +77,32 @@ def _images(pixels,grid,cutoff):
     return result
 
 
-def load_pipeline(bundle_dir=None,*,device='cpu',batch_size=8):
-    """Select explicit folder > CVDL_BUNDLE > shipped bundle. Never download/refit."""
+ENGINES=('torch','onnx')
+
+
+def load_pipeline(bundle_dir=None,*,device='cpu',batch_size=8,engine='torch',threads=None):
+    """Select explicit folder > CVDL_BUNDLE > shipped bundle. Never download/refit.
+
+    engine='torch' runs weights.pt with PyTorch (CPU or GPU). engine='onnx' runs
+    the bundle's verified model.onnx with ONNX Runtime on CPU and never imports
+    torch. threads limits ONNX Runtime CPU threads (None: runtime default).
+    """
     if type(batch_size) is not int or not 1<=batch_size<=8:
         raise ValueError('batch_size must be in 1..8')
-    network,config,device=load_bundle(bundle_dir,device=device)
-    return Pipeline(network,config,device,batch_size)
+    if engine=='onnx':
+        from .onnx_engine import load_onnx_bundle
+        network,config,device=load_onnx_bundle(bundle_dir,device=device,threads=threads)
+    elif engine=='torch':
+        from .bundle import load_bundle
+        network,config,device=load_bundle(bundle_dir,device=device)
+    else:
+        raise ValueError('engine must be torch or onnx')
+    return Pipeline(network,config,device,batch_size,engine)
 
 
-def analyze(photo,*,bundle_dir=None,device='cpu',batch_size=8,allow_rgba=False,include_images=False):
+def analyze(photo,*,bundle_dir=None,device='cpu',batch_size=8,engine='torch',allow_rgba=False,include_images=False):
     """One-shot convenience call; services should keep a loaded pipeline instead."""
-    return load_pipeline(bundle_dir,device=device,batch_size=batch_size).analyze(
+    return load_pipeline(bundle_dir,device=device,batch_size=batch_size,engine=engine).analyze(
         photo,allow_rgba=allow_rgba,include_images=include_images)
 
 

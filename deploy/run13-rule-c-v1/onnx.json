@@ -1,0 +1,40 @@
+{
+  "format_version": 1,
+  "onnx_sha256": "9edca0f14017b4c84f8742d053d11dc561205c9e69d5a6d3ac14402a532ad16c",
+  "weights_sha256": "0d4b72c25f980b233a33941a5bbc67293ce75b071c6d17e2e72b62b691ab8728",
+  "contract_sha256": "71db7982bb0e3b59d6ec126b487f0405fa4cfc652bfc0995a6d64a34456567f9",
+  "precision": "fp32",
+  "opset": 18,
+  "inputs": {
+    "images": [
+      "N",
+      3,
+      256,
+      256
+    ]
+  },
+  "outputs": {
+    "tile_prob": [
+      "N"
+    ],
+    "cell_logits": [
+      "N",
+      8,
+      8
+    ]
+  },
+  "export": {
+    "torch": "2.14.0",
+    "onnxruntime": "1.32.0",
+    "python": "3.12.3",
+    "check": {
+      "tiles": 32,
+      "seed": 20261125,
+      "tolerance": 0.001,
+      "max_abs_difference": {
+        "tile_prob": 1.3709068298339844e-06,
+        "cell_logits": 2.09808349609375e-05
+      }
+    }
+  }
+}
