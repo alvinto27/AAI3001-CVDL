@@ -87,7 +87,7 @@ and push, then inspect the PC pre-flight without starting the VM:
 bash scripts/g4/submit.sh run --notebook notebooks/newdata-1.ipynb --commit SHA --timeout-min 105 --dry-run
 ```
 
-Do not remove `--dry-run` without approval. The [G4 runbook](active/g4-batch-runner.md#submit-a-run)
+Do not remove `--dry-run` without approval. The [G4 runbook](archive/g4-batch-runner.md#submit-a-run)
 explains machine detection, pinned settings validation and the separate speed tool.
 
 ## Data and citations

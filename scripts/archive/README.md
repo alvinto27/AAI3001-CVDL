@@ -11,7 +11,7 @@ Some older scripts read `Datasets/generated/raise512-run1-records` and **need th
 | `evaluate_rgb_candidate_context.py` | Retained B36 adapter for the original #11 panel; not an active scoring entry point. | Run19 colour-context history. |
 | `g4/step_profile.py` | Compared notebook-04 raw and Lightning training-step timings. | [2026-10-14 journal](../../docs/journal/2026-10-14/README.md). |
 | `loader_speed_matrix.py` | Compared packed-loader timings serially on CPU. | Historical packed-loader verification logs. |
-| `measure_hard_noise_256.py` | Scanned or checked the frozen 256-pixel hard-test noise records. | [Hard-test recipe](../../docs/active/plan-hard-test-256.md); no rebuild is approved. |
+| `measure_hard_noise_256.py` | Scanned or checked the frozen 256-pixel hard-test noise records. | [Hard-test recipe](../../docs/archive/plan-hard-test-256.md); no rebuild is approved. |
 | `build_new_source_manifests.py` | Built ALASKA/LSDIR manifests from frozen selections; its provenance test moved to `tests/archive/test_new_source_manifests.py`. | [New-source code plan](../../docs/archive/plan-new-data-code.md). |
 | `alaska_select.py` | ALASKA selection v1 (superseded). `scripts/alaska_select_v2.py` still imports its constants from here. | [alaska-selection-v2.md](../../docs/active/alaska-selection-v2.md) |
 | `check_sources.py` | Full read-only verification of source records and readers. | [source-verification.md](../../docs/archive/source-verification.md) |

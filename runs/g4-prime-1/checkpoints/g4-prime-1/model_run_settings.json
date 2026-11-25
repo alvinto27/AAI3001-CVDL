@@ -1,0 +1,9 @@
+{
+  "compile_mode": "default",
+  "compile_target": "net",
+  "compile_dynamic": false,
+  "compile_fullgraph": false,
+  "tf32_matmul": false,
+  "tf32_cudnn": true,
+  "torch_version": "2.14.1+cu130"
+}

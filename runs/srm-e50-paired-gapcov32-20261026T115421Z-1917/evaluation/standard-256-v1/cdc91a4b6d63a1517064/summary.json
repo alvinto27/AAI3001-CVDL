@@ -1,0 +1,140 @@
+{
+  "evaluation_id": "cdc91a4b6d63a1517064",
+  "output": "/work/runs/srm-e50-paired-gapcov32-20261026T115421Z-1917/evaluation/standard-256-v1/cdc91a4b6d63a1517064",
+  "suite": "standard-256-v1",
+  "quick": false,
+  "timings": [
+    {
+      "panel": "validation",
+      "pairs": 18000,
+      "seconds": 60.92886390100466
+    },
+    {
+      "panel": "standard",
+      "higher_k": false,
+      "pairs": 10944,
+      "seconds": 40.975227062997874
+    },
+    {
+      "panel": "alaska-seen",
+      "higher_k": false,
+      "pairs": 2688,
+      "seconds": 9.699219788999471
+    },
+    {
+      "panel": "alaska-unseen",
+      "higher_k": false,
+      "pairs": 3168,
+      "seconds": 10.65949440300028
+    },
+    {
+      "panel": "lsdir",
+      "higher_k": false,
+      "pairs": 5280,
+      "seconds": 16.861452630000713
+    }
+  ],
+  "total_seconds": 234.73499093099963,
+  "hard_test": {
+    "status": "complete",
+    "version": "hard-test-256-v1",
+    "recipe_sha256": "d6d91a5a98dae856d1ae47ba864455d2986967fbc8ce816348ef4de2b1370793",
+    "files_sha256": {
+      "pairs-alaska-seen.csv": "3a8b3be4b990571121b005808ab73d3fc889937b391365511b468a0fdd6f4c5b",
+      "pairs-alaska-unseen.csv": "9c7708ee1e4aedca578119b1bc969e14887e7b6edc1a9126d74b75770e7ba241",
+      "pairs-lsdir.csv": "c60a77a3ba0d3db79eb067c9c0eb983fbad6b534aaa432da5e45114136a8926b",
+      "pairs-standard.csv": "77c96353ed89b925e07f0f1e1c84b36515a6b9d8be96ffffaec81cf0071be074"
+    },
+    "noise_edges": {
+      "alaska": 2.6133468747138977,
+      "div2k": 2.4415316581726074,
+      "lsdir": 2.515662729740143,
+      "raise": 1.6907958090305328
+    },
+    "pairs": 32256,
+    "cells": 32,
+    "seconds": 91.32385952899494,
+    "quick": false,
+    "AUC_clean_weighting": "paired rows (as v1)",
+    "FA_counting": "distinct clean tiles within cell",
+    "validation_threshold": {
+      "threshold_origin": "post_hoc_256",
+      "recipe_id": "60da4391043e8ce48ff2",
+      "run_name": "srm-e50-paired-gapcov32-20261026T115421Z-1917",
+      "mapping_sha256": "9d349b11361fc616e23543b6e01cde7db6beb84d213422d6074be451f35e9c11",
+      "checkpoint_sha256": "4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf",
+      "policy": "validation-min-pe-v1/atol1e-12/min-fa/first-ascending/float64-ge",
+      "recipe_sha256": "60da4391043e8ce48ff2ca879a62ccacc6d77751c7fb7ddba1d2e097e49b5fbc",
+      "full_pairs_sha256": "e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d",
+      "selected_pairs_sha256": "e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d",
+      "geometry": {
+        "tile_size": 256,
+        "grid": "overlap_last"
+      },
+      "quick": false,
+      "deployment": true,
+      "score_csv_sha256": "6f95ba9ae93dbfe7b0d64db44349e93686f18897bb78459eb4f5f6816637ef26",
+      "cutoff": 0.49069544672966003,
+      "FA": 0.059944444444444446,
+      "miss": 0.12061111111111111,
+      "P_E_at_validation_cutoff": 0.09027777777777778,
+      "AUC": 0.9758331234567901,
+      "pairs": 18000,
+      "clean_tiles": 18000,
+      "images": 36000,
+      "photos": 2497,
+      "threshold_id": "1fbc1a29bc8e9f4ab9a3"
+    },
+    "overlap_standard": {
+      "alaska-seen": {
+        "distinct_hard_tiles": 5675,
+        "shared_distinct_tiles": 997,
+        "shared_pairs": 1429
+      },
+      "alaska-unseen": {
+        "distinct_hard_tiles": 5763,
+        "shared_distinct_tiles": 1009,
+        "shared_pairs": 1391
+      },
+      "lsdir": {
+        "distinct_hard_tiles": 7251,
+        "shared_distinct_tiles": 730,
+        "shared_pairs": 808
+      },
+      "standard": {
+        "distinct_hard_tiles": 7020,
+        "shared_distinct_tiles": 1882,
+        "shared_pairs": 2168
+      }
+    }
+  },
+  "validation_threshold": {
+    "status": "complete",
+    "threshold_origin": "post_hoc_256",
+    "recipe_id": "60da4391043e8ce48ff2",
+    "run_name": "srm-e50-paired-gapcov32-20261026T115421Z-1917",
+    "mapping_sha256": "9d349b11361fc616e23543b6e01cde7db6beb84d213422d6074be451f35e9c11",
+    "checkpoint_sha256": "4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf",
+    "policy": "validation-min-pe-v1/atol1e-12/min-fa/first-ascending/float64-ge",
+    "recipe_sha256": "60da4391043e8ce48ff2ca879a62ccacc6d77751c7fb7ddba1d2e097e49b5fbc",
+    "full_pairs_sha256": "e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d",
+    "selected_pairs_sha256": "e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d",
+    "geometry": {
+      "tile_size": 256,
+      "grid": "overlap_last"
+    },
+    "quick": false,
+    "deployment": true,
+    "score_csv_sha256": "6f95ba9ae93dbfe7b0d64db44349e93686f18897bb78459eb4f5f6816637ef26",
+    "cutoff": 0.49069544672966003,
+    "FA": 0.059944444444444446,
+    "miss": 0.12061111111111111,
+    "P_E_at_validation_cutoff": 0.09027777777777778,
+    "AUC": 0.9758331234567901,
+    "pairs": 18000,
+    "clean_tiles": 18000,
+    "images": 36000,
+    "photos": 2497,
+    "threshold_id": "1fbc1a29bc8e9f4ab9a3"
+  }
+}

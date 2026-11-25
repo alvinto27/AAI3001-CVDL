@@ -18,11 +18,13 @@ FIGURE_SIZE = (10, 3.9)
 PLOT_MARGINS = {"left": .23, "right": .95, "bottom": .15, "top": .85}
 
 
-def report_rows(report, heading):
-    """Read the first Markdown table in a named report subsection."""
-    section = report.split(heading, 1)[1].split("\n### ", 1)[0]
-    table = section.split("\n|", 1)[1].split("\n\n", 1)[0]
-    return [line.strip("| ").split(" | ") for line in table.splitlines()[2:]]
+def report_rows(report, header):
+    """Read a results table by its columns, independent of section numbering."""
+    _, found, body = report.partition(header + "\n")
+    if not found:
+        raise ValueError(f"Missing report table: {header}")
+    table = body.split("\n\n", 1)[0]
+    return [line.strip("| ").split(" | ") for line in table.splitlines()[1:]]
 
 
 def axes_style(ax, dark=False):
@@ -90,7 +92,7 @@ def compare_models(history):
 
 
 def noise_effect(report):
-    rows = report_rows(report, "### 6.2 Hard cases")
+    rows = report_rows(report, "| Panel | k=1, all bpp | k=1, low bpp | k=1, low bpp + noisy |")
     fig, ax = plt.subplots(figsize=FIGURE_SIZE)
     fig.subplots_adjust(**PLOT_MARGINS)
     axes_style(ax, dark=True)
@@ -110,7 +112,7 @@ def noise_effect(report):
 
 
 def photo_rules(report):
-    rows = report_rows(report, "### 6.5 Whole-photo verdict")
+    rows = report_rows(report, "| Rule | False alarms | Misses | P_E |")
     fig, ax = plt.subplots(figsize=FIGURE_SIZE)
     fig.subplots_adjust(**PLOT_MARGINS)
     axes_style(ax)

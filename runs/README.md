@@ -27,21 +27,46 @@ not touched by housekeeping passes here. It carries both executed notebooks
 that produced it, `04_v3c_otf_2026-10-13.ipynb` (VM/L4) and
 `04_v3c_otf_pc_2026-10-13.ipynb` (PC).
 
-## Model files are on the VM
+## Report runs: summaries tracked
 
-Model files for the frozen v3a/v3b/v3c runs live at:
+The README's model-history ladder compares these three runs. Their summary
+files are tracked (added with `git add -f`) so that every number in the
+report can be checked against a file.
 
-```text
-/srv/aai3001/AAI3001-CVDL/checkpoints/<run>/
-```
+| Run folder | Model | Evaluation |
+| --- | --- | --- |
+| `g4-prime-1/` | V3c baseline (KV XuNet + GroupNorm), re-scored | `29fb97d0c311a0eca3b1` |
+| `srm-e50-paired-gapcov32-20261026T115421Z-1917/` | Run 21: SRM filters, paired batches, covariance pooling | `cdc91a4b6d63a1517064` |
+| `srm-cell-aux-paired-gapcov32-20261029T063502Z-5452/` | Run 22, the shipped model: run 21 + trained cell head | `a1ab2faad8f27bca309e` |
 
-(That path is the VM's own working checkout, unrelated to this repository's
-`runs/`.) Fetch a best checkpoint from the repository root with:
+Each folder has:
 
-```sh
-scp 'aai-team@gcp-aai3001:/srv/aai3001/AAI3001-CVDL/checkpoints/baseline_kv_xunet_v3_clip3_group/best-*.ckpt' \
-  runs/baseline_kv_xunet_v3_clip3_group/
-```
+| Path | Content |
+| --- | --- |
+| `evaluation/standard-256-v1/<evaluation>/summary.json`, `main_summary.csv`, `diagnostic_summary.csv` | Standard-test scores (P_E, AUC, false alarms, misses) |
+| `…/panels/<panel>/` | The same scores for ALASKA seen, ALASKA unseen, LSDIR and the standard panel |
+| `…/hard-test/hard_summary.json`, `hard_cells.csv` | Hard-test scores (k=1, low payload) |
+| `…/validation/calibration.json` | The decision threshold and how it was chosen |
+| `…/evaluation_settings.json` | The test suite, recipe and checkpoint used |
+| `checkpoints/<run>/logs/csv/run/metrics.csv`, `training_curves.png` | Loss and accuracy per epoch |
+| `checkpoints/<run>/run_settings.json`, `data_run_settings.json`, `model_run_settings.json` | Training settings and the exact training data selection |
+| `report.ipynb` / `report_22.ipynb` (runs 21 and 22) | The executed report notebook with all outputs |
+
+Not tracked: checkpoints (the shipped weights are in
+`deploy/run22-rule-c-v1/`), per-tile prediction CSVs (about 90 MB per run),
+TensorBoard events and machine logs.
+
+## Model files
+
+The checkpoints of the frozen v3a/v3b/v3c runs (and the user's OTF run) were
+on the team VM at `/srv/aai3001/AAI3001-CVDL/checkpoints/<run>/`. That old VM
+checkout was removed on 2026-11-25, after a full copy was checked by SHA-256
+(checkpoints, dataset records, logs). The copy is outside git on the
+maintainer's PC, in `runs/vm-backup-2026-11-25/`. Ask for a file if you need
+it.
+
+The shipped model's weights are tracked in `deploy/run22-rule-c-v1/`
+(`weights.pt`, `model.onnx`).
 
 Use `last.ckpt` to resume training. Use `best-*.ckpt` for evaluation. Keep
 local model copies out of git.
@@ -51,7 +76,8 @@ local model copies out of git.
 Git ignores all of `runs/` by default (`.ckpt` files, per-run `logs/tb/`
 TensorBoard events, `lightning_logs/`, and everything else new); the files
 listed above stayed tracked through the move from the old `checkpoints/` and
-`runs-out/` folders. Do not stage other run folders.
+`runs-out/` folders, and the report-run summaries were added with
+`git add -f`. Do not stage other run folders.
 
 ## G4 batch runner: VM-internal paths are unchanged
 
@@ -62,7 +88,7 @@ own checkout, separate from this repository's `runs/`, and is left as-is.
 When a finished job's result folder is copied from the Pi
 (`/srv/cvdl-results/<job-id>/`) onto this PC, it lands under
 `runs/<job-id>/`, not `runs-out/<job-id>/`. See
-`docs/active/g4-batch-runner.md`.
+`docs/archive/g4-batch-runner.md`.
 
 ## Watch TensorBoard
 

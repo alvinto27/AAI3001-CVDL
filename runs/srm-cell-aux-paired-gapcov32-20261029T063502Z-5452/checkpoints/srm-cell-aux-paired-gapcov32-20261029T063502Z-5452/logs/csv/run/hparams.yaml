@@ -1,0 +1,18 @@
+batch_size: 128
+cell_loss_weight: 0.2
+cell_supervision: changed_cells_v1
+clip_t: 3.0
+front_end: srm
+grad_clip: 1.0
+lr: 3.0e-05
+lr_drops: !!python/tuple []
+max_epochs: 15
+model: xunet_wide_gapcov32
+norm: none
+paired_batches: true
+precision: '32'
+steps_per_epoch: 2813
+val_batch_images: 64
+warmup_epochs: 1
+weight_decay: 0.0001
+width: 4

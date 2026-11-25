@@ -1,0 +1,291 @@
+{
+  "calibration_inputs": {
+    "threshold_origin": "post_hoc_256",
+    "recipe_id": "60da4391043e8ce48ff2",
+    "run_name": "srm-e50-paired-gapcov32-20261026T115421Z-1917",
+    "mapping_sha256": "9d349b11361fc616e23543b6e01cde7db6beb84d213422d6074be451f35e9c11",
+    "checkpoint_sha256": "4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf",
+    "policy": "validation-min-pe-v1/atol1e-12/min-fa/first-ascending/float64-ge",
+    "recipe_sha256": "60da4391043e8ce48ff2ca879a62ccacc6d77751c7fb7ddba1d2e097e49b5fbc",
+    "full_pairs_sha256": "e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d",
+    "selected_pairs_sha256": "e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d",
+    "geometry": {
+      "tile_size": 256,
+      "grid": "overlap_last"
+    },
+    "quick": false,
+    "deployment": true
+  },
+  "software": {
+    "torch": "2.14.0+rocm10.1.0",
+    "numpy": "2.5.3"
+  },
+  "suite": "standard-256-v1",
+  "recipe_sha256": "5045c1076ab3f540a61c619c0759f02e79c2ea36f388a094d33cf813d3756d83",
+  "checkpoint_sha256": "4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf",
+  "selected_pairs_sha256": {
+    "pairs-standard.csv": "a15983f33e8f96d4fbca5b281664ed6a4a10bdd2b7864c12475defd4ea23fc92",
+    "pairs-alaska-seen.csv": "c17c3d7de35d18cdce839cebc51d4a079098f25ff361616612ecf58b17b3537e",
+    "pairs-alaska-unseen.csv": "19629ef766e37b5ca5d7d68fa5f08d649d6cd44d7651e0039dd59f5fedd3330f",
+    "pairs-lsdir.csv": "98259cf9bb912cd8f50c94e69db4896cfa133a372b9cd9bc506c08c27045424b"
+  },
+  "higher_k": false,
+  "quick": false,
+  "device": "cuda",
+  "batch_size": 32,
+  "workers": 4,
+  "rocm_conv1_fix": false,
+  "hard_enabled": true,
+  "hard_recipe_sha256": "d6d91a5a98dae856d1ae47ba864455d2986967fbc8ce816348ef4de2b1370793",
+  "hard_selected_pairs_sha256": "305364aa1d326a1bad21d062c9b7262b2d6b5bd074238552fa55a1b774744fe4",
+  "evaluation_id": "cdc91a4b6d63a1517064",
+  "full_files_sha256": {
+    "pairs-alaska-seen.csv": "c17c3d7de35d18cdce839cebc51d4a079098f25ff361616612ecf58b17b3537e",
+    "pairs-alaska-unseen.csv": "19629ef766e37b5ca5d7d68fa5f08d649d6cd44d7651e0039dd59f5fedd3330f",
+    "pairs-k5to8-alaska-seen.csv": "075639b3acc9bcabf5679c6802469d9366059206302a4df3a77caf4ac7653043",
+    "pairs-k5to8-alaska-unseen.csv": "bed3630546dad5f5096917e57124f1314e5f9fb619c2d932a032cb27d25fd054",
+    "pairs-k5to8-lsdir.csv": "3b5a6919c176bf74111043ae08478e146975607b19a0f9e57626ac397c2cadcf",
+    "pairs-k5to8-standard.csv": "a61b1c4281845101d3092db2bc4d7c4a3d5c9325eed57714ee7a52ddc010a99b",
+    "pairs-lsdir.csv": "98259cf9bb912cd8f50c94e69db4896cfa133a372b9cd9bc506c08c27045424b",
+    "pairs-standard.csv": "a15983f33e8f96d4fbca5b281664ed6a4a10bdd2b7864c12475defd4ea23fc92"
+  },
+  "values": {
+    "root": "/work",
+    "device": "cuda",
+    "rocm": true,
+    "precision_limits": [
+      "32",
+      "bf16-mixed"
+    ],
+    "quick": false,
+    "workers": 6,
+    "eval_workers": 4,
+    "diag_workers": 4,
+    "headless": false,
+    "main_threads": 1,
+    "precision": "32",
+    "channels_last": false,
+    "persistent_workers": true,
+    "compile": "off",
+    "compile_threads": 4,
+    "inductor_cache": null,
+    "triton_cache": null,
+    "rocm_conv1_fix": false,
+    "output_root": "/work/runs",
+    "cache_root": null,
+    "manifest_root": null,
+    "data_root": "/work/Datasets/generated/raise512-run1-records",
+    "labels_path": "/work/Datasets/generated/raise512-run1-records/labels.csv",
+    "split_path": "/work/Datasets/generated/raise512-run1-records/splits/split_seed0.csv",
+    "quick_train_pairs": 32,
+    "quick_eval_pairs": 16,
+    "seed": 0,
+    "paired_batches": true,
+    "data": "otf",
+    "clip_t": 3.0,
+    "norm": "none",
+    "epochs": 50,
+    "limit_train_batches": 0,
+    "lr": 0.0003,
+    "warmup_epochs": 1,
+    "grad_clip": 1.0,
+    "lr_drops": [
+      [
+        8,
+        0.3
+      ],
+      [
+        33,
+        0.1
+      ]
+    ],
+    "train_yaml": "/work/configs/train-k1to4.yaml",
+    "train_grid": "overlap_last",
+    "train_tile_size": 256,
+    "post_fit_eval": "none",
+    "name": "srm-e50-paired-gapcov32",
+    "extra_tests": "test-bpp1,source-panels",
+    "front_end": "srm",
+    "model": "xunet_wide_gapcov32",
+    "width": 4,
+    "batch_size": 32,
+    "source": "decode",
+    "source_mix": {
+      "raise": 0.4,
+      "lsdir": 0.2,
+      "alaska": 0.4
+    },
+    "sources": [
+      "raise",
+      "lsdir",
+      "alaska"
+    ],
+    "tiles_per_epoch": 180000,
+    "tile_size": 512,
+    "run_seed": 0,
+    "train_photo_fraction": 1.0,
+    "checkpoint_validation": "capped",
+    "val_cap_raise": 5000,
+    "val_cap_lsdir": 1500,
+    "eval_profile": "overlap_full_mix",
+    "prefetch": null,
+    "prefetch_images": 128,
+    "pack_blocks": 16,
+    "prime_next_epoch": false,
+    "run_name": "srm-e50-paired-gapcov32",
+    "notebook": null,
+    "job_id": "srm-e50-paired-gapcov32-20261026T115421Z-1917",
+    "speed_matrix": false,
+    "speed_batches": [
+      32,
+      64,
+      128
+    ],
+    "speed_precisions": [
+      "32",
+      "bf16-mixed"
+    ],
+    "speed_pairs": null,
+    "speed_steps": 600,
+    "speed_warmup": 50
+  },
+  "provenance": {
+    "evaluation_overrides": [
+      {
+        "argument": "eval_batch_size=32",
+        "key": "batch_size",
+        "value": 32,
+        "source": "CLI --set (evaluation only)"
+      },
+      {
+        "argument": "rocm_conv1_fix=off",
+        "key": "rocm_conv1_fix",
+        "value": false,
+        "source": "CLI --set (evaluation only)"
+      },
+      {
+        "argument": "eval_workers=4",
+        "key": "eval_workers",
+        "value": 4,
+        "source": "CLI --set (evaluation only)"
+      }
+    ]
+  },
+  "checkpoint": "/work/runs/srm-e50-paired-gapcov32-20261026T115421Z-1917/checkpoints/srm-e50-paired-gapcov32-20261026T115421Z-1917/best-epoch43-val_pe0.0329-val_auc0.9946.ckpt",
+  "train_geometry": {
+    "tile_size": 256,
+    "grid": "overlap_last"
+  },
+  "test_geometry": {
+    "tile_size": 256,
+    "grid": "overlap_last"
+  },
+  "hard_test": {
+    "status": "complete",
+    "version": "hard-test-256-v1",
+    "recipe_sha256": "d6d91a5a98dae856d1ae47ba864455d2986967fbc8ce816348ef4de2b1370793",
+    "files_sha256": {
+      "pairs-alaska-seen.csv": "3a8b3be4b990571121b005808ab73d3fc889937b391365511b468a0fdd6f4c5b",
+      "pairs-alaska-unseen.csv": "9c7708ee1e4aedca578119b1bc969e14887e7b6edc1a9126d74b75770e7ba241",
+      "pairs-lsdir.csv": "c60a77a3ba0d3db79eb067c9c0eb983fbad6b534aaa432da5e45114136a8926b",
+      "pairs-standard.csv": "77c96353ed89b925e07f0f1e1c84b36515a6b9d8be96ffffaec81cf0071be074"
+    },
+    "noise_edges": {
+      "alaska": 2.6133468747138977,
+      "div2k": 2.4415316581726074,
+      "lsdir": 2.515662729740143,
+      "raise": 1.6907958090305328
+    },
+    "pairs": 32256,
+    "cells": 32,
+    "seconds": 91.32385952899494,
+    "quick": false,
+    "AUC_clean_weighting": "paired rows (as v1)",
+    "FA_counting": "distinct clean tiles within cell",
+    "validation_threshold": {
+      "threshold_origin": "post_hoc_256",
+      "recipe_id": "60da4391043e8ce48ff2",
+      "run_name": "srm-e50-paired-gapcov32-20261026T115421Z-1917",
+      "mapping_sha256": "9d349b11361fc616e23543b6e01cde7db6beb84d213422d6074be451f35e9c11",
+      "checkpoint_sha256": "4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf",
+      "policy": "validation-min-pe-v1/atol1e-12/min-fa/first-ascending/float64-ge",
+      "recipe_sha256": "60da4391043e8ce48ff2ca879a62ccacc6d77751c7fb7ddba1d2e097e49b5fbc",
+      "full_pairs_sha256": "e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d",
+      "selected_pairs_sha256": "e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d",
+      "geometry": {
+        "tile_size": 256,
+        "grid": "overlap_last"
+      },
+      "quick": false,
+      "deployment": true,
+      "score_csv_sha256": "6f95ba9ae93dbfe7b0d64db44349e93686f18897bb78459eb4f5f6816637ef26",
+      "cutoff": 0.49069544672966003,
+      "FA": 0.059944444444444446,
+      "miss": 0.12061111111111111,
+      "P_E_at_validation_cutoff": 0.09027777777777778,
+      "AUC": 0.9758331234567901,
+      "pairs": 18000,
+      "clean_tiles": 18000,
+      "images": 36000,
+      "photos": 2497,
+      "threshold_id": "1fbc1a29bc8e9f4ab9a3"
+    },
+    "overlap_standard": {
+      "alaska-seen": {
+        "distinct_hard_tiles": 5675,
+        "shared_distinct_tiles": 997,
+        "shared_pairs": 1429
+      },
+      "alaska-unseen": {
+        "distinct_hard_tiles": 5763,
+        "shared_distinct_tiles": 1009,
+        "shared_pairs": 1391
+      },
+      "lsdir": {
+        "distinct_hard_tiles": 7251,
+        "shared_distinct_tiles": 730,
+        "shared_pairs": 808
+      },
+      "standard": {
+        "distinct_hard_tiles": 7020,
+        "shared_distinct_tiles": 1882,
+        "shared_pairs": 2168
+      }
+    }
+  },
+  "validation_threshold": {
+    "status": "complete",
+    "threshold_origin": "post_hoc_256",
+    "recipe_id": "60da4391043e8ce48ff2",
+    "run_name": "srm-e50-paired-gapcov32-20261026T115421Z-1917",
+    "mapping_sha256": "9d349b11361fc616e23543b6e01cde7db6beb84d213422d6074be451f35e9c11",
+    "checkpoint_sha256": "4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf",
+    "policy": "validation-min-pe-v1/atol1e-12/min-fa/first-ascending/float64-ge",
+    "recipe_sha256": "60da4391043e8ce48ff2ca879a62ccacc6d77751c7fb7ddba1d2e097e49b5fbc",
+    "full_pairs_sha256": "e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d",
+    "selected_pairs_sha256": "e017acb0f463bb147ff437bd1b3e833710eee7284066850729c9666b0079344d",
+    "geometry": {
+      "tile_size": 256,
+      "grid": "overlap_last"
+    },
+    "quick": false,
+    "deployment": true,
+    "score_csv_sha256": "6f95ba9ae93dbfe7b0d64db44349e93686f18897bb78459eb4f5f6816637ef26",
+    "cutoff": 0.49069544672966003,
+    "FA": 0.059944444444444446,
+    "miss": 0.12061111111111111,
+    "P_E_at_validation_cutoff": 0.09027777777777778,
+    "AUC": 0.9758331234567901,
+    "pairs": 18000,
+    "clean_tiles": 18000,
+    "images": 36000,
+    "photos": 2497,
+    "threshold_id": "1fbc1a29bc8e9f4ab9a3"
+  },
+  "code_commit": "3f944ab",
+  "runtime": {
+    "torch": "2.14.0+rocm10.1.0",
+    "numpy": "2.5.3",
+    "pillow": "12.3.0"
+  }
+}

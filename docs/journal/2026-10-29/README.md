@@ -228,7 +228,7 @@ Rerun32-update replay of one real batch (48,621 changed pixels), through shared 
 
 - Recorded the user's explicit **“make the paid run”** authorization. Orchestrator pushed/fetched `yx` through9805d09, checked selected launch commit **c031fca3511f7e66d4df35bc10bdf23b0ef5087e** against its FULL tree/fixtures/runtime and later docs-only changes, and passed canonical submit dry-run7 gates.
 - Actual submit job **srm-cell-aux-paired-gapcov32-20261029T063502Z-5452** set metadata run/commitc031fca/timeout90min/max120min/protocolresume-v1/attempt0. Initial start plus2 manual retries at240-second intervals all returned STOCKOUT for `g4-standard-48` / `nvidia-rtx-pro-6000` in `us-central1-c`.
-- Added [queue run22](../../active/run-queue.md) as **queued (capacity blocked)**. This worker task only records orchestrator-reported actions; it does not launch or monitor anything.
+- Added [queue run22](../../archive/run-queue.md) as **queued (capacity blocked)**. This worker task only records orchestrator-reported actions; it does not launch or monitor anything.
 
 ### Found
 

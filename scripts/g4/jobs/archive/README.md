@@ -9,7 +9,7 @@ These files are historical parity fixtures, not submission inputs.
 
 Submit a notebook plus commit. Its first code cell owns experiment values;
 the G4 profile owns workers, paths and performance flags. See the
-[G4 runbook](../../../../docs/active/g4-batch-runner.md#submit-a-run).
+[G4 runbook](../../../../docs/archive/g4-batch-runner.md#submit-a-run).
 
 `../speed-1.env` remains active: it configures the separate speed-matrix tool,
 not a notebook experiment. The recipe tests resolve these archived env files

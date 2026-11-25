@@ -1,7 +1,7 @@
 # Result: training tiling (6 arms, 2026-10-16/17)
 
-Design: [plan-training-tiling](../active/plan-training-tiling.md) and [plan-tiling-256](../archive/plan-tiling-256.md).
-Runs and job IDs: [run queue](../active/run-queue.md). One seed per arm.
+Design: [plan-training-tiling](../archive/plan-training-tiling.md) and [plan-tiling-256](../archive/plan-tiling-256.md).
+Runs and job IDs: [run queue](../archive/run-queue.md). One seed per arm.
 
 ## Setup
 

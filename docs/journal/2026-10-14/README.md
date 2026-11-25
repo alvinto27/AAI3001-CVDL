@@ -43,7 +43,7 @@
   after every code cell. It also writes a 10 s heartbeat and live `run.log`.
 - The G4 run-and-stop kit was added in commits `9919f86` and `eddf21a`.
   Its files are under `scripts/g4/`; the record is
-  [docs/active/g4-batch-runner.md](../../active/g4-batch-runner.md). It includes setup, systemd
+  [docs/archive/g4-batch-runner.md](../../archive/g4-batch-runner.md). It includes setup, systemd
   job, submit, speed-test, and cache-verification scripts.
   - `build_cache.py` supports `--allow-high-workers`; the default limit of
     1-8 workers is unchanged. A builder uses about 1 GiB RAM.

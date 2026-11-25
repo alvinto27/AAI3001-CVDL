@@ -1,0 +1,140 @@
+{
+  "evaluation_id": "29fb97d0c311a0eca3b1",
+  "output": "/work/runs/g4-prime-1/evaluation/standard-256-v1/29fb97d0c311a0eca3b1",
+  "suite": "standard-256-v1",
+  "quick": false,
+  "timings": [
+    {
+      "panel": "validation",
+      "pairs": 18000,
+      "seconds": 45.80332550699859
+    },
+    {
+      "panel": "standard",
+      "higher_k": false,
+      "pairs": 10944,
+      "seconds": 40.60839057400153
+    },
+    {
+      "panel": "alaska-seen",
+      "higher_k": false,
+      "pairs": 2688,
+      "seconds": 7.192172228000345
+    },
+    {
+      "panel": "alaska-unseen",
+      "higher_k": false,
+      "pairs": 3168,
+      "seconds": 7.6589821570014465
+    },
+    {
+      "panel": "lsdir",
+      "higher_k": false,
+      "pairs": 5280,
+      "seconds": 16.95448165199923
+    }
+  ],
+  "total_seconds": 197.37222392399963,
+  "hard_test": {
+    "status": "complete",
+    "version": "hard-test-256-v1",
+    "recipe_sha256": "d6d91a5a98dae856d1ae47ba864455d2986967fbc8ce816348ef4de2b1370793",
+    "files_sha256": {
+      "pairs-alaska-seen.csv": "3a8b3be4b990571121b005808ab73d3fc889937b391365511b468a0fdd6f4c5b",
+      "pairs-alaska-unseen.csv": "9c7708ee1e4aedca578119b1bc969e14887e7b6edc1a9126d74b75770e7ba241",
+      "pairs-lsdir.csv": "c60a77a3ba0d3db79eb067c9c0eb983fbad6b534aaa432da5e45114136a8926b",
+      "pairs-standard.csv": "77c96353ed89b925e07f0f1e1c84b36515a6b9d8be96ffffaec81cf0071be074"
+    },
+    "noise_edges": {
+      "alaska": 2.6133468747138977,
+      "div2k": 2.4415316581726074,
+      "lsdir": 2.515662729740143,
+      "raise": 1.6907958090305328
+    },
+    "pairs": 32256,
+    "cells": 32,
+    "seconds": 74.89351299000009,
+    "quick": false,
+    "AUC_clean_weighting": "paired rows (as v1)",
+    "FA_counting": "distinct clean tiles within cell",
+    "validation_threshold": {
+      "threshold_origin": "post_hoc_256",
+      "recipe_id": "8328cc6b0673cade0312",
+      "run_name": "g4-prime-1",
+      "mapping_sha256": "6ab71f35338d384575e04101fc8cc666a6381b646e2c977da8ceec228f20cf7c",
+      "checkpoint_sha256": "741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d",
+      "policy": "validation-min-pe-v1/atol1e-12/min-fa/first-ascending/float64-ge",
+      "recipe_sha256": "8328cc6b0673cade03127786f8a43475b20cccf0c786696c570a550698877e90",
+      "full_pairs_sha256": "b42abd186c3baa157400c159fddb6a32d116e9f059f346ed4059a6c052a71664",
+      "selected_pairs_sha256": "b42abd186c3baa157400c159fddb6a32d116e9f059f346ed4059a6c052a71664",
+      "geometry": {
+        "tile_size": 256,
+        "grid": "overlap_last"
+      },
+      "quick": false,
+      "deployment": true,
+      "score_csv_sha256": "ce0efd15d654f86762ae9b2eed13ea3374be513fa4cb83eb0587a54f1c99a4ca",
+      "cutoff": 0.5790094137191772,
+      "FA": 0.015222222222222222,
+      "miss": 0.06733333333333333,
+      "P_E_at_validation_cutoff": 0.041277777777777774,
+      "AUC": 0.9888338395061729,
+      "pairs": 18000,
+      "clean_tiles": 18000,
+      "images": 36000,
+      "photos": 270,
+      "threshold_id": "be4c3a478ef7779486c7"
+    },
+    "overlap_standard": {
+      "alaska-seen": {
+        "distinct_hard_tiles": 5675,
+        "shared_distinct_tiles": 997,
+        "shared_pairs": 1429
+      },
+      "alaska-unseen": {
+        "distinct_hard_tiles": 5763,
+        "shared_distinct_tiles": 1009,
+        "shared_pairs": 1391
+      },
+      "lsdir": {
+        "distinct_hard_tiles": 7251,
+        "shared_distinct_tiles": 730,
+        "shared_pairs": 808
+      },
+      "standard": {
+        "distinct_hard_tiles": 7020,
+        "shared_distinct_tiles": 1882,
+        "shared_pairs": 2168
+      }
+    }
+  },
+  "validation_threshold": {
+    "status": "complete",
+    "threshold_origin": "post_hoc_256",
+    "recipe_id": "8328cc6b0673cade0312",
+    "run_name": "g4-prime-1",
+    "mapping_sha256": "6ab71f35338d384575e04101fc8cc666a6381b646e2c977da8ceec228f20cf7c",
+    "checkpoint_sha256": "741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d",
+    "policy": "validation-min-pe-v1/atol1e-12/min-fa/first-ascending/float64-ge",
+    "recipe_sha256": "8328cc6b0673cade03127786f8a43475b20cccf0c786696c570a550698877e90",
+    "full_pairs_sha256": "b42abd186c3baa157400c159fddb6a32d116e9f059f346ed4059a6c052a71664",
+    "selected_pairs_sha256": "b42abd186c3baa157400c159fddb6a32d116e9f059f346ed4059a6c052a71664",
+    "geometry": {
+      "tile_size": 256,
+      "grid": "overlap_last"
+    },
+    "quick": false,
+    "deployment": true,
+    "score_csv_sha256": "ce0efd15d654f86762ae9b2eed13ea3374be513fa4cb83eb0587a54f1c99a4ca",
+    "cutoff": 0.5790094137191772,
+    "FA": 0.015222222222222222,
+    "miss": 0.06733333333333333,
+    "P_E_at_validation_cutoff": 0.041277777777777774,
+    "AUC": 0.9888338395061729,
+    "pairs": 18000,
+    "clean_tiles": 18000,
+    "images": 36000,
+    "photos": 270,
+    "threshold_id": "be4c3a478ef7779486c7"
+  }
+}
