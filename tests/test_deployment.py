@@ -89,16 +89,21 @@ class CalibrationTests(unittest.TestCase):
             self.assertTrue(pd.read_csv(Path(t)/'reference.csv').empty)
 
     def test_mapping_is_pinned_and_exact_roster(self):
-        entries=C.mapping(ROOT);self.assertEqual(len(entries),15)
+        entries=C.mapping(ROOT);self.assertEqual(len(entries),16)
         self.assertEqual(sum(e['recipe_id']=='60da4391043e8ce48ff2' for e in entries.values()),14)
-        # Removing only GAP+covariance must reproduce the old fourteen-entry mapping exactly.
+        # Removing only the g4-prime-1 baseline must reproduce the old fifteen-entry mapping exactly.
         raw=(ROOT/C.MAPPING).read_bytes()
         old=json.loads(raw);appended=old['entries'].pop()
         old_raw=(V.canonical(old)+'\n').encode()
-        self.assertEqual(V.digest(old_raw),'1fb68ae0a84a8c28235218874f0f66688aee03800d943d1abf2143414ed7dc7f')
+        self.assertEqual(V.digest(old_raw),'9d349b11361fc616e23543b6e01cde7db6beb84d213422d6074be451f35e9c11')
         prefix=old_raw[:old_raw.index(b'],"version"')]
         self.assertEqual(raw[:len(prefix)],prefix)
-        self.assertEqual(appended['checkpoint_sha256'],'4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf')
+        self.assertEqual(appended['checkpoint_sha256'],'741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d')
+        # The V3c baseline shares the wide-R2 RAISE/DIV2K list (same saved training photos).
+        wide=entries['9ba63252e8eecbf398f646f2d69641b70ad37c914ed8b7d6b4665dda54a961e1']
+        self.assertEqual(entries['741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d'],dict(wide,
+            run_name='g4-prime-1',checkpoint_file='best-epoch08-val_pe0.0147-val_auc0.9973.ckpt',
+            checkpoint_sha256='741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d'))
         baseline=entries['bf64848a49bdc6e20b7fcdba47cb8eee0ed247b909a928cc45e4a4102db9f076']
         paired=entries['b00cd4b6d1f4c3648580691c9cf0e2a4bd83c55740a3cf2a7a561a8adf12f180']
         self.assertEqual(paired,dict(baseline,run_name='srm-e50-paired-20261023T022339Z-4518',

@@ -12,7 +12,7 @@ from .metrics import threshold, rates, roc_auc
 
 POLICY='validation-min-pe-v1/atol1e-12/min-fa/first-ascending/float64-ge'
 MAPPING='configs/evaluation-calibration-v1.json'
-MAPPING_SHA='9d349b11361fc616e23543b6e01cde7db6beb84d213422d6074be451f35e9c11'
+MAPPING_SHA='6ab71f35338d384575e04101fc8cc666a6381b646e2c977da8ceec228f20cf7c'
 
 
 def mapping(root):
