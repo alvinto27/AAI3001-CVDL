@@ -17,7 +17,7 @@ AAI3001 Computer Vision and Deep Learning, team project. This README is the proj
 
 We made our own labelled dataset. A deterministic generator embeds messages into 31,100 real photos from four public collections (RAISE, DIV2K, ALASKA2, LSDIR). It records, for each image, the settings used and a mask of every pixel that carries the message. The model is a 0.64 M-parameter convolutional neural network (CNN). It has a fixed bank of 30 high-pass filters (SRM), a widened XuNet body, a covariance-pooling head, and a second output head that we trained on the pixel masks to make a 32 px heatmap. Every model was scored on the same frozen test sets, with photo-level bootstrap intervals.
 
-On 10,944 test pairs from photos that were never seen in training, the shipped model (run 22) has an error rate P_E of **2.54%** (AUC .997). The course-style baseline had 4.05%. On the hardest case, a 1-bit message at low payload, AUC rises from .627 to **.798**. For whole photos, a small logistic rule flags **5.6%** of clean test photos and misses 10.2% of photos with a message. We export the model to ONNX Runtime with no change in any of the 21,888 test decisions. This makes the service image 3.5× smaller and 1.7–2.3× faster than PyTorch on CPU. A React web app shows the verdict and the heatmap.
+On 10,944 test pairs from photos that were never seen in training, the shipped model (run 22) has an error rate P_E of **2.54%** (AUC .997). The course-style baseline had 4.05%. On the hardest case, a 1-bit message at low payload, AUC rises from .627 to **.798**. For whole photos, a small logistic rule flags **5.6%** of clean test photos and misses 10.2% of photos with a message. We export the model to ONNX Runtime with no change in any of the 21,888 test decisions. This makes the service image 3.5× smaller and 1.7–2.3× faster than PyTorch on CPU. The public cloud demo runs on an NVIDIA L4 GPU, 6–8× faster than the cloud VM's CPU, with no change in any of 50 test verdicts. A React web app shows the verdict and the heatmap.
 
 ---
 
@@ -347,10 +347,21 @@ The service needs no gradients, so we export the network to ONNX ([`cvdl/pipelin
 | --- | --- | --- |
 | **Local, container** | `podman build -f deploy/Dockerfile -t cvdl-pipeline:onnx .` then `podman run --rm -p 127.0.0.1:8000:8000 cvdl-pipeline:onnx` (Docker works the same way) | Working, used for Figures 5–6 |
 | **Local, Python** | `pip install -r deploy/requirements-onnx.txt` then `python -m cvdl.pipeline.serve --engine onnx` | Working |
-| **Local, GPU** | `deploy/Dockerfile.torch` with a CUDA torch build | Not tested on a GPU |
-| **Cloud** | Google Cloud VM (8 vCPU, `asia-northeast3`) runs the same ONNX image as a `systemd` service. Tailscale Funnel gives the public HTTPS address: `/` serves the built web app, `/api` goes to the API on the same origin ([runbook](docs/active/deploy-gcp-funnel.md), [service file](deploy/gcp/cvdl-pipeline.container)) | **Live**: <https://gcp-aai3001.taild62d21.ts.net>. Checked from the public route: same scores as local (0.009 clean, 0.839 stego), about 4.3 s per 2.8 MP photo including upload; restarts by itself after a VM reboot |
+| **GPU** | `deploy/Dockerfile.torch` built with the CUDA 13.0 torch wheel (`--build-arg TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130`), run with `--device nvidia.com/gpu=all ... --device cuda` | Working on an NVIDIA L4 (the cloud row) |
+| **Cloud** | Google Cloud VM (`g2-standard-8`: 8 vCPU, 1 NVIDIA L4, `asia-northeast3`). The GPU image runs as a `systemd` service; the ONNX CPU image is installed as a fallback that one command starts. Tailscale Funnel gives the public HTTPS address: `/` serves the built web app, `/api` goes to the API on the same origin ([runbook](docs/active/deploy-gcp-funnel.md), [GPU service](deploy/gcp/cvdl-pipeline.container), [CPU fallback](deploy/gcp/cvdl-pipeline-cpu.container)) | **Live**: <https://gcp-aai3001.taild62d21.ts.net>. Checked from the public route: 2.9 s for a 2.8 MP photo including the upload, 4.5 s for a 16 MP RAISE photo; restarts by itself after a VM reboot |
 
-The cloud and local deployments use the same image, built from the same commit, with the optimised ONNX model (§7.2).
+All deployments serve the same run 22 bundle (weights, cut-offs and photo rule) from the same commit. Local CPU use gets the optimised ONNX model (§7.2). The cloud VM has a GPU, so it serves the PyTorch build on CUDA instead:
+
+| Cloud VM, same 50 test images (25 photos, clean + k=1 stego) | ONNX on the VM's CPU | PyTorch on the L4 GPU |
+| --- | ---: | ---: |
+| Changed photo verdicts / flagged tiles | — | **0** / **0** of 2,796 |
+| Changed flagged cells | — | 7 of 168,486 (0.004%) |
+| Largest tile-probability difference | — | 1.6e-3 |
+| Median server time, ≤1.2 MP (ALASKA, LSDIR) | 0.53 s | **0.08 s** (6.5×) |
+| Median server time, 2–3 MP (DIV2K) | 2.10 s | **0.27 s** (7.8×) |
+| Median server time, 16 MP (RAISE) | 10.16 s | **1.67 s** (6.1×) |
+
+The VM's CPU (4 physical cores at 2.2 GHz) is about 4× slower than the desktop in §7.2, so the GPU matters there. The small differences come from GPU arithmetic (PyTorch uses TF32 for convolutions on NVIDIA GPUs, as in training); they changed no verdict and no tile decision. Record: [runbook](docs/active/deploy-gcp-funnel.md#gpu-check-2026-11-25).
 
 ### 7.4 User interface
 
@@ -382,7 +393,7 @@ UI design decisions:
 | **New cameras** | 38 camera models in the data; 8 held out completely | Unseen-camera P_E 14.87% vs seen-camera 17.62% (§6.1) |
 | **New collections** | DIV2K was never in training | P_E 8.6%, mostly from false alarms. The main gap to close |
 | **New embedding methods** | The generator is configured with YAML. A new setting is a config change, and the same frozen-test tools score it | k 5–8 tests are already available (`evaluate_run.py --higher-k`). Adaptive methods (S-UNIWARD, HILL) would need a new embedder and retraining |
-| **Throughput** | The service keeps nothing between requests and handles one analysis per worker. Copies scale out with the number of containers. `CVDL_THREADS` sets CPU threads | ONNX cut CPU time by 1.7–2.3× and image size by 3.5×. The PyTorch image remains available for GPUs |
+| **Throughput** | The service keeps nothing between requests and handles one analysis per worker. Copies scale out with the number of containers. `CVDL_THREADS` sets CPU threads | ONNX cut CPU time by 1.7–2.3× and image size by 3.5×. On the cloud L4 GPU, a 2–3 MP photo takes 0.27 s of server time (§7.3) |
 | **Model updates** | Replace the bundle folder. The integrity checks refuse a mismatched model | Three bundles (runs 13, 18, 22) already use the same service |
 
 **Future work.**
@@ -390,7 +401,7 @@ UI design decisions:
 1. Add more source collections to training to reduce DIV2K-style false alarms.
 2. Add a JPEG-domain detector next to this one.
 3. Calibrate the photo score per source.
-4. Test the GPU image.
+4. Serve ONNX Runtime with its CUDA or TensorRT backend, so the GPU also runs the optimised ONNX model.
 
 ---
 

@@ -19,6 +19,10 @@
   - Installed Podman 4.9.3. Image `cvdl-pipeline:report-fb1f6ad` (ONNX) built on the PC and loaded on the VM; Quadlet unit `deploy/gcp/cvdl-pipeline.container` (loopback port 8000, starts at boot). App built with `VITE_API_URL=/api` into `/srv/demo/app`.
   - Tailscale Funnel on 443: `/` = app, `/api` = API. User enabled Funnel and added `tag:aai3001` to the funnel `nodeAttrs`.
   - Checks on the public route: health ready (engine onnx); DIV2K 0829 clean 0.009 `not_detected`, stego 0.839 `message_detected` (same as local), about 4.3 s per request; browser verdict after 4.4 s, no console errors; reboot test: service and Funnel came back by themselves. [Runbook](../../active/deploy-gcp-funnel.md).
+  - Tailnet devices could not open the site: on the tailnet the name resolves to the VM's Tailscale address, and the policy allowed only port 22. User added a grant for port 443; works now.
+  - GPU serving (user approved). The VM's CPU (4 cores at 2.2 GHz) took 2.1 s for a 2–3 MP photo (desktop 0.53 s). Installed NVIDIA Container Toolkit 1.20.2. Its CDI spec (cdiVersion 0.7.0) is too new for Podman 4.9: `deploy/gcp/make-cdi-spec.sh` writes 0.6.0 without `additionalGids` and masks `nvidia-cdi-refresh`. Built `cvdl-pipeline:gpu-5970a3b` on the VM (`deploy/Dockerfile.torch`, torch 2.14.0 cu130, 5.88 GB).
+  - GPU check against the ONNX CPU service on the VM, 25 test-split photos × (clean, k=1 stego), seed 20261125 (`runs/verification/gpu-l4-2026-11-25/`): **0/50 verdict changes, 0/2,796 tile-flag changes**, 7/168,486 cell-flag changes; largest tile-probability difference 1.6e-3. Median server time CPU → GPU: ≤1.2 MP 0.53 → 0.08 s, 2–3 MP 2.10 → 0.27 s, 16 MP 10.16 → 1.67 s. 41/50 verdicts correct (same on both).
+  - Switched the live service to the GPU (`deploy/gcp/cvdl-pipeline.container`); ONNX CPU unit `deploy/gcp/cvdl-pipeline-cpu.container` kept as a fallback (`Conflicts=` + `After=`; the first version without `After=` failed once on the shared port, then recovered on retry). Public route: 2.9 s for a 3.7 MB photo, 4.5 s for a 23.8 MB RAISE photo; browser verdict after 1.8 s, header "run22-rule-c · CUDA". Reboot test passed. Temporary `sudo` removed again.
 - README rewritten as the project report, in paper form (abstract, related work, dataset, method, protocol, results, system, scalability, limitations, 18 references checked online). The old README moved to `docs/development.md` (links fixed). New: `scripts/build_report_figures.py` (model-history chart from `docs/results/model-history-2026-11-25.json`; heatmap example from DIV2K test photo 0829 with a seeded k=1 contiguous 0.25 bpp message, ONNX engine: clean 0.009 not detected, stego 0.839 detected), and 3 UI screenshots of `app/` against the real ONNX container. FAST level: **697 tests OK (35 skipped)**.
 
 ## Found
@@ -80,11 +84,12 @@ Image size 1.14 GB → 329 MB. Memory after the runs: PyTorch 198–246 MB, ONNX
 
 - User: re-score only the V3c baseline.
 - ~~User (Option A): host on one Hugging Face Docker Space that serves the backend and the React build; no Vercel.~~ Replaced: HF Docker Spaces now need a paid plan. User: host on the team L4 VM behind Tailscale Funnel.
+- Cloud serves PyTorch on the L4 GPU (passed the 0-verdict-change check); ONNX on CPU stays the optimised local deployment and the cloud fallback. Future option: ONNX Runtime with a GPU backend.
 - Ship ONNX FP32 as the deployed engine. Reject INT8: it fails the frozen tests. Do not resize photos for speed: resizing destroys the LSB signal.
 
 ## Next
 
-- Pending (user): push `pipeline` (`da70753`, `b96ca7c`).
-- Pending (user): may `pipeline` merge into `app` (Babydage's branch)? Who owns the Hugging Face account?
+- ~~Pending (user): push `pipeline` (`da70753`, `b96ca7c`).~~ Done.
+- ~~Pending (user): may `pipeline` merge into `app` (Babydage's branch)? Who owns the Hugging Face account?~~ Merged (`73fa326`); Hugging Face not used.
 - Pending (user): switch the VM from Spot to standard provisioning for the demo period (VM stop, change, start; the service restarts by itself).
 - Pending: repo cleanup; merge to `main`.

@@ -33,7 +33,7 @@ No Lightning/pandas/YAML/torchvision/RAW decoders are needed. Leave training dep
 
 ### GPU option
 
-**Passing GPU devices does not turn the CPU image into a GPU image.** The ONNX image is CPU only. Build `deploy/Dockerfile.torch` with `--build-arg TORCH_INDEX_URL=...` for the matching torch 2.14.0 index. A compatible wheel/runtime and host driver are required. GPU builds are untested here.
+**Passing GPU devices does not turn the CPU image into a GPU image.** The ONNX image is CPU only. Build `deploy/Dockerfile.torch` with `--build-arg TORCH_INDEX_URL=...` for the matching torch 2.14.0 index. A compatible wheel/runtime and host driver are required. Tested on 2026-11-25 on an NVIDIA L4 (driver 595.91, CUDA 13.2) with `TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130` and Podman CDI: 0 changed verdicts and 0 changed flagged tiles against the ONNX CPU engine on 50 test images, 6–8× faster than that VM's CPU ([cloud runbook](../../docs/active/deploy-gcp-funnel.md#gpu-check-2026-11-25)). Podman 4.9 needs a CDI spec with `cdiVersion` 0.6.0: see `deploy/gcp/make-cdi-spec.sh`.
 
 For a prepared NVIDIA image tagged `cvdl-pipeline:gpu`:
 
