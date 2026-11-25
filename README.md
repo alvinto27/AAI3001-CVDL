@@ -171,7 +171,7 @@ flowchart LR
 *Figure 2. Run 22 network ([`cvdl/models.py`](cvdl/models.py), class `XuNetWideGAPCov32`): 638,611 trained parameters and 2,250 fixed SRM weights.*
 
 - **SRM filters** [[5](#ref-5), [6](#ref-6)] remove image content and keep the noise, where the message is.
-- **Covariance pooling** [[7](#ref-7), [8](#ref-8)] keeps how feature channels vary *together*, not only their averages. It was the most effective architecture change ([Section 4.2](#42-what-made-the-difference)).
+- **Covariance pooling** [[7](#ref-7), [8](#ref-8)] keeps how feature channels vary *together*, not only their averages. It was the most effective architecture change ([§4.2](#42-what-made-the-difference)).
 - **The cell head** (this work) is trained on the generator's changed-cell targets, so the heatmap learns *where* the message is. It adds only 257 parameters.
 - **No normalisation layers.** Both common choices let a message in one place change scores elsewhere, which a heatmap cannot allow (details below).
 
@@ -242,7 +242,7 @@ Generating the data on the fly moves photo decoding and message embedding into t
 | Epoch-start priming | Starts the next epoch's workers during validation, so their shuffle buffers are already full | Stall at each epoch start 11–12 s → 1 s; training part of an epoch 60–62 s → 49–51 s |
 | Precision | cuDNN TF32 kept for convolutions; full FP32 for the matrix products of the covariance head | TF32 convolutions are 4–6% faster than full FP32 on an L4 |
 
-Tested and not used: BF16 mixed precision gave only 1.10× (measured on GBRAS-Net, the slowest candidate network), and the channels-last memory layout gave no gain. The compilation and per-step rates above were measured on the 512 px model of that stage. With all the changes, run 21 trained at a steady 18 steps/s with 128 tiles per step (about 2,300 tiles/s). These changes affect training only; the deployed service has its own inference path ([Section 5](#5-deployment)).
+Tested and not used: BF16 mixed precision gave only 1.10× (measured on GBRAS-Net, the slowest candidate network), and the channels-last memory layout gave no gain. The compilation and per-step rates above were measured on the 512 px model of that stage. With all the changes, run 21 trained at a steady 18 steps/s with 128 tiles per step (about 2,300 tiles/s). These changes affect training only; the deployed service has its own inference path ([§5](#5-deployment)).
 
 </details>
 
@@ -282,7 +282,7 @@ The service ([`cvdl/photo_inference.py`](cvdl/photo_inference.py)) works in five
 - Each model's tile cut-off minimises P_E on the 18,000-pair validation set. The cell cut-off gives 5% false cells on validation. Test data never sets a cut-off.
 - Each run had pass/fail criteria fixed before it was scored. Example: run 13's cell map had to beat the CAM of a control model, and its standard P_E could not rise more than 0.25 points above the control. The map passed; the P_E criterion failed by 0.07 points.
 - 95% intervals come from 2,000 bootstrap resamples *of photos* (all tiles of a photo stay together). Comparisons between models use the same resampled photos (a paired bootstrap).
-- All 10 models in [Section 4.2](#42-what-made-the-difference) were re-scored on the same frozen sets, so their differences are direct comparisons.
+- All 10 models in [§4.2](#42-what-made-the-difference) were re-scored on the same frozen sets, so their differences are direct comparisons.
 - The score summaries, training curves and executed report notebooks of the baseline, run 21 and run 22 are in [`runs/`](runs/README.md#report-runs-summaries-tracked).
 
 </details>
@@ -358,7 +358,7 @@ The primary hard measure is k=1 at low bpp, pooled over ALASKA seen, ALASKA unse
 | **Baseline → run 22** | **all of the above** | **−1.50 [−1.90, −1.12]** | **+.172 [+.163, +.180]** |
 
 - Covariance pooling was the most effective architecture change: hard AUC +.029 and standard P_E −0.40 points.
-- Run 22 gives up 0.39 points of standard P_E for a trained heatmap and a higher hard AUC. It was selected because localisation is one of the two aims of this work ([Section 4.3](#43-localisation-does-the-heatmap-point-to-the-message)), and because it is the first model whose photo rule met both pre-set criteria ([Section 4.4](#44-whole-photo-verdict)).
+- Run 22 gives up 0.39 points of standard P_E for a trained heatmap and a higher hard AUC. It was selected because localisation is one of the two aims of this work ([§4.3](#43-localisation-does-the-heatmap-point-to-the-message)), and because it is the first model whose photo rule met both pre-set criteria ([§4.4](#44-whole-photo-verdict)).
 - The ladder is not a one-change-at-a-time ablation: some steps changed several settings together (the first step changed width, normalisation and the k range). The course-style baseline also trained for fewer epochs, on fewer photo collections. The total gain is therefore a gain of the whole system, not of the architecture alone.
 - Changes that did not help (standard P_E on the same tests): delayed pooling 3.43%; colour-separated first layer 3.66%; trainable SRM 3.34%; a low-payload curriculum 3.10%; a harder data mix 3.10%; trim or pad tiling instead of overlap 4.82–6.53%.
 
@@ -435,7 +435,7 @@ By source, rule (c) has P_E of RAISE 1.5%, DIV2K 4.9%, LSDIR 4.3%, ALASKA unseen
 
 **Two diagnostic experiments show where the CNN leaves signal unused: a classical statistic finds scattered 1-bit replacement better in noisy photos, and all models are more sensitive to green than to red or blue.**
 
-A classical detector, weighted-stego analysis (WS) [[11](#ref-11), [12](#ref-12)], was compared with an earlier CNN of this work (SRM-e50, [Section 4.2](#42-what-made-the-difference)) on the same hard-test tiles. WS estimates the message length from the parity structure that LSB *replacement* leaves. On noisy ALASKA photos with a 1-bit replacement message, the whole WS 95% interval lay above the CNN in 10 of 12 conditions. The advantage was largest for scattered messages; for a contiguous block the two were tied on ALASKA, and the CNN was better on LSDIR (.894 against .753). WS found no signal in LSB *matching*, as expected, while the CNN detects both methods about equally. A better ranking did not give a better operating point: at cut-offs set on validation data, WS flagged up to 38.7% of noisy clean test tiles, against up to 19.6% for the CNN. The result shows that usable statistical evidence remains in images where the CNN is weak.
+A classical detector, weighted-stego analysis (WS) [[11](#ref-11), [12](#ref-12)], was compared with an earlier CNN of this work (SRM-e50, [§4.2](#42-what-made-the-difference)) on the same hard-test tiles. WS estimates the message length from the parity structure that LSB *replacement* leaves. On noisy ALASKA photos with a 1-bit replacement message, the whole WS 95% interval lay above the CNN in 10 of 12 conditions. The advantage was largest for scattered messages; for a contiguous block the two were tied on ALASKA, and the CNN was better on LSDIR (.894 against .753). WS found no signal in LSB *matching*, as expected, while the CNN detects both methods about equally. A better ranking did not give a better operating point: at cut-offs set on validation data, WS flagged up to 38.7% of noisy clean test tiles, against up to 19.6% for the CNN. The result shows that usable statistical evidence remains in images where the CNN is weak.
 
 A colour experiment hid the same message in only the red, only the green or only the blue values of 480 test photos, with the same pixels and density in each case. All three models tested (runs 18, R1 and SRM-e50, before run 22) were clearly more sensitive to green. A message in red or blue alone raised the miss rate by about 5–6 points. A possible cause, not tested, is that camera sensors have two green sites in each 2×2 Bayer block and the least noise in green. This matters for colour steganalysis, since most published detectors work on greyscale images.
 
@@ -590,8 +590,8 @@ The result screen for a stego photo is at the top of this page. A clean photo ge
 - **Single runs:** each recipe was trained once, with one seed. One repeat differed by 0.48 points; this is a single observation, not an estimate of the variance.
 - **Test-set reuse:** the frozen test sets were never used for training or for cut-offs, but their results guided later design choices. They are not an untouched final confirmation set.
 - **Validation differences:** older models chose their checkpoints with their own validation data (some at 512 px) and were given new 256 px cut-offs afterwards. Their validation photo mix also differed.
-- **Confounded comparisons:** some steps of the model history changed several settings together, and the baseline had less training and less varied data ([Section 4.2](#42-what-made-the-difference)).
-- **Scattered messages:** the heatmap finds 52% of changed cells for a contiguous message, but only 11% for a scattered one ([Section 4.3](#43-localisation-does-the-heatmap-point-to-the-message)).
+- **Confounded comparisons:** some steps of the model history changed several settings together, and the baseline had less training and less varied data ([§4.2](#42-what-made-the-difference)).
+- **Scattered messages:** the heatmap finds 52% of changed cells for a contiguous message, but only 11% for a scattered one ([§4.3](#43-localisation-does-the-heatmap-point-to-the-message)).
 - **Photo-verdict test:** it uses the same source collections as development, so seen-camera results are not evidence for unseen cameras.
 - **Human review:** a flag is evidence for a person to check, not a finding of wrongdoing. The UI says so on every result.
 
@@ -601,7 +601,7 @@ This work presented an end-to-end system for colour LSB steganalysis: a labelled
 
 Future work follows from these results:
 
-- **Parity-aware input.** WS detects scattered replacement better than the CNN ([Section 4.5](#45-diagnostic-findings)). An extra fixed input, the SRM residual multiplied by the parity of each pixel value, would give the CNN the same information.
+- **Parity-aware input.** WS detects scattered replacement better than the CNN ([§4.5](#45-diagnostic-findings)). An extra fixed input, the SRM residual multiplied by the parity of each pixel value, would give the CNN the same information.
 - **Detectors for LSB matching.** The classical statistics see no signal in matching, so matching needs CNN-specific evidence and its own diagnostics.
 - **Better localisation of scattered messages**, where the heatmap finds only 11% of changed cells.
 - **Multiple training seeds**, to check whether the measured differences survive training variability.
@@ -686,7 +686,7 @@ cd app && npm install && npm run dev        # http://127.0.0.1:3000
 | --- | --- |
 | Python environment (CUDA) | `uv sync` ([development guide](docs/development.md)) |
 | Get the source photos | [`Datasets/README.md`](Datasets/README.md) |
-| Train run 21, then run 22 | The notebooks listed in [Section 3](#3-model) (loss and training details), through `scripts/run_notebook.py` |
+| Train run 21, then run 22 | The notebooks listed in [§3](#3-model) (loss and training details), through `scripts/run_notebook.py` |
 | Score a run on the frozen tests | `python scripts/evaluate_run.py runs/<run>` |
 | Build an ONNX bundle | `python -m cvdl.pipeline.export_onnx deploy/<bundle>` |
 | Rebuild the figures | `python scripts/build_report_figures.py` |
