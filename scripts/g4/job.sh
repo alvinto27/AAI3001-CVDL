@@ -41,12 +41,26 @@ meta() {
 # Production run mode only: bring the checkout to the job commit before job_run.sh starts.
 # A failure here is not fatal: job_run.sh repeats the step, records the failure,
 # delivers the error files and shuts down.
-if (( TEST == 0 )) && [[ $(meta job-mode || true) == run ]]; then
+job_mode=off
+if (( TEST == 0 )); then job_mode=$(meta job-mode || true); fi
+if (( TEST == 0 )) && [[ $job_mode == run || $job_mode == resume ]]; then
     job_id=$(meta job-id || true)
     commit=$(meta job-commit || true)
     commit=${commit:-origin/yx}
-    if [[ -n $job_id ]] && valid_id "$job_id" && valid_commit "$commit" \
-        && [[ ! -f "$STATE_ROOT/jobs/$job_id.record" ]]; then
+    eligible=0
+    if [[ -n $job_id ]] && valid_id "$job_id" && valid_commit "$commit"; then
+        record="$STATE_ROOT/jobs/$job_id.record"
+        if [[ $job_mode == run && ! -f $record ]]; then eligible=1
+        elif [[ $job_mode == resume && -f $record ]]; then
+            saved_commit=$(grep -m1 '^commit=' "$record" | cut -d= -f2-)
+            saved_state=$(grep -m1 '^training-state=' "$record" | cut -d= -f2-)
+            saved_attempt=$(grep -m1 '^attempt=' "$record" | cut -d= -f2-)
+            requested=$(meta job-attempt || true)
+            if [[ $saved_commit == "$commit" && $saved_attempt =~ ^(0|[1-9][0-9]{0,8})$ && $requested =~ ^(0|[1-9][0-9]{0,8})$ \
+                && $saved_state =~ ^(starting|running|interrupted)$ ]] && (( requested == saved_attempt + 1 )); then eligible=1; fi
+        fi
+    fi
+    if (( eligible )); then
         if [[ -n $(git status --porcelain) ]]; then
             note 'Dirty checkout; no update'
         elif ! git fetch -q origin yx; then

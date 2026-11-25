@@ -466,4 +466,37 @@ def extract(
     return np.packbits(bits[:payload_bit_count], bitorder="big").tobytes()
 
 
-__all__ = ["EmbedResult", "embed", "embed_fast", "extract"]
+def replace_at_units(carrier, payload_data, k, selected_units):
+    """Evaluation-only lowest-k replacement at explicit RGB units, without RNG.
+
+    k=1/2 needs no field padding for byte payloads. Unit order defines message
+    order. Existing embed/embed_fast/extraction and their RNG paths are unchanged.
+    """
+    carrier, height, width, total = _validate_carrier(carrier)
+    k = _validate_integer(k, 'k', 1)
+    if k not in (1, 2):
+        raise ValueError('explicit-unit replacement supports k=1 or k=2')
+    if not isinstance(payload_data, bytes) or not payload_data:
+        raise ValueError('payload_data must be nonempty bytes')
+    units = np.asarray(selected_units)
+    if (units.ndim != 1 or units.dtype.kind not in 'iu' or
+            len(units) != len(payload_data)*8//k or len(units) > total or
+            (len(units) and (units.min() < 0 or units.max() >= total)) or
+            len(np.unique(units)) != len(units)):
+        raise ValueError('invalid explicit unit indices or payload capacity')
+    units = units.astype(np.intp, copy=False)
+    bits = np.unpackbits(np.frombuffer(payload_data, dtype=np.uint8), bitorder='big')
+    fields, _ = _target_fields(bits, k, len(units), None)
+    stego = carrier.copy()
+    flat = stego.reshape(-1)
+    before = flat[units].copy()
+    flat[units] = _replace_values(before, fields, 'lowest', k)
+    changed = np.sort(units[before != flat[units]])
+    changed.setflags(write=False)
+    metadata = dict(payload_bytes=len(payload_data), embedded_bits=len(payload_data)*8,
+        units_used=len(units), units_changed=len(changed),
+        bpp_actual=len(payload_data)*8/float(height*width))
+    return stego, metadata, changed
+
+
+__all__ = ["EmbedResult", "embed", "embed_fast", "extract", "replace_at_units"]

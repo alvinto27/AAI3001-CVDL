@@ -55,6 +55,30 @@ def top_values(notebook):
     return values
 
 
+def resume_identity(notebook_path, commit, *, root=ROOT):
+    """Resume-only identity check, without importing training dependencies.
+
+    This is not the full resolved-settings report. The pinned VM runner still
+    checks the complete saved recipe and checkpoint before training.
+    """
+    import hashlib
+    from cvdl.settings import validate_notebook_name
+    notebook=validate_notebook(notebook_path,commit=commit,root=root)
+    values=top_values(notebook)
+    validate_notebook_name(notebook_path,values)
+    refuse_pilot(values)
+    raw=subprocess.check_output(['git','show',f'{commit}:{notebook_path}'],cwd=root)
+    return dict(validation='resume-identity-only',commit=commit,notebook=notebook_path,
+        notebook_sha256=hashlib.sha256(raw).hexdigest())
+
+
+def validation_srm_elements(values):
+    """Largest evaluation SRM tensor for an explicit image-batch cap."""
+    if values.get('val_batch_images') is None or values.get('front_end')!='srm':return None
+    tile=(values.get('train_tile_size') or values['tile_size']) if values.get('checkpoint_validation')=='train_matched' else values['tile_size']
+    return min(values['batch_size'],values['val_batch_images'])*90*tile*tile
+
+
 def preflight(notebook_path, commit, *, root=ROOT, speed_env=None):
     """Use settings code/configs FROM the selected commit in an isolated snapshot."""
     notebook = validate_notebook(notebook_path,commit=commit,root=root)
@@ -82,11 +106,20 @@ if getattr(settings,'train_grid','recorded')!='recorded':
     for source in settings.sources:
         records.extend(csv.DictReader((Path(settings.root)/f'data/{source}/photo_manifest.csv').open()))
     summary(settings.root,records,getattr(settings,'train_tile_size',None) or settings.tile_size,settings.train_grid)
+# The gate is current controller policy; model imports come from this pinned
+# snapshot, including for historical commits that predate the gate helper.
+from runpy import run_path
+try:
+    sizes = run_path(sys.argv[4])['check_tensors'](plain(settings.values))
+except ValueError as error:
+    print(str(error), file=sys.stderr)
+    raise SystemExit(2)
 print(json.dumps(dict(values=plain(settings.values), sources=plain(settings.provenance),
     profile=settings.profile, run_name=settings.run_name, globals=settings.legacy_globals(),
-    run_settings=asdict(settings.to_run_settings()))))
+    run_settings=asdict(settings.to_run_settings()), tensor_limits=sizes)))
 '''
-        done = subprocess.run([sys.executable,'-c',script,json.dumps(values),json.dumps(profile),json.dumps(speed_env or {})],
+        checker = Path(__file__).with_name('tensor_limits.py').resolve()
+        done = subprocess.run([sys.executable,'-c',script,json.dumps(values),json.dumps(profile),json.dumps(speed_env or {}),str(checker)],
                               cwd=snapshot,capture_output=True,text=True)
         if done.returncode:
             raise ValueError('G4 pre-flight failed before boot:\n'+done.stderr.strip())
@@ -100,6 +133,8 @@ print(json.dumps(dict(values=plain(settings.values), sources=plain(settings.prov
             return value.replace(str(snapshot),'<checkout>') if isinstance(value,str) else value
         report = display(report)
     report.update(commit=commit,notebook=notebook_path)
+    elements=validation_srm_elements(report['values'])
+    if elements is not None:report['largest_validation_srm_output_elements']=elements
     return report
 
 
@@ -137,6 +172,7 @@ def main():
     parser.add_argument('--commit',default='HEAD')
     parser.add_argument('--root',type=Path,default=ROOT)
     parser.add_argument('--check-path-only',action='store_true')
+    parser.add_argument('--resume-identity-only',action='store_true')
     args=parser.parse_args()
     if not (args.notebook or args.job_env or args.speed_env_stdin):
         parser.error('choose --notebook, --job-env or --speed-env-stdin')
@@ -151,6 +187,8 @@ def main():
             print(json.dumps(preflight(env['V3_NOTEBOOK'],args.commit,root=args.root,speed_env=env),indent=2))
         elif args.job_env:
             print(validate_job_env(args.job_env,args.job_id,root=args.root,commit=args.commit))
+        elif args.resume_identity_only:
+            print(json.dumps(resume_identity(args.notebook,args.commit,root=args.root),indent=2))
         elif args.check_path_only:
             validate_notebook(args.notebook,commit=args.commit,root=args.root)
         else:

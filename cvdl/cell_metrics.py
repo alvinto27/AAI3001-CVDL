@@ -70,7 +70,8 @@ def interval(point, draws):
     return dict(point=float(point),low=float(lo),high=float(hi),valid_replicates=len(draws))
 
 
-def localization(counts, valid_negative, scores, photos, *, replicates=REPLICATES):
+def localization(counts, valid_negative, scores, photos, *, replicates=REPLICATES,
+                 difference_name='aux_minus_cam', draws_out=None):
     """Both true within-stego tile-mean AUC and pooled eligible-cell AUC.
 
     scores [tiles,maps,64]; only tiles with positive AND valid negative cells
@@ -97,9 +98,11 @@ def localization(counts, valid_negative, scores, photos, *, replicates=REPLICATE
     labels=p[keep];flat_scores=s.transpose(0,2,1)[keep]
     flat_photos=np.broadcast_to(photos[:,None],keep.shape)[keep]
     pooled,pooled_draws=photo_auc_bootstrap(labels,flat_scores,flat_photos,replicates=replicates)
+    if draws_out is not None:
+        draws_out.update(within_stego_auc=draws,pooled_cell_auc=pooled_draws)
     for i in range(s.shape[1]):
         result['maps'].append(dict(within_stego_auc=interval(point[i],draws[:,i]),pooled_cell_auc=interval(pooled[i],pooled_draws[:,i])))
     if s.shape[1]==2:
-        result['aux_minus_cam']=dict(within_stego_auc=interval(point[1]-point[0],draws[:,1]-draws[:,0]),
+        result[difference_name]=dict(within_stego_auc=interval(point[1]-point[0],draws[:,1]-draws[:,0]),
             pooled_cell_auc=interval(pooled[1]-pooled[0],pooled_draws[:,1]-pooled_draws[:,0]))
     return result

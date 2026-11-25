@@ -2,7 +2,7 @@
 # First-boot setup and separate upload/cache/speed steps for rtx6000pro.
 set -euo pipefail
 STEP=${1:-}
-[[ -n $STEP ]] || { echo 'Usage: setup.sh {base|upload|cache|speed} [--host IP] [--inbox-key FILE] [--workers N] [--streams N]' >&2; exit 2; }
+[[ -n $STEP ]] || { echo 'Usage: setup.sh {base|freeze-updates|upload|cache|speed} [--host IP] [--inbox-key FILE] [--workers N] [--streams N]' >&2; exit 2; }
 shift
 REPO_URL=https://github.com/alvinto27/AAI3001-CVDL.git
 REPO_DIR="$HOME/AAI3001-CVDL"
@@ -23,9 +23,54 @@ while (($#)); do
         *) echo "Unknown argument: $1" >&2; exit 2 ;;
     esac
 done
+# Only run this policy on the dedicated training VM, during maintenance.
+# Package installation can restart services even when PID1 re-exec is harmless.
+freeze_updates() {
+    [[ $(id -un) == yangxuan && $(hostname -s) == rtx6000pro ]] || {
+        echo 'freeze-updates requires yangxuan on rtx6000pro (maintenance only)' >&2; return 2;
+    }
+    local unit state load config
+    state=$(sudo systemctl show cvdl-g4-job.service --property=ActiveState --value)
+    [[ $state == inactive || $state == failed ]] || {
+        echo 'Job unit is not quiescent; do not change package policy during a job' >&2; return 2;
+    }
+    # Stop new triggers, but NEVER kill a running apt/dpkg transaction.
+    sudo systemctl disable --now apt-daily.timer apt-daily-upgrade.timer
+    for unit in apt-daily.service apt-daily-upgrade.service; do
+        state=$(sudo systemctl show "$unit" --property=ActiveState --value)
+        [[ $state == inactive || $state == failed ]] || {
+            echo "$unit is busy: wait for it to finish, then rerun freeze-updates" >&2; return 2;
+        }
+    done
+    sudo mkdir -p /etc/apt/apt.conf.d /etc/needrestart/conf.d
+    printf '%s\n' 'APT::Periodic::Update-Package-Lists "0";' 'APT::Periodic::Unattended-Upgrade "0";' |
+        sudo tee /etc/apt/apt.conf.d/zz-cvdl-no-auto-updates >/dev/null
+    # Ubuntu24.04 needrestart uses -m u; a restart-mode variable alone is not
+    # sufficient. Exclude only our one-shot job, including future installations.
+    printf '%s\n' '$nrconf{override_rc}->{qr(^cvdl-g4-job\.service$)} = 0;' |
+        sudo tee /etc/needrestart/conf.d/99-cvdl-job.conf >/dev/null
+    local units=(apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service unattended-upgrades.service)
+    sudo systemctl mask --now "${units[@]}"
+    # Persistent /etc masks and policy survive reboot and pinned git checkouts.
+    for unit in "${units[@]}"; do
+        load=$(sudo systemctl show "$unit" --property=LoadState --value)
+        state=$(sudo systemctl show "$unit" --property=ActiveState --value)
+        [[ $load == masked && $state == inactive ]] || {
+            echo "$unit is not masked/inactive: $load/$state" >&2; return 2;
+        }
+        printf '%s %s %s\n' "$unit" "$load" "$state"
+    done
+    config=$(apt-config dump)
+    grep -Fxq 'APT::Periodic::Update-Package-Lists "0";' <<< "$config"
+    grep -Fxq 'APT::Periodic::Unattended-Upgrade "0";' <<< "$config"
+    sudo systemctl show cvdl-g4-job.service --property=Type,Restart,KillMode,TimeoutStopUSec,Requires,Wants,After,PartOf,BindsTo
+    echo 'Automatic package updates are disabled. Apply security updates in planned maintenance, not during jobs.'
+}
 case "$STEP" in
+    freeze-updates) freeze_updates ;;
     base)
         [[ $(id -un) == yangxuan ]] || { echo 'Run base as yangxuan, not root' >&2; exit 2; }
+        freeze_updates
         sudo apt-get update
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl git rsync openssh-client build-essential python3-dev
         if [[ ! -x "$HOME/.local/bin/uv" ]]; then curl -LsSf https://astral.sh/uv/install.sh | sh; fi
@@ -91,5 +136,5 @@ case "$STEP" in
             OMP_NUM_THREADS=1 .venv/bin/python scripts/g4/speed_test.py \
                 --cache-root "$CACHE_ROOT" --out "runs-out/g4-speed-$(date -u +%Y%m%dT%H%M%SZ).json")
         ;;
-    *) echo 'Usage: setup.sh {base|upload|cache|speed}' >&2; exit 2 ;;
+    *) echo 'Usage: setup.sh {base|freeze-updates|upload|cache|speed}' >&2; exit 2 ;;
 esac

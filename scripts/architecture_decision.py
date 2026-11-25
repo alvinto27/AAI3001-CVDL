@@ -26,7 +26,7 @@ DELAYED_RUN = 'srm-delayed-20261019T100714Z-3282'
 OUT = ROOT / 'runs/verification/architecture-decision-2026-10-19'
 
 
-def join_predictions(paths):
+def join_predictions(paths, *, names=NAMES):
     """Fail on any complete key-set, paired-row, or non-score metadata mismatch."""
     import numpy as np
     import pandas as pd
@@ -50,7 +50,7 @@ def join_predictions(paths):
     except AssertionError as error:
         raise ValueError('prediction metadata mismatch') from error
     result = base.drop(columns='prob_stego').reset_index()
-    for name, frame in zip(NAMES, frames, strict=True):
+    for name, frame in zip(names, frames, strict=True):
         result[name] = frame.prob_stego.to_numpy()
     pairs = result.groupby('pair_id', sort=False)
     if not pairs.label.agg(list).map(lambda labels: sorted(labels) == [0, 1]).all():
@@ -60,18 +60,29 @@ def join_predictions(paths):
     return result
 
 
-def auc_intervals(frame, *, replicates=REPLICATES, seed=SEED):
-    """One photo draw per replicate, applied to both models before differencing."""
+def auc_intervals(frame, *, replicates=REPLICATES, seed=SEED, names=NAMES,
+                  metric='auc', cutoffs=None):
+    """Shared photo draws; default arm-A AUC calculations remain unchanged.
+
+    P_E uses each model's frozen cutoff; paired rows make mean error equal to
+    (FA+miss)/2 in every photo resample. Never refit cutoffs on sampled test rows.
+    """
     import numpy as np
     from cvdl.metrics import auc_numpy
     frame = frame.reset_index(drop=True)
     labels = frame.label.to_numpy()
-    scores = frame[list(NAMES)].to_numpy()
+    scores = frame[list(names)].to_numpy()
+    if metric=='pe':
+        cutoff_values=np.array([cutoffs[name] for name in names],dtype=float)
+        if not np.isfinite(cutoff_values).all():raise ValueError('invalid frozen cutoffs')
+        errors=(scores>=cutoff_values)!=labels[:,None]
+    elif metric!='auc':raise ValueError('unknown bootstrap metric')
     groups = [g.index.to_numpy() for _, g in frame.groupby('source_photo', sort=True)]
     if not groups:
         raise ValueError('empty bootstrap population')
 
     def estimate(indices):
+        if metric=='pe':return errors[indices].mean(axis=0)
         return np.array([auc_numpy(labels[indices], scores[indices, j]) for j in range(2)])
 
     point = estimate(np.arange(len(frame)))
@@ -83,17 +94,17 @@ def auc_intervals(frame, *, replicates=REPLICATES, seed=SEED):
     low, high = np.quantile(draws, [.025, .975], axis=0)
     delta_low, delta_high = np.quantile(draws[:, 1] - draws[:, 0], [.025, .975])
     models = {name: dict(point=float(point[j]), low=float(low[j]), high=float(high[j]))
-              for j, name in enumerate(NAMES)}
+              for j, name in enumerate(names)}
     return dict(pairs=int((labels == 1).sum()), photos=len(groups), models=models,
         difference=dict(point=float(point[1] - point[0]), low=float(delta_low), high=float(delta_high))), draws
 
 
-def rates(frame, cutoffs):
+def rates(frame, cutoffs, *, names=NAMES):
     """Frozen validation cut-offs only; preserve the evaluator's >= tie rule."""
     clean = frame[frame.label == 0]
     stego = frame[frame.label == 1]
     result = {}
-    for name in NAMES:
+    for name in names:
         cutoff = cutoffs[name]
         fa = float((clean[name] >= cutoff).mean())
         miss = float((stego[name] < cutoff).mean())

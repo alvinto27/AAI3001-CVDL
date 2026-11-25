@@ -23,6 +23,8 @@ def configure(settings):
     """Apply machine limits/backend choice, then seed in the original order."""
     torch.set_num_threads(settings.main_threads)
     torch.backends.cudnn.benchmark = torch.version.cuda is not None
+    if settings.model=='xunet_wide_gapcov32':
+        torch.backends.cuda.matmul.allow_tf32=False  # Match R1; covariance uses full FP32 products.
     random.seed(settings.seed)
     np.random.seed(settings.seed)
     torch.manual_seed(settings.seed)
@@ -30,7 +32,9 @@ def configure(settings):
 
 
 def conv1_factory(settings):
-    if settings.rocm_conv1_fix and settings.rocm and settings.device == 'cuda':
+    # This workaround is for XuNet's dense 5x5 conv1, not GBRAS's 1x1 adapter.
+    # Colour-separated conv1 uses native grouped convolution; unfold is dense-only.
+    if settings.model not in {'gbras','xunet_wide_coloursep36'} and settings.rocm_conv1_fix and settings.rocm and settings.device == 'cuda':
         from notebooks.rocm_conv1_wgrad import UnfoldWgradConv2d
         return UnfoldWgradConv2d.from_conv
     return None
@@ -50,11 +54,14 @@ def create_data(s):
             from .pilot import apply
             apply(otf, s)
         if getattr(s,'embedding_schedule',None) is not None:
-            from .curriculum import CurriculumImages
-            otf.train=CurriculumImages(otf.corpus,s.embedding_schedule,s.embedding_stage_epochs,
+            from .curriculum import CurriculumImages, SCRATCH50, scratch50_record
+            otf.train=CurriculumImages(otf.corpus,s.embedding_schedule,getattr(s,'embedding_stage_epochs',None),
                 **({'cell_supervision':s.cell_supervision} if getattr(s,'cell_supervision','off')!='off' else {}))
-            otf.record['embedding_schedule']=dict(mode=s.embedding_schedule,stage_epochs=s.embedding_stage_epochs,
-                original_fraction=.25 if s.embedding_schedule=='low_bpp' else 1.,assignment='exact per epoch before worker sharding; counts reflect consumed stegos')
+            if s.embedding_schedule==SCRATCH50:
+                otf.record['embedding_schedule']=scratch50_record(otf.corpus.settings.tiles_per_epoch)
+            else:
+                otf.record['embedding_schedule']=dict(mode=s.embedding_schedule,stage_epochs=s.embedding_stage_epochs,
+                    original_fraction=.25 if s.embedding_schedule=='low_bpp' else 1.,assignment='exact per epoch before worker sharding; counts reflect consumed stegos')
         otf.record.update(compile_mode=s.compile, prime_next_epoch=s.prime_next_epoch)
         return otf, data.otf_pair_tables(otf)
     labels = data.load_labels(labels_path=s.labels_path)
@@ -69,7 +76,8 @@ def create_loaders(s, otf, tables):
     if otf is not None:
         loaders = data.build_otf_loaders(otf, **kwargs, prefetch=s.prefetch,
             prefetch_images=s.prefetch_images, prime_next_epoch=s.prime_next_epoch,
-            pack_blocks=s.pack_blocks)
+            pack_blocks=s.pack_blocks,
+            **({'val_batch_images':s.val_batch_images} if getattr(s,'val_batch_images',None) is not None else {}))
         clean, stego, _ = otf.fixed_train[0]
         byte_images, _, _ = next(iter(loaders.val))
         assert byte_images.dtype == torch.uint8
@@ -86,11 +94,15 @@ def create_loaders(s, otf, tables):
 
 
 def model_checks(s, clean_batch, stego_batch):
-    """Count parameters and check frozen KV weights, preserving both allocations."""
+    """Count parameters and check front-end trainability, preserving allocations."""
     def model():
+        head_identity={}
+        if s.model=='xunet_wide_gapcov32':
+            from .cov_pool import SPEC
+            head_identity=dict(cov_pool_identity=dict(SPEC))
         return models.model_from_hparams(dict(model=s.model, clip_t=s.clip_t, norm=s.norm,
                                              width=s.width, front_end=s.front_end,
-                                             **({'cell_supervision':s.cell_supervision} if getattr(s,'cell_supervision','off')!='off' else {})))
+                                             **({'cell_supervision':s.cell_supervision} if getattr(s,'cell_supervision','off')!='off' else {}),**head_identity))
     counted = model()
     print(f'Total parameters: {sum(p.numel() for p in counted.parameters()):,}')
     print(f'Output shape for one batch: {tuple(counted(clean_batch[:1]).shape)}')
@@ -104,9 +116,14 @@ def model_checks(s, clean_batch, stego_batch):
     optimizer.zero_grad(set_to_none=True)
     loss = F.cross_entropy(probe(images), targets)
     loss.backward()
+    learn_srm = s.model == 'xunet_wide_learn_srm'
+    if learn_srm:
+        gradient = probe.kv.conv.weight.grad
+        assert gradient is not None and torch.isfinite(gradient).all() and gradient.abs().max() > 0
     optimizer.step()
-    assert torch.equal(before, probe.kv.conv.weight.detach())
-    print(f'Probe loss: {loss.item():.5f}; KV weights unchanged: True')
+    unchanged = torch.equal(before, probe.kv.conv.weight.detach())
+    assert unchanged != learn_srm
+    print(f'Probe loss: {loss.item():.5f}; KV weights unchanged: {unchanged}')
 
 
 def finish_training(s, bundle, loaders):
@@ -133,21 +150,35 @@ def finish_training(s, bundle, loaders):
     return str(checkpoint.last_model_path) if getattr(s,'evaluation_checkpoint','best')=='last' else best
 
 
-def create_training(s, otf_data, loaders):
-    """Wire checkpoint-compatible callbacks, loggers, Trainer and module."""
+def create_training(s, otf_data, loaders, *, trainer_options=None):
+    """Wire the shared training path; optional loop bounds serve benchmark tools."""
     train_loader, val_loader = loaders.train, loaders.val
     checkpoint_dir = Path(s.output_root) / s.run_directory_name
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     starting=getattr(s,'init_checkpoint',None) is not None
+    scratch50=getattr(s,'embedding_schedule',None)=='low_bpp50_v1'
     resuming=False; prior_model={}
-    if starting:
+    learn_srm=s.model=='xunet_wide_learn_srm'
+    gapcov=s.model=='xunet_wide_gapcov32'
+    if starting or scratch50 or learn_srm or gapcov:
         from .curriculum import check_start
+        if learn_srm:from .learn_srm_training import check_start
+        if gapcov:from .cov_training import check_start
         resuming=check_start(s,checkpoint_dir)
         if resuming:prior_model=json.loads((checkpoint_dir/'model_run_settings.json').read_text())
     model_run_settings = {"compile_mode": s.compile,
                           "compile_target": "net" if s.compile == "default" else None,
                           "compile_dynamic": False if s.compile == "default" else None,
                           "compile_fullgraph": False if s.compile == "default" else None,
+                          "channels_last": s.channels_last,
+                          "memory_format": "channels_last" if s.channels_last else "contiguous",
+                          "amp_boundaries": {
+                              "srm_front_end_and_clamp": "float32_autocast_disabled" if s.front_end == "srm" else "not_used",
+                              "learned_layers": "lightning_bfloat16_autocast" if s.precision == "bf16-mixed" else "float32",
+                              "normalization_parameters_and_running_stats": "float32",
+                              "cross_entropy": "float32",
+                              "validation_probabilities_and_metrics": "float32",
+                          },
                           "tf32_matmul": torch.backends.cuda.matmul.allow_tf32,
                           "tf32_cudnn": torch.backends.cudnn.allow_tf32,
                           "torch_version": str(torch.__version__),
@@ -157,6 +188,23 @@ def create_training(s, otf_data, loaders):
                           "weight_decay": 1e-4, "lr_drops": s.lr_drops,
                           "batch_size": s.batch_size, "precision": s.precision, "model": s.model, "width": s.width, "persistent_validation_workers": s.persistent_workers,
                           "train_yaml": s.train_yaml, "extra_tests": s.extra_tests}
+    if getattr(s,'val_batch_images',None) is not None:
+        model_run_settings.update(val_batch_images=s.val_batch_images,
+            effective_val_batch_images=min(s.batch_size,s.val_batch_images))
+    if s.model=='xunet_wide_coloursep36':
+        model_run_settings.update(conv1_backend='native_grouped',rocm_conv1_fix_active=False,
+            rocm_conv1_fix_reason='dense-only unfold workaround excluded for groups3')
+    if s.model=='xunet_wide_learn_srm':
+        model_run_settings.update(srm_trainable=True,srm_coefficients=2250,srm_groups=3,
+            srm_initialization='existing_SRM_ARRAY_float32',conv1_backend='unfold_wgrad' if conv1_factory(s) else 'native_dense')
+    if gapcov:
+        from .cov_pool import SPEC
+        model_run_settings.update(cov_pool_identity=dict(SPEC),srm_trainable=False,
+            conv1_backend='unfold_wgrad' if conv1_factory(s) else 'native_dense')
+        model_run_settings['amp_boundaries']['gap_covariance_head']='float32_autocast_disabled'
+    if scratch50:
+        from .curriculum import scratch50_record
+        model_run_settings['embedding_schedule_identity']=scratch50_record(s.tiles_per_epoch)
     (checkpoint_dir / "model_run_settings.json").write_text(json.dumps(model_run_settings, indent=2) + "\n")
     print("Model run settings:", json.dumps(model_run_settings, indent=2))
     if s.data == "otf":
@@ -203,7 +251,9 @@ def create_training(s, otf_data, loaders):
         auto_insert_metric_name=False, monitor="val_pe", mode="min", save_top_k=1, save_last=True,
         every_n_epochs=1, save_on_train_epoch_end=False,
     )
+    from .checkpoint_io import DurableCheckpointIO
     trainer = L.Trainer(
+        plugins=[DurableCheckpointIO()],
         max_epochs=s.epochs,
         **({"limit_train_batches": s.limit_train_batches} if s.limit_train_batches else {}),
         precision=s.precision,
@@ -216,17 +266,36 @@ def create_training(s, otf_data, loaders):
         log_every_n_steps=50,
         enable_progress_bar=not s.headless,
         deterministic=False,
+        **(trainer_options or {}),
     )
     training_started = time.perf_counter()
     assert trainer.checkpoint_callbacks == [checkpoint_callback], "only one best-and-last checkpoint callback is allowed"
-    lightning_model = SteganalysisModule(clip_t=s.clip_t, norm=s.norm, validation_data=otf_data, conv1_factory=conv1_factory(s), lr=s.lr, max_epochs=s.epochs, paired_batches=s.paired_batches, steps_per_epoch=len(train_loader), warmup_epochs=s.warmup_epochs, grad_clip=s.grad_clip, lr_drops=s.lr_drops, batch_size=s.batch_size, precision=s.precision, model=s.model, width=s.width, front_end=s.front_end,
-        **(dict(cell_supervision=s.cell_supervision,cell_loss_weight=s.cell_loss_weight) if getattr(s,'cell_supervision','off')!='off' else {}))
+    lightning_model = SteganalysisModule(clip_t=s.clip_t, norm=s.norm, validation_data=otf_data, conv1_factory=conv1_factory(s), lr=s.lr, max_epochs=s.epochs, paired_batches=s.paired_batches, channels_last=s.channels_last, steps_per_epoch=len(train_loader), warmup_epochs=s.warmup_epochs, grad_clip=s.grad_clip, lr_drops=s.lr_drops, batch_size=s.batch_size, precision=s.precision, model=s.model, width=s.width, front_end=s.front_end,
+        **(dict(cell_supervision=s.cell_supervision,cell_loss_weight=s.cell_loss_weight) if getattr(s,'cell_supervision','off')!='off' else {}),
+        **({'val_batch_images':s.val_batch_images} if getattr(s,'val_batch_images',None) is not None else {}))
     if starting:
         from .curriculum import initialize
         initialization=initialize(s,lightning_model,checkpoint_dir,resuming)
         model_run_settings['initialization_checkpoint_sha256']=initialization['checkpoint_sha256']
         model_run_settings['evaluation_checkpoint']=getattr(s,'evaluation_checkpoint','best')
-    if s.name:
+        if gapcov:
+            model_run_settings.update(initialization='weights_only',cell_supervision=s.cell_supervision,
+                cell_loss_weight=s.cell_loss_weight,initial_cell_head_sha256=initialization['initial_cell_head_sha256'],
+                source_provenance=initialization['source_provenance'])
+            lightning_model.hparams['source_provenance']=initialization['source_provenance']
+            for key in ('initial_weights_sha256','initial_cell_head_sha256'):
+                lightning_model.hparams[key]=initialization[key]
+            lightning_model.hparams['initialization_checkpoint_sha256']=initialization['checkpoint_sha256']
+    if scratch50:
+        from .curriculum import initialize_scratch50
+        initialize_scratch50(s,checkpoint_dir,resuming)
+        lightning_model.hparams['embedding_schedule_identity']=model_run_settings['embedding_schedule_identity']
+        model_run_settings['initialization']='random'
+    if learn_srm or (gapcov and not starting):
+        from .curriculum import initialize_scratch50
+        initialize_scratch50(s,checkpoint_dir,resuming)
+        model_run_settings['initialization']='random'
+    if s.name or scratch50:
         import hashlib
         digest=hashlib.sha256()
         for name,tensor in lightning_model.net.state_dict().items():
@@ -246,4 +315,4 @@ def create_training(s, otf_data, loaders):
 def curriculum_callbacks(s,folder):
     if getattr(s,'embedding_schedule',None) is None:return []
     from .curriculum import CurriculumCounts
-    return [CurriculumCounts(folder/'embedding_epoch_counts.jsonl',s.embedding_schedule,s.embedding_stage_epochs)]
+    return [CurriculumCounts(folder/'embedding_epoch_counts.jsonl',s.embedding_schedule,getattr(s,'embedding_stage_epochs',None))]

@@ -133,7 +133,7 @@ Recorded by the Orchestrator (the Scribe session stopped on 2026-10-15).
 ### Afternoon: per-cell design, hold, documentation tidy-up
 
 - Did: Worker_2 wrote the per-cell training design
-  (`a6170ed`, [plan](../../active/plan-per-cell-training.md)): separate 1x1
+  (`a6170ed`, [plan](../../archive/plan-per-cell-training.md)): separate 1x1
   cell head, hard "any changed pixel" cell label with a reliability weight,
   50% region payloads, loss `tile CE + 0.2 x cell BCE`, pass marks fixed
   before a run. Not approved.

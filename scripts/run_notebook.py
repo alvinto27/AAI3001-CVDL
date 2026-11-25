@@ -10,6 +10,7 @@ import base64
 from contextlib import nullcontext, redirect_stderr, redirect_stdout
 from copy import deepcopy
 from datetime import datetime, timezone
+import hashlib
 import json
 import multiprocessing
 import os
@@ -290,10 +291,17 @@ def run(args):
             if key not in settings and (key == "QUICK" or resolved_settings.profile == "g4"):
                 settings[key] = value
     previous = output / "status.json"
+    source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+    notebook_sha=hashlib.sha256(notebook_path.read_bytes()).hexdigest()
+    resume_checkpoint=None
+    if args.resume and (not output.is_dir() or not previous.is_file()):
+        raise ValueError('resume requires the existing interrupted output/status; never start fresh')
     if output.exists() and any(output.iterdir()):
         if not args.resume or not compact or not previous.is_file():
             raise ValueError(f"use a new, empty output folder: {output} (or --resume for interrupted notebook 05)")
         prior = json.loads(previous.read_text(encoding="utf-8"))
+        if prior.get('source_commit')!=source_commit or prior.get('notebook_sha256')!=notebook_sha:
+            raise ValueError('resume commit or notebook differs from the saved run')
         if prior.get("state") == "done" or prior.get("executed_notebook") != str(output / "executed.ipynb"):
             raise ValueError("only an interrupted notebook 05 run can resume")
         if (prior.get("effective_settings") != {**settings, "V3_OUTPUT_ROOT": str(output / "checkpoints")}
@@ -302,6 +310,8 @@ def run(args):
         resume_name=resolved_settings.run_directory_name if declared.get('name') else settings.get('V3_RUN_NAME')
         if not resume_name or not (output / "checkpoints" / resume_name / "last.ckpt").is_file():
             raise ValueError("resume needs the existing last.ckpt")
+        from scripts.g4.resume import checkpoint_info
+        resume_checkpoint=checkpoint_info(output)
     output.mkdir(parents=True, exist_ok=True)
     if compact:
         os.environ["CVDL_HEADLESS_LOG"] = "1"
@@ -337,6 +347,7 @@ def run(args):
     notebook.setdefault("metadata", {})["headless_run"] = {"source": str(notebook_path), "settings": settings}
     status = {"state": "running", "current_cell": None, "last_completed_cell": None,
               "started_at": now(), "ended_at": None, "heartbeat_at": now(), "exit_code": None,
+              "source_commit": source_commit, "notebook_sha256": notebook_sha, "resume_checkpoint": resume_checkpoint,
               "effective_settings": settings.copy(), "setting_overrides": list(args.set),
               "runtime_settings": {}, "cells": [],
               "executed_notebook": str(executed), "log": str(output / "run.log"),

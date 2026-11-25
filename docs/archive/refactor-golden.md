@@ -127,6 +127,6 @@ relaxed. GPU scalar/probability deltas remain informational as before. The GPU
 runner also passes `--set lr=0.0003` (the unchanged LR) and checks that the final
 `run_settings.json` records `lr` with source `override` and in override history.
 
-The package/API design is in the [cvdl plan](../active/plan-cvdl-package.md). Keep old
+The package/API design is in the [cvdl plan](plan-cvdl-package.md). Keep old
 checkpoint parameter and hyperparameter names. Update capture adapters explicitly
 when later phases remove notebook globals; do not weaken exact CPU/data checks.

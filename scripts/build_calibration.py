@@ -12,10 +12,20 @@ sys.path.insert(0,str(ROOT))
 sys.path.insert(0,str(ROOT/'LSB-Dataset-Generator'))
 WIDE='xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_r2-20261015T121753Z-29499'
 MIX='xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_mixr2-20261016T024859Z-9032'
+# V3c notebook-04 baseline (KV XuNet, GroupNorm). Same saved RAISE/DIV2K training
+# photos and 512 data settings as WIDE, so it shares the WIDE calibration list.
+BASELINE='g4-prime-1'
 RUNS=(WIDE,MIX,'tiling-overlap-20261016T135926Z-8501','tiling-trim-20261016T144117Z-3222',
  'tiling-pad-20261017T013055Z-7210','tiling-overlap-256-20261017T022212Z-9778',
  'tiling-trim-256-20261017T032025Z-8579','tiling-pad-256-20261017T043145Z-9721',
- 'srm-20261017T052857Z-4521','srm-e50-20261017T111310Z-0214')
+ 'srm-20261017T052857Z-4521','srm-e50-20261017T111310Z-0214',
+ 'srm-e50-paired-20261023T022339Z-4518',
+ 'srm-e50-curriculum50-paired-20261023T090435Z-3325',
+ 'srm-e50-paired-coloursep36-20261024T115642Z-1325',
+ 'srm-e50-paired-learn-srm-20261026T022114Z-0923',
+ 'srm-e50-paired-gapcov32-20261026T115421Z-1917',
+ BASELINE)
+SAME_DATA_KEYS=('sources','grid','tile_size','source_weights','variants_per_tile','train_photo_fraction','run_seed')
 
 
 def build(root=ROOT):
@@ -51,17 +61,24 @@ def build(root=ROOT):
         training_pairs=sum(counts.values()),sources=evidence,
         calibration_pairs=18000,calibration_budget='user-approved fixed size; NOT 10% of original training epoch'))+'\n'
     outputs={root/'data/val'/rid/name:text for name,text in files.items()}
+    baseline_folders=list((root/'runs'/BASELINE/'checkpoints').iterdir())
+    if len(baseline_folders)!=1:raise ValueError('ambiguous baseline training evidence folder')
+    base=json.loads((baseline_folders[0]/'data_run_settings.json').read_bytes())
+    if base['train_photo_selection']!=record['train_photo_selection'] or any(
+            base['settings'][k]!=old[k] for k in SAME_DATA_KEYS):
+        raise ValueError('baseline training data differs from WIDE; cannot share its calibration list')
     entries=[]
     for run in RUNS:
         folders=list((root/'runs'/run/'checkpoints').iterdir())
         if len(folders)!=1:raise ValueError(f'ambiguous checkpoint folder: {run}')
         checkpoint=Path(select_best_checkpoint(None,folders[0]))
-        list_id=rid if run==WIDE else '60da4391043e8ce48ff2'
-        pinned=summary if run==WIDE else json.loads((root/'data/val'/list_id/'summary.json').read_text())
+        own_list=run in (WIDE,BASELINE)
+        list_id=rid if own_list else '60da4391043e8ce48ff2'
+        pinned=summary if own_list else json.loads((root/'data/val'/list_id/'summary.json').read_text())
         entries.append(dict(run_name=run,checkpoint_file=checkpoint.name,checkpoint_sha256=V.digest(checkpoint.read_bytes()),
             recipe_id=list_id,recipe_sha256=pinned['recipe_sha256'],pairs_sha256=pinned['pairs_sha256'],
             threshold_origin='post_hoc_256'))
-    if len({r['checkpoint_sha256'] for r in entries})!=10:raise ValueError('duplicate checkpoint mapping')
+    if len({r['checkpoint_sha256'] for r in entries})!=len(RUNS):raise ValueError('duplicate checkpoint mapping')
     mapping=V.canonical(dict(version='evaluation-calibration-v1',entries=entries))+'\n'
     outputs[root/'configs/evaluation-calibration-v1.json']=mapping
     return outputs,dict(recipe_id=rid,summary=summary,training_counts=counts,mapping_sha256=V.digest(mapping.encode()),entries=entries)

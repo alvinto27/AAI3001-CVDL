@@ -1,0 +1,31 @@
+{
+  "version": "run21-cell-comparison-v1",
+  "detector": {
+    "evaluation": "runs/srm-e50-paired-gapcov32-20261026T115421Z-1917/evaluation/standard-256-v1/cdc91a4b6d63a1517064",
+    "checkpoint_sha256": "4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf",
+    "files_sha256": {
+      "summary.json": "9510ddcdefa6854f640d87e3cf63c934b9b337f4ac1b05dce5c54c0438500106",
+      "evaluation_settings.json": "8f470db06c1e1dbce3f60cb5a219af7a8d72dcc0e6ce01bcea0cde3adc76fc53",
+      "validation/calibration.json": "3a7c6f33264e990a1c6f57f9526d55880a65fc9ee6777af4a173117fb14589d3",
+      "validation/predictions.csv": "6f95ba9ae93dbfe7b0d64db44349e93686f18897bb78459eb4f5f6816637ef26",
+      "hard-test/hard_predictions.csv": "e856b903a048a1690c8447b62725a11a9d5c0b1f26cb1a1987361a1eae1f9dad",
+      "panels/alaska-seen/predictions.csv": "e33bfee9312ae9f9f70642b0a68cbcb5be23f9a540118fbcc077f62a68469609",
+      "panels/alaska-unseen/predictions.csv": "ba7932512071f1ae3e2982d7ee768f7b22bbd4dce38404518ba7f59d05999796",
+      "panels/lsdir/predictions.csv": "e45628f350539677dc7d891e3d4904bfd6d374ff2b8bf915e2f1b3b4c3376a1e",
+      "panels/standard/predictions.csv": "06507898da368e33379bc8199185d4a89b08c77e7a980589edb883bd80fdac96"
+    }
+  },
+  "heatmap": {
+    "folder": "runs/verification/cell-curriculum50-paired-2026-10-23/cells",
+    "checkpoint_sha256": "eee9c63a0bd9a91b63758dfc4ddfcca37e47a2a621fbb663557c37bec4b00b80",
+    "files_sha256": {
+      "cells.json": "ddc46bec1dc3b2ca7e5ecdb82519736e8219406117c3f27ae54365cca3524e63",
+      "cells.png": "34ee33c531d3d7efe9a04b5a471e3f5f48ae7a93088b5484ef912f92747226f9",
+      "summary.json": "50ebc199f465d624a5dd766a464c9ceee9ffa3cae726b4eb859f8b4c5f98e6fb",
+      "test-pairs.csv": "3d51007649b5e29bd4bf6a21ed00b64bf461308c5f6bc1b6916515e327e02885",
+      "test-scores.npz": "dbcdb009b1449ad00ee29e42888802e8075d9655b3dc42ac7ab2dd85ea6f1b37",
+      "val-pairs.csv": "8c79f3311e2bf9998b7b8a2ee0c2d3dfac917af7190fcd28ab3b54e8a8bb55f5",
+      "val-scores.npz": "7c57885684b8eec2ae5e8754174b4fd12f6ef366532aa2bbb592c94eb669ded6"
+    }
+  }
+}

@@ -7,11 +7,75 @@ import pandas as pd
 from .report_charts import PANELS,SOURCES,text
 
 
+def _read(path):
+    if not path.is_file():raise ValueError(f'missing saved cell output: {path}')
+    return json.loads(path.read_text())
+
+
+def _map_label(summary,key):
+    """Plain map name from the saved summary; never guessed from the model."""
+    if key=='aux':return 'cell head'
+    if key=='cam':return 'CAM'
+    if key=='class_score':
+        return 'attribution' if summary.get('map_kind')=='attribution' else 'class-score map'
+    raise ValueError(f'unknown saved cell map: {key}')
+
+
+def _geometry(summary,key):
+    meta=summary.get('map_metadata',{}).get(key,{})
+    size=meta.get('receptive_field',48)
+    return f'{size}×{size}'+(' (whole tile)' if meta.get('global_context') else '')
+
+
+def general_cell_tables(folder,reference_dir=None):
+    """Any saved cell_eval output: its own maps, own cut-offs, optional reference.
+
+    Reads summary.json and cells.png only. No new statistics: the reference
+    columns are side by side, not a paired test.
+    """
+    folder=Path(folder)
+    summary=_read(folder/'cells/summary.json')
+    figure=folder/'cells/cells.png'
+    if not figure.is_file():raise ValueError(f'missing saved cell figure: {figure}')
+    reference=None
+    if reference_dir is not None:
+        reference_dir=Path(reference_dir)
+        reference=_read(reference_dir/'summary.json' if (reference_dir/'summary.json').is_file() else reference_dir/'cells/summary.json')
+        if reference.get('selection_counts')!=summary.get('selection_counts'):
+            raise ValueError('reference cell summary uses a different frozen fixture')
+    def auc(value):return '—' if value is None else f"{value['point']:.3f} [{value['low']:.3f}, {value['high']:.3f}]"
+    def difference(value):return f"{value['point']:+.4f} [{value['low']:+.4f}, {value['high']:+.4f}]"
+    def localized(saved):return {r['panel']:r for r in saved['localization'] if r['split']=='test' and r['placement']=='contiguous'}
+    own=localized(summary);ref=localized(reference) if reference else {}
+    own_maps=[k for k in ('aux','cam','class_score') if k in summary['maps']]
+    ref_maps=[k for k in ('aux','cam','class_score') if reference and k in reference['maps']]
+    columns=[('This model: '+_map_label(summary,k),own,k) for k in own_maps]+[('Reference: '+_map_label(reference,k),ref,k) for k in ref_maps]
+    rows=[]
+    for panel in own:
+        row={'Test panel':'All panels' if panel=='pooled' else SOURCES.get(panel,PANELS.get(panel,panel))}
+        for label,saved,key in columns:
+            item=saved.get(panel)
+            row[label]=auc(item['maps'][key]['within_stego_auc'] if item else None)
+        rows.append(row)
+    differences=[]
+    for name,label in (('aux_minus_cam','Cell head − same-model CAM'),('aux_minus_class_score','Cell head − same-model attribution')):
+        if name in own['pooled']:
+            differences.append({'Comparison':label,'AUC change (95% interval)':difference(own['pooled'][name]['within_stego_auc'])})
+    rates=[]
+    for prefix,saved,keys in (('This model',summary,own_maps),('Reference',reference,ref_maps)):
+        for key in keys:
+            values=saved['maps'][key]
+            test=next(r for r in values['test'] if r['panel']=='pooled' and r['placement']=='all')
+            rates.append({'Map':f'{prefix}: {_map_label(saved,key)}','Patch seen':_geometry(saved,key),'Cell cut-off':f"{values['cutoff']:.3f}",
+                'Validation false alarms':f"{100*values['validation_FA']:.1f}%",
+                'Test false alarms':f"{100*test['FA']:.1f}%",'Test recall':f"{100*test['recall']:.1f}%"})
+    return dict(figure=figure,auc=pd.DataFrame(rows),differences=pd.DataFrame(differences),rates=pd.DataFrame(rates),
+        has_reference=reference is not None)
+
+
 def cell_tables(folder,reference_dir=None):
     folder=Path(folder)
-    def read(path):
-        if not path.is_file():raise ValueError(f'missing saved cell output: {path}')
-        return json.loads(path.read_text())
+    read=_read
     summary=read(folder/'cells/summary.json')
     paired=read(folder/'aux-minus-control-cam.json')['panels']
     tiles=read(folder/'tile-comparison.json')
@@ -55,8 +119,30 @@ def cell_tables(folder,reference_dir=None):
     return dict(figure=figure,auc=pd.DataFrame(rows),differences=differences,rates=pd.DataFrame(rates),tiles=pd.DataFrame(tile_rows),recall_note=note)
 
 
+def show_general_cell_report(folder,reference_dir=None):
+    from IPython.display import display,HTML,Image
+    tables=general_cell_tables(folder,reference_dir)
+    display(Image(data=tables['figure'].read_bytes()))
+    def table(name):display(HTML(tables[name].to_html(index=False,border=0)))
+    table('auc')
+    text('AUC and 95% photo-bootstrap intervals compare changed and valid unchanged cells **within each contiguous message tile**, then average the tile AUCs. '
+         'The cell head was trained with changed-cell targets and sees a 48×48-pixel patch per square. '
+         'CAM applies the tile-scoring layer at each grid location. Attribution is worked out afterwards from the tile score and depends on the whole 256×256 tile. '
+         'Squares are 32 pixels apart; these are not exact causal pixel maps.')
+    if tables['has_reference']:
+        text('Reference columns come from its own saved run on the same frozen tiles. They are shown side by side; this is not a paired test.')
+    if len(tables['differences']):
+        table('differences')
+        text('Same-model differences use the same photos for both maps: 2,000 paired resamples. Positive changes favour the cell head.')
+    table('rates')
+    text('Each map uses its own validation cut-off, at at most 5% false alarms. Test rates include clean partners and valid unchanged message cells; '
+         'recall is the fraction of changed cells above the cut-off and includes contiguous and scattered random messages.')
+
+
 def show_cell_report(folder,reference_dir=None):
     from IPython.display import display,HTML,Image
+    if not (Path(folder)/'aux-minus-control-cam.json').is_file():
+        return show_general_cell_report(folder,reference_dir)
     tables=cell_tables(folder,reference_dir)
     display(Image(data=tables['figure'].read_bytes()))
     def table(name):display(HTML(tables[name].to_html(index=False,border=0)))

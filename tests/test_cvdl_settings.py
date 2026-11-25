@@ -137,6 +137,10 @@ class SettingsTests(unittest.TestCase):
         previous=Path.cwd()
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ,{}):
             root=Path(tmp); subprocess.check_call(['git','init','-q',str(root)])
+            # The runner now records the pinned source commit, as real G4 jobs do.
+            subprocess.check_call(['git','-C',str(root),'-c','user.name=Runner fixture',
+                '-c','user.email=fixture@localhost','-c','core.hooksPath=/dev/null',
+                'commit','--allow-empty','-qm','source identity fixture'])
             (root/'.gitignore').write_text('runs/\n')
             notebook=root/'notebooks/05_xunet_v4_nonorm.ipynb';notebook.parent.mkdir()
             name='xunet_v4_clip3_nonorm_lr0.001_warm1_drop1_e3_otf'

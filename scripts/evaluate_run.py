@@ -65,9 +65,30 @@ WIDE_R2_EVIDENCE={
     'executed.ipynb':'431f0d2188f2641f0cc0a9b1af04a18e6dd4be9ae420f196164ed3447f52ed64',
 }
 
+# g4-prime-1: the V3c notebook-04 baseline (KV XuNet, GroupNorm, clip 3). It has the
+# same three data-record omissions as wide-R2, and its model record holds compile
+# settings only. The pinned notebook gives the values below: cell 2 (NORM, CLIP_T,
+# EPOCHS=10, BATCH_SIZE=32, no TRAIN_YAML), cell 19 (AdamW lr 1e-3, StepLR step 5
+# x0.1 = drop at epoch 6, no warmup, no gradient clipping), cell 8 output (53,950
+# train / 11,238 val pairs) and cell 21 output (22,476 validation images).
+# Training-only values do not change evaluation; they are recorded for provenance.
+G4_PRIME_1_EVIDENCE={
+    'data_run_settings.json':'fe32946b66cb54f3d8950c75ae8f99706fc6bb248de8ccca43f1b11c8f2967b3',
+    'model_run_settings.json':'800d54be08b7cf576fbc3201763733ce6ae76d827d3513151d56dece699d4f0a',
+    'executed.ipynb':'adfca428ea5e86b92fa74a3485e1dab3b416bba201a7b3d7ab36e9dce7906fd7',
+}
+G4_PRIME_1_MODEL=dict(model='xunet',width=4,norm='group',clip_t=3.0,lr=1e-3,warmup_epochs=0,
+    lr_drops=[[6,0.1]],batch_size=32,train_yaml=None,extra_tests='none',max_epochs=10,grad_clip_norm=0.0)
+
+
+def legacy_migrations():
+    """Approved pinned migrations. Read at call time so tests can patch evidence."""
+    return (dict(migration='wide-r2-full-source-v1',evidence=WIDE_R2_EVIDENCE,model=None),
+            dict(migration='g4-prime-1-v3c-v1',evidence=G4_PRIME_1_EVIDENCE,model=G4_PRIME_1_MODEL))
+
 
 def legacy_data_record(folder):
-    """Resolve only the evidenced old wide-R2 omissions; never change saved files."""
+    """Resolve only evidenced old-record omissions; never change saved files."""
     folder=Path(folder)
     record=json.loads((folder/'data_run_settings.json').read_text())
     old=record.get('settings',{})
@@ -77,16 +98,19 @@ def legacy_data_record(folder):
     if not missing:return record,None
     evidence={name:folder/name for name in ('data_run_settings.json','model_run_settings.json')}
     evidence['executed.ipynb']=folder.parent.parent/'executed.ipynb'
-    if set(missing)!={'checkpoint_validation','settings.source_mix','settings.tiles_per_epoch'} or any(
-        not p.is_file() or hashlib.sha256(p.read_bytes()).hexdigest()!=WIDE_R2_EVIDENCE[name]
-        for name,p in evidence.items()):
+    actual={name:hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None for name,p in evidence.items()}
+    matches=[m for m in legacy_migrations() if m['evidence']==actual]
+    if set(missing)!={'checkpoint_validation','settings.source_mix','settings.tiles_per_epoch'} or len(matches)!=1:
         raise ValueError(f'missing legacy settings {missing} in {folder}; no approved saved-record evidence for migration')
+    match=matches[0]
     # The three pinned files prove the historical standard/full-source loader.
     record={**record,'checkpoint_validation':'standard',
             'settings':{**old,'source_mix':None,'tiles_per_epoch':None}}
-    return record,dict(migration='wide-r2-full-source-v1',evidence_sha256=WIDE_R2_EVIDENCE,
+    result=dict(migration=match['migration'],evidence_sha256=match['evidence'],
         derived={'checkpoint_validation':'standard','source_mix':None,'tiles_per_epoch':None},
         original_validation_pairs=11238,original_training_pairs=53950)
+    if match['model'] is not None:result['model_settings']=dict(match['model'])
+    return record,result
 
 
 def settings_for_run(folder, *, eval_overrides=()):
@@ -104,9 +128,12 @@ def settings_for_run(folder, *, eval_overrides=()):
         # Explicit migration for pre-package G4 artefacts; never guess a notebook.
         model=json.loads((folder/'model_run_settings.json').read_text())
         record,migration=legacy_data_record(folder);old=record['settings']
+        if migration and 'model_settings' in migration:model={**model,**migration['model_settings']}
         if migration:print('LEGACY SETTINGS MIGRATION: '+json.dumps(migration,sort_keys=True),flush=True)
         experiment={k:model[k] for k in ('norm','clip_t','lr','warmup_epochs','lr_drops','batch_size','model','width','train_yaml','extra_tests')}
-        experiment.update(epochs=model['max_epochs'],grad_clip=model['grad_clip_norm'],run_name=folder.name,
+        # A hand-named migrated run (g4-prime-1) has no derived-prefix name; derive it from its pinned recipe.
+        named=None if migration and 'model_settings' in migration else folder.name
+        experiment.update(epochs=model['max_epochs'],grad_clip=model['grad_clip_norm'],run_name=named,
             checkpoint_validation=record['checkpoint_validation'],val_cap_raise=record.get('val_cap_raise',5000),
             val_cap_lsdir=record.get('val_cap_lsdir',1500),eval_profile=record['eval_profile'],data=record['data'])
         for key in ('sources','source','tile_size','source_mix','tiles_per_epoch','run_seed','train_photo_fraction','paired_batches'):
@@ -114,7 +141,18 @@ def settings_for_run(folder, *, eval_overrides=()):
         overrides=dict(quick=record['quick'])
     experiment['train_yaml']=portable_config(experiment.get('train_yaml'))
     overrides.update(evaluation_override_values(eval_overrides))
-    return load(environ={},_profile=profile,overrides=overrides,**experiment)
+    # Resolve/validate the original training recipe FIRST. The fixed scratch
+    # curriculum intentionally refuses non-128 training batches; an evaluation
+    # batch is not a training-recipe change. Never relax its settings guard.
+    evaluation_batch=(overrides.pop('batch_size',None)
+                      if experiment.get('embedding_schedule')=='low_bpp50_v1' else None)
+    settings=load(environ={},_profile=profile,overrides=overrides,**experiment)
+    if evaluation_batch is None:return settings
+    from dataclasses import replace
+    from cvdl.settings import freeze
+    return replace(settings,values=freeze(dict(settings.values,batch_size=evaluation_batch)),
+        provenance=freeze(dict(settings.provenance,batch_size='override: evaluation only')),
+        overrides=freeze((*settings.overrides,dict(name='batch_size',value=evaluation_batch))))
 
 
 # These are exactly the architecture choices read by model_from_hparams.

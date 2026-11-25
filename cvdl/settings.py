@@ -129,10 +129,14 @@ SCHEMA = MappingProxyType({
     'quick': Definition('bool', boolean, True, 'bool', 'Small trial mode.', env='QUICK', legacy_global='QUICK', machine=True),
     'workers': Definition('int', integer, 6, '>=0', 'Training workers.', lambda v:v>=0, 'V3_WORKERS', 'OTF_WORKERS', True),
     'eval_workers': Definition('int', integer, 4, '>=0', 'Evaluation workers.', lambda v:v>=0, 'V3_EVAL_WORKERS', 'EVAL_WORKERS', True),
+    'val_batch_images': Definition('int?', lambda x:None if x is None or str(x).lower()=='none' else integer(x), None,
+        'None or positive even image count', 'Opt-in evaluation-only image-batch cap; training is unchanged.',
+        lambda v:v is None or (v>=2 and v%2==0), env='V3_VAL_BATCH_IMAGES', machine=True),
     'diag_workers': Definition('int', integer, lambda c:c['eval_workers'], '>=0', 'Diagnostic photo workers.', lambda v:v>=0, 'V3_DIAG_WORKERS', machine=True),
     'headless': Definition('bool', boolean, False, 'bool', 'Compact headless progress.', env='CVDL_HEADLESS_LOG', machine=True),
     'main_threads': Definition('int', integer, 1, '>0', 'Main PyTorch threads.', lambda v:v>0, 'V3_MAIN_THREADS', 'MAIN_THREADS', True),
     'precision': Definition('str', str, '32', '32/bf16-mixed within profile limits', 'Training precision.', lambda v:v in {'32','bf16-mixed'}, 'V3_PRECISION', 'PRECISION', True),
+    'channels_last': Definition('bool', boolean, False, 'bool', 'Channels-last model and image-batch memory format.', env='V3_CHANNELS_LAST', machine=True),
     'persistent_workers': Definition('bool', boolean, True, 'bool', 'Persistent validation workers.', env='V3_PERSISTENT_WORKERS', machine=True),
     'compile': Definition('str', compile_mode, 'off', 'off/default', 'Inner network compilation.', lambda v:v in {'off','default'}, 'V3_COMPILE', 'COMPILE_MODE', True),
     'compile_threads': Definition('int', integer, 4, '>0', 'Inductor compile worker limit.', lambda v:v>0, 'TORCHINDUCTOR_COMPILE_THREADS', machine=True),
@@ -160,7 +164,7 @@ SCHEMA = MappingProxyType({
     'lr_drops': Definition('tuple?', drops, lambda c:((c['epochs']//2+1,.1),), 'None=automatic; increasing epoch:factor; factor (0,1]', 'LR drop plan.', env='V3_LR_DROPS', legacy_global='LR_DROPS'),
     'init_checkpoint': Definition('path?', optional_string, None, 'path or None', 'Weights-only start checkpoint; resume stays separate.'),
     'init_checkpoint_sha256': Definition('str?', optional_string, None, '64 lowercase hex characters', 'Required start-file SHA-256.', lambda v:v is None or bool(re.fullmatch(r'[0-9a-f]{64}',v))),
-    'embedding_schedule': Definition('str?', optional_string, None, 'None/low_bpp/original', 'Approved three-stage embedding schedule.', lambda v:v in {None,'low_bpp','original'}),
+    'embedding_schedule': Definition('str?', optional_string, None, 'None/low_bpp/original/low_bpp50_v1', 'Opt-in embedding schedule.', lambda v:v in {None,'low_bpp','original','low_bpp50_v1'}),
     'embedding_stage_epochs': Definition('int', integer, 5, '>0', 'Epochs in each of three embedding stages.', lambda v:v>0),
     'cell_supervision': Definition('str', str, 'off', 'off/changed_cells_v1', 'Opt-in changed-cell auxiliary target.', lambda v:v in {'off','changed_cells_v1'}),
     'cell_loss_weight': Definition('float', number, .2, '>0', 'Auxiliary cell BCE weight.', lambda v:v>0),
@@ -173,7 +177,7 @@ SCHEMA = MappingProxyType({
     'name': Definition('str?', optional_string, None, 'notebook stem or None', 'Short experiment notebook name.'),
     'extra_tests': Definition('str', str, 'test-bpp1', 'none/test-bpp1/source-panels or both panels', 'Extra evaluation panels.', lambda v:set(v.split(','))<={'none','test-bpp1','source-panels'} and ('none' not in v or v=='none'), 'V3_EXTRA_TESTS', 'EXTRA_TESTS'),
     'front_end': Definition('str', str, 'kv', 'kv/srm', 'Fixed first-layer residual filters: KV or the 30 SRM filters.', lambda v:v in {'kv','srm'}),
-    'model': Definition('str', str, 'xunet', 'xunet/xunet_wide/xunet_wide_delayed', 'Network architecture.', lambda v:v in {'xunet','xunet_wide','xunet_wide_delayed'}, 'V3_MODEL', 'MODEL'),
+    'model': Definition('str', str, 'xunet', 'xunet/xunet_wide/xunet_wide_delayed/xunet_wide_coloursep36/xunet_wide_learn_srm/xunet_wide_gapcov32/gbras', 'Network architecture.', lambda v:v in {'xunet','xunet_wide','xunet_wide_delayed','xunet_wide_coloursep36','xunet_wide_learn_srm','xunet_wide_gapcov32','gbras'}, 'V3_MODEL', 'MODEL'),
     'width': Definition('int', integer, 4, '1..8', 'Wide network multiplier.', lambda v:1<=v<=8, 'V3_WIDTH', 'WIDTH'),
     'batch_size': Definition('int', integer, lambda c:8 if c['quick'] else 32, 'positive multiple of 4', 'Training images per batch.', lambda v:v>0 and v%4==0, 'V3_BATCH_SIZE', 'BATCH_SIZE'),
     'source': Definition('str', str, 'decode', 'decode/cache', 'Photo input path.', lambda v:v in {'decode','cache'}, 'V3_SOURCE', 'OTF_SOURCE'),
@@ -340,8 +344,10 @@ class Settings:
         out = {spec.legacy_global:plain(self.values[name]) for name,spec in SCHEMA.items() if spec.legacy_global}
         out.update(EVAL_PERSISTENT_WORKERS=self.persistent_workers and self.eval_workers>0,
             QUICK_PAIRS={'train':self.quick_train_pairs,'val':self.quick_eval_pairs,'test':self.quick_eval_pairs},
-            DEVICE=self.device, ROCM_CONV1_FIX_ACTIVE=self.rocm_conv1_fix and self.rocm and self.device=='cuda',
+            DEVICE=self.device, ROCM_CONV1_FIX_ACTIVE=self.model not in {'gbras','xunet_wide_coloursep36'} and self.rocm_conv1_fix and self.rocm and self.device=='cuda',
             PIL_VERSION=version('Pillow'))
+        if self.model=='xunet_wide_coloursep36':
+            out['ROCM_CONV1_FIX_REASON']='native grouped conv1; dense-only unfold workaround excluded'
         return out
 
     def apply_runtime_environment(self):
@@ -358,6 +364,8 @@ class Settings:
         dirty = bool(subprocess.check_output(['git','status','--porcelain'],cwd=self.root,text=True).strip())
         record = dict(values=plain(self.values), sources=plain(self.provenance), profile=self.profile,
                       overrides=plain(self.overrides), git=dict(commit=commit,dirty=dirty))
+        if getattr(self,'val_batch_images',None) is not None:
+            record['effective_val_batch_images']=min(self.batch_size,self.val_batch_images)
         (folder/'run_settings.json').write_text(json.dumps(record,indent=2)+'\n')
         return record
 
@@ -397,7 +405,11 @@ def _run_name(c, explicit):
     prefix += f"_e{c['epochs']}"
     if c['front_end']!='kv': prefix += '_'+c['front_end']
     if c['model']=='xunet_wide': prefix += f"_wide-w{c['width']}"
+    if c['model']=='xunet_wide_coloursep36': prefix += '_wide-w4_coloursep36'
+    if c['model']=='xunet_wide_learn_srm': prefix += '_wide-w4_learn-srm'
+    if c['model']=='xunet_wide_gapcov32': prefix += '_wide-w4_gapcov32'
     if c['model']=='xunet_wide_delayed': prefix += f"_wide-w{c['width']}_delayed"
+    if c['model']=='gbras': prefix += '_gbras-adapter90to30'
     if c['batch_size'] != (8 if c['quick'] else 32): prefix += f"_b{c['batch_size']}"
     if c['precision']!='32': prefix += f"_prec-{c['precision']}"
     name = c['run_name'] or prefix+('_quick' if c['quick'] else '')+('_otf' if c['data']=='otf' else '')
@@ -428,7 +440,9 @@ def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_v
         put(name,value,'profile')
     for name,value in notebook_values.items():
         resolved = canonical(name)
-        if SCHEMA[resolved].machine:
+        # Evaluation batching is a machine limit that can be pinned explicitly
+        # in a notebook; all other machine-owned notebook controls stay refused.
+        if SCHEMA[resolved].machine and resolved!='val_batch_images':
             raise ValueError(f'setting {name!r} is machine-owned; use the automatic profile or a one-off override, not the notebook')
         put(name,value,'notebook')
     explicit_overrides = [(canonical(name), value) for name,value in override_pairs]
@@ -514,26 +528,51 @@ def load(*, overrides=(), environ=None, _profile=None, must_set=(), **notebook_v
             raise ValueError('pilot mode needs OTF, train_matched validation and post_fit_eval=none')
     if c['model']=='xunet_wide_delayed' and c['front_end']!='srm':
         raise ValueError('delayed-pooling arm requires the SRM front end')
+    if c['model']=='xunet_wide_coloursep36' and (c['front_end'],c['norm'],c['width'],c['clip_t'],c['cell_supervision'])!=('srm','none',4,3.0,'off'):
+        raise ValueError('coloursep36 requires SRM, norm none, width4, clip_t3 and no cell supervision')
+    if c['model']=='xunet_wide_learn_srm' and (c['front_end'],c['norm'],c['width'],c['clip_t'],c['cell_supervision'])!=('srm','none',4,3.0,'off'):
+        raise ValueError('learn_srm requires SRM, norm none, width4, clip_t3 and no cell supervision')
+    if c['model']=='xunet_wide_gapcov32' and (c['front_end'],c['norm'],c['width'],c['clip_t'])!=('srm','none',4,3.0):
+        raise ValueError('gapcov32 requires SRM, norm none, width4 and clip_t3')
+    if c['model']=='gbras' and (c['front_end']!='srm' or c['norm']!='batch' or c['clip_t']!=3.0):
+        raise ValueError('GBRAS arm requires front_end=srm, intrinsic norm=batch and clip_t=3')
     if bool(c['init_checkpoint']) != bool(c['init_checkpoint_sha256']):
         raise ValueError('init_checkpoint and required SHA-256 must be supplied together')
-    if c['embedding_schedule'] is not None:
-        if (c['data']!='otf' or not c['source_mix'] or c['paired_batches'] or
+    if c['embedding_schedule']=='low_bpp50_v1':
+        if (c['data']!='otf' or dict(c['source_mix'] or {})!={'raise':.4,'lsdir':.2,'alaska':.4} or
+                c['tiles_per_epoch']!=180000 or c['batch_size']%8 or not c['train_yaml'] or
+                c['epochs']!=50 or c['init_checkpoint'] or c['init_checkpoint_sha256'] or
+                'embedding_stage_epochs' in supplied or c['cell_supervision']!='off' or
+                c['model']!='xunet_wide' or c['front_end']!='srm' or c['width']!=4 or
+                c['norm']!='none' or c['clip_t']!=3. or c['train_tile_size']!=256 or
+                c['train_grid']!='overlap_last' or c['lr']!=3e-4 or c['warmup_epochs']!=1 or
+                c['lr_drops']!=((8,.3),(33,.1)) or c['evaluation_checkpoint']!='best' or
+                c['precision']!='32' or c['channels_last']):
+            raise ValueError('low_bpp50_v1 needs the 50-epoch scratch SRM-e50 recipe, no init/stage length, best selection, and either batch mode')
+        if not c['pilot'] and (c['checkpoint_validation']!='capped' or c['val_cap_raise']!=5000 or
+                               c['val_cap_lsdir']!=1500 or c['batch_size']!=128):
+            raise ValueError('low_bpp50_v1 needs SRM-e50 capped validation and batch128; only PC pilot overrides are allowed')
+    elif c['embedding_schedule'] is not None:
+        if (c['data']!='otf' or not c['source_mix'] or (c['paired_batches'] and c['embedding_schedule']!='original') or
                 c['batch_size']%8 or c['tiles_per_epoch']%4 or not c['train_yaml'] or
                 c['epochs']!=3*c['embedding_stage_epochs'] or not c['init_checkpoint']):
-            raise ValueError('embedding schedule needs OTF source mix, unpaired batch divisible by8, tiles divisible by4, train_yaml, weights start, and three complete stages')
+            raise ValueError('embedding schedule needs OTF source mix, batch divisible by8, tiles divisible by4, train_yaml, weights start, and three complete stages; paired mode needs original schedule')
     if c['cell_supervision']!='off':
         if (c['embedding_schedule']!='original' or c['train_tile_size']!=256 or c['train_grid']!='overlap_last' or
-                c['model']!='xunet_wide' or c['width']!=4 or c['front_end']!='srm' or c['norm']!='none' or
+                c['model'] not in {'xunet_wide','xunet_wide_gapcov32'} or c['width']!=4 or c['front_end']!='srm' or c['norm']!='none' or
                 c['checkpoint_validation']!='train_matched' or c['validation_recipe']!='60da4391043e8ce48ff2'):
             raise ValueError('cell supervision needs original schedule, SRM wide-w4 norm none, 256 overlap_last and validation 60da')
     elif 'cell_loss_weight' in supplied:
         raise ValueError('cell_loss_weight needs enabled cell supervision')
     # Opt-ins must not add keys to historical effective settings or run records.
     absent=[]
+    if c['val_batch_images'] is None:absent+=['val_batch_images']
+    elif c['data']!='otf':raise ValueError('val_batch_images requires OTF OrderedPairLoader evaluation')
     if c['cell_supervision']=='off':absent+=['cell_supervision','cell_loss_weight']
     if not c['pilot']:absent+=['pilot']
     if c['init_checkpoint'] is None:absent+=['init_checkpoint','init_checkpoint_sha256']
     if c['embedding_schedule'] is None:absent+=['embedding_schedule','embedding_stage_epochs']
+    elif c['embedding_schedule']=='low_bpp50_v1':absent+=['embedding_stage_epochs']
     if c['evaluation_checkpoint']=='best':absent+=['evaluation_checkpoint']
     for name in absent:c.pop(name);origins_all.pop(name)
     result = Settings(freeze(c),freeze(origins_all),profile.name,freeze(history))

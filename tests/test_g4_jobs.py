@@ -21,7 +21,7 @@ from scripts.g4.preflight import preflight, top_values, validate_notebook, valid
 from scripts.run_notebook import settings_file
 
 ROOT=Path(__file__).resolve().parents[1]
-BOOTSTRAP_SHA='89cc83e9c73cc43476f6daf5e77825ddc298a32a22a52af8ded0909f15b1f2af'
+BOOTSTRAP_SHA='f4aa9aa7567539d2ee035476965ecf26c192924156480cbe39c600e97c0172a1'
 
 
 def git(root,*args):
@@ -86,7 +86,7 @@ class RecipeTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'requires.*pc.*detected.*g4'):
                 automatic_profile()
 
-    def test_installed_bootstrap_source_is_unchanged_and_execs_checkout(self):
+    def test_installed_bootstrap_source_is_pinned_and_execs_checkout(self):
         source=(ROOT/'scripts/g4/job.sh').read_text()
         self.assertEqual(hashlib.sha256(source.encode()).hexdigest(),BOOTSTRAP_SHA)
         self.assertNotIn('V3_NOTEBOOK',source)
@@ -101,7 +101,8 @@ class SubmissionTests(unittest.TestCase):
         cls.temp=tempfile.TemporaryDirectory(prefix='cvdl-g4-tests-')
         parent=Path(cls.temp.name);cls.root=parent/'repo';cls.root.mkdir()
         paths=git(ROOT,'ls-files').splitlines()+[
-            'scripts/g4/preflight.py','notebooks/newdata-1.ipynb','notebooks/wide-1.ipynb',
+            'scripts/g4/launch_gate.py','scripts/g4/launch_probe.sh','scripts/g4/pi_launch_check.sh',
+            'scripts/g4/preflight.py','scripts/g4/tensor_limits.py','scripts/g4/resume.py','cvdl/checkpoint_io.py','cvdl/file_io.py','notebooks/newdata-1.ipynb','notebooks/wide-1.ipynb',
             'scripts/g4/jobs/archive/newdata-1.env','scripts/g4/jobs/archive/wide-1.env',
             'scripts/g4/jobs/archive/README.md']
         copied=[]
@@ -139,7 +140,15 @@ a=[str(root/x[6:]) if x.startswith('/work/') else x for x in a]
 a[0]=sys.executable
 raise SystemExit(subprocess.call(a,cwd=root))
 ''');wrapper.chmod(0o755)
-        cloud=tools/'gcloud';cloud.write_text('#!/bin/sh\necho UNEXPECTED_CLOUD_CALL >&2\nexit 99\n');cloud.chmod(0o755)
+        # Boot fixtures never query the host's system manager.
+        systemctl=tools/'systemctl'
+        systemctl.write_text('#!/bin/sh\ncase "$*" in *--property=LoadState*) echo masked;; *--property=ActiveState*) echo inactive;; *) exit 99;; esac\n')
+        systemctl.chmod(0o755)
+        ssh=tools/'ssh'
+        ssh.write_text('#!/bin/sh\nprintf "%s\\n" mount_source=1 filesystem_rw=1 upload_owner_write=1 srv_search=1 results_search=1\n');ssh.chmod(0o755)
+        cloud=tools/'gcloud'
+        cloud.write_text('#!/bin/sh\nif [ "$1 $2 $3" = "compute instances describe" ]; then echo \'{"scheduling":{"maxRunDuration":{"seconds":"18000"},"instanceTerminationAction":"STOP"}}\'; else echo UNEXPECTED_CLOUD_CALL >&2; exit 99; fi\n')
+        cloud.chmod(0o755)
         cls.marker=parent/'runner-called'
         cls.env={**os.environ,'PATH':str(tools)+os.pathsep+os.environ['PATH'],
                  'TEST_REPO':str(cls.root),'RUN_MARKER':str(cls.marker)}
@@ -202,12 +211,15 @@ raise SystemExit(subprocess.call(a,cwd=root))
 
     def test_pinned_commit_not_working_tree_is_preflight_source(self):
         path=self.root/'notebooks/newdata-1.ipynb';before=path.read_bytes()
-        path.write_text('bad JSON in working tree')
+        model=self.root/'cvdl/models.py';model_before=model.read_bytes()
+        path.write_text('bad JSON in working tree');model.write_text('invalid live Python source!')
         try:
             report=preflight('notebooks/newdata-1.ipynb',self.commit,root=self.root)
             self.assertTrue(report['run_name'].endswith('wide-w4_mixr2'))
             self.assertEqual(report['values']['quick'],False)
-        finally:path.write_bytes(before)
+            self.assertGreater(report['tensor_limits']['stages']['training']['tensor_outputs'],0)
+        finally:
+            path.write_bytes(before);model.write_bytes(model_before)
 
     def test_old_commit_metadata_incompatibility_fails_before_boot(self):
         source=(self.root/'cvdl/settings.py').read_text()

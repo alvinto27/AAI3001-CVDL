@@ -14,6 +14,7 @@ from cvdl.settings import machine_profile
 
 RUN='xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_r2-20261015T121753Z-29499'
 FOLDER=ROOT/'runs'/RUN/'checkpoints'/'xunet_v4_clip3_nonorm_lr0.0003_warm1_drops5x0.3-20x0.1_k1to4_e30_wide-w4_r2'
+BASELINE_FOLDER=ROOT/'runs'/'g4-prime-1'/'checkpoints'/'g4-prime-1'
 
 
 class LegacyMigrationTests(unittest.TestCase):
@@ -66,5 +67,48 @@ class LegacyMigrationTests(unittest.TestCase):
         frame,identity=D.resolve(s,FOLDER/'best-epoch23-val_pe0.0177-val_auc0.9957.ckpt',sha)
         self.assertEqual(identity['recipe_id'],'8328cc6b0673cade0312');self.assertEqual(identity['threshold_origin'],'post_hoc_256')
         self.assertEqual(len(frame),18000);self.assertEqual(before,{name:(FOLDER/name).read_bytes() for name in before})
+
+class BaselineMigrationTests(unittest.TestCase):
+    """g4-prime-1 (V3c): same data omissions; model values come from the pinned notebook."""
+    def setUp(self):
+        t=tempfile.TemporaryDirectory();self.addCleanup(t.cleanup)
+        self.run=Path(t.name)/'g4-prime-1';self.folder=self.run/'checkpoints'/'g4-prime-1';self.folder.mkdir(parents=True)
+        record=dict(settings=dict(sources=['raise','div2k'],source='decode',tile_size=512,run_seed=0,
+            train_photo_fraction=1.,paired_batches=False),eval_profile='overlap_full_mix',data='otf',quick=False)
+        (self.folder/'data_run_settings.json').write_text(json.dumps(record))
+        (self.folder/'model_run_settings.json').write_text(json.dumps(dict(compile_mode='default')))
+        (self.run/'executed.ipynb').write_text('{"fixture": "v3c notebook"}')
+        self.evidence={n:hashlib.sha256((self.run/n if n=='executed.ipynb' else self.folder/n).read_bytes()).hexdigest() for n in E.G4_PRIME_1_EVIDENCE}
+        self.profile=machine_profile('pc',root=ROOT,device='cpu',precision_limits=('32',))
+
+    def test_pinned_notebook_supplies_model_and_data_values(self):
+        before={p:p.read_bytes() for p in self.run.rglob('*') if p.is_file()}
+        with patch.object(E,'G4_PRIME_1_EVIDENCE',self.evidence),patch('cvdl.settings.automatic_profile',return_value=self.profile):
+            settings,context,_=E.settings_for_evaluation(self.folder,self.folder/'unused.ckpt')
+        v=settings.values
+        self.assertEqual((v['model'],v['norm'],v['clip_t'],v['front_end']),('xunet','group',3.0,'kv'))
+        self.assertEqual((v['epochs'],v['batch_size'],v['lr'],v['warmup_epochs'],v['grad_clip']),(10,32,1e-3,0,0.0))
+        self.assertEqual(settings.checkpoint_validation,'standard');self.assertIsNone(settings.source_mix)
+        self.assertEqual(context['legacy_settings_migration']['migration'],'g4-prime-1-v3c-v1')
+        self.assertEqual(context['legacy_settings_migration']['model_settings']['norm'],'group')
+        self.assertEqual(before,{p:p.read_bytes() for p in before})
+
+    def test_unpinned_compile_only_model_record_fails(self):
+        with self.assertRaisesRegex(ValueError,'no approved saved-record evidence'):E.legacy_data_record(self.folder)
+
+    def test_wide_evidence_does_not_match_baseline_files(self):
+        with patch.object(E,'WIDE_R2_EVIDENCE',self.evidence),patch.object(E,'G4_PRIME_1_EVIDENCE',self.evidence):
+            with self.assertRaisesRegex(ValueError,'no approved'):E.legacy_data_record(self.folder)
+
+    @unittest.skipUnless((BASELINE_FOLDER/'data_run_settings.json').is_file(),'historical artifact unavailable')
+    def test_actual_baseline_record_hydrates_and_maps_to_8328(self):
+        before={name:(BASELINE_FOLDER/name).read_bytes() for name in ('data_run_settings.json','model_run_settings.json')}
+        with patch('cvdl.settings.automatic_profile',return_value=self.profile):s=E.settings_for_run(BASELINE_FOLDER)
+        self.assertEqual((s.values['model'],s.values['norm'],s.values['clip_t']),('xunet','group',3.0))
+        sha='741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d'
+        frame,identity=D.resolve(s,BASELINE_FOLDER/'best-epoch08-val_pe0.0147-val_auc0.9973.ckpt',sha)
+        self.assertEqual(identity['recipe_id'],'8328cc6b0673cade0312');self.assertEqual(identity['threshold_origin'],'post_hoc_256')
+        self.assertEqual(len(frame),18000);self.assertEqual(before,{name:(BASELINE_FOLDER/name).read_bytes() for name in before})
+
 
 if __name__=='__main__':unittest.main()

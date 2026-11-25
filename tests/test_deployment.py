@@ -89,8 +89,42 @@ class CalibrationTests(unittest.TestCase):
             self.assertTrue(pd.read_csv(Path(t)/'reference.csv').empty)
 
     def test_mapping_is_pinned_and_exact_roster(self):
-        entries=C.mapping(ROOT);self.assertEqual(len(entries),10)
-        self.assertEqual(sum(e['recipe_id']=='60da4391043e8ce48ff2' for e in entries.values()),9)
+        entries=C.mapping(ROOT);self.assertEqual(len(entries),16)
+        self.assertEqual(sum(e['recipe_id']=='60da4391043e8ce48ff2' for e in entries.values()),14)
+        # Removing only the g4-prime-1 baseline must reproduce the old fifteen-entry mapping exactly.
+        raw=(ROOT/C.MAPPING).read_bytes()
+        old=json.loads(raw);appended=old['entries'].pop()
+        old_raw=(V.canonical(old)+'\n').encode()
+        self.assertEqual(V.digest(old_raw),'9d349b11361fc616e23543b6e01cde7db6beb84d213422d6074be451f35e9c11')
+        prefix=old_raw[:old_raw.index(b'],"version"')]
+        self.assertEqual(raw[:len(prefix)],prefix)
+        self.assertEqual(appended['checkpoint_sha256'],'741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d')
+        # The V3c baseline shares the wide-R2 RAISE/DIV2K list (same saved training photos).
+        wide=entries['9ba63252e8eecbf398f646f2d69641b70ad37c914ed8b7d6b4665dda54a961e1']
+        self.assertEqual(entries['741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d'],dict(wide,
+            run_name='g4-prime-1',checkpoint_file='best-epoch08-val_pe0.0147-val_auc0.9973.ckpt',
+            checkpoint_sha256='741c9db0871b74acf6da4ad2d43f2ab0326b8acc531259d268f9371821f0848d'))
+        baseline=entries['bf64848a49bdc6e20b7fcdba47cb8eee0ed247b909a928cc45e4a4102db9f076']
+        paired=entries['b00cd4b6d1f4c3648580691c9cf0e2a4bd83c55740a3cf2a7a561a8adf12f180']
+        self.assertEqual(paired,dict(baseline,run_name='srm-e50-paired-20261023T022339Z-4518',
+            checkpoint_file='best-epoch39-val_pe0.0444-val_auc0.9917.ckpt',
+            checkpoint_sha256='b00cd4b6d1f4c3648580691c9cf0e2a4bd83c55740a3cf2a7a561a8adf12f180'))
+        curriculum=entries['14c8e05c3d476912dd5540970060d3634b3a72b7d375ba5dad5ccafd50905c3a']
+        self.assertEqual(curriculum,dict(baseline,run_name='srm-e50-curriculum50-paired-20261023T090435Z-3325',
+            checkpoint_file='best-epoch39-val_pe0.0419-val_auc0.9922.ckpt',
+            checkpoint_sha256='14c8e05c3d476912dd5540970060d3634b3a72b7d375ba5dad5ccafd50905c3a'))
+        b36=entries['2f45fb4d20203d690a6a074ac3cbf8d45dae08a82713f0a504148b3ca450f0d5']
+        self.assertEqual(b36,dict(baseline,run_name='srm-e50-paired-coloursep36-20261024T115642Z-1325',
+            checkpoint_file='best-epoch48-val_pe0.0572-val_auc0.9860.ckpt',
+            checkpoint_sha256='2f45fb4d20203d690a6a074ac3cbf8d45dae08a82713f0a504148b3ca450f0d5'))
+        learned=entries['6201ad87013e5ddfffdec4a08e4d683d67cc7e0231c8314b30cbced6195d04e4']
+        self.assertEqual(learned,dict(baseline,run_name='srm-e50-paired-learn-srm-20261026T022114Z-0923',
+            checkpoint_file='best-epoch40-val_pe0.0538-val_auc0.9884.ckpt',
+            checkpoint_sha256='6201ad87013e5ddfffdec4a08e4d683d67cc7e0231c8314b30cbced6195d04e4'))
+        covariance=entries['4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf']
+        self.assertEqual(covariance,dict(baseline,run_name='srm-e50-paired-gapcov32-20261026T115421Z-1917',
+            checkpoint_file='best-epoch43-val_pe0.0329-val_auc0.9946.ckpt',
+            checkpoint_sha256='4ba2a4b59a535b53ab9c0235c54231476b45e2193982bf28f7b7f2171d9898cf'))
         with tempfile.TemporaryDirectory() as t:
             p=Path(t)/C.MAPPING;p.parent.mkdir();p.write_bytes((ROOT/C.MAPPING).read_bytes()+b' ')
             with self.assertRaisesRegex(ValueError,'mapping SHA'):C.mapping(t)

@@ -384,7 +384,9 @@ class TrainingImages(IterableDataset):
         dtype=getattr(torch,self.corpus.settings.tensor_dtype)
         if self.corpus.settings.paired_batches:
             clean,stego,index,entropy=item
-            return (image_tensor(clean,entropy,0,self.corpus.settings.augment,dtype),
+            # Anchor both partners to the historical stego augmentation key.
+            # The unpaired path (including all keyed RNG draws) stays unchanged.
+            return (image_tensor(clean,entropy,1,self.corpus.settings.augment,dtype),
                     image_tensor(stego,entropy,1,self.corpus.settings.augment,dtype),index)
         image,label,index,entropy=item
         return image_tensor(image,entropy,label,self.corpus.settings.augment,dtype),label,index

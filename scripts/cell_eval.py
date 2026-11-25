@@ -33,7 +33,8 @@ def score(network,root,rows,*,device,workers,batch_pairs):
     kwargs=dict(batch_size=batch_pairs,num_workers=workers,pin_memory=device=='cuda',worker_init_fn=initialize_worker)
     if workers:kwargs.update(multiprocessing_context='spawn',prefetch_factor=1)
     loader=DataLoader(dataset,**kwargs)
-    collected={k:[] for k in ('counts','valid_negative','cam')}
+    primary='class_score' if hasattr(network,'class_score_cells') else 'cam'
+    collected={k:[] for k in ('counts','valid_negative',primary)}
     if hasattr(network,'cell_head'):collected['aux']=[]
     for images,counts,valid,indices in loader:
         if indices.tolist()!=list(range(sum(len(v) for v in collected['counts']),sum(len(v) for v in collected['counts'])+len(images))):
@@ -41,14 +42,14 @@ def score(network,root,rows,*,device,workers,batch_pairs):
         batch=len(images)
         images=images.reshape(-1,256,256,3).permute(0,3,1,2).to(device=device,dtype=torch.float32)
         cam,aux,_=cell_maps(network,images)
-        collected['cam'].append(cam.cpu().numpy().reshape(batch,2,8,8))
+        collected[primary].append(cam.cpu().numpy().reshape(batch,2,8,8))
         if aux is not None:collected['aux'].append(aux.cpu().numpy().reshape(batch,2,8,8))
         collected['counts'].append(counts.numpy());collected['valid_negative'].append(valid.numpy())
     return {k:np.concatenate(v) for k,v in collected.items()},dataset.corpus
 
 
 def report(val_rows,test_rows,val,test,*,replicates=REPLICATES):
-    maps=[k for k in ('cam','aux') if k in val]
+    maps=[k for k in ('cam','class_score','aux') if k in val]
     result={'primary_localization':'mean_per_eligible_stego_tile_auc; contiguous only',
         'secondary_localization':'pooled eligible-stego-cell AUC',
         'bootstrap':dict(unit='source_photo',replicates=replicates,seed=SEED,interval='percentile95; shared draws for maps'),
@@ -76,7 +77,8 @@ def report(val_rows,test_rows,val,test,*,replicates=REPLICATES):
                 take=np.array([(panel=='pooled' or r['diagnostic_panel']==panel) and r['placement']==placement for r in rows])
                 scores=np.stack([arrays[name][take,1].reshape(-1,64) for name in maps],axis=1)
                 item=localization(arrays['counts'][take],arrays['valid_negative'][take],scores,
-                    [r['source_photo'] for r,t in zip(rows,take) if t],replicates=replicates)
+                    [r['source_photo'] for r,t in zip(rows,take) if t],replicates=replicates,
+                    difference_name='aux_minus_class_score' if 'class_score' in maps else 'aux_minus_cam')
                 item['maps']={name:entry for name,entry in zip(maps,item['maps'])}
                 result['localization'].append(dict(split=split,panel=panel,placement=placement,**item))
     from collections import Counter
@@ -87,6 +89,21 @@ def report(val_rows,test_rows,val,test,*,replicates=REPLICATES):
         test_fa=next(r for r in result['maps']['aux']['test'] if r['panel']=='pooled' and r['placement']=='all')['FA']
         result['auxiliary_target_mark']=bool(primary and primary['point']>=.75 and primary['low']>.5 and test_fa<=.07)
     return result
+
+
+def describe_map(summary,network):
+    if getattr(network,'cell_map_kind',None)=='attribution':
+        from scripts.training_decision import COV_ATTRIBUTION
+        summary.update(context_only=not hasattr(network,'cell_head'),main_rule_affected=False,map_kind='attribution',
+            map_storage_key='class_score',map_label=network.cell_map_label,map_definition=COV_ATTRIBUTION)
+        if hasattr(network,'cell_head'):summary.pop('auxiliary_target_mark',None)
+        summary.setdefault('map_metadata',{})['class_score']=dict(kind='signed_attribution',context_only=True,
+            receptive_field=256,stride=32,global_context=True,label=network.cell_map_label)
+    elif hasattr(network,'class_score_cells'):
+        summary['map_definition']='class_score: post-ELU/BN two-class margin, native stride16 averaged to32; not a CAM'
+    if hasattr(network,'cell_head'):
+        summary.setdefault('map_metadata',{})['aux']=dict(kind='trained_head_logit',context_only=False,
+            receptive_field=48,stride=32,global_context=False,label='Trained changed-cell logit; not a pixel probability')
 
 
 def main():
@@ -118,8 +135,13 @@ def main():
     from cvdl.pilot import refuse_run
     refuse_run(args.checkpoint.parent)
     if args.output.exists() and any(args.output.iterdir()):raise ValueError('use an empty output folder')
-    args.output.mkdir(parents=True,exist_ok=True)
     start=time.perf_counter();torch.set_num_threads(1)
+    from cvdl.cell_artifacts import checkpoint_identity,bind_scores
+    identity=checkpoint_identity(args.checkpoint)
+    if identity['model']=='xunet_wide_gapcov32' and identity['cell_supervision']=='changed_cells_v1':
+        from cvdl.gapcov_provenance import validate_sources,CELL_AUX
+        if identity['source_provenance']!=validate_sources(ROOT,CELL_AUX):raise ValueError('cell checkpoint source mismatch')
+    args.output.mkdir(parents=True,exist_ok=True)
     checkpoint=torch.load(args.checkpoint,map_location='cpu',weights_only=False)
     network=model_from_hparams(checkpoint.get('hyper_parameters',{})).eval()
     network.load_state_dict({k.removeprefix('net.'):v for k,v in checkpoint['state_dict'].items()},strict=True)
@@ -131,6 +153,7 @@ def main():
     val,_=score(network,ROOT,val_rows,device=args.device,workers=args.workers,batch_pairs=args.batch_pairs)
     test,corpus=score(network,ROOT,test_rows,device=args.device,workers=args.workers,batch_pairs=args.batch_pairs)
     summary=report(val_rows,test_rows,val,test,replicates=args.replicates)
+    describe_map(summary,network)
     for split,rows,arrays in (('val',val_rows,val),('test',test_rows,test)):
         pd.DataFrame(rows).to_csv(args.output/f'{split}-pairs.csv',index=False)
         np.savez_compressed(args.output/f'{split}-scores.npz',**arrays)
@@ -145,6 +168,7 @@ def main():
             control_cam=control,control_limits=limits)
     summary['seconds']=time.perf_counter()-start
     (args.output/'summary.json').write_text(json.dumps(summary,indent=2,allow_nan=False)+'\n')
+    bind_scores(args.output,identity,manifest)
     stop.set();watcher.join()
     print(json.dumps(dict(seconds=summary['seconds'],validation_pairs=len(val_rows),test_pairs=len(test_rows),maps=list(summary['maps'])),indent=2))
 

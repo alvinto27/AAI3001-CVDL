@@ -5,7 +5,8 @@
 The Spot VM `rtx6000pro` is in `us-central1-c`. It has one RTX PRO 6000.
 Its external IP changes at boot. The machine costs about $1.63 per hour when
 running. **Do not start it just to test these scripts.** Its GCE maximum run
-duration is 120 minutes from boot, with action **Stop**. Maintenance mode does
+duration is ~~120 minutes~~ 18000 s (300 minutes, since 2026-10-22) from boot,
+with action **Stop**. Change it only while the VM is TERMINATED. Maintenance mode does
 not bypass that limit.
 
 The boot service is enabled only after setup. It reads **instance** metadata
@@ -73,6 +74,8 @@ to `job_run.sh`, `run_notebook.py`, notebooks or profiles: push the job commit
 instead. `setup.sh base` installs it only when setting up a new VM. A future
 change to `job.sh` itself needs a maintenance install; that is not part of this
 workflow.
+
+**Automatic-update gate (`499296a`, 2026-10-26):** in run and resume modes, after the owned attempt start is recorded and before package work or training, `job_run.sh` requires the five units from `setup.sh freeze-updates` (`apt-daily.timer`, `apt-daily-upgrade.timer`, `apt-daily.service`, `apt-daily-upgrade.service`, `unattended-upgrades.service`) to be masked and inactive. A failed query, a blank or unknown state, or an unmasked or active unit refuses the attempt (exit 2): the console and the attempt-end reason name each unit, then normal delivery and shutdown follow. The gate is read-only (no repair, no stop of a package transaction). Maintenance and off modes are unchanged. Cause: run 20 was stopped by `apt-daily-upgrade` on 2026-10-26 ([journal](../journal/2026-10-26/README.md)); `freeze-updates` was applied to the VM that day (`17b5aac`).
 
 ## First boot (person, maintenance mode)
 
@@ -385,10 +388,21 @@ A recorded ID never runs twice. Use a new ID for a new attempt.
 2. Commit/push the intended notebook and code; fetch `origin/yx` on the PC.
    On that commit, full tests (`scripts/test_cpu.py`) must pass ([test levels](test-levels.md)).
    ~~and the golden compare~~ (golden retired 2026-10-21).
+   **Tensor-size check (`2054c99`, 2026-10-26):** full preflight runs the production model with fake (meta-backed) CPU tensors: training forward + backward and checkpoint-validation forward, capped or not. It reports the largest op outputs per stage and **refuses** any tensor over 2,147,483,647 elements (exactly that passes); an op without fake support also refuses, by name. No GPU, real allocation or compilation. It checks logical tensor sizes only, not VRAM, backend workspaces, kernel compatibility or speed. R1's uncapped notebook now refuses (SRM conv `[128,90,512,512]` = 3,019,898,880); cap 64 passes. `--resume-identity-only` stays an identity check.
+   **Launch gate (`42cdfe8`, 2026-10-26):** run and resume (also `--dry-run` and the watchdog's pending resume) make read-only Pi and GCE checks before any metadata write or start. Pi (`scripts/g4/pi_launch_check.sh`, the same unprivileged script over the admin SSH from the PC, or locally for the watchdog): `/srv` mounted from `/dev/sda1` with read-write filesystem (superblock) options; the upload user (`cvdl-inbox`) owns `/srv/cvdl-results` with owner write, and can search `/srv` and the folder by mode bits. This is a metadata check, not a write probe or an ACL audit. GCE: `maxRunDuration` 18000 s and termination action STOP. Each check prints PASS/FAIL on stderr; a failure, timeout or malformed answer refuses. No keys, IAM, upload restrictions or service hardening changed. Live read-only check by the Orchestrator 2026-10-26 (as `rpi400` and as `cvdl-watchdog`): all five Pi checks pass.
 3. Run the exact notebook + SHA command with `--dry-run`. Review effective
    settings, RUN_NAME, job ID, timeout and the two-line metadata env.
 4. Only after explicit user approval, repeat without `--dry-run`.
-5. Check delivered `status.json`, `executed.ipynb`, `run_settings.json`,
+5. **Post-flight (`e46fc91`, 2026-10-26):** on the PC host,
+   `bash scripts/g4/postflight_probe.sh "$JOB" > frame` and then
+   `podman exec -i -w /work aai3001 python -B scripts/g4/postflight.py "$JOB" --remote-stdin < frame`.
+   Read-only, one table; exit non-zero on any FAIL or unavailable check. It checks: every file in the checkpoint
+   tree Pi = PC (SHA-256) and readable (octal modes); `status.json` and `attempts.jsonl` identical on both sides;
+   delivered status done / exit 0; contiguous attempts ending done / exit 0 (interrupted predecessors allowed);
+   the current VM job-id and job-mode (default `run`, `--expected-job-mode`); a fresh watchdog phase / armed / job
+   (default UNARMED / false). The runner record is VM-only: an INFO row, not read. Do not restore metadata only to
+   make it pass. First live use (run 20): 30 PASS, 1 FAIL (job-mode was `resume` after the resume), 1 INFO.
+   Also check delivered `status.json`, `executed.ipynb`, `run_settings.json`,
    `boot.log` checkout-script evidence and final VM stop. The write-only inbox
    key cannot inspect results; use the Pi admin account.
 

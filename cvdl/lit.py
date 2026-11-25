@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from torch.nn import functional as F
 import lightning as L
+from lightning_utilities.core.apply_func import apply_to_collection
 from .models import XuNet, XuNetWide, model_from_hparams
 from .metrics import probability_error, auc_numpy
 
@@ -22,26 +23,59 @@ def v4_lr_factor(step: int, steps_per_epoch: int, max_epochs: int, warmup_epochs
 class SteganalysisModule(L.LightningModule):
     """Lightning wrapper for paired or unpaired image batches."""
 
-    def __init__(self, lr: float = 3e-4, max_epochs: int = 20, weight_decay: float = 1e-4, paired_batches: bool = False, clip_t=3.0, norm="none", steps_per_epoch: int = 1, warmup_epochs: int = 1, grad_clip: float = 1.0, lr_drops=None, batch_size: int = 32, precision: str = "32", model: str = "xunet", width: int = 4, front_end: str = "kv", *, validation_data=None, conv1_factory=None, cell_supervision='off', cell_loss_weight=0.2):
+    def __init__(self, lr: float = 3e-4, max_epochs: int = 20, weight_decay: float = 1e-4, paired_batches: bool = False, clip_t=3.0, norm="none", steps_per_epoch: int = 1, warmup_epochs: int = 1, grad_clip: float = 1.0, lr_drops=None, batch_size: int = 32, precision: str = "32", model: str = "xunet", width: int = 4, front_end: str = "kv", *, validation_data=None, conv1_factory=None, cell_supervision='off', cell_loss_weight=0.2, channels_last: bool = False, val_batch_images: int | None = None):
         super().__init__()
         if lr_drops is None:
             lr_drops = ((max_epochs // 2 + 1, 0.1),)
         # front_end is saved only when it is not the default, so KV checkpoints keep their old hyper_parameters.
         if cell_supervision not in ('off','changed_cells_v1') or not np.isfinite(cell_loss_weight) or cell_loss_weight <= 0:
             raise ValueError('invalid cell supervision/loss weight')
-        if cell_supervision!='off' and paired_batches:
-            raise ValueError('cell training requires unpaired batches')
-        self.save_hyperparameters(ignore=["validation_data", "conv1_factory", *(["front_end"] if front_end == "kv" else []),
-            *(['cell_supervision','cell_loss_weight'] if cell_supervision=='off' else [])])
+        if val_batch_images is not None and (type(val_batch_images) is not int or val_batch_images<2 or val_batch_images%2):
+            raise ValueError('val_batch_images must be a positive even image count')
+        self.save_hyperparameters(ignore=["validation_data", "conv1_factory", *(['val_batch_images'] if val_batch_images is None else []), *(["front_end"] if front_end == "kv" else []),
+            *(['cell_supervision','cell_loss_weight'] if cell_supervision=='off' else []),
+            *(['channels_last'] if not channels_last else [])])
+        if val_batch_images is not None:
+            self.hparams['effective_val_batch_images']=min(batch_size,val_batch_images)
         self.validation_data = validation_data
+        head_identity={}
+        if model=='xunet_wide_gapcov32':
+            from .cov_pool import SPEC
+            head_identity=dict(cov_pool_identity=dict(SPEC))
+            self.hparams.update(head_identity)
         self.net = model_from_hparams(dict(model=model, clip_t=clip_t, norm=norm, width=width, front_end=front_end,
-            **(dict(cell_supervision=cell_supervision) if cell_supervision!='off' else {})))
+            **(dict(cell_supervision=cell_supervision) if cell_supervision!='off' else {}),**head_identity))
         if conv1_factory is not None:
             self.net.conv1 = conv1_factory(self.net.conv1)
+        self.channels_last = channels_last
+        if channels_last:
+            self.net.to(memory_format=torch.channels_last)
         self.validation_scores = []
         self.validation_labels = []
         self.validation_sources = []
         self.validation_losses = []
+
+    def on_load_checkpoint(self, checkpoint):
+        if self.hparams.get('model')=='xunet_wide_gapcov32':
+            from .cov_pool import SPEC
+            saved=checkpoint.get('hyper_parameters',{})
+            if saved.get('cov_pool_identity')!=SPEC:
+                raise ValueError('gapcov32 checkpoint head identity mismatch')
+            if saved.get('cell_supervision','off')!=self.hparams.get('cell_supervision','off'):
+                raise ValueError('gapcov32 checkpoint cell supervision mismatch')
+            if self.hparams.get('cell_supervision','off')!='off':
+                if saved.get('cell_loss_weight')!=self.hparams.cell_loss_weight:
+                    raise ValueError('gapcov32 checkpoint cell loss mismatch')
+                for key in ('initialization_checkpoint_sha256','initial_weights_sha256','initial_cell_head_sha256','source_provenance'):
+                    if key in self.hparams and saved.get(key)!=self.hparams[key]:
+                        raise ValueError('gapcov32 checkpoint initialization mismatch: '+key)
+
+    def transfer_batch_to_device(self, batch, device, dataloader_idx):
+        batch = super().transfer_batch_to_device(batch, device, dataloader_idx)
+        if self.channels_last:
+            batch = apply_to_collection(batch, torch.Tensor,
+                lambda x: x.contiguous(memory_format=torch.channels_last) if x.ndim == 4 else x)
+        return batch
 
     def pair_logits_targets(self, batch):
         clean, stego, _ = batch
@@ -61,16 +95,23 @@ class SteganalysisModule(L.LightningModule):
     def training_step(self, batch, batch_idx):
         if self.hparams.get('cell_supervision','off')!='off':
             from .cell_training import cell_loss
-            images,targets,tags=batch
+            if self.hparams.paired_batches:
+                clean,stego,tags=batch
+                images=torch.cat((clean,stego),dim=0)
+                targets=torch.cat((torch.zeros(len(clean),dtype=torch.long,device=clean.device),
+                                   torch.ones(len(stego),dtype=torch.long,device=stego.device)))
+                tags=torch.cat((tags[:,0],tags[:,1]),dim=0)
+            else:
+                images,targets,tags=batch
             logits,aux=self.net(images.float(),return_aux=True)
-            tile_ce=F.cross_entropy(logits,targets)
-            auxiliary,stats=cell_loss(aux,tags)
+            tile_ce=F.cross_entropy(logits.float(),targets)
+            auxiliary,stats=cell_loss(aux.float(),tags)
             loss=tile_ce+self.hparams.cell_loss_weight*auxiliary
             for name,value in dict(tile_ce=tile_ce,cell_loss=auxiliary,**stats).items():
                 self.log('train_'+name,value,on_step=False,on_epoch=True,batch_size=targets.numel())
         else:
             logits, targets = self.training_logits_targets(batch)
-            loss = F.cross_entropy(logits, targets)
+            loss = F.cross_entropy(logits.float(), targets)
         accuracy = (logits.argmax(dim=1) == targets).float().mean()
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=targets.numel())
         self.log("train_acc", accuracy, on_step=False, on_epoch=True, prog_bar=True, batch_size=targets.numel())
@@ -84,6 +125,7 @@ class SteganalysisModule(L.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         logits, targets = self.pair_logits_targets(batch)
+        logits = logits.float()
         loss = F.cross_entropy(logits, targets)
         accuracy = (logits.argmax(dim=1) == targets).float().mean()
         self.validation_scores.append(logits.softmax(dim=1)[:, 1].detach().cpu())

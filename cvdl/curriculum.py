@@ -1,8 +1,9 @@
-"""Opt-in weight-only starts and fixed low-bpp curriculum (approved C1-C6).
+"""Opt-in weight-only starts and versioned embedding curricula.
 
-Training uses the original photo schedule, OTF seeds, augmentation and shuffle.
-Only the embedding config changes. Exactly one quarter of scheduled tile draws
-uses the original config, before worker sharding/shuffling (not a batch quota).
+Use the original photo schedule, OTF seeds, augmentation and shuffle. The legacy
+low_bpp policy retains an exact quarter of original-config draws. low_bpp50_v1
+starts with seven normal epochs, then retains an exact half. Assignment precedes
+worker sharding/shuffling; neither policy imposes a per-batch quota.
 """
 from dataclasses import replace
 import hashlib
@@ -16,8 +17,32 @@ from lsb_torch import TrainingImages
 
 STAGES = ((.35,1),(.25,2),(.15,3))
 
+# Separate versioned policy: zero-based start/end, bpp maximum, k1 weight,
+# original fraction. Never extend/reinterpret the legacy three-stage table.
+SCRATCH50 = 'low_bpp50_v1'
+SCRATCH50_STAGES = ((0,7,.5,1,1.), (7,20,.35,1,.5),
+                    (20,32,.25,2,.5), (32,50,.15,3,.5))
+
+
+def scratch50_record(count):
+    table=[dict(start=start,end=end,bpp_min=.05,bpp_max=maximum,
+                k1_weight=weight,original_fraction=fraction,
+                original_draws=int(count*fraction),staged_draws=count-int(count*fraction))
+           for start,end,maximum,weight,fraction in SCRATCH50_STAGES]
+    canonical=json.dumps(dict(mode=SCRATCH50,stages=SCRATCH50_STAGES),sort_keys=True,separators=(',',':'))
+    return dict(mode=SCRATCH50,version=1,epoch_index='zero-based',stages=table,
+                table_sha256=hashlib.sha256(canonical.encode()).hexdigest(),
+                assignment='exact per epoch before worker sharding; counts reflect consumed stegos')
+
 
 def stage_for_epoch(epoch, stage_epochs=5, mode='low_bpp'):
+    if mode==SCRATCH50:
+        if type(epoch) is not int or not 0<=epoch<50:
+            raise ValueError('epoch outside low_bpp50_v1 (0..49)')
+        for i,(start,end,maximum,weight,fraction) in enumerate(SCRATCH50_STAGES):
+            if start<=epoch<end:
+                return dict(stage=i+1,bpp_min=.05,bpp_max=maximum,k1_weight=weight,
+                            original_fraction=fraction)
     if type(epoch) is not int or not 0<=epoch<3*stage_epochs:
         raise ValueError('epoch outside the three-stage schedule')
     stage=epoch//stage_epochs
@@ -28,6 +53,14 @@ def stage_for_epoch(epoch, stage_epochs=5, mode='low_bpp'):
 
 
 def original_positions(count, seed, epoch, mode):
+    if mode==SCRATCH50:
+        stage=stage_for_epoch(epoch,mode=mode)
+        if count%2:raise ValueError('exact half needs tiles_per_epoch divisible by two')
+        if stage['original_fraction']==1.:return np.ones(count,dtype=bool)
+        flags=np.zeros(count,dtype=bool)
+        rng=np.random.default_rng(np.random.SeedSequence([seed,epoch,0x43353031]))
+        flags[rng.permutation(count)[:count//2]]=True
+        return flags
     if count%4:raise ValueError('exact quarter needs tiles_per_epoch divisible by four')
     if mode=='original':return np.ones(count,dtype=bool)
     if mode!='low_bpp':raise ValueError('unknown embedding schedule')
@@ -40,10 +73,14 @@ def original_positions(count, seed, epoch, mode):
 class CurriculumImages(TrainingImages):
     def __init__(self,corpus,mode,stage_epochs,*,cell_supervision='off'):
         super().__init__(corpus)
+        if mode==SCRATCH50 and stage_epochs is not None:
+            raise ValueError('low_bpp50_v1 has fixed boundaries, not a legacy stage length')
         if cell_supervision not in ('off','changed_cells_v1'):
             raise ValueError('unknown cell supervision')
-        if cell_supervision != 'off' and (mode != 'original' or corpus.train_tile != 256 or corpus.settings.paired_batches or corpus.settings.source_mix is None):
-            raise ValueError('cell targets need original schedule, 256 mixed-source unpaired training')
+        if corpus.settings.paired_batches and mode not in ('original',SCRATCH50):
+            raise ValueError('paired training requires the original schedule or low_bpp50_v1')
+        if cell_supervision != 'off' and (mode != 'original' or corpus.train_tile != 256 or corpus.settings.source_mix is None):
+            raise ValueError('cell targets need original schedule, 256 mixed-source training')
         self.cell_supervision=cell_supervision
         from lsb_batch import read_config
         if corpus.config.as_dict()!=read_config(corpus.root/'configs/train-k1to4.yaml').as_dict():
@@ -80,7 +117,13 @@ class CurriculumImages(TrainingImages):
                 # Metadata is carried through shuffle/packing to the callback;
                 # only actually consumed stegos enter the epoch counts.
                 tag=(pair_id*2,int(original))
-                if self.cell_supervision!='off':
+                if settings.paired_batches:
+                    clean_tag,stego_tag=tag,(tag[0]+1,tag[1])
+                    if self.cell_supervision!='off':
+                        clean_tag=clean_tag+(np.zeros((8,8),dtype=np.uint16),np.ones((8,8),dtype=bool))
+                        stego_tag=stego_tag+tuple(result[2])
+                    yield clean,stego,(clean_tag,stego_tag),meta['embedding_seed_key']
+                elif self.cell_supervision!='off':
                     yield clean,0,tag+(np.zeros((8,8),dtype=np.uint16),np.ones((8,8),dtype=bool)),meta['embedding_seed_key']
                     yield stego,1,(tag[0]+1,tag[1],*result[2]),meta['embedding_seed_key']
                 else:
@@ -89,6 +132,19 @@ class CurriculumImages(TrainingImages):
             del photo
 
     def _output(self,item):
+        if self.corpus.settings.paired_batches:
+            from lsb_torch import image_tensor
+            clean,stego,tags,entropy=item
+            dtype=getattr(torch,self.corpus.settings.tensor_dtype)
+            if self.cell_supervision!='off':
+                images=[];packed=[]
+                for image,tag in zip((clean,stego),tags):
+                    image,cells=image_tensor(image,entropy,1,self.corpus.settings.augment,dtype,cell_targets=tag[2:])
+                    images.append(image)
+                    packed.append(torch.cat((torch.tensor(tag[:2],dtype=torch.long),*(a.flatten() for a in cells))))
+                return *images,torch.stack(packed)
+            return (image_tensor(clean,entropy,1,self.corpus.settings.augment,dtype),
+                    image_tensor(stego,entropy,1,self.corpus.settings.augment,dtype),torch.tensor(tags,dtype=torch.long))
         if self.cell_supervision!='off':
             from lsb_torch import image_tensor
             image,label,tag,entropy=item
@@ -119,9 +175,15 @@ class CurriculumCounts(L.Callback):
 
     def on_train_batch_end(self,trainer,module,outputs,batch,batch_idx):
         _,labels,tags=batch
-        stego=labels==1
-        self.original+=int(((tags[:,1]==1)&stego).sum())
-        self.staged+=int(((tags[:,1]==0)&stego).sum())
+        if getattr(module,'hparams',{}).get('paired_batches',False):
+            # One stego tag per pair; batch[1] contains pixels, not labels.
+            flags=tags[:,1,1]
+            self.original+=int((flags==1).sum())
+            self.staged+=int((flags==0).sum())
+        else:
+            stego=labels==1
+            self.original+=int(((tags[:,1]==1)&stego).sum())
+            self.staged+=int(((tags[:,1]==0)&stego).sum())
 
     def on_train_epoch_end(self,trainer,module):
         self._write(int(trainer.current_epoch))
@@ -149,6 +211,20 @@ def weights_only(module,path,expected_sha):
     for key,default in defaults.items():
         if h.get(key,default)!=current.get(key,default):
             raise ValueError('initial checkpoint architecture setting mismatch: '+key)
+    covariance_cells=current.get('model')=='xunet_wide_gapcov32' and current.get('cell_supervision','off')=='changed_cells_v1'
+    if covariance_cells:
+        from .cov_pool import SPEC
+        from .models import SRM_ARRAY
+        bank=torch.from_numpy(SRM_ARRAY).unsqueeze(1).repeat(3,1,1,1)
+        if (h.get('cov_pool_identity')!=SPEC or current.get('cov_pool_identity')!=SPEC or
+                h.get('cell_supervision','off')!='off'):
+            raise ValueError('initial checkpoint covariance identity mismatch')
+        expected_keys={'net.'+key for key in module.net.state_dict() if not key.startswith('cell_head.')}
+        if set(saved['state_dict'])!=expected_keys:
+            raise ValueError('initial checkpoint state architecture mismatch')
+        if (not torch.equal(saved['state_dict'].get('net.kv.conv.weight',torch.empty(0)),bank) or
+                module.net.kv.conv.weight.requires_grad):
+            raise ValueError('initial checkpoint SRM must remain frozen')
     state={key.removeprefix('net.'):value for key,value in saved['state_dict'].items()}
     target=module.net.state_dict()
     head_keys={'cell_head.weight','cell_head.bias'} if current.get('cell_supervision','off')=='changed_cells_v1' else set()
@@ -158,8 +234,20 @@ def weights_only(module,path,expected_sha):
     # Only this explicitly declared new head stays initialized. All other keys
     # have been checked; the final copy remains strict (also for feature off).
     module.net.load_state_dict({**state,**{k:target[k] for k in head_keys}},strict=True)
-    return dict(checkpoint=str(path),checkpoint_sha256=actual,weights_only=True,
+    record=dict(checkpoint=str(path),checkpoint_sha256=actual,weights_only=True,
                 optimizer_restored=False,scheduler_restored=False,source_epoch=int(saved.get('epoch',-1)))
+    if covariance_cells:
+        record.update(initial_weights_sha256=state_sha256(state),
+            initial_cell_head_sha256=state_sha256({k:target[k] for k in sorted(head_keys)}))
+    return record
+
+
+def state_sha256(state):
+    """Tensor identity in state-dict order, matching the historical base digest."""
+    digest=hashlib.sha256()
+    for name,tensor in state.items():
+        digest.update(name.encode());digest.update(tensor.detach().cpu().contiguous().numpy().tobytes())
+    return digest.hexdigest()
 
 
 def start_identity(settings):
@@ -169,7 +257,9 @@ def start_identity(settings):
     identity={k:plain(v) for k,v in settings.values.items() if not SCHEMA[k].machine}
     if settings.train_yaml:
         identity['train_yaml_sha256']=hashlib.sha256(Path(settings.train_yaml).read_bytes()).hexdigest()
-    if getattr(settings,'embedding_schedule',None) is not None:
+    if getattr(settings,'embedding_schedule',None)==SCRATCH50:
+        identity['embedding_schedule_identity']=scratch50_record(settings.tiles_per_epoch)
+    elif getattr(settings,'embedding_schedule',None) is not None:
         identity['stage_table']=[list(s) for s in STAGES]
     return identity
 
@@ -183,7 +273,21 @@ def check_start(settings,folder):
         if prior['settings']!=identity:raise ValueError('start/resume settings or initialization fingerprint changed')
         if not resume:raise ValueError('existing initialized run has no last.ckpt; use a new run')
     elif resume:raise ValueError('resume checkpoint has no initialization identity record')
+    if resume and getattr(settings,'embedding_schedule',None)==SCRATCH50:
+        saved=torch.load(Path(folder)/'last.ckpt',map_location='cpu',weights_only=False)
+        if saved.get('hyper_parameters',{}).get('embedding_schedule_identity')!=identity['embedding_schedule_identity']:
+            raise ValueError('resume checkpoint schedule identity mismatch')
     return resume
+
+
+def initialize_scratch50(settings,folder,resume):
+    """Record a random start without invoking checkpoint/weights-only loading."""
+    path=Path(folder)/'training_start.json'
+    if resume:return json.loads(path.read_text())
+    record=dict(initialization='random',weights_only=False,optimizer_restored=False,
+                scheduler_restored=False,settings=start_identity(settings))
+    path.write_text(json.dumps(record,indent=2)+'\n')
+    return record
 
 
 def initialize(settings,module,folder,resume):
@@ -194,6 +298,9 @@ def initialize(settings,module,folder,resume):
     checkpoint=Path(settings.init_checkpoint)
     if not checkpoint.is_absolute():checkpoint=Path(settings.root)/checkpoint
     record=weights_only(module,checkpoint,settings.init_checkpoint_sha256)
+    if settings.model=='xunet_wide_gapcov32' and getattr(settings,'cell_supervision','off')!='off':
+        from .gapcov_provenance import validate_sources,CELL_AUX
+        record['source_provenance']=validate_sources(settings.root,CELL_AUX)
     record['settings']=start_identity(settings)
     path.write_text(json.dumps(record,indent=2)+'\n')
     print('WEIGHTS INIT '+json.dumps({k:v for k,v in record.items() if k!='settings'}),flush=True)

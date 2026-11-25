@@ -78,7 +78,9 @@ class DataParityTests(unittest.TestCase):
                         method='replace', placement='random', payload_kind='random_bytes', bpp_actual=.1))
             labels = pd.DataFrame(rows)
             labels.to_csv(root / 'labels.csv', index=False)
-            for paired in (False, True):
+            # Augmented legacy PNG pairing is now deliberately refused (covered
+            # in test_paired_training); retain the historical unpaired parity.
+            for paired in (False,):
                 with self.subTest(paired=paired):
                     ns = notebook_namespace(root, V3_DATA='png', LABELS_PATH=root / 'labels.csv',
                         SPLIT_PATH=root / 'old-split.csv', PAIRED_BATCHES=paired, QUICK=True)

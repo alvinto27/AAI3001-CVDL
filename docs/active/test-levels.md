@@ -18,12 +18,14 @@ On 2026-10-20 the full CPU suite took 8.2 min (424 tests) and the golden compare
 
 ```sh
 podman exec -w /work aai3001 python -B scripts/required_test_level.py           # which checks this change needs
-podman exec -w /work aai3001 python -B scripts/test_cpu.py --level fast         # about 2.7 min
-podman exec -w /work aai3001 python -B scripts/test_cpu.py                      # full (default), about 8.3 min
+podman exec -w /work aai3001 python -B scripts/test_cpu.py --level fast         # ~~about 2.7 min~~ about 4.7 min (2026-10-26)
+podman exec -w /work aai3001 python -B scripts/test_cpu.py                      # full (default), ~~about 8.3 min~~ about 16 min (2026-10-26)
 ```
 
 - `test_cpu.py` sets the CPU-only environment (no GPU, 1 thread) itself. The fast level skips the whole `test_lsb_torch` module with the visible reason `full level only: ...`. The full level runs every test.
-- A plain `python -B -m unittest discover -s tests` is unchanged and runs every test.
+- Use the shared runner for all suites. Do not bypass it with raw unittest. Focused example: `podman exec -w /work aai3001 python -B scripts/test_cpu.py --tests tests.test_cpu_levels tests.test_suite_lock`.
+- The runner takes one kernel file lock at container `/tmp/cvdl-cpu-test-suite.lock` before discovery or focused imports. Other checkouts use the same lock. It prints the owner PID, checkout and selection on contention. Default wait: 120 s; use `--lock-timeout SECONDS` to change it or `--no-wait` to refuse at once. Exit/crash releases the kernel lock. Never delete the lock file.
+- Before FAST/FULL discovery, a read-only path check verifies the container Git pointer, known metadata/published-kernel/historical fixtures and the physically in-checkout compile-cache fixture path. External data links are allowed; missing/dangling fixtures or an escaped cache path refuse before the long suite. This is a small path smoke check, not complete dataset/hash verification. It never creates or repairs links. Focused checks can test fixture setup without needing all long-suite fixtures.
 - `required_test_level.py` is read-only (no fetch). It compares `merge-base(origin/yx, HEAD)` to HEAD, plus staged, unstaged and untracked files, ~~and prints `TESTS: FAST|FULL` and `GOLDEN: REQUIRED|NOT REQUIRED` with the matched paths. If it cannot read the changes, it prints FULL and REQUIRED.~~ Since `72f51b5` (2026-10-21) it prints two lines: `TESTS: NONE|FAST|FULL` with the matched paths, then `Before a G4 launch: always FULL tests.` If it cannot read the changes, it prints FULL.
 
 ## Rule
@@ -76,7 +78,7 @@ Rules: `tests/archive/` has no `__init__.py`, so neither level discovers it. Act
 
 Measured after the trim: full 407 run, 0 skipped, 490.4 s; fast 378 run, 29 skipped, 147.5 s; golden ALL EQUAL.
 
-Not done (user): 9 small frozen-notebook and old-metric tests stay in fast (moving them saves about 0.1 s). ~~Next (paused): retire the legacy-512 evaluation (`--test-suite legacy-512`), which keeps about 30 more tests alive; design first.~~ Done 2026-10-21 (`3c3dc39`, [legacy-512 retirement](legacy-512-retirement.md)): 407 to 370 tests; fast 341 run + 29 skipped, 142.4 s; full 473.8 s. Test gap: ideas board #14.
+Not done (user): 9 small frozen-notebook and old-metric tests stay in fast (moving them saves about 0.1 s). ~~Next (paused): retire the legacy-512 evaluation (`--test-suite legacy-512`), which keeps about 30 more tests alive; design first.~~ Done 2026-10-21 (`3c3dc39`, [legacy-512 retirement](../archive/legacy-512-retirement.md)): 407 to 370 tests; fast 341 run + 29 skipped, 142.4 s; full 473.8 s. Test gap: ideas board #14.
 
 ## Golden retired, constants list added (2026-10-21, `72f51b5`, user)
 
@@ -84,3 +86,11 @@ The user decided that strict before/after enforcement does not suit a project th
 
 Measured: full 360 run, 474.9 s; fast 331 run + 29 skipped, 141.6 s. No full-only rule depended on the golden, so the levels select the same tests as before.
 
+## 2026-10-26: replays to FULL, clean-FULL evidence (`e1add75`)
+
+From the process audit (user approved B1 + B3). Before: FAST 640.3 s (561 run, 31 skipped; saved run on an earlier revision); FULL about 16 min (569 run, 970.7 s).
+
+- **B1:** FAST also skips four historical multiworker replay methods (unpaired loader replay, curriculum first-seven-epochs replay, legacy run 10/11 replay, B36 full-panel worker replay). They still run in FULL and in focused runs. A change to their listed direct inputs (`REPLAY_FULL_FILES`, `tests/fixtures/`, the #11 recipe folder in `scripts/required_test_level.py`) requires FULL. After: one serial FAST 280.5 s (592 total, 35 skipped), about 6 min shorter. Times are observations, not limits.
+- **B3:** a complete FULL that passes on a checkout clean at start and end writes local evidence keyed by the HEAD tree, the SHA-256 of the `REQUIRED_FIXTURES` files and the Python / torch versions. When the key matches, `required_test_level.py` prints `FAST satisfied by matching FULL evidence`. FAST and focused runs never write it; FULL evidence never removes a FULL requirement. A FULL before a G4 launch is still required.
+- **B2** (`91f1bf8`): all suites go through `scripts/test_cpu.py` (one container-wide lock; see the list above).
+- **2026-10-29:** historical source tests use real pinned-source fixtures rather than requiring future runtime files to equal old approved bytes. `tests/frozen_sources.py` and `cvdl/gapcov_provenance.py` are FULL dependencies because the full-only panel replay uses them. Live historical inference/decision commands still refuse extended source; [source-version policy](plan-run21-cell-heatmap.md).
