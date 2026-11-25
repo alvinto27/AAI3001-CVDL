@@ -4,7 +4,7 @@
 
 The README is the report (rubric: dataset, model development, deployment, UI, scalability). V3c baseline `g4-prime-1` re-scored on the frozen suites (eval `29fb97d0c311a0eca3b1`; calibration entry 16, `MAPPING_SHA` `6ab71f35...cf7c`): standard P_E 4.05% vs shipped run 22 2.54% (−1.50 points [−1.90, −1.12]); hard k=1 low AUC .627 vs .798. Full model-history ladder in the [2026-11-25 journal](journal/2026-11-25/README.md). Deployment optimization: the `pipeline` branch now serves run 22 with ONNX Runtime FP32 (`da70753`): same decisions as PyTorch on the full frozen test, 1.7–2.3× faster per photo, image 1.14 GB → 329 MB; INT8 rejected (standard P_E +3.24 points). `pipeline` is merged into `app` (`73fa326`). Branch `report` (`app` + `yx`) holds the [README report](../README.md) in paper form, with figures in `figures/report/`; the old README is now the [development guide](development.md). Cloud demo **live** at <https://gcp-aai3001.taild62d21.ts.net> (team VM, run 22 on the L4 GPU: 0/50 verdict changes vs ONNX CPU, 0.27 s per 2–3 MP photo; ONNX CPU fallback; Tailscale Funnel; [runbook](active/deploy-gcp-funnel.md)). VM switched to standard provisioning (no 12 h stop). Next: cleanup, merge to `main`.
 
-Repo cleanup (2026-11-25): ladder-run summaries tracked under `runs/` ([list](../runs/README.md#report-runs-summaries-tracked)); 12 finished plans moved to `archive/`. Next: merge `report` into `main` after a trial merge.
+Repo cleanup (2026-11-25): ladder-run summaries tracked under `runs/` ([list](../runs/README.md#report-runs-summaries-tracked)); 12 finished plans moved to `archive/`. `report` merged into `main` (`ba30013`); `main` is the submission branch.
 
 ## Run 22 shipped — submission model (user, 2026-11-05)
 
