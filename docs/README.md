@@ -2,19 +2,19 @@
 
 This project tests stego detection on RAISE, DIV2K, ALASKA, and LSDIR. Training is finished. The [run queue](archive/run-queue.md) and the [ideas board](archive/ideas-board.md) are kept as records. Read [status](status.md) before acting, [findings](findings.md) for older run comparisons (512-era; see its note), and the [dated journal](journal/README.md) for the original records.
 
-The project report is the [root README](../README.md). Its figures are in `figures/report/` (rebuilt by `scripts/build_report_figures.py`, except the UI screenshots). The former root README (environment setup, notebooks, Spot VM training) is now the [development guide](development.md).
+The project report is the [root README](../README.md). Its figures are in `figures/report/` (rebuilt by `scripts/build_report_figures.py`, except the UI screenshots). The former root README (environment setup, notebooks, VM training) is now the [development guide](development.md).
 
 ## Current references (`active/` means kept for use, not permission to run)
 Plans that scripts read by path (`plan-run21-cell-heatmap`, `plan-curriculum50`, `plan-paired-training`, `plan-architecture-tests`, `legacy-wide-r2-migration`) stay in `active/`, because the decision scripts and tests fingerprint them.
 
 - [Run21 trained heatmap / run22 — implementation, launch and collection record](active/plan-run21-cell-heatmap.md)
-- [Run22 LAST evaluation — standard errors worse, hard ranking better, no clear primary localization gain; photos/adoption pending (2026-10-29)](active/plan-run21-cell-heatmap.md#run22--detector-and-trained-head-evaluation-complete)
+- [Run22 LAST evaluation — standard errors worse, hard ranking better, no clear primary localization gain (2026-10-29); adopted as the submission model 2026-11-05](active/plan-run21-cell-heatmap.md#run22--detector-and-trained-head-evaluation-complete)
 - [50-epoch low-bpp curriculum from scratch (ideas #17) — approved plan (2026-10-22)](active/plan-curriculum50.md)
 - [Paired training (ideas #16): R1 SRM-e50 paired, R2 cell model paired — approved plan (2026-10-22)](active/plan-paired-training.md)
 - [Cloud deployment: GCP VM + Tailscale Funnel — live demo layout, checks and runbook (2026-11-25)](active/deploy-gcp-funnel.md)
 - [Test levels and the changed-path rule — fast/full/none tests; golden retired 2026-10-21 (built `891aefe`, 2026-10-20)](active/test-levels.md)
 - [Wide-R2 legacy settings migration — saved evidence and limits](active/legacy-wide-r2-migration.md)
-- [Architecture tests: delayed pooling and GBRAS-Net (idea 10) — approved 2026-10-19; arm A no gain, arm G waits for the user](active/plan-architecture-tests.md)
+- [Architecture tests: delayed pooling and GBRAS-Net (idea 10) — approved 2026-10-19; arm A no gain; arm G not run (on hold since 2026-10-21, closed at submission)](active/plan-architecture-tests.md)
 - [Settings and seed rules](active/settings-and-seeds.md)
 - [Frozen RAISE/DIV2K records](active/frozen-source-records.md)
 - [ALASKA selection v2](active/alaska-selection-v2.md)
