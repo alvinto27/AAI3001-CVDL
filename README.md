@@ -175,7 +175,7 @@ flowchart LR
 - **SRM filters** [[5](#ref-5), [6](#ref-6)] remove image content and keep the noise, where the message is.
 - **Covariance pooling** [[7](#ref-7), [8](#ref-8)] keeps how feature channels vary *together*, not only their averages. It was the most effective architecture change ([§4.2](#42-what-made-the-difference)).
 - **The cell head** (this work) is trained on the generator's changed-cell targets, so the heatmap learns *where* the message is. It adds only 257 parameters.
-- **No normalisation layers.** Both common choices let a message in one place change scores elsewhere, which a heatmap cannot allow (details below).
+- **No normalisation layers.** BatchNorm made a tile's training-time score depend on the rest of its batch, and GroupNorm let a message in one place change scores elsewhere, which a heatmap cannot allow (details below).
 
 <details>
 <summary><b>Details:</b> layers and design choices</summary>
@@ -194,7 +194,7 @@ flowchart LR
 
 - *Fixed SRM front end* [[5](#ref-5), [6](#ref-6)]. Clipping at ±3 (pixel units) stops strong edges from dominating. A *trainable* SRM bank (run 20) did worse (3.34% vs 2.55%).
 - *XuNet body, 4× wider, without normalisation* [[9](#ref-9)]. The absolute-value and tanh layers keep the sign symmetry of ±1 changes. Widening the 1×1 layers gave more capacity at almost no cost in speed.
-- *Why normalisation was removed.* Normalisation layers rescale features with statistics computed over many positions, so a local change can move the output elsewhere. We measured this for both standard choices. With BatchNorm, a tile's score depended on the other tiles in its batch: in training mode, a batch of only clean tiles was classified correctly only 1.7–2.2% of the time. GroupNorm removed the batch dependence, but its statistics span the whole feature map: a message in one region shifted the scores of unchanged cells in the same normalised region (mean absolute cell-score shift 0.6–11.7, maximum 140). After the normalisation was removed, scores outside the changed regions did not move in 36 of 36 probe cases, and scoring a photo in parts or whole differed by at most 0.00064. A heatmap must leave clean regions unaffected by a message elsewhere, so the final network has no normalisation layers.
+- *Why normalisation was removed.* Normalisation layers rescale features with statistics computed over many positions. We measured the effect of both standard choices. With BatchNorm, a tile's score depended on the other tiles in its batch: in training mode, a batch of only clean tiles was classified correctly only 1.7–2.2% of the time. (In evaluation mode BatchNorm uses fixed running statistics, so this is a training problem.) GroupNorm removed the batch dependence, but its statistics span the whole feature map: a message in one region shifted the scores of unchanged cells in the same normalised region (mean absolute cell-score shift 0.6–11.7, maximum 140). After the normalisation was removed, scores outside the changed regions did not move in 36 of 36 probe cases, and scoring a photo in parts or whole differed by at most 0.00064. A heatmap must leave clean regions unaffected by a message elsewhere, so the final network has no normalisation layers. This was a choice for the heatmap; it does not show that normalisation cannot help tile classification.
 - *Covariance pooling* [[7](#ref-7), [8](#ref-8)]. Our independent implementation is in [`cvdl/cov_pool.py`](cvdl/cov_pool.py).
 - *Cell head*. It shares the body with the tile classifier, so the heatmap adds almost no computation.
 
@@ -302,7 +302,7 @@ The service ([`cvdl/photo_inference.py`](cvdl/photo_inference.py)) works in five
 | ALASKA, seen cameras | 17.62% | Noisy phone photos |
 
 - k=1 (one changed bit per value) is the hardest case: P_E 4.79% on the standard set, against 1.5–2.0% for k=2–4.
-- A 1-bit, low-payload message in a *noisy* phone photo is close to undetectable (AUC .53–.55). The sensor noise is larger than the message.
+- A 1-bit, low-payload message in a *noisy* phone photo is close to chance for the CNN (AUC .53–.55). The noise is not the whole explanation: a classical statistic still finds a weak signal in this condition for scattered replacement ([§4.5](#45-diagnostic-findings)).
 
 <details>
 <summary><b>Details:</b> full tables</summary>
@@ -362,7 +362,7 @@ The primary hard measure is k=1 at low bpp, pooled over ALASKA seen, ALASKA unse
 - Covariance pooling was the most effective architecture change: hard AUC +.029 and standard P_E −0.40 points.
 - Run 22 gives up 0.39 points of standard P_E for a trained heatmap and a higher hard AUC. It was selected because localisation is one of the two aims of this work ([§4.3](#43-localisation-does-the-heatmap-point-to-the-message)), and because it is the first model whose photo rule met both pre-set criteria ([§4.4](#44-whole-photo-verdict)).
 - The ladder is not a one-change-at-a-time ablation: some steps changed several settings together (the first step changed width, normalisation and the k range). The course-style baseline also trained for fewer epochs, on fewer photo collections. The total gain is therefore a gain of the whole system, not of the architecture alone.
-- Changes that did not help (standard P_E on the same tests): delayed pooling 3.43%; colour-separated first layer 3.66%; trainable SRM 3.34%; a low-payload curriculum 3.10%; a harder data mix 3.10%; trim or pad tiling instead of overlap 4.82–6.53%.
+- Changes that did not help (standard P_E on the same tests; each was tested in one form only, see [§8](#8-limitations)): delayed pooling 3.43%; colour-separated first layer 3.66%; trainable SRM 3.34%; a low-payload curriculum 3.10%; a harder data mix 3.10%; trim or pad tiling instead of overlap 4.82–6.53%.
 
 </details>
 
@@ -586,9 +586,10 @@ The result screen for a stego photo is at the top of this page. A clean photo ge
 
 ## 8. Limitations
 
-- **Noisy phone photos:** 1-bit, low-payload messages are close to undetectable (AUC .53–.55).
+- **Noisy phone photos:** 1-bit, low-payload messages are close to chance for the CNN (AUC .53–.55), although a classical statistic still finds a weak signal there for scattered replacement (AUC .575 against .510 for an earlier CNN, [§4.5](#45-diagnostic-findings)).
 - **Unseen collections:** false alarms are higher, 13.3% at tile level on DIV2K.
 - **Detection, not extraction:** the tool reports *whether* and *where*, not the message content.
+- **Narrow negative results:** the changes that did not help each reject only the version tested. Removing the first two pooling layers also shrank the area each output sees, from 48×48 to 20×20 px, so it did not test larger receptive fields. Trainable SRM filters were unconstrained (no high-pass constraint, the network's learning rate, residuals still clipped at ±3). The colour-separated first layer also changed width and parameter count. The tanh-saturation idea was set aside after an observational comparison with a different network, not a controlled test. The max/top-k pooling test swapped the pooling at inference only.
 - **Single runs:** each recipe was trained once, with one seed. One repeat differed by 0.48 points; this is a single observation, not an estimate of the variance.
 - **Test-set reuse:** the frozen test sets were never used for training or for cut-offs, but their results guided later design choices. They are not an untouched final confirmation set.
 - **Validation differences:** older models chose their checkpoints with their own validation data (some at 512 px) and were given new 256 px cut-offs afterwards. Their validation photo mix also differed.
@@ -603,7 +604,8 @@ This work presented an end-to-end system for colour LSB steganalysis: a labelled
 
 Future work follows from these results:
 
-- **Parity-aware input.** WS detects scattered replacement better than the CNN ([§4.5](#45-diagnostic-findings)). An extra fixed input, the SRM residual multiplied by the parity of each pixel value, would give the CNN the same information.
+- **Parity-aware input.** WS detects scattered replacement better than the CNN ([§4.5](#45-diagnostic-findings)). An extra fixed input, the SRM residual multiplied by the parity of each pixel value, would give the CNN this parity information directly. Whether the current residual input already carries enough of it is not established.
+- **Controlled versions of the narrow negative tests:** keep early resolution while restoring the receptive field (more spatial layers or dilation); test the activation and the ±3 residual clip directly (for example a scaled tanh); constrain learnable filters to stay high-pass, with their own learning rate.
 - **Detectors for LSB matching.** The classical statistics see no signal in matching, so matching needs CNN-specific evidence and its own diagnostics.
 - **Better localisation of scattered messages**, where the heatmap finds only 11% of changed cells.
 - **Multiple training seeds**, to check whether the measured differences survive training variability.
