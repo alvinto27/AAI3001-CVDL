@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 400" role="img" aria-labelledby="title desc">
+  <title id="title">Run 22 architecture</title>
+  <desc id="desc">A 3 by 256 by 256 RGB tile passes through a fixed SRM filter bank and a seven-layer wide XuNet. From the shared 256 by 8 by 8 feature map, global average and covariance pooling feed a 784-input clean or stego classifier. A separate one-by-one convolution produces an eight-by-eight localisation heatmap.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L8 4 L0 8 Z" fill="#c1cbc8"/>
+    </marker>
+    <pattern id="cells" width="8" height="8" patternUnits="userSpaceOnUse">
+      <rect width="8" height="8" fill="none" stroke="#2c302e" stroke-width="1.3"/>
+    </pattern>
+    <style>
+      text { fill: #f7f3e4; font-family: "Segoe UI", Arial, sans-serif; font-size: 19px; text-anchor: middle; }
+      .name { font-weight: 600; font-size: 22px; }
+      .detail { fill: #d8dfd8; }
+      .wire { fill: none; stroke: #c1cbc8; stroke-width: 2; stroke-linejoin: round; }
+      .box { stroke-width: 1.8; }
+      .fixed { fill: #242b2c; stroke: #8494aa; }
+      .shared { fill: #252936; stroke: #7491ff; }
+      .pool { fill: #202f2c; stroke: #5eaf9e; }
+      .cell { fill: #302b25; stroke: #e69945; }
+    </style>
+  </defs>
+  <!-- Shared trunk, three readouts, and the join of the two pooling paths. -->
+  <g class="wire" marker-end="url(#arrow)">
+    <path d="M178 61 V77"/><path d="M178 155 V171"/><path d="M178 260 V280"/>
+    <path d="M386 62 H440"/><path d="M386 178 H440"/><path d="M355 321 H440"/>
+    <path d="M788 120 H853"/><path d="M723 321 H853"/>
+  </g>
+  <g class="wire">
+    <path d="M386 321 V62"/>
+    <path d="M723 62 H788 V178 H723"/>
+  </g>
+  <g fill="#c1cbc8"><circle cx="386" cy="321" r="3.5"/><circle cx="386" cy="178" r="3.5"/><circle cx="788" cy="120" r="3.5"/></g>
+
+  <rect class="box fixed" x="2" y="2" width="352" height="58" rx="9"/>
+  <text class="name" x="178" y="28">RGB input tile</text>
+  <text class="detail" x="178" y="51">3 × 256 × 256</text>
+  <rect class="box fixed" x="2" y="79" width="352" height="75" rx="9"/>
+  <text class="name" x="178" y="103">Fixed SRM filter bank</text>
+  <text class="detail" x="178" y="127">30 filters × 3 colours</text>
+  <text class="detail" x="178" y="148">90 residual maps · clip to ±3</text>
+  <rect class="box shared" x="2" y="173" width="352" height="86" rx="9"/>
+  <text class="name" x="178" y="200">Wide XuNet backbone</text>
+  <text class="detail" x="178" y="225">7 convolutional layers</text>
+  <text class="detail" x="178" y="248">No normalisation layers</text>
+  <rect class="box shared" x="2" y="282" width="352" height="78" rx="9"/>
+  <text class="name" x="178" y="315">Shared feature map</text>
+  <text class="detail" x="178" y="342">256 × 8 × 8</text>
+
+  <rect class="box pool" x="443" y="23" width="279" height="78" rx="9"/>
+  <text class="name" x="582" y="56">Global average</text>
+  <text class="detail" x="582" y="83">256 features</text>
+  <rect class="box pool" x="443" y="139" width="279" height="78" rx="9"/>
+  <text class="name" x="582" y="172">Covariance pooling</text>
+  <text class="detail" x="582" y="199">528 features</text>
+  <rect class="box cell" x="443" y="282" width="279" height="78" rx="9"/>
+  <text class="name" x="582" y="315">1 × 1 convolution</text>
+  <text class="detail" x="582" y="342">Cell head</text>
+
+  <rect class="box pool" x="856" y="66" width="313" height="108" rx="9"/>
+  <text class="name" x="1012" y="97">Linear classifier</text>
+  <text class="detail" x="1012" y="124">784 features → 2 classes</text>
+  <text x="1012" y="153">Clean / Stego</text>
+  <g transform="translate(856 289)">
+    <rect width="64" height="64" fill="#3c352b"/>
+    <path d="M8 24 H48 V56 H8 Z" fill="#6a4c2f"/>
+    <path d="M16 24 H40 V48 H16 Z" fill="#9c682f"/>
+    <path d="M24 32 H40 V40 H24 Z" fill="#e39841"/>
+    <rect width="64" height="64" fill="url(#cells)"/>
+  </g>
+  <text class="name" x="1050" y="317">8 × 8 heatmap</text>
+  <text class="detail" x="1050" y="344">One 32 px cell per score</text>
+</svg>

@@ -1,0 +1,72 @@
+Finding hidden messages in photographs
+AAI3001 presentation script · approximately 8–9 minutes with pauses
+Bracketed cues are for the presenter.
+
+Slide 1 · Finding hidden messages in photographs
+[Give the audience a moment to look at the butterfly.]
+
+Take a look at the butterfly’s wings. We have two copies of this photograph. The one on screen is clean. The other carries an 86-kilobyte message, and it looks just like this one. Could we tell which copy carries the message? And if we flagged it, could we show someone where to look? We’ll come back to the butterfly once we’ve seen how the detector works.
+
+Slide 2 · One intensity step can carry a bit
+[Point to the last digit in each row.]
+
+These two numbers are the brightness of one colour channel in a pixel. In the first row it’s 146. Changing the last binary digit from zero to one makes it 147. That last digit is the least significant bit, or LSB. One step is practically invisible. Across a patch of pixels, though, those changes can alter the pattern of local noise. That’s the signal we trained our network to recognise.
+
+Slide 3 · 31,100 source photos, split by photo
+
+To teach the network what changed, we started with 31,100 photographs from four collections. We took a clean tile, embedded a message in a copy, and kept a record of where the pixels changed. That gave us two views of the same scene and a known location for the message.
+
+We kept every tile from the same photograph in one split. Otherwise, the model could see part of a scene during training and another part during testing. We also held out all of DIV2K and eight ALASKA camera models to see how well the detector travelled to unfamiliar images.
+
+Slide 4 · One network answers “whether” and “where”
+[Trace the left column down to the shared feature map, then follow the green and orange branches.]
+
+We feed in a 256-by-256-pixel tile at its original resolution. Fixed high-pass filters suppress much of the visible scene and bring out differences between neighbouring pixels. A convolutional network called XuNet learns patterns in those differences.
+
+Follow the two green paths. One summarises each feature channel with its average. The other measures how channels vary together. Together they give the classifier 784 features to decide whether a tile is clean or carries a message. Now follow the orange path. It keeps the eight-by-eight grid and scores each cell separately. That gives us a location we can show on the photograph.
+
+Slide 5 · Three questions need three tests
+
+Before looking at the numbers, keep the unit of each test in mind. For detection, we scored 10,944 pairs of clean and embedded tiles. For location, we asked whether changed cells scored higher than unchanged cells within the same tile. For the final verdict, we tested 576 whole photos, each in its clean form and with twelve message variants. We chose the decision thresholds on separate validation data before scoring these tests.
+
+Slide 6 · Tile error varies by image source
+[Point first to 2.54%, then to the RAISE and ALASKA bars.]
+
+Our standard tile error was 2.54%. That’s balanced error, the average of the false-alarm rate and the miss rate. The bars show why the source matters. Error was 1.76% on RAISE but nearly 18% on the seen-camera ALASKA panel. The standard benchmark contains many more RAISE tiles than DIV2K tiles. So if we expect uploads from a range of cameras, we need to look beyond that headline score.
+
+Slide 7 · Moving to 256 px tiles cut error the most
+[Point to the zero line, then the top dot.]
+
+Each dot compares one model with its predecessor. A move to the left means error went down. The biggest drop came when we reduced training tiles from 512 to 256 pixels, matching the test size. Error fell by 2.17 percentage points. The whiskers show the uncertainty in each change when we resample the test photos. The bottom dot sits to the right of zero. Adding the heatmap head actually cost us some standard tile accuracy. So why did we keep it?
+
+Slide 8 · Which model would you deploy?
+[Follow the run 21 and run 22 rows across the three plots.]
+
+If we chose on standard tile error alone, we’d pick run 21 at 2.15%. But our tool also needs to handle small messages and show an analyst where to look. In the right-hand plot, higher AUC means the model more often ranks a tile carrying a message above a clean one. Run 22 had the highest AUC of these three models on low-payload messages. It also gave us a trained heatmap and met both of our whole-photo targets. That’s the model we shipped.
+
+Slide 9 · Noise can push detection close to chance
+[On the “ALASKA seen” row, move from the white circle to the yellow diamond.]
+
+Here we kept the payload small and looked at what happens on particularly noisy tiles. On cameras we’d seen during training, AUC fell from 0.730 across low-payload tiles to 0.535 on the noisy subset. See how close the diamond is to the dashed line? That line is 0.50, where ranking is equivalent to chance. Even a familiar camera can produce enough noise to hide the signal.
+
+Slide 10 · The heatmap follows the embedded band
+[Pause on the left image, then point to the middle and right panels.]
+
+Here’s the butterfly again, this time carrying the message. The white band in the middle panel shows where we embedded it. The orange cells on the right are the model’s prediction. They follow the band across the wings, with a few isolated flags elsewhere. The photo score rose from 0.01 on the clean copy to 0.84 on this one. Across 128 test tiles with contiguous messages, the mean within-tile AUC was 0.864. That measures how well we located the changes.
+
+Slide 11 · Combining tiles and cells cut photo misses
+[Compare the orange miss-rate bars in the top and bottom groups.]
+
+How do we turn dozens of tile scores into one decision about a photo? Counting flagged tiles alone missed about two out of every three photos carrying a message. A narrow band like the one on the butterfly helps explain why a cluster of neighbouring cells can be useful evidence. When we combined tile scores with cell evidence, the miss rate fell to 10.2%. The trade-off was more false alarms, rising from 2.4% to 5.6% of clean photos.
+
+Slide 12 · From an upload to regions for review
+
+This is what an analyst sees after uploading the butterfly. They can inspect the flagged regions, adjust the overlay and export the heatmap. We also checked what happened when we changed the inference engine. On CPU, the ONNX version matched all 21,888 standard tile decisions from PyTorch and ran faster. On the cloud GPU, a two-to-three-megapixel image took about a quarter of a second of server time. That makes it practical to inspect a result during a review.
+
+Slide 13 · A flag gives an analyst somewhere to look
+
+Think back to the first slide. We couldn’t see a message in those wings. The most useful thing our system gave us was a specific band of pixels to inspect, along with a score we could put in context. Our results also tell us when to be cautious, especially with tiny messages in noisy photos. Next, we’d train on a wider range of sources, check calibration across cameras and evaluate a separate detector for JPEG-domain embedding.
+
+Slide 14 · References
+
+These are the papers and photo collections we built on. The links below lead to our full bibliography and the measurements for all ten models. Thank you. We’re happy to take questions.

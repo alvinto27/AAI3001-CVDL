@@ -73,19 +73,12 @@
       <div class="sheet">
         <p class="kicker">Method <span>/</span> Run 22</p>
         <h2>One network answers “whether” and “where”</h2>
-        <div class="network">
-          <div class="stage"><small>Input</small><h3>RGB tile</h3><p>256 × 256 pixels at original resolution</p></div>
-          <i aria-hidden="true">→</i>
-          <div class="stage"><small>Residuals</small><h3>SRM filters</h3><p>30 fixed filters per colour produce 90 noise maps</p></div>
-          <i aria-hidden="true">→</i>
-          <div class="stage"><small>Shared features</small><h3>Wide XuNet</h3><p>An 8 × 8 grid with 256 feature channels</p></div>
-          <i aria-hidden="true">→</i>
-          <div class="heads"><div><small>Tile score</small><p>Average and covariance pooling</p></div><div><small>Heatmap</small><p>One score per 32 × 32 px cell</p></div></div>
-        </div>
-        <p class="annotation">Run 21 learned to classify paired tiles. Run 22 added 15 epochs of joint training on tile labels and changed-cell masks.</p>
-        <p class="foot">638,611 trainable parameters</p>
+        <figure class="architecture">
+          <img src="charts/run22-architecture.svg" alt="A fixed SRM bank filters the RGB tile. Seven XuNet layers produce a shared 256 × 8 × 8 feature map. Global average pooling and covariance pooling supply 256 and 528 features to the clean/stego classifier. A 1 × 1 cell head predicts the 8 × 8 heatmap.">
+        </figure>
+        <p class="foot">Two supervised outputs from one backbone · 638,611 trainable parameters</p>
       </div>
-      <aside class="notes">SRM stands for Spatial Rich Model. The high-pass filters suppress much of the scene content. Covariance pooling captures how feature channels vary together. Run 21 trained for 50 epochs, and run 22 started from its best checkpoint. Its loss combines tile cross-entropy with 0.2 times the cell binary cross-entropy.</aside>
+      <aside class="notes">Follow the left column down to the shared feature map. The two green paths pool 256 averages and 528 covariance features, which the linear classifier uses together. The orange cell head keeps the spatial grid to predict the location. The illustrated heatmap is schematic. Run 21 trained for 50 epochs on tile labels. Run 22 started from its best checkpoint and trained for another 15 epochs on tile labels and changed-cell masks.</aside>
     </section>
 
     <section id="evaluation">

@@ -103,14 +103,8 @@ figcaption { margin-top: 12px; }
 .lsdir { --x: 1115; --y: 131; }
 .specimens figcaption { color: var(--ink); font-size: 24px; }
 .specimens figcaption span { color: var(--muted); }
-.network { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1.12fr; gap: 14px; align-items: center; margin: auto 0; }
-.network small { display: block; color: var(--accent); margin-bottom: 14px; }
-.stage { border-top: 2px solid var(--rule); padding-top: 16px; min-height: 178px; }
-.stage p, .heads p { font-size: 24px; color: var(--muted); }
-.network i { font: 30px Georgia, serif; color: var(--accent); }
-.heads { border-left: 2px solid var(--accent); padding-left: 20px; }
-.heads div + div { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 18px; }
-.heads small { margin-bottom: 4px; }
+.architecture { margin: auto 0; }
+.architecture img { display: block; width: 100%; height: auto; }
 .reveal .annotation { font-size: 26px; padding: 16px 0 16px 22px; border-left: 4px solid var(--accent); margin: 22px 0 32px; max-width: 1140px; }
 
 .reveal table { width: 100%; font-size: 25px; border-collapse: collapse; }
