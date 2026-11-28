@@ -1,4 +1,4 @@
-# Project status — 2026-11-25
+# Project status — 2026-11-28
 
 ## Current state
 
@@ -11,6 +11,7 @@
 | Cloud deployment | Live demo <https://gcp-aai3001.taild62d21.ts.net> while the VM runs: PyTorch on the L4 GPU, ONNX CPU fallback, Tailscale Funnel. The VM uses standard provisioning. [Runbook](active/deploy-gcp-funnel.md). |
 | Training | Finished. No run is running or approved. |
 | Tests | Last FULL: 697 OK, 2 skipped (2026-11-25, docs move). Last FAST: 697 run, 35 skipped by the level (slide-deck merge). |
+| Findings | Corrected 2026-11-28 after a hypothesis audit: several negative results reject only the tested version ([corrections](findings.md#corrections-after-the-hypothesis-audit-2026-11-28), [journal](journal/2026-11-28/README.md)). |
 | Run records | Summaries of the baseline, run 21 and run 22 are tracked under `runs/` ([list](../runs/README.md#report-runs-summaries-tracked)). Checkpoints are outside git; the shipped weights are in the bundle. |
 
 ## Open items
